@@ -1,4 +1,4 @@
-const CACHE = "anytime-shell-v2";
+const CACHE = "anytime-shell-v3";
 const PRECACHE = [];
 
 self.addEventListener("install", (event) => {
