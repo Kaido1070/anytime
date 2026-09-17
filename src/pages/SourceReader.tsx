@@ -71,6 +71,14 @@ function ReaderChapter({
   const restoredRef = useRef(false);
   saveRef.current = saveProgress;
 
+  const selectedChapter = payload.item.chapters?.find(
+    (entry) => Number(entry.number) === Number(chapter),
+  );
+  const imageReferer =
+    payload.item.source === "teamx"
+      ? selectedChapter?.url || `${payload.item.url.replace(/\/$/, "")}/${chapter}`
+      : undefined;
+
   useLayoutEffect(() => {
     const previousRestoration = history.scrollRestoration;
     history.scrollRestoration = "manual";
@@ -146,37 +154,20 @@ function ReaderChapter({
       </header>
 
       <div className="reader-panels source-pages">
-        {payload.pages.map((page, index) => {
-          const meta = payload.pageMeta?.find((item) => item.url === page);
-          const hasCanvasRatio = Boolean(meta?.width && meta?.height);
-          const image = (
-            <img
-              src={sourceService.imageUrl(payload.item.source, page)}
-              alt={`${payload.item.title} - الفصل ${chapter} - صفحة ${index + 1}`}
-              loading={index < 2 ? "eager" : "lazy"}
-              fetchPriority={index === 0 ? "high" : "auto"}
-              onLoad={() => {
-                if (!restoredRef.current && index < 2) {
-                  window.dispatchEvent(new Event("resize"));
-                }
-              }}
-            />
-          );
-
-          if (hasCanvasRatio && meta?.width && meta?.height) {
-            return (
-              <div
-                className="source-page-frame"
-                key={`${index}:${page}`}
-                style={{ aspectRatio: `${meta.width} / ${meta.height}` }}
-              >
-                {image}
-              </div>
-            );
-          }
-
-          return <div key={`${index}:${page}`} className="source-page-natural">{image}</div>;
-        })}
+        {payload.pages.map((page, index) => (
+          <img
+            key={`${index}:${page}`}
+            src={sourceService.imageUrl(payload.item.source, page, imageReferer)}
+            alt={`${payload.item.title} - الفصل ${chapter} - صفحة ${index + 1}`}
+            loading={index < 2 ? "eager" : "lazy"}
+            fetchPriority={index === 0 ? "high" : "auto"}
+            onLoad={() => {
+              if (!restoredRef.current && index < 2) {
+                window.dispatchEvent(new Event("resize"));
+              }
+            }}
+          />
+        ))}
       </div>
 
       <footer className="reader-end">
