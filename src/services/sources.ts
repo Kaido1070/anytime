@@ -35,6 +35,22 @@ function originalImageUrl(source: SourceName, url: string) {
   return url.replace(/thumbnail_/gi, "");
 }
 
+function wordpressOriginalCover(url?: string) {
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete("w");
+    parsed.searchParams.delete("width");
+    parsed.searchParams.delete("h");
+    parsed.searchParams.delete("height");
+    parsed.searchParams.delete("resize");
+    parsed.pathname = parsed.pathname.replace(/-\d{2,4}x\d{2,4}(?=\.[a-z0-9]{2,5}$)/i, "");
+    return parsed.toString();
+  } catch {
+    return url.replace(/-\d{2,4}x\d{2,4}(?=\.[a-z0-9]{2,5}(?:\?|$))/i, "");
+  }
+}
+
 function uniqueCovers(values: Array<string | undefined>) {
   return values.filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index);
 }
@@ -81,8 +97,10 @@ export const sourceService = {
   },
 
   async coverCandidates(item: SourceManga) {
-    const fallback = uniqueCovers([item.cover]);
-    if (item.source !== "mangatime") return fallback;
+    const fallback = item.source === "3asq"
+      ? uniqueCovers([wordpressOriginalCover(item.cover), item.cover])
+      : uniqueCovers([item.cover]);
+    if (item.source !== "mangatime" && item.source !== "3asq") return fallback;
 
     const cached = coverRequests.get(item.key);
     if (cached) return cached;
