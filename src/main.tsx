@@ -3,6 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import { LibraryProvider } from "./hooks/useLibrary";
 import App from "./App";
 import "./styles.css";
+import "./mobile-fixes.css";
 const root =
   import.meta.hot?.data.root ?? createRoot(document.getElementById("root")!);
 if (import.meta.hot) import.meta.hot.data.root = root;
