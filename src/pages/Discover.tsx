@@ -24,7 +24,8 @@ type GenreId =
   | "isekai"
   | "system"
   | "school"
-  | "mystery";
+  | "mystery"
+  | "novel";
 
 type HasMoreBySource = Record<SourceName, boolean>;
 
@@ -47,6 +48,7 @@ const GENRES: { id: GenreId; label: string; aliases: string[] }[] = [
   { id: "system", label: "نظام", aliases: ["نظام", "system"] },
   { id: "school", label: "مدرسي", aliases: ["مدرسي", "مدرسة", "school", "school life"] },
   { id: "mystery", label: "غموض", aliases: ["غموض", "mystery"] },
+  { id: "novel", label: "روايات", aliases: ["روايات", "رواية", "رواية ويب", "novel", "web novel", "light novel"] },
 ];
 
 function normalize(value: string) {
