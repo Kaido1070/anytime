@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 import { SectionTitle, Progress, Icon } from "../components/UI";
 import { SourceCard } from "../components/SourceCard";
+import { mergeSourceItems, type SourceGroup } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
 
 export function Home() {
   const { user, data, friends } = useLibrary();
   const [sourceItems, setSourceItems] = useState<Record<string, SourceManga>>({});
-  const [latest, setLatest] = useState<SourceManga[]>([]);
+  const [latest, setLatest] = useState<SourceGroup[]>([]);
 
   const sourceKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -51,13 +52,13 @@ export function Home() {
       if (!active) return;
       const mangaTime = results[0].status === "fulfilled" ? results[0].value.items : [];
       const teamX = results[1].status === "fulfilled" ? results[1].value.items : [];
-      const merged: SourceManga[] = [];
+      const interleaved: SourceManga[] = [];
       const max = Math.max(mangaTime.length, teamX.length);
-      for (let i = 0; i < max && merged.length < 4; i += 1) {
-        if (mangaTime[i]) merged.push(mangaTime[i]);
-        if (teamX[i] && merged.length < 4) merged.push(teamX[i]);
+      for (let i = 0; i < max; i += 1) {
+        if (mangaTime[i]) interleaved.push(mangaTime[i]);
+        if (teamX[i]) interleaved.push(teamX[i]);
       }
-      setLatest(merged);
+      setLatest(mergeSourceItems(interleaved).slice(0, 4));
     });
     return () => {
       active = false;
@@ -68,11 +69,11 @@ export function Home() {
   const current = last && sourceService.isSourceKey(last.mangaId) ? sourceItems[last.mangaId] : null;
   const chapter = current && last ? last.chapter : 0;
   const percent = current ? data?.progress[`${current.key}:${chapter}`]?.percent ?? 0 : 0;
-  const favorites = (data?.favorites ?? [])
+  const favoriteItems = (data?.favorites ?? [])
     .filter((id) => sourceService.isSourceKey(id))
     .map((id) => sourceItems[id])
-    .filter(Boolean)
-    .slice(0, 4);
+    .filter((item): item is SourceManga => Boolean(item));
+  const favoriteGroups = mergeSourceItems(favoriteItems).slice(0, 4);
 
   return (
     <>
@@ -125,8 +126,8 @@ export function Home() {
         <SectionTitle title="آخر التحديثات" to="/discover" label="استكشف" />
         {latest.length ? (
           <div className="cover-grid home-grid source-grid">
-            {latest.map((item) => (
-              <SourceCard key={item.key} item={item} />
+            {latest.map((group) => (
+              <SourceCard key={group.id} item={group.primary} sources={group.items} />
             ))}
           </div>
         ) : (
@@ -143,11 +144,11 @@ export function Home() {
       <section>
         <SectionTitle title="مفضلتك" to="/favorites" label="عرض الكل" />
         <div className="cover-grid home-grid">
-          {favorites.map((item) => (
-            <SourceCard key={item.key} item={item} />
+          {favoriteGroups.map((group) => (
+            <SourceCard key={group.id} item={group.primary} sources={group.items} />
           ))}
         </div>
-        {!favorites.length && (
+        {!favoriteGroups.length && (
           <p className="empty">أضف الأعمال اللي تحبها من المصادر عشان تظهر هنا.</p>
         )}
       </section>

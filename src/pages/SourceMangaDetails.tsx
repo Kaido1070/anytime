@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
+import { parseSourceGroupKeys, sourceDetailsPath } from "../services/sourceMerge";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
@@ -19,10 +20,15 @@ function statusLabel(status?: string) {
 
 export function SourceMangaDetails() {
   const { key = "" } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const sourceKey = decodeURIComponent(key);
+  const sourceGroupParam = searchParams.get("sources");
+  const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
+  const requestedSourceSignature = requestedSourceKeys.join("|");
   const { data, favorite } = useLibrary();
   const [item, setItem] = useState<SourceManga | null>(null);
+  const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [ascending, setAscending] = useState(false);
@@ -40,6 +46,19 @@ export function SourceMangaDetails() {
     return () => { active = false; };
   }, [sourceKey]);
 
+  useEffect(() => {
+    let active = true;
+    if (requestedSourceKeys.length <= 1) {
+      setSourceOptions([]);
+      return;
+    }
+    sourceService
+      .resolve(requestedSourceKeys)
+      .then((resolved) => active && setSourceOptions(resolved))
+      .catch(() => active && setSourceOptions([]));
+    return () => { active = false; };
+  }, [requestedSourceSignature]);
+
   const saved = useMemo(() => Object.values(data?.progress ?? {})
     .filter((progress) => progress.mangaId === sourceKey)
     .sort((a, b) => b.updatedAt - a.updatedAt)[0], [data?.progress, sourceKey]);
@@ -47,6 +66,11 @@ export function SourceMangaDetails() {
   if (loading) return <><Back to="/discover" /><p className="empty">جاري تحميل العمل والفصول من المصدر…</p></>;
   if (!item || error) return <><Back to="/discover" /><h1>تعذر فتح العمل</h1><p className="error source-error">{error || "العمل غير موجود في المصدر."}</p></>;
 
+  const optionMap = new Map(sourceOptions.map((entry) => [entry.key, entry]));
+  optionMap.set(item.key, item);
+  const sourceChoices = requestedSourceKeys
+    .map((entryKey) => optionMap.get(entryKey))
+    .filter((entry): entry is SourceManga => Boolean(entry));
   const chapters = item.chapters ?? [];
   const orderedChapters = [...chapters].sort((a, b) => ascending ? a.number - b.number : b.number - a.number);
   const firstChapter = [...chapters].sort((a, b) => a.number - b.number)[0]?.number;
@@ -75,6 +99,24 @@ export function SourceMangaDetails() {
         <div>
           <p className="eyebrow">{sourceService.sourceLabel(item.source)} · {statusLabel(item.status)}</p>
           <h1 dir="auto">{displayTitle}</h1>
+          {sourceChoices.length > 1 && (
+            <div className="source-switcher" aria-label="اختيار مصدر العمل">
+              <span className="source-switcher-label">اختر المصدر</span>
+              <div className="source-switcher-options">
+                {sourceChoices.map((option) => (
+                  <Link
+                    key={option.key}
+                    className={`source-switch-option ${option.key === sourceKey ? "active" : ""}`}
+                    aria-current={option.key === sourceKey ? "page" : undefined}
+                    to={sourceDetailsPath(option.key, requestedSourceKeys)}
+                  >
+                    {sourceService.sourceLabel(option.source)}
+                    {option.key === sourceKey && <small>الحالي</small>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="genres">{(item.genres ?? []).slice(0, 10).map((genre) => <span key={genre}>{genre}</span>)}</div>
           {item.description && <p className="description" dir="auto">{item.description}</p>}
           <div className="detail-actions">

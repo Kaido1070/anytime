@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLibrary } from "../hooks/useLibrary";
 import { SourceCard } from "../components/SourceCard";
 import { Link } from "react-router-dom";
+import { mergeSourceItems } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
 
@@ -9,6 +10,7 @@ export function Favorites() {
   const { data } = useLibrary();
   const [items, setItems] = useState<SourceManga[]>([]);
   const keys = (data?.favorites ?? []).filter((id) => sourceService.isSourceKey(id));
+  const groups = useMemo(() => mergeSourceItems(items), [items]);
 
   useEffect(() => {
     let active = true;
@@ -31,10 +33,10 @@ export function Favorites() {
       <h1>
         المفضلة<span className="accent">.</span>
       </h1>
-      <p className="muted page-intro">{keys.length} أعمال محفوظة عندك.</p>
+      <p className="muted page-intro">{groups.length || keys.length} أعمال محفوظة عندك.</p>
       <div className="cover-grid">
-        {items.map((item) => (
-          <SourceCard key={item.key} item={item} detail />
+        {groups.map((group) => (
+          <SourceCard key={group.id} item={group.primary} sources={group.items} detail />
         ))}
       </div>
       {!keys.length && (

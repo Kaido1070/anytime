@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { SourceCard } from "../components/SourceCard";
 import { Icon } from "../components/UI";
+import { mergeSourceItems } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import type { SourceManga, SourceName } from "../types";
 
@@ -108,11 +109,12 @@ export function Discover() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const visibleItems = useMemo(() => {
-    return items.filter((item) => {
+  const visibleGroups = useMemo(() => {
+    const filtered = items.filter((item) => {
       if (sourceFilter !== "all" && item.source !== sourceFilter) return false;
       return matchesGenres(item, genreFilters);
     });
+    return mergeSourceItems(filtered);
   }, [items, sourceFilter, genreFilters]);
 
   const hasMore = sourceFilter === "all"
@@ -352,15 +354,15 @@ export function Discover() {
       </div>
 
       {error && <p className="error source-error">{error}</p>}
-      {(loading || filterLoading) && !visibleItems.length && <p className="empty">جاري جلب الأعمال من المصادر…</p>}
+      {(loading || filterLoading) && !visibleGroups.length && <p className="empty">جاري جلب الأعمال من المصادر…</p>}
 
       <div className="cover-grid source-grid">
-        {visibleItems.map((item) => (
-          <SourceCard key={item.key} item={item} />
+        {visibleGroups.map((group) => (
+          <SourceCard key={group.id} item={group.primary} sources={group.items} />
         ))}
       </div>
 
-      {!loading && !filterLoading && !visibleItems.length && !error && (
+      {!loading && !filterLoading && !visibleGroups.length && !error && (
         <p className="empty">ما لقينا أعمال تطابق الفلاتر المحددة.</p>
       )}
 
