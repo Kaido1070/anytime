@@ -6,12 +6,12 @@ export function Friends() {
   const { friends } = useLibrary();
   return (
     <>
-      <p className="eyebrow">STORIES ARE BETTER SHARED</p>
+      <p className="eyebrow">القراءة أحلى مع الأصدقاء</p>
       <h1>
-        In good company<span className="accent">.</span>
+        الأصدقاء<span className="accent">.</span>
       </h1>
       <p className="muted page-intro">
-        A small circle. A whole world of stories.
+        شوف وش يقرؤون وخذ من مفضلتهم.
       </p>
       <div className="friends-list">
         {friends.map((friend, i) => (
@@ -25,13 +25,12 @@ export function Friends() {
             </span>
             <div>
               <h2>{friend.user.name}</h2>
-              <small>CURRENTLY READING</small>
+              <small>يقرأ حاليا</small>
               <p>
-                {findManga(friend.reading.mangaId)?.title} · Ch.{" "}
-                {friend.reading.chapter}
+                {findManga(friend.reading.mangaId)?.title} · الفصل {friend.reading.chapter}
               </p>
               <small>
-                Recent favorites:{" "}
+                آخر المفضلة:{" "}
                 {friend.favorites.map((id) => findManga(id)?.title).join(", ")}
               </small>
             </div>
@@ -50,7 +49,7 @@ export function FriendProfile() {
     return (
       <>
         <Back to="/friends" />
-        <h1>Friend not found</h1>
+        <h1>الصديق غير موجود</h1>
       </>
     );
   const current = findManga(friend.reading.mangaId)!;
@@ -60,20 +59,20 @@ export function FriendProfile() {
       <div className="friend-heading">
         <span className="avatar large">{friend.user.name[0]}</span>
         <div>
-          <p className="eyebrow">A FRIEND'S READING ROOM</p>
+          <p className="eyebrow">مكتبة صديقك</p>
           <h1>{friend.user.name}</h1>
         </div>
       </div>
-      <SectionTitle title="Currently reading" />
+      <SectionTitle title="يقرأ حاليا" />
       <Link className="update-row friend-current" to={`/manga/${current.id}`}>
         <img src={current.cover} alt="" />
         <div>
           <h2>{current.title}</h2>
-          <p>Chapter {friend.reading.chapter}</p>
+          <p>الفصل {friend.reading.chapter}</p>
         </div>
-        <span>→</span>
+        <span>←</span>
       </Link>
-      <SectionTitle title="Favorites" />
+      <SectionTitle title="المفضلة" />
       <div className="cover-grid">
         {friend.favorites.map((id) => {
           const item = findManga(id)!;
@@ -86,7 +85,7 @@ export function FriendProfile() {
                 disabled={added}
                 onClick={() => favorite(id, true)}
               >
-                {added ? "✓ In your favorites" : "Add to My Favorites"}
+                {added ? "✓ موجود في مفضلتك" : "أضف إلى مفضلتي"}
               </button>
             </div>
           );
