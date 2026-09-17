@@ -70,3 +70,11 @@ test("3asq chapter number parser handles Madara slugs", () => {
   assert.equal(__test.asqChapterNumber("الفصل 12.5", "chapter-12-5"), 12.5);
   assert.equal(__test.asqChapterNumber("", "1037_1"), 1037.1);
 });
+
+
+test("3asq type classifier distinguishes novels and web novels", () => {
+  assert.equal(__test.normalizeAsqType("رواية"), "novel");
+  assert.equal(__test.normalizeAsqType("رواية ويب"), "web-novel");
+  assert.equal(__test.normalizeAsqType("Web Novel"), "web-novel");
+  assert.equal(__test.normalizeAsqType("مانجا"), "manga");
+});
