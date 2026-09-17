@@ -4,19 +4,6 @@ export interface User {
   username: string;
 }
 
-export interface Manga {
-  id: string;
-  title: string;
-  alternative?: string;
-  genres: string[];
-  status: string;
-  description: string;
-  latest: number;
-  chapters: number[];
-  color: string;
-  cover: string;
-}
-
 export type SourceName = "mangatime" | "teamx";
 
 export interface SourceChapter {
