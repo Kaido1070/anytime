@@ -9,10 +9,10 @@ export const manga: Manga[] = [
     id: "returner",
     title: "A Returner's Magic Should Be Special",
     alternative: "Gwihwanjaui Mabeobeun Teukbyeolhaeya Hamnida",
-    genres: ["فانتازيا", "أكشن", "أكاديمية"],
+    genres: ["Fantasy", "Action", "Academy"],
     status: "Ongoing",
     description:
-      "يحصل ديسير على فرصة ثانية ويعود إلى أيام الأكاديمية وهو يحمل ذكريات مستقبل لا يريد أن يتكرر. هذه المرة سيحاول إنقاذ الأشخاص الذين خسرهم من قبل.",
+      "Desir is given a second chance and returns to his academy days carrying memories of a future he refuses to let repeat. This time, he will try to save the people he lost before.",
     latest: 150,
     chapters: Array.from({ length: 10 }, (_, i) => 150 - i),
     color: "#b9bc99",
@@ -21,10 +21,10 @@ export const manga: Manga[] = [
   {
     id: "eleceed",
     title: "Eleceed",
-    genres: ["أكشن", "كوميديا"],
+    genres: ["Action", "Comedy"],
     status: "Ongoing",
     description:
-      "صداقة غير متوقعة تدخل طالبا طيب القلب إلى عالم خفي مليء بالقدرات الخارقة.",
+      "An unexpected friendship draws a kind-hearted student into a hidden world filled with extraordinary abilities.",
     latest: 318,
     chapters: [318, 317, 316, 315, 314],
     color: "#92b3bd",
@@ -33,10 +33,10 @@ export const manga: Manga[] = [
   {
     id: "solo",
     title: "Solo Leveling",
-    genres: ["أكشن", "فانتازيا"],
+    genres: ["Action", "Fantasy"],
     status: "Completed",
     description:
-      "صياد يبدأ من أضعف نقطة ثم يكتشف طريقا يغير حياته بالكامل.",
+      "A hunter starts from the weakest point and discovers a path that changes his life completely.",
     latest: 200,
     chapters: [200, 199, 198, 197, 196],
     color: "#a4a2cf",
@@ -45,10 +45,10 @@ export const manga: Manga[] = [
   {
     id: "horizon",
     title: "The Horizon",
-    genres: ["مغامرة", "دراما"],
+    genres: ["Adventure", "Drama"],
     status: "Completed",
     description:
-      "شخصان يواصلان رحلة طويلة في عالم هادئ وغريب ويبحثان عن شيء بسيط يتمسكان به.",
+      "Two people continue a long journey through a quiet, strange world while searching for something simple to hold on to.",
     latest: 21,
     chapters: [21, 20, 19, 18, 17],
     color: "#c9a482",
