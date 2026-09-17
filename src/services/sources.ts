@@ -25,6 +25,15 @@ function params(input: Record<string, string | number | undefined>) {
   return search.toString();
 }
 
+function originalImageUrl(source: SourceName, url: string) {
+  if (source !== "teamx") return url;
+
+  // Team-X/OlympusStaff uses `thumbnail_` copies for list/search cards.
+  // Removing that prefix points to the original full-size cover, which is
+  // also how current Team-X reader extensions obtain the non-thumbnail art.
+  return url.replace(/thumbnail_/gi, "");
+}
+
 export const sourceService = {
   async latest(source: SourceName, page = 1) {
     return api<SourceListResponse>(
@@ -68,7 +77,8 @@ export const sourceService = {
 
   imageUrl(source: SourceName, url?: string, referer?: string) {
     if (!url) return "";
-    return `/api/source/image?${params({ source, url, referer })}`;
+    const original = originalImageUrl(source, url);
+    return `/api/source/image?${params({ source, url: original, referer })}`;
   },
 
   isSourceKey(key?: string | null) {
