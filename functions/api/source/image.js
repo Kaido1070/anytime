@@ -2,6 +2,7 @@ const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
 const ASQ_BASE = "https://3asq.online";
+const STARZ_BASE = "https://starzmanga.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -15,7 +16,7 @@ export async function onRequest(context) {
 
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") ?? "").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga") {
     return json({ error: "UNKNOWN_SOURCE" }, 400);
   }
 
@@ -23,7 +24,9 @@ export async function onRequest(context) {
     ? TEAMX_BASE
     : source === "3asq"
       ? ASQ_BASE
-      : MANGATIME_BASE;
+      : source === "starzmanga"
+        ? STARZ_BASE
+        : MANGATIME_BASE;
   const raw = String(url.searchParams.get("url") ?? "");
   const target = absoluteUrl(base, raw);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
@@ -37,7 +40,9 @@ export async function onRequest(context) {
     ? safeTeamXReferer(url.searchParams.get("referer"))
     : source === "3asq"
       ? safeAsqReferer(url.searchParams.get("referer"))
-      : `${MANGATIME_BASE}/`;
+      : source === "starzmanga"
+        ? safeStarzReferer(url.searchParams.get("referer"))
+        : `${MANGATIME_BASE}/`;
 
   const response = await fetch(target, {
     headers: {
@@ -93,6 +98,18 @@ function safeAsqReferer(value) {
     return parsed.toString();
   } catch {
     return `${ASQ_BASE}/`;
+  }
+}
+
+function safeStarzReferer(value) {
+  if (!value) return `${STARZ_BASE}/`;
+  try {
+    const parsed = new URL(String(value), STARZ_BASE);
+    if (!/^(?:www\.)?starzmanga\.com$/i.test(parsed.hostname)) return `${STARZ_BASE}/`;
+    if (!/^\/manga\//i.test(parsed.pathname)) return `${STARZ_BASE}/`;
+    return parsed.toString();
+  } catch {
+    return `${STARZ_BASE}/`;
   }
 }
 

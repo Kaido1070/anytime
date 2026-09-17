@@ -2,6 +2,7 @@ const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
 const ASQ_BASE = "https://3asq.online";
+const STARZ_BASE = "https://starzmanga.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -20,6 +21,7 @@ export async function onRequest(context) {
         { id: "mangatime", name: "MangaTime", mode: "trpc" },
         { id: "teamx", name: "Team-X", mode: "html" },
         { id: "3asq", name: "3asq", mode: "html" },
+        { id: "starzmanga", name: "StarzManga", mode: "madara" },
       ],
     });
   }
@@ -49,7 +51,9 @@ export async function onRequest(context) {
         ? await mangaTimeList(db, { page, sortBy: "recent" })
         : source === "teamx"
           ? await teamXLatest(db, page)
-          : await asqLatest(db, page);
+          : source === "3asq"
+            ? await asqLatest(db, page)
+            : await starzLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -60,7 +64,9 @@ export async function onRequest(context) {
         ? await mangaTimeList(db, { page, sortBy: "popularity" })
         : source === "teamx"
           ? await teamXPopular(db, page)
-          : await asqPopular(db, page);
+          : source === "3asq"
+            ? await asqPopular(db, page)
+            : await starzPopular(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -73,7 +79,9 @@ export async function onRequest(context) {
         ? await mangaTimeList(db, { page, sortBy: "popularity", query })
         : source === "teamx"
           ? await teamXSearch(db, query)
-          : await asqSearch(db, query, page);
+          : source === "3asq"
+            ? await asqSearch(db, query, page)
+            : await starzSearch(db, query, page);
       return json(payload, 200, shortCache());
     }
 
@@ -95,7 +103,9 @@ export async function onRequest(context) {
         ? await mangaTimeSeries(db, item)
         : item.source === "teamx"
           ? await teamXSeries(db, item)
-          : await asqSeries(db, item);
+          : item.source === "3asq"
+            ? await asqSeries(db, item)
+            : await starzSeries(db, item);
       return json({ item: detail }, 200, shortCache());
     }
 
@@ -111,7 +121,9 @@ export async function onRequest(context) {
         ? await mangaTimeChapter(context, db, item, number)
         : item.source === "teamx"
           ? await teamXChapter(db, item, number)
-          : await asqChapter(db, item, number);
+          : item.source === "3asq"
+            ? await asqChapter(db, item, number)
+            : await starzChapter(db, item, number);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
@@ -144,7 +156,7 @@ class SourceError extends Error {
 
 function sourceFromQuery(url) {
   const source = String(url.searchParams.get("source") ?? "mangatime").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga") {
     throw new SourceError("UNKNOWN_SOURCE", "المصدر غير معروف.", 400);
   }
   return source;
@@ -157,7 +169,7 @@ function safePage(value) {
 
 function safeSourceKey(value) {
   const key = String(value ?? "").trim();
-  return /^(mt|tx|aq):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
+  return /^(mt|tx|aq|sz):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
 }
 
 function shortCache() {
@@ -944,6 +956,269 @@ function asqHasNext(html) {
   return /<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html);
 }
 
+
+// StarzManga / Manga Starz ---------------------------------------------------
+
+async function starzLatest(db, page) {
+  return starzList(db, { page, order: "latest" });
+}
+
+async function starzPopular(db, page) {
+  return starzList(db, { page, order: "views" });
+}
+
+async function starzList(db, { page, order }) {
+  const html = await starzFetchText("/manga/page/" + page + "/?m_orderby=" + encodeURIComponent(order));
+  const items = await starzItemsFromHtml(html);
+  await rememberItems(db, items);
+  return { items: items.slice(0, 24), hasMore: starzHasNext(html), page };
+}
+
+async function starzSearch(db, query, page) {
+  const prefix = page > 1 ? "/page/" + page + "/" : "/";
+  const html = await starzFetchText(prefix + "?s=" + encodeURIComponent(query) + "&post_type=wp-manga");
+  const items = await starzItemsFromHtml(html);
+  await rememberItems(db, items);
+  return { items: items.slice(0, 24), hasMore: starzHasNext(html), page };
+}
+
+async function starzItemsFromHtml(html) {
+  const bySlug = new Map();
+  const blocks = madaraBlocksByClass(html, ["c-tabs-item__content", "page-item-detail"]);
+  const candidates = blocks.length ? blocks : [String(html ?? "")];
+
+  for (const block of candidates) {
+    for (const anchor of extractAnchors(block)) {
+      const href = absoluteUrl(STARZ_BASE, anchor.href);
+      if (!href) continue;
+      let parsed;
+      try {
+        parsed = new URL(href);
+      } catch {
+        continue;
+      }
+      if (!/^(?:www\.)?starzmanga\.com$/i.test(parsed.hostname)) continue;
+      const match = parsed.pathname.match(/^\/manga\/([^/]+)\/?$/i);
+      if (!match) continue;
+
+      const slug = decodeURIComponent(match[1]);
+      if (!slug || bySlug.has(slug)) continue;
+
+      const title = cleanText(
+        anchor.attrs.title ||
+          firstMatch(anchor.inner, /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i) ||
+          firstImgAttr(block, "alt") ||
+          stripTags(anchor.inner),
+      );
+      if (!title || /^image$/i.test(title)) continue;
+
+      const cover = absoluteUrl(STARZ_BASE, asqFirstImage(block));
+      bySlug.set(slug, {
+        key: "sz:" + safeSlugKey(slug),
+        source: "starzmanga",
+        sourceId: slug,
+        slug,
+        type: "manga",
+        url: STARZ_BASE + "/manga/" + encodeURIComponent(slug) + "/",
+        title,
+        cover,
+        description: "",
+        status: "",
+        genres: [],
+      });
+      break;
+    }
+  }
+
+  return [...bySlug.values()].slice(0, 80);
+}
+
+async function starzSeries(db, item) {
+  const seriesUrl = item.url || STARZ_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
+  const html = await starzFetchText(seriesUrl, false);
+  const title = cleanText(
+    firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+      firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+      item.title,
+  );
+  const summaryImage =
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*\bsummary_image\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+    "";
+  const cover = absoluteUrl(STARZ_BASE, asqFirstImage(summaryImage) || item.cover);
+  const description = cleanText(
+    firstMatch(html, /description-summary[^>]*>([\s\S]*?)<\/div>/i) ||
+      firstMatch(html, /manga-excerpt[^>]*>([\s\S]*?)<\/div>/i) ||
+      "",
+  );
+  const plain = cleanText(stripTags(html));
+  const status = normalizeStatus(
+    firstMatch(plain, /الحالة\s*:?\s*(مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك)/i) ||
+      firstMatch(plain, /status\s*:?\s*(ongoing|completed|hiatus|cancelled|canceled)/i) ||
+      "",
+  );
+  const type = normalizeAsqType(
+    firstMatch(plain, /النوع\s*:?\s*(رواية ويب|رواية|مانجا ويب|مانهوا|مانجا|كوميك)/i) ||
+      firstMatch(plain, /type\s*:?\s*(web novel|light novel|novel|webtoon|manhwa|manga|comic)/i) ||
+      item.type,
+  );
+  const genres = asqGenres(html);
+  if (type === "novel" || type === "web-novel") genres.push("روايات");
+
+  const postId = starzPostId(html);
+  let chapterHtml = html;
+  if (postId) {
+    chapterHtml = await starzFetchChapters(postId).catch(() => html);
+  }
+  const chapters = parseStarzChapters(chapterHtml, seriesUrl);
+  const updated = {
+    ...item,
+    sourceId: postId || item.sourceId,
+    type,
+    title,
+    cover,
+    description,
+    status,
+    genres: [...new Set(genres)],
+    latest: chapters[0]?.number ?? null,
+    chapters,
+  };
+  await rememberItems(db, [updated]);
+  return updated;
+}
+
+function starzPostId(html) {
+  return cleanText(
+    firstMatch(html, /id=["']manga-chapters-holder["'][^>]*data-id=["']([^"']+)["']/i) ||
+      firstMatch(html, /data-id=["']([^"']+)["'][^>]*id=["']manga-chapters-holder["']/i) ||
+      firstMatch(html, /class=["'][^"']*rating-post-id[^"']*["'][^>]*value=["']([^"']+)["']/i) ||
+      firstMatch(html, /value=["']([^"']+)["'][^>]*class=["'][^"']*rating-post-id/i) ||
+      firstMatch(html, /data-post=["']([^"']+)["']/i),
+  );
+}
+
+async function starzFetchChapters(postId) {
+  const body = new URLSearchParams({
+    action: "manga_get_chapters",
+    manga: String(postId),
+  });
+  const response = await fetch(STARZ_BASE + "/wp-admin/admin-ajax.php", {
+    method: "POST",
+    headers: {
+      ...sourceHeaders(STARZ_BASE, "text/html,application/xhtml+xml,*/*;q=0.8"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: false },
+  });
+  if (!response.ok) throw new SourceError("STARZ_CHAPTERS", "StarzManga لم يرجع قائمة الفصول.", 502);
+  return response.text();
+}
+
+function parseStarzChapters(html, seriesUrl) {
+  const base = new URL(seriesUrl, STARZ_BASE);
+  const basePath = base.pathname.replace(/\/$/, "");
+  const found = new Map();
+  const regex = /<li\b[^>]*class=["'][^"']*\bwp-manga-chapter\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+  let match;
+  while ((match = regex.exec(String(html ?? "")))) {
+    const block = match[1];
+    const anchor = extractAnchors(block).find((entry) => {
+      const href = absoluteUrl(STARZ_BASE, entry.href);
+      if (!href) return false;
+      try {
+        const parsed = new URL(href);
+        return parsed.pathname.startsWith(basePath + "/") && parsed.pathname !== basePath + "/";
+      } catch {
+        return false;
+      }
+    });
+    if (!anchor) continue;
+
+    const url = absoluteUrl(STARZ_BASE, anchor.href);
+    if (!url) continue;
+    const parsed = new URL(url);
+    const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+    const title = cleanText(stripTags(anchor.inner)) || chapterId;
+    const number = asqChapterNumber(title, chapterId);
+    if (!Number.isFinite(number)) continue;
+    found.set(number, { number, title: title || "الفصل " + number, publishedAt: null, url });
+  }
+  return [...found.values()].sort((a, b) => b.number - a.number);
+}
+
+async function starzChapter(db, item, number) {
+  const series = await starzSeries(db, item);
+  const selected = series.chapters?.find(
+    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  );
+  if (!selected?.url) {
+    throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في StarzManga.", 404);
+  }
+  const chapterUrl = new URL(selected.url, STARZ_BASE);
+  chapterUrl.searchParams.set("style", "list");
+  const html = await starzFetchText(chapterUrl.toString(), false);
+  const pages = parseStarzPages(html);
+  if (!pages.length) throw new SourceError("NO_PAGES", "StarzManga لم يرجع صور الفصل.", 502);
+
+  return {
+    item: series,
+    number,
+    title: selected.title || "الفصل " + number,
+    pages,
+    ...chapterNavigation(series.chapters ?? [], number),
+  };
+}
+
+function parseStarzPages(html) {
+  const source = String(html ?? "");
+  const pageBlocks = madaraBlocksByClass(source, ["page-break"]);
+  const pages = [];
+  for (const block of pageBlocks) {
+    const raw = asqFirstImage(block);
+    const url = absoluteUrl(STARZ_BASE, raw);
+    if (url && !isStarzUiImage(url)) pages.push(url);
+  }
+  if (pages.length) return [...new Set(pages)];
+
+  const marker = source.search(/class=["'][^"']*\breading-content\b[^"']*["']/i);
+  const tail = marker >= 0 ? source.slice(marker) : source;
+  const footer = tail.search(/(?:id=["'](?:comments|manga-discussion)["']|<footer\b)/i);
+  const scoped = footer >= 0 ? tail.slice(0, footer) : tail;
+  return [...new Set(
+    extractImages(scoped)
+      .map((image) => absoluteUrl(STARZ_BASE, image.src))
+      .filter((url) => url && !isStarzUiImage(url)),
+  )];
+}
+
+function isStarzUiImage(url) {
+  return /(?:logo|avatar|favicon|icon|profile|banner|ads?)(?:[\/_-]|\.)/i.test(url);
+}
+
+async function starzFetchText(pathOrUrl, useBase = true) {
+  const target = new URL(pathOrUrl, STARZ_BASE).toString();
+  const response = await fetch(target, {
+    headers: sourceHeaders(
+      STARZ_BASE,
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    ),
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: true },
+  });
+  if (!response.ok) {
+    if (response.status === 403 || response.status === 503) {
+      throw new SourceError("STARZ_BLOCKED", "StarzManga رفض الطلب مؤقتًا.", 502);
+    }
+    throw new SourceError("STARZ_UPSTREAM", "StarzManga رجع HTTP " + response.status + ".", 502);
+  }
+  return response.text();
+}
+
+function starzHasNext(html) {
+  return /<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html);
+}
+
 // Shared parsing & transport -------------------------------------------------
 
 function chapterNavigation(chapters, number) {
@@ -961,7 +1236,9 @@ async function proxyImage(source, rawUrl) {
     ? TEAMX_BASE
     : source === "3asq"
       ? ASQ_BASE
-      : MANGATIME_BASE;
+      : source === "starzmanga"
+        ? STARZ_BASE
+        : MANGATIME_BASE;
   const target = absoluteUrl(base, rawUrl);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
 
@@ -1176,6 +1453,9 @@ export const __test = {
   parseTeamXPages,
   parseAsqChapters,
   parseAsqPages,
+  parseStarzChapters,
+  parseStarzPages,
+  starzPostId,
   asqChapterNumber,
   normalizeAsqType,
   mangaTimeTypeGenres,

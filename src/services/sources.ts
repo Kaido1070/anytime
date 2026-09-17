@@ -97,10 +97,10 @@ export const sourceService = {
   },
 
   async coverCandidates(item: SourceManga) {
-    const fallback = item.source === "3asq"
+    const fallback = item.source === "3asq" || item.source === "starzmanga"
       ? uniqueCovers([wordpressOriginalCover(item.cover), item.cover])
       : uniqueCovers([item.cover]);
-    if (item.source !== "mangatime" && item.source !== "3asq") return fallback;
+    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga") return fallback;
 
     const cached = coverRequests.get(item.key);
     if (cached) return cached;
@@ -122,12 +122,13 @@ export const sourceService = {
   },
 
   isSourceKey(key?: string | null) {
-    return Boolean(key && /^(mt|tx|aq):/.test(key));
+    return Boolean(key && /^(mt|tx|aq|sz):/.test(key));
   },
 
   sourceLabel(source: SourceName) {
     if (source === "mangatime") return "MangaTime";
     if (source === "teamx") return "Team-X";
-    return "3asq";
+    if (source === "3asq") return "3asq";
+    return "StarzManga";
   },
 };

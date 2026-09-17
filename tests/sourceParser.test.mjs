@@ -87,3 +87,32 @@ test("MangaTime novel types receive the Arabic novels category", () => {
   assert.equal(__test.isNovelLabel("Light Novel"), true);
   assert.equal(__test.isNovelLabel("رواية ويب"), true);
 });
+
+
+test("StarzManga extracts Madara post id and chapter list", () => {
+  const detail = '<div id="manga-chapters-holder" data-id="82737"></div>';
+  assert.equal(__test.starzPostId(detail), "82737");
+
+  const html = `
+    <ul>
+      <li class="wp-manga-chapter"><a href="https://starzmanga.com/manga/getter-robo-go/chapter-12/">الفصل 12</a></li>
+      <li class="wp-manga-chapter"><a href="/manga/getter-robo-go/chapter-11-5/">Chapter 11.5</a></li>
+    </ul>
+  `;
+  const chapters = __test.parseStarzChapters(html, "https://starzmanga.com/manga/getter-robo-go/");
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [12, 11.5]);
+});
+
+test("StarzManga page parser keeps chapter images only", () => {
+  const html = `
+    <div class="reading-content">
+      <div class="page-break"><img data-src="https://cdn.example.com/chapter/001.webp"></div>
+      <div class="page-break"><img src="https://cdn.example.com/chapter/002.webp"></div>
+    </div>
+    <footer><img src="https://starzmanga.com/logo.png"></footer>
+  `;
+  assert.deepEqual(__test.parseStarzPages(html), [
+    "https://cdn.example.com/chapter/001.webp",
+    "https://cdn.example.com/chapter/002.webp",
+  ]);
+});

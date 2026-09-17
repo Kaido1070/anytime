@@ -49,16 +49,19 @@ export function Home() {
       sourceService.latest("mangatime", 1),
       sourceService.latest("teamx", 1),
       sourceService.latest("3asq", 1),
+      sourceService.latest("starzmanga", 1),
     ]).then((results) => {
       if (!active) return;
       const mangaTime = results[0].status === "fulfilled" ? results[0].value.items : [];
       const teamX = results[1].status === "fulfilled" ? results[1].value.items : [];
       const asq = results[2].status === "fulfilled" ? results[2].value.items : [];
+      const starz = results[3].status === "fulfilled" ? results[3].value.items : [];
       const interleaved: SourceManga[] = [];
-      const max = Math.max(mangaTime.length, teamX.length, asq.length);
+      const max = Math.max(mangaTime.length, teamX.length, asq.length, starz.length);
       for (let i = 0; i < max; i += 1) {
         if (teamX[i]) interleaved.push(teamX[i]);
         if (asq[i]) interleaved.push(asq[i]);
+        if (starz[i]) interleaved.push(starz[i]);
         if (mangaTime[i]) interleaved.push(mangaTime[i]);
       }
       setLatest(mergeSourceItems(interleaved).slice(0, 4));
@@ -136,7 +139,7 @@ export function Home() {
         ) : (
           <div className="source-callout">
             <div>
-              <b>Team-X + 3asq + MangaTime</b>
+              <b>Team-X + 3asq + StarzManga + MangaTime</b>
               <p className="muted">بحث وفصول حقيقية داخل قارئ Anytime.</p>
             </div>
             <Link className="primary" to="/discover">فتح الاستكشاف</Link>

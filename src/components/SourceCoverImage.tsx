@@ -15,7 +15,7 @@ export function SourceCoverImage({ item, onError, ...props }: Props) {
     setCovers(item.cover ? [item.cover] : []);
     setIndex(0);
 
-    if (item.source === "mangatime" || item.source === "3asq") {
+    if (item.source === "mangatime" || item.source === "3asq" || item.source === "starzmanga") {
       void sourceService.coverCandidates(item).then((next) => {
         if (!active || !next.length) return;
         setCovers(next);
