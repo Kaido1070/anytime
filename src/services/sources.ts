@@ -6,6 +6,18 @@ import type {
 } from "../types";
 
 const coverRequests = new Map<string, Promise<string[]>>();
+const chapterRequests = new Map<string, Promise<SourceChapterPayload>>();
+const MAX_CHAPTER_REQUESTS = 8;
+
+function rememberChapterRequest(key: string, request: Promise<SourceChapterPayload>) {
+  chapterRequests.delete(key);
+  chapterRequests.set(key, request);
+  while (chapterRequests.size > MAX_CHAPTER_REQUESTS) {
+    const oldest = chapterRequests.keys().next().value as string | undefined;
+    if (!oldest) break;
+    chapterRequests.delete(oldest);
+  }
+}
 
 async function api<T>(path: string): Promise<T> {
   const response = await fetch(path, {
@@ -91,10 +103,24 @@ export const sourceService = {
   },
 
   async getChapter(key: string, chapter: number) {
-    const payload = await api<{ chapter: SourceChapterPayload }>(
+    const requestKey = `${key}:${chapter}`;
+    const cached = chapterRequests.get(requestKey);
+    if (cached) {
+      rememberChapterRequest(requestKey, cached);
+      return cached;
+    }
+
+    const request = api<{ chapter: SourceChapterPayload }>(
       `/api/source/chapter?${params({ key, number: chapter })}`,
-    );
-    return payload.chapter;
+    )
+      .then((payload) => payload.chapter)
+      .catch((cause) => {
+        chapterRequests.delete(requestKey);
+        throw cause;
+      });
+
+    rememberChapterRequest(requestKey, request);
+    return request;
   },
 
   async resolve(keys: string[]) {
