@@ -12,7 +12,7 @@ export function Login() {
     try {
       await signIn(String(form.get("username")), String(form.get("password")));
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Unable to sign in.");
+      setError(error instanceof Error ? error.message : "تعذر تسجيل الدخول.");
     } finally {
       setBusy(false);
     }
@@ -21,11 +21,11 @@ export function Login() {
     <main className="login">
       <div className="login-art">
         <span className="brand-mark">a</span>
-        <p>A LITTLE ESCAPE, ALWAYS HERE.</p>
+        <p>استراحة صغيرة في أي وقت</p>
         <h1>
-          One more
+          فصل آخر
           <br />
-          chapter<span>.</span>
+          وبس<span>.</span>
         </h1>
         <div className="login-covers">
           <img src="/covers/eleceed.svg" alt="" />
@@ -34,29 +34,29 @@ export function Login() {
         </div>
       </div>
       <div className="login-form">
-        <p className="eyebrow">WELCOME TO ANYTIME</p>
-        <h2>Your place in the story.</h2>
-        <p className="muted">Sign in to your private reading room.</p>
+        <p className="eyebrow">أهلا بك في ANYTIME</p>
+        <h2>مكانك داخل القصة.</h2>
+        <p className="muted">سجل دخولك إلى مكتبتك الخاصة.</p>
         <form onSubmit={submit}>
           <label>
-            Username
+            اسم المستخدم
             <input
               name="username"
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
               required
-              placeholder="Your username"
+              placeholder="اسم المستخدم"
             />
           </label>
           <label>
-            Password
+            كلمة المرور
             <input
               name="password"
               type="password"
               autoComplete="current-password"
               required
-              placeholder="Your password"
+              placeholder="كلمة المرور"
             />
           </label>
           {error && (
@@ -65,14 +65,14 @@ export function Login() {
             </p>
           )}
           <button className="primary" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"} <span>→</span>
+            {busy ? "جاري الدخول…" : "تسجيل الدخول"} <span>←</span>
           </button>
         </form>
         <p className="demo-note">
-          PHASE 01 · MOCK LOGIN
+          المرحلة الأولى · تسجيل تجريبي
           <br />
           <span>
-            Mahdi, Kaido, or Ahmed · Password: <b>anytime</b>
+            Mahdi أو Kaido أو Ahmed · كلمة المرور: <b>anytime</b>
           </span>
         </p>
       </div>
