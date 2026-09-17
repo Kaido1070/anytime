@@ -23,9 +23,7 @@ export function Login() {
         <span className="brand-mark">a</span>
         <p>تابع قصتك</p>
         <h1>
-          في أي وقت
-          <br />
-          وأي مكان<span>.</span>
+          في أي وقت<span>.</span>
         </h1>
         <div className="login-covers">
           <img src="/covers/eleceed.svg" alt="" />
