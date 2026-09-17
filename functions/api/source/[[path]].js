@@ -296,7 +296,7 @@ async function mangaTimeList(db, { page, sortBy, query = null }) {
       cover: absoluteUrl(MANGATIME_BASE, row.coverUrl),
       description: "",
       status: "",
-      genres: [],
+      genres: mangaTimeTypeGenres(row.type),
     })),
   );
   await rememberItems(db, items);
@@ -326,15 +326,38 @@ async function mangaTimeSeries(db, item) {
     cover: absoluteUrl(MANGATIME_BASE, detail?.coverUrl ?? item.cover),
     description: String(detail?.description ?? ""),
     status: normalizeStatus(detail?.status),
-    genres: [
-      ...(Array.isArray(detail?.genres) ? detail.genres.map((genre) => String(genre?.name ?? "")) : []),
-      String(detail?.type ?? item.type ?? ""),
-    ].filter(Boolean),
+    genres: mangaTimeSeriesGenres(detail, item),
     latest: chapters[0]?.number ?? null,
     chapters,
   };
   await rememberItems(db, [updated]);
   return updated;
+}
+
+function mangaTimeTypeGenres(type) {
+  const raw = String(type ?? "").trim();
+  if (!raw) return [];
+  return isNovelLabel(raw) ? [raw, "روايات"] : [raw];
+}
+
+function mangaTimeSeriesGenres(detail, item) {
+  const values = [
+    ...(Array.isArray(detail?.genres) ? detail.genres.map((genre) => String(genre?.name ?? "")) : []),
+    String(detail?.type ?? item?.type ?? ""),
+  ].filter(Boolean);
+
+  if (values.some(isNovelLabel)) values.push("روايات");
+  return [...new Set(values)];
+}
+
+function isNovelLabel(value) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+  return /(?:^|\s)(?:novel|web novel|light novel)(?:$|\s)/i.test(normalized) ||
+    /رواي(?:ة|ات)/.test(normalized);
 }
 
 async function mangaTimeChapter(context, db, item, number) {
@@ -1155,5 +1178,8 @@ export const __test = {
   parseAsqPages,
   asqChapterNumber,
   normalizeAsqType,
+  mangaTimeTypeGenres,
+  mangaTimeSeriesGenres,
+  isNovelLabel,
   normalizeStatus,
 };
