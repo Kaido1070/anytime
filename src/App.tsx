@@ -5,10 +5,8 @@ import { AppLayout } from "./layouts/AppLayout";
 import { Login } from "./pages/Login";
 import { Home } from "./pages/Home";
 import { Favorites } from "./pages/Favorites";
-import { MangaDetails } from "./pages/MangaDetails";
 import { Friends, FriendProfile } from "./pages/Friends";
 import { Profile } from "./pages/Profile";
-import { Reader } from "./pages/Reader";
 import { Discover } from "./pages/Discover";
 import { SourceMangaDetails } from "./pages/SourceMangaDetails";
 import { SourceReader } from "./pages/SourceReader";
@@ -19,9 +17,7 @@ export default function App() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (!pathname.startsWith("/read/") && !pathname.startsWith("/read-source/")) {
-      window.scrollTo(0, 0);
-    }
+    if (!pathname.startsWith("/read-source/")) window.scrollTo(0, 0);
   }, [pathname]);
 
   if (loading) return <div className="loading">جاري فتح مكتبتك…</div>;
@@ -41,7 +37,6 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Home />} />
             <Route path="discover" element={<Discover />} />
-            <Route path="manga/:id" element={<MangaDetails />} />
             <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
             <Route path="friends" element={<Friends />} />
@@ -57,7 +52,6 @@ export default function App() {
               }
             />
           </Route>
-          <Route path="read/:id/:chapter" element={<Reader />} />
           <Route path="read-source/:key/:chapter" element={<SourceReader />} />
         </Routes>
       )}
