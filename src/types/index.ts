@@ -64,10 +64,13 @@ export interface UserData {
   progress: Record<string, ReadingProgress>;
   completed: string[];
   lastOpened: { mangaId: string; chapter: number } | null;
+  profilePrivate: boolean;
 }
 
 export interface Friend {
   user: User;
   reading: { mangaId: string; chapter: number } | null;
   favorites: string[];
+  private: boolean;
+  history: ReadingProgress[];
 }
