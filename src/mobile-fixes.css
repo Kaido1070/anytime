@@ -2,55 +2,51 @@
 @media (max-width: 759px) {
   .login-art {
     min-height: 0;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "mark mark"
-      "tagline covers"
-      "headline covers";
-    column-gap: 20px;
-    align-items: end;
-    padding-bottom: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 24px;
   }
 
   .login-art > .brand-mark {
-    grid-area: mark;
-    justify-self: start;
-    margin: 0 0 34px;
+    align-self: flex-start;
+    margin: 0 0 30px;
   }
 
   .login-art > p {
-    grid-area: tagline;
-    align-self: end;
     margin: 0 0 10px;
   }
 
   .login-art h1 {
-    grid-area: headline;
-    align-self: start;
+    position: relative;
+    z-index: 2;
     font-size: clamp(38px, 11vw, 48px);
     line-height: 1.08;
     letter-spacing: -1.5px;
+    margin: 0;
   }
 
   .login-covers {
-    grid-area: covers;
     position: static;
-    width: 112px;
+    width: 100%;
     height: 145px;
-    margin: 0;
+    margin: 24px 0 0;
     padding: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    align-items: flex-start;
     direction: ltr;
+    overflow: visible;
   }
 
   .login-covers img {
-    width: 72px;
-    height: 101px;
+    display: block;
+    width: 82px;
+    height: 115px;
+    flex: 0 0 82px;
     object-fit: cover;
-    flex: 0 0 auto;
+    border-radius: 7px;
+    box-shadow: 0 14px 24px #0006;
   }
 
   .login-covers img:first-child {
@@ -58,12 +54,12 @@
   }
 
   .login-covers img:nth-child(2) {
-    transform: rotate(-7deg) translateX(13px);
+    transform: rotate(-6deg);
     z-index: 2;
   }
 
   .login-covers img:last-child {
-    transform: rotate(7deg) translateX(-13px);
+    transform: rotate(6deg) translateX(-14px);
     z-index: 1;
   }
 
