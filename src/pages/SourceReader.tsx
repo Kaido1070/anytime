@@ -1,11 +1,35 @@
 // Production reader deploy marker: Team-X images use the chapter referer path.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon, Progress } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import type { SourceChapterPayload } from "../types";
+
+const INITIAL_READER_PAGES = 2;
+const READER_PRELOAD_MARGIN = "1400px 0px";
+
+type NavigatorWithConnection = Navigator & {
+  connection?: {
+    effectiveType?: string;
+    saveData?: boolean;
+  };
+};
+
+function readerConcurrency() {
+  if (typeof navigator === "undefined") return 2;
+  const connection = (navigator as NavigatorWithConnection).connection;
+  if (
+    connection?.saveData ||
+    connection?.effectiveType === "slow-2g" ||
+    connection?.effectiveType === "2g" ||
+    connection?.effectiveType === "3g"
+  ) {
+    return 2;
+  }
+  return connection?.effectiveType === "4g" ? 3 : 2;
+}
 
 export function SourceReader() {
   const { key = "", chapter = "" } = useParams();
@@ -71,7 +95,59 @@ function ReaderChapter({
   const [percent, setPercent] = useState(saved);
   const saveRef = useRef(saveProgress);
   const restoredRef = useRef(false);
+  const initialPageCount = Math.min(INITIAL_READER_PAGES, payload.pages.length);
+  const initialPageIndexes = Array.from({ length: initialPageCount }, (_, index) => index);
+  const requestedRef = useRef<Set<number>>(new Set(initialPageIndexes));
+  const activeRef = useRef<Set<number>>(new Set(initialPageIndexes));
+  const queueRef = useRef<number[]>([]);
+  const maxConcurrentRef = useRef(readerConcurrency());
+  const [requestedPages, setRequestedPages] = useState<Set<number>>(
+    () => new Set(initialPageIndexes),
+  );
+  const prefetchedNextRef = useRef<number | null>(null);
   saveRef.current = saveProgress;
+
+  const pumpImageQueue = useCallback(() => {
+    let changed = false;
+    while (
+      activeRef.current.size < maxConcurrentRef.current &&
+      queueRef.current.length
+    ) {
+      const nextIndex = queueRef.current.shift();
+      if (nextIndex == null || requestedRef.current.has(nextIndex)) continue;
+      requestedRef.current.add(nextIndex);
+      activeRef.current.add(nextIndex);
+      changed = true;
+    }
+    if (changed) setRequestedPages(new Set(requestedRef.current));
+  }, []);
+
+  const requestPage = useCallback(
+    (index: number) => {
+      if (
+        index < 0 ||
+        index >= payload.pages.length ||
+        requestedRef.current.has(index) ||
+        queueRef.current.includes(index)
+      ) {
+        return;
+      }
+      queueRef.current.push(index);
+      pumpImageQueue();
+    },
+    [payload.pages.length, pumpImageQueue],
+  );
+
+  const settlePage = useCallback(
+    (index: number, loaded: boolean) => {
+      activeRef.current.delete(index);
+      pumpImageQueue();
+      if (loaded && !restoredRef.current && index < INITIAL_READER_PAGES) {
+        window.dispatchEvent(new Event("resize"));
+      }
+    },
+    [pumpImageQueue],
+  );
 
   const selectedChapter = payload.item.chapters?.find(
     (entry) => Number(entry.number) === Number(chapter),
@@ -145,6 +221,16 @@ function ReaderChapter({
     };
   }, [sourceKey, chapter, payload.pages.length]);
 
+  useEffect(() => {
+    if (percent < 75 || payload.next == null || prefetchedNextRef.current === payload.next) {
+      return;
+    }
+    prefetchedNextRef.current = payload.next;
+    void sourceService.getChapter(sourceKey, payload.next).catch(() => {
+      if (prefetchedNextRef.current === payload.next) prefetchedNextRef.current = null;
+    });
+  }, [percent, payload.next, sourceKey]);
+
   return (
     <main className="reader source-reader">
       <header className="reader-header">
@@ -160,17 +246,14 @@ function ReaderChapter({
 
       <div className="reader-panels source-pages">
         {payload.pages.map((page, index) => (
-          <img
+          <ProgressiveReaderPage
             key={`${index}:${page}`}
+            index={index}
             src={sourceService.imageUrl(payload.item.source, page, imageReferer)}
             alt={`${displayTitle} - الفصل ${chapter} - صفحة ${index + 1}`}
-            loading={index < 2 ? "eager" : "lazy"}
-            fetchPriority={index === 0 ? "high" : "auto"}
-            onLoad={() => {
-              if (!restoredRef.current && index < 2) {
-                window.dispatchEvent(new Event("resize"));
-              }
-            }}
+            shouldLoad={requestedPages.has(index)}
+            onNear={requestPage}
+            onSettled={settlePage}
           />
         ))}
       </div>
@@ -209,5 +292,60 @@ function ReaderChapter({
         <span>تقدم القراءة: {Math.round(percent)}%</span>
       </div>
     </main>
+  );
+}
+
+
+function ProgressiveReaderPage({
+  index,
+  src,
+  alt,
+  shouldLoad,
+  onNear,
+  onSettled,
+}: {
+  index: number;
+  src: string;
+  alt: string;
+  shouldLoad: boolean;
+  onNear: (index: number) => void;
+  onSettled: (index: number, loaded: boolean) => void;
+}) {
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    if (shouldLoad) return;
+    const image = imageRef.current;
+    if (!image) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      onNear(index);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        onNear(index);
+        observer.disconnect();
+      },
+      { rootMargin: READER_PRELOAD_MARGIN },
+    );
+
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [index, onNear, shouldLoad]);
+
+  return (
+    <img
+      ref={imageRef}
+      src={shouldLoad ? src : undefined}
+      alt={alt}
+      loading="eager"
+      decoding="async"
+      fetchPriority={index === 0 ? "high" : "auto"}
+      onLoad={() => onSettled(index, true)}
+      onError={() => onSettled(index, false)}
+    />
   );
 }
