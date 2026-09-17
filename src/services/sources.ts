@@ -66,9 +66,9 @@ export const sourceService = {
     return payload.items;
   },
 
-  imageUrl(source: SourceName, url?: string) {
+  imageUrl(source: SourceName, url?: string, referer?: string) {
     if (!url) return "";
-    return `/api/source/image?${params({ source, url })}`;
+    return `/api/source/image?${params({ source, url, referer })}`;
   },
 
   isSourceKey(key?: string | null) {
