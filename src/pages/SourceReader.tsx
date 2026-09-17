@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon, Progress } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
+import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import type { SourceChapterPayload } from "../types";
 
@@ -79,6 +80,7 @@ function ReaderChapter({
     payload.item.source === "teamx"
       ? selectedChapter?.url || `${payload.item.url.replace(/\/$/, "")}/${chapter}`
       : undefined;
+  const displayTitle = sourceDisplayTitle(payload.item);
 
   useLayoutEffect(() => {
     const previousRestoration = history.scrollRestoration;
@@ -148,7 +150,7 @@ function ReaderChapter({
           <Icon name="back" />
         </Link>
         <div>
-          <small dir="auto">{payload.item.title}</small>
+          <small dir="auto">{displayTitle}</small>
           <h1>الفصل {chapter}</h1>
         </div>
         <span>{Math.round(percent)}%</span>
@@ -159,7 +161,7 @@ function ReaderChapter({
           <img
             key={`${index}:${page}`}
             src={sourceService.imageUrl(payload.item.source, page, imageReferer)}
-            alt={`${payload.item.title} - الفصل ${chapter} - صفحة ${index + 1}`}
+            alt={`${displayTitle} - الفصل ${chapter} - صفحة ${index + 1}`}
             loading={index < 2 ? "eager" : "lazy"}
             fetchPriority={index === 0 ? "high" : "auto"}
             onLoad={() => {
