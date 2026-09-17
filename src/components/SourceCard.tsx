@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { SourceManga } from "../types";
 import { useLibrary } from "../hooks/useLibrary";
+import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { SourceCoverImage } from "./SourceCoverImage";
 
@@ -15,6 +16,7 @@ export function SourceCard({
   const progress = Object.values(data?.progress ?? {})
     .filter((entry) => entry.mangaId === item.key)
     .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const displayTitle = sourceDisplayTitle(item);
 
   return (
     <Link className="manga-card source-card" to={`/source/${encodeURIComponent(item.key)}`}>
@@ -22,7 +24,7 @@ export function SourceCard({
         {item.cover ? (
           <SourceCoverImage
             item={item}
-            alt={`غلاف ${item.title}`}
+            alt={`غلاف ${displayTitle}`}
             width="300"
             height="420"
             loading="lazy"
@@ -32,7 +34,7 @@ export function SourceCard({
         )}
         <span className="cover-label">{sourceService.sourceLabel(item.source)}</span>
       </div>
-      <h3 dir="auto">{item.title}</h3>
+      <h3 dir="auto">{displayTitle}</h3>
       <p>
         {detail
           ? progress
