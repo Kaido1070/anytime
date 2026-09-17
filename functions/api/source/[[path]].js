@@ -709,20 +709,39 @@ async function asqSeries(db, item) {
       "",
   );
 
+  const sourceType = normalizeAsqType(
+    firstMatch(plain, /النوع\s*:?\s*(رواية ويب|رواية|مانجا ويب|مانهوا|مانجا|كوميك)/i) ||
+      firstMatch(plain, /type\s*:?\s*(web novel|light novel|novel|webtoon|manhwa|manga|comic)/i) ||
+      item.type,
+  );
   const genres = asqGenres(html);
+  if (sourceType === "novel" || sourceType === "web-novel") genres.push("روايات");
+  const normalizedGenres = [...new Set(genres)];
   const chapters = parseAsqChapters(html, item.url || ASQ_BASE + "/manga/" + item.slug + "/");
   const updated = {
     ...item,
+    type: sourceType || item.type,
     title,
     cover,
     description,
     status,
-    genres,
+    genres: normalizedGenres,
     latest: chapters[0]?.number ?? null,
     chapters,
   };
   await rememberItems(db, [updated]);
   return updated;
+}
+
+function normalizeAsqType(value) {
+  const type = cleanText(value).toLowerCase();
+  if (/رواية\s*ويب|web\s*novel/.test(type)) return "web-novel";
+  if (/رواية|light\s*novel|novel/.test(type)) return "novel";
+  if (/مانهوا|manhwa/.test(type)) return "manhwa";
+  if (/مانجا\s*ويب|webtoon/.test(type)) return "webtoon";
+  if (/مانجا|manga/.test(type)) return "manga";
+  if (/كوميك|comic/.test(type)) return "comic";
+  return type || "manga";
 }
 
 function parseAsqChapters(html, seriesUrl) {
@@ -1135,5 +1154,6 @@ export const __test = {
   parseAsqChapters,
   parseAsqPages,
   asqChapterNumber,
+  normalizeAsqType,
   normalizeStatus,
 };
