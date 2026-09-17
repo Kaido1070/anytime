@@ -79,7 +79,7 @@ function ReaderChapter({
   const imageReferer =
     payload.item.source === "teamx"
       ? selectedChapter?.url || `${payload.item.url.replace(/\/$/, "")}/${chapter}`
-      : payload.item.source === "3asq"
+      : payload.item.source === "3asq" || payload.item.source === "starzmanga"
         ? selectedChapter?.url || payload.item.url
         : undefined;
   const displayTitle = sourceDisplayTitle(payload.item);
