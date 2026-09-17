@@ -2,6 +2,12 @@ const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PASSWORD_ITERATIONS = 25000;
 
+const PRIVATE_ACCOUNTS = [
+  { id: "mahdi", username: "has", name: "Has" },
+  { id: "kaido", username: "yas", name: "Yas" },
+  { id: "ahmed", username: "mah", name: "Mah" },
+];
+
 const DEFAULT_PASSWORD_MIGRATIONS = new Map([
   [
     "Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE",
@@ -20,18 +26,31 @@ const DEFAULT_PASSWORD_MIGRATIONS = new Map([
 export async function onRequestPost(context) {
   const { request } = context;
   const db = context.env?.DB;
-  if (!db) return json({ error: "D1_NOT_CONFIGURED", message: "قاعدة بيانات Anytime غير مربوطة بالموقع بعد." }, 503);
+  if (!db) {
+    return json(
+      {
+        error: "D1_NOT_CONFIGURED",
+        message: "قاعدة بيانات Anytime غير مربوطة بالموقع بعد.",
+      },
+      503,
+    );
+  }
 
   const url = new URL(request.url);
   const origin = request.headers.get("Origin");
   if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
 
   try {
+    await syncPrivateAccountNames(db);
+
     const body = await request.json().catch(() => ({}));
     const username = normalizeUsername(body.username);
     const password = typeof body.password === "string" ? body.password : "";
     if (!username || password.length < 1 || password.length > 128) {
-      return json({ error: "INVALID_LOGIN", message: "بيانات الدخول غير صحيحة." }, 401);
+      return json(
+        { error: "INVALID_LOGIN", message: "بيانات الدخول غير صحيحة." },
+        401,
+      );
     }
 
     let user = await db
@@ -43,14 +62,26 @@ export async function onRequestPost(context) {
 
     if (!user) {
       await sleep(100);
-      return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
+      return json(
+        {
+          error: "INVALID_LOGIN",
+          message: "اسم المستخدم أو كلمة المرور غير صحيحة.",
+        },
+        401,
+      );
     }
 
     user = await migrateDefaultPasswordIfNeeded(db, user);
 
     if (!(await verifyPassword(password, user))) {
       await sleep(100);
-      return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
+      return json(
+        {
+          error: "INVALID_LOGIN",
+          message: "اسم المستخدم أو كلمة المرور غير صحيحة.",
+        },
+        401,
+      );
     }
 
     const token = randomToken(32);
@@ -75,10 +106,33 @@ export async function onRequestPost(context) {
   } catch (error) {
     console.error("Anytime login error", error);
     return json(
-      { error: "SERVER_ERROR", message: "صار خطأ أثناء تسجيل الدخول. حاول مرة ثانية." },
+      {
+        error: "SERVER_ERROR",
+        message: "صار خطأ أثناء تسجيل الدخول. حاول مرة ثانية.",
+      },
       500,
     );
   }
+}
+
+async function syncPrivateAccountNames(db) {
+  const now = Date.now();
+  await db.batch(
+    PRIVATE_ACCOUNTS.map((account) =>
+      db
+        .prepare(
+          "UPDATE users SET username = ?, name = ?, updated_at = ? WHERE id = ? AND (username <> ? OR name <> ?)",
+        )
+        .bind(
+          account.username,
+          account.name,
+          now,
+          account.id,
+          account.username,
+          account.name,
+        ),
+    ),
+  );
 }
 
 async function migrateDefaultPasswordIfNeeded(db, user) {
@@ -102,8 +156,15 @@ async function migrateDefaultPasswordIfNeeded(db, user) {
 
 async function verifyPassword(password, row) {
   const salt = base64UrlToBytes(row.password_salt);
-  const derived = await derivePasswordHash(password, salt, Number(row.password_iterations));
-  return timingSafeEqual(base64UrlToBytes(derived), base64UrlToBytes(row.password_hash));
+  const derived = await derivePasswordHash(
+    password,
+    salt,
+    Number(row.password_iterations),
+  );
+  return timingSafeEqual(
+    base64UrlToBytes(derived),
+    base64UrlToBytes(row.password_hash),
+  );
 }
 
 async function derivePasswordHash(password, salt, iterations) {
@@ -123,7 +184,10 @@ async function derivePasswordHash(password, salt, iterations) {
 }
 
 async function sha256Base64Url(value) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
@@ -137,12 +201,16 @@ function timingSafeEqual(a, b) {
 function bytesToBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 function base64UrlToBytes(value) {
   const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
+  const padded =
+    normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
   const binary = atob(padded);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
