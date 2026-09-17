@@ -7,12 +7,12 @@ export function Favorites() {
   const items = manga.filter((item) => data?.favorites.includes(item.id));
   return (
     <>
-      <p className="eyebrow">YOUR PERSONAL SHELF</p>
+      <p className="eyebrow">مكتبتك الخاصة</p>
       <h1>
-        Favorites<span className="accent">.</span>
+        المفضلة<span className="accent">.</span>
       </h1>
       <p className="muted page-intro">
-        {items.length} stories worth coming back to.
+        {items.length} أعمال محفوظة عندك.
       </p>
       <div className="cover-grid">
         {items.map((item) => (
@@ -21,10 +21,10 @@ export function Favorites() {
       </div>
       {!items.length && (
         <div className="empty">
-          <h2>Your shelf is waiting.</h2>
-          <p>Find a story on Home or borrow inspiration from a friend.</p>
+          <h2>مفضلتك فاضية.</h2>
+          <p>أضف عملا من الرئيسية أو خذ اقتراحا من أحد أصدقائك.</p>
           <Link className="primary" to="/">
-            Explore stories →
+            استعرض الأعمال ←
           </Link>
         </div>
       )}
