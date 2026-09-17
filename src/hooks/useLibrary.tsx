@@ -26,7 +26,7 @@ function useLibraryState() {
       })
       .catch(() =>
         setError(
-          "Local storage is unavailable. Enable browser storage and reload.",
+          "تعذر استخدام التخزين المحلي. فعّل تخزين المتصفح ثم أعد تحميل الصفحة.",
         ),
       )
       .finally(() => setLoading(false));
@@ -48,7 +48,7 @@ function useLibraryState() {
       else await service.addFavorite(id);
       await refresh();
     } catch {
-      setError("Could not save favorites. Check available browser storage.");
+      setError("تعذر حفظ المفضلة. تحقق من مساحة تخزين المتصفح.");
     }
   };
   const saveProgress = async (progress: ReadingProgress) => {
@@ -56,7 +56,7 @@ function useLibraryState() {
       await service.saveReadingProgress(progress);
       setData(await service.getData());
     } catch {
-      setError("Reading progress could not be saved on this device.");
+      setError("تعذر حفظ تقدم القراءة على هذا الجهاز.");
     }
   };
   return {
