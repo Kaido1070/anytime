@@ -16,6 +16,7 @@ export function AppLayout() {
         style={{ direction: "ltr", justifyContent: "flex-start" }}
       >
         <Link to="/" className="wordmark" dir="ltr">
+          <span className="brand-mark">a</span>
           Anytime
         </Link>
       </header>
