@@ -63,12 +63,11 @@ CREATE TABLE IF NOT EXISTS friendships (
   FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Initial private accounts. Password hashes use PBKDF2-SHA256 (210,000 rounds).
--- The original Phase 1 password remains valid until each user changes it from Profile.
+-- Stable internal IDs are retained so existing favorites, progress, friendships and sessions survive account renames.
 INSERT OR IGNORE INTO users VALUES
-  ('mahdi','mahdi','Mahdi','nckWsLoOqPQ2ko0y6KFcdQ','Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE',210000,unixepoch()*1000,unixepoch()*1000),
-  ('kaido','kaido','Kaido','w-fi6L0FIdkx0NNSYyhvdg','g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y',210000,unixepoch()*1000,unixepoch()*1000),
-  ('ahmed','ahmed','Ahmed','4ueIIy1PaWKbbDjqIkf39g','Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI',210000,unixepoch()*1000,unixepoch()*1000);
+  ('mahdi','has','Has','nckWsLoOqPQ2ko0y6KFcdQ','Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE',210000,unixepoch()*1000,unixepoch()*1000),
+  ('kaido','yas','Yas','w-fi6L0FIdkx0NNSYyhvdg','g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y',210000,unixepoch()*1000,unixepoch()*1000),
+  ('ahmed','mah','Mah','4ueIIy1PaWKbbDjqIkf39g','Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI',210000,unixepoch()*1000,unixepoch()*1000);
 
 INSERT OR IGNORE INTO favorites VALUES
   ('mahdi','returner',unixepoch()*1000),
