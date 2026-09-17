@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import type { Manga } from "../types";
 import { useLibrary } from "../hooks/useLibrary";
+
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     home: "m3 10 9-7 9 7v10H3Z M9 20v-7h6v7",
+    search: "m21 21-4.35-4.35 M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
     favorites: "M6 3h12v18l-6-4-6 4Z",
     friends:
       "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3 M18 7a3 3 0 0 1 0 6 M22 21v-3a4 4 0 0 0-3-4 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
@@ -28,6 +30,7 @@ export function Icon({ name }: { name: string }) {
     </svg>
   );
 }
+
 export function Progress({ value }: { value: number }) {
   return (
     <div
@@ -42,6 +45,7 @@ export function Progress({ value }: { value: number }) {
     </div>
   );
 }
+
 export function MangaCard({
   item,
   detail = false,
@@ -58,7 +62,7 @@ export function MangaCard({
       <div className="cover-wrap">
         <img
           src={item.cover}
-          alt={`غلاف تجريبي لـ ${item.title}`}
+          alt={`غلاف ${item.title}`}
           width="300"
           height="420"
         />
@@ -78,6 +82,7 @@ export function MangaCard({
     </Link>
   );
 }
+
 export function SectionTitle({
   title,
   to,
@@ -98,6 +103,7 @@ export function SectionTitle({
     </div>
   );
 }
+
 export function Back({ to = "/" }: { to?: string }) {
   return (
     <Link className="back" to={to}>

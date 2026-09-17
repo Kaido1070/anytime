@@ -9,13 +9,23 @@ import { MangaDetails } from "./pages/MangaDetails";
 import { Friends, FriendProfile } from "./pages/Friends";
 import { Profile } from "./pages/Profile";
 import { Reader } from "./pages/Reader";
+import { Discover } from "./pages/Discover";
+import { SourceMangaDetails } from "./pages/SourceMangaDetails";
+import { SourceReader } from "./pages/SourceReader";
+import "./phase3.css";
+
 export default function App() {
   const { user, loading, error } = useLibrary();
   const { pathname } = useLocation();
+
   useEffect(() => {
-    if (!pathname.startsWith("/read/")) window.scrollTo(0, 0);
+    if (!pathname.startsWith("/read/") && !pathname.startsWith("/read-source/")) {
+      window.scrollTo(0, 0);
+    }
   }, [pathname]);
+
   if (loading) return <div className="loading">جاري فتح مكتبتك…</div>;
+
   return (
     <>
       {error && (
@@ -30,7 +40,9 @@ export default function App() {
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route element={<AppLayout />}>
             <Route index element={<Home />} />
+            <Route path="discover" element={<Discover />} />
             <Route path="manga/:id" element={<MangaDetails />} />
+            <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
             <Route path="friends" element={<Friends />} />
             <Route path="friends/:id" element={<FriendProfile />} />
@@ -46,6 +58,7 @@ export default function App() {
             />
           </Route>
           <Route path="read/:id/:chapter" element={<Reader />} />
+          <Route path="read-source/:key/:chapter" element={<SourceReader />} />
         </Routes>
       )}
     </>
