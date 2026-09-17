@@ -9,6 +9,7 @@ const SOURCES: { id: SourceName; label: string }[] = [
   { id: "mangatime", label: "MangaTime" },
   { id: "teamx", label: "Team-X" },
   { id: "3asq", label: "3asq" },
+  { id: "starzmanga", label: "StarzManga" },
 ];
 
 type SourceFilter = "all" | SourceName;
@@ -33,6 +34,7 @@ const EMPTY_HAS_MORE: HasMoreBySource = {
   mangatime: false,
   teamx: false,
   "3asq": false,
+  starzmanga: false,
 };
 
 const GENRES: { id: GenreId; label: string; aliases: string[] }[] = [
