@@ -4,7 +4,7 @@ export interface User {
   username: string;
 }
 
-export type SourceName = "mangatime" | "teamx";
+export type SourceName = "mangatime" | "teamx" | "3asq";
 
 export interface SourceChapter {
   number: number;
