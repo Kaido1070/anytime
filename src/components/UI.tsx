@@ -33,7 +33,7 @@ export function Progress({ value }: { value: number }) {
     <div
       className="progress"
       role="progressbar"
-      aria-label="Reading progress"
+      aria-label="تقدم القراءة"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(value)}
@@ -58,30 +58,30 @@ export function MangaCard({
       <div className="cover-wrap">
         <img
           src={item.cover}
-          alt={`${item.title} placeholder cover`}
+          alt={`غلاف تجريبي لـ ${item.title}`}
           width="300"
           height="420"
         />
         <span className="cover-label">
-          {item.status === "Completed" ? "COMPLETE" : "UPDATING"}
+          {item.status === "Completed" ? "مكتمل" : "مستمر"}
         </span>
       </div>
       <h3>{item.title}</h3>
       <p>
         {detail
           ? progress
-            ? `Ch. ${progress.chapter} · ${Math.round(progress.percent)}% read`
-            : "Not started"
+            ? `الفصل ${progress.chapter} · قرأت ${Math.round(progress.percent)}%`
+            : "لم تبدأ بعد"
           : item.genres.join(" · ")}
       </p>
-      {detail && <small>Latest chapter {item.latest}</small>}
+      {detail && <small>آخر فصل {item.latest}</small>}
     </Link>
   );
 }
 export function SectionTitle({
   title,
   to,
-  label = "View all",
+  label = "عرض الكل",
 }: {
   title: string;
   to?: string;
@@ -101,7 +101,7 @@ export function SectionTitle({
 export function Back({ to = "/" }: { to?: string }) {
   return (
     <Link className="back" to={to}>
-      <Icon name="back" /> Back
+      <Icon name="back" /> رجوع
     </Link>
   );
 }
