@@ -38,3 +38,35 @@ test("source status normalization supports Arabic and English", () => {
   assert.equal(__test.normalizeStatus("Completed"), "completed");
   assert.equal(__test.normalizeStatus("متوقف"), "hiatus");
 });
+
+
+test("3asq parser reads Madara chapter numbers and URLs", () => {
+  const html = `
+    <ul>
+      <li class="wp-manga-chapter"><a href="https://3asq.online/manga/one-piece/chapter-1193/">الفصل 1193</a></li>
+      <li class="wp-manga-chapter"><a href="/manga/one-piece/1037_1/">الفصل 1037.1</a></li>
+    </ul>
+  `;
+  const chapters = __test.parseAsqChapters(html, "https://3asq.online/manga/one-piece/");
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [1193, 1037.1]);
+  assert.ok(chapters[0].url.includes("/manga/one-piece/chapter-1193/"));
+});
+
+test("3asq page parser prefers lazy Madara page images", () => {
+  const html = `
+    <div class="reading-content">
+      <div class="page-break"><img src="data:image/gif;base64,placeholder" data-src="https://cdn.example.com/001.webp"></div>
+      <div class="page-break"><img data-lazy-src="https://cdn.example.com/002.webp"></div>
+    </div>
+    <footer><img src="/logo.png"></footer>
+  `;
+  assert.deepEqual(__test.parseAsqPages(html), [
+    "https://cdn.example.com/001.webp",
+    "https://cdn.example.com/002.webp",
+  ]);
+});
+
+test("3asq chapter number parser handles Madara slugs", () => {
+  assert.equal(__test.asqChapterNumber("الفصل 12.5", "chapter-12-5"), 12.5);
+  assert.equal(__test.asqChapterNumber("", "1037_1"), 1037.1);
+});
