@@ -1,5 +1,6 @@
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
+const ASQ_BASE = "https://3asq.online";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -13,7 +14,7 @@ export async function onRequestGet({ request, env }) {
 
   const url = new URL(request.url);
   const key = String(url.searchParams.get("key") ?? "").trim();
-  if (!/^mt:[A-Za-z0-9_-]{1,110}$/.test(key)) {
+  if (!/^(?:mt|aq):[A-Za-z0-9_-]{1,110}$/.test(key)) {
     return json({ error: "INVALID_SOURCE_KEY" }, 400);
   }
 
@@ -22,13 +23,31 @@ export async function onRequestGet({ request, env }) {
     .bind(key)
     .first();
 
-  if (!item || item.source !== "mangatime") {
+  if (!item || !["mangatime", "3asq"].includes(String(item.source))) {
     return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
   }
 
-  const storedCover = absoluteUrl(MANGATIME_BASE, item.cover_url);
+  const source = String(item.source);
+  const base = source === "3asq" ? ASQ_BASE : MANGATIME_BASE;
+  const storedCover = absoluteUrl(base, item.cover_url);
 
   try {
+    if (source === "3asq") {
+      const detailCovers = await asqDetailCovers(String(item.slug || ""));
+      const stableCover = detailCovers[0] || storedCover;
+      const covers = buildCoverCandidates(...detailCovers, storedCover);
+
+      if (stableCover) {
+        await env.DB
+          .prepare("UPDATE source_items SET cover_url = ?, updated_at = ? WHERE source_key = ?")
+          .bind(stableCover, Date.now(), key)
+          .run()
+          .catch(() => undefined);
+      }
+
+      return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
+    }
+
     const detail = await mangaTimeTrpc("content.getSeriesBySlug", { slug: String(item.slug || "") });
     const detailCover = absoluteUrl(MANGATIME_BASE, detail?.coverUrl) || storedCover;
     const covers = buildCoverCandidates(detailCover, storedCover);
@@ -43,22 +62,22 @@ export async function onRequestGet({ request, env }) {
 
     return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
   } catch (error) {
-    console.error("MangaTime cover resolver error", error);
+    console.error(source === "3asq" ? "3asq cover resolver error" : "MangaTime cover resolver error", error);
     return json(
-      { covers: buildCoverCandidates(storedCover, storedCover) },
+      { covers: buildCoverCandidates(storedCover) },
       200,
       { "Cache-Control": "private, max-age=300" },
     );
   }
 }
 
-function buildCoverCandidates(primary, fallback) {
+function buildCoverCandidates(...candidates) {
   const values = [];
   const add = (value) => {
     if (value && !values.includes(value)) values.push(value);
   };
 
-  for (const value of [primary, fallback]) {
+  for (const value of candidates) {
     if (!value) continue;
     const original = unwrapAndMaximize(value);
     add(original);
@@ -96,6 +115,83 @@ function unwrapAndMaximize(value) {
   } catch {
     return current;
   }
+}
+
+async function asqDetailCovers(slug) {
+  const target = new URL(`/manga/${encodeURIComponent(slug)}/`, ASQ_BASE);
+  const response = await fetch(target, {
+    headers: sourceHeaders(
+      ASQ_BASE,
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    ),
+    redirect: "follow",
+    cf: { cacheTtl: 3600, cacheEverything: true },
+  });
+  if (!response.ok) throw new Error(`3asq HTTP ${response.status}`);
+
+  const html = await response.text();
+  const summary =
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*\bsummary_image\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+    html;
+
+  const imageMatch = summary.match(/<img\b([^>]*)>/i);
+  if (!imageMatch) return [];
+
+  const attrs = parseAttrs(imageMatch[1]);
+  const candidates = [];
+
+  const add = (value) => {
+    const absolute = absoluteUrl(ASQ_BASE, decodeEntities(value));
+    if (absolute && !candidates.includes(absolute) && !absolute.startsWith("data:")) {
+      candidates.push(absolute);
+    }
+  };
+
+  add(attrs["data-src"]);
+  add(attrs["data-lazy-src"]);
+
+  for (const value of srcsetCandidates(attrs.srcset)) add(value);
+  add(attrs.src);
+
+  return candidates;
+}
+
+function srcsetCandidates(value) {
+  if (!value) return [];
+  return String(value)
+    .split(",")
+    .map((entry) => {
+      const [url, descriptor = ""] = entry.trim().split(/\s+/, 2);
+      const width = Number.parseInt(descriptor, 10) || 0;
+      return { url, width };
+    })
+    .filter((entry) => entry.url)
+    .sort((a, b) => b.width - a.width)
+    .map((entry) => entry.url);
+}
+
+function parseAttrs(value) {
+  const attrs = {};
+  const regex = /([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
+  let match;
+  while ((match = regex.exec(String(value || "")))) {
+    attrs[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? "";
+  }
+  return attrs;
+}
+
+function firstMatch(value, regex) {
+  return String(value || "").match(regex)?.[1] || "";
+}
+
+function decodeEntities(value) {
+  return String(value || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ");
 }
 
 async function mangaTimeTrpc(endpoint, input) {
