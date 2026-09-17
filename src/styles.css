@@ -626,6 +626,178 @@ small {
 .profile-info b {
   font-weight: 500;
 }
+.profile-visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  margin-top: 12px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  background: #252724;
+  font-size: 10px;
+  font-weight: 700;
+}
+.profile-stats {
+  max-width: 760px;
+}
+.profile-privacy-card {
+  max-width: 760px;
+  margin: 0 auto 42px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.profile-privacy-copy h2 {
+  margin: 3px 0 8px;
+  font-size: 20px;
+}
+.profile-privacy-copy .muted {
+  margin: 0;
+  line-height: 1.8;
+}
+.privacy-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 18px;
+  padding: 5px;
+  border: 1px solid #393c3d;
+  border-radius: 10px;
+  background: #191b1c;
+}
+.privacy-toggle button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+.privacy-toggle button.active {
+  background: var(--accent);
+  color: #202224;
+}
+.privacy-toggle button:disabled {
+  opacity: 0.65;
+}
+.profile-library-section {
+  max-width: 880px;
+  margin: 0 auto 42px;
+}
+.profile-reading-list,
+.friend-history-list {
+  display: grid;
+  gap: 10px;
+}
+.profile-reading-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.profile-reading-cover {
+  width: 72px;
+  aspect-ratio: 5 / 7;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #191b1c;
+}
+.profile-reading-cover img,
+.profile-reading-cover .source-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: cover;
+  border-radius: 0;
+}
+.profile-reading-copy {
+  min-width: 0;
+}
+.profile-reading-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.profile-reading-title > div {
+  min-width: 0;
+}
+.profile-reading-title small {
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 700;
+}
+.profile-reading-title h3 {
+  margin: 4px 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.profile-reading-title b {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.profile-reading-copy > p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.profile-row-arrow {
+  color: var(--muted);
+  font-size: 18px;
+}
+.profile-favorites-grid {
+  margin-top: 4px;
+}
+.profile-security {
+  max-width: 460px;
+  margin: 44px auto 0;
+}
+.friend-row-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.friend-row-title h2 {
+  margin-bottom: 0;
+}
+.friend-private-badge {
+  padding: 3px 8px;
+  border: 1px solid #4a4d4e;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.friend-private-note {
+  margin: 0 0 34px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.friend-private-note b {
+  display: block;
+  margin-bottom: 6px;
+}
+.friend-private-note p {
+  margin: 0;
+  line-height: 1.7;
+}
+.friend-history-list {
+  margin-bottom: 30px;
+}
 .signout {
   display: flex;
   justify-content: space-between;
@@ -950,6 +1122,42 @@ small {
   .update-row img {
     width: 49px;
     height: 66px;
+  }
+  .profile-stats {
+    margin-bottom: 24px;
+  }
+  .profile-stats strong {
+    font-size: 24px;
+  }
+  .profile-stats span {
+    font-size: 10px;
+  }
+  .profile-privacy-card {
+    padding: 16px;
+    margin-bottom: 30px;
+  }
+  .profile-library-section {
+    margin-bottom: 32px;
+  }
+  .profile-reading-row {
+    grid-template-columns: 54px minmax(0, 1fr);
+    gap: 11px;
+    padding: 10px;
+  }
+  .profile-reading-cover {
+    width: 54px;
+  }
+  .profile-row-arrow {
+    display: none;
+  }
+  .profile-reading-title h3 {
+    font-size: 13px;
+  }
+  .profile-reading-title b {
+    font-size: 10px;
+  }
+  .profile-reading-copy > p {
+    font-size: 10px;
   }
   .update-row h3 {
     font-size: 13px;
