@@ -1,3 +1,4 @@
+// Production reader deploy marker: Team-X images use the chapter referer path.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon, Progress } from "../components/UI";
