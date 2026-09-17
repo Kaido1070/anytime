@@ -42,7 +42,7 @@ export function Favorites() {
       {!keys.length && (
         <div className="empty">
           <h2>مفضلتك فاضية.</h2>
-          <p>ابحث في MangaTime أو Team-X وأضف اللي تبيه.</p>
+          <p>ابحث في المصادر وأضف اللي تبيه.</p>
           <Link className="primary" to="/discover">
             استعرض الأعمال ←
           </Link>

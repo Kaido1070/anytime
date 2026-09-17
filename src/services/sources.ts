@@ -104,10 +104,12 @@ export const sourceService = {
   },
 
   isSourceKey(key?: string | null) {
-    return Boolean(key && /^(mt|tx):/.test(key));
+    return Boolean(key && /^(mt|tx|aq):/.test(key));
   },
 
   sourceLabel(source: SourceName) {
-    return source === "mangatime" ? "MangaTime" : "Team-X";
+    if (source === "mangatime") return "MangaTime";
+    if (source === "teamx") return "Team-X";
+    return "3asq";
   },
 };

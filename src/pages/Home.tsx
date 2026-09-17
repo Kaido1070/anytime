@@ -48,15 +48,18 @@ export function Home() {
     Promise.allSettled([
       sourceService.latest("mangatime", 1),
       sourceService.latest("teamx", 1),
+      sourceService.latest("3asq", 1),
     ]).then((results) => {
       if (!active) return;
       const mangaTime = results[0].status === "fulfilled" ? results[0].value.items : [];
       const teamX = results[1].status === "fulfilled" ? results[1].value.items : [];
+      const asq = results[2].status === "fulfilled" ? results[2].value.items : [];
       const interleaved: SourceManga[] = [];
-      const max = Math.max(mangaTime.length, teamX.length);
+      const max = Math.max(mangaTime.length, teamX.length, asq.length);
       for (let i = 0; i < max; i += 1) {
-        if (mangaTime[i]) interleaved.push(mangaTime[i]);
         if (teamX[i]) interleaved.push(teamX[i]);
+        if (asq[i]) interleaved.push(asq[i]);
+        if (mangaTime[i]) interleaved.push(mangaTime[i]);
       }
       setLatest(mergeSourceItems(interleaved).slice(0, 4));
     });
@@ -133,7 +136,7 @@ export function Home() {
         ) : (
           <div className="source-callout">
             <div>
-              <b>MangaTime + Team-X</b>
+              <b>Team-X + 3asq + MangaTime</b>
               <p className="muted">بحث وفصول حقيقية داخل قارئ Anytime.</p>
             </div>
             <Link className="primary" to="/discover">فتح الاستكشاف</Link>

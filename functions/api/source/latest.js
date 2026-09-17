@@ -1,11 +1,15 @@
+import { onRequest as handleSourceRequest } from "./[[path]].js";
+
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
 const SOURCE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet(context) {
+  const { request, env } = context;
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") || "mangatime").toLowerCase();
+  if (source === "3asq") return handleSourceRequest(context);
   if (!env.DB) return json({ error: "D1_NOT_CONFIGURED", message: "قاعدة بيانات Anytime غير مربوطة بالموقع." }, 503);
   if (!(await getSession(request, env.DB))) return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
   const page = safePage(url.searchParams.get("page"));

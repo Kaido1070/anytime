@@ -1,6 +1,7 @@
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
+const ASQ_BASE = "https://3asq.online";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -18,6 +19,7 @@ export async function onRequest(context) {
       sources: [
         { id: "mangatime", name: "MangaTime", mode: "trpc" },
         { id: "teamx", name: "Team-X", mode: "html" },
+        { id: "3asq", name: "3asq", mode: "html" },
       ],
     });
   }
@@ -45,7 +47,9 @@ export async function onRequest(context) {
       const page = safePage(url.searchParams.get("page"));
       const payload = source === "mangatime"
         ? await mangaTimeList(db, { page, sortBy: "recent" })
-        : await teamXLatest(db, page);
+        : source === "teamx"
+          ? await teamXLatest(db, page)
+          : await asqLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -54,7 +58,9 @@ export async function onRequest(context) {
       const page = safePage(url.searchParams.get("page"));
       const payload = source === "mangatime"
         ? await mangaTimeList(db, { page, sortBy: "popularity" })
-        : await teamXPopular(db, page);
+        : source === "teamx"
+          ? await teamXPopular(db, page)
+          : await asqPopular(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -65,7 +71,9 @@ export async function onRequest(context) {
       const page = safePage(url.searchParams.get("page"));
       const payload = source === "mangatime"
         ? await mangaTimeList(db, { page, sortBy: "popularity", query })
-        : await teamXSearch(db, query);
+        : source === "teamx"
+          ? await teamXSearch(db, query)
+          : await asqSearch(db, query, page);
       return json(payload, 200, shortCache());
     }
 
@@ -85,7 +93,9 @@ export async function onRequest(context) {
       if (!item) return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
       const detail = item.source === "mangatime"
         ? await mangaTimeSeries(db, item)
-        : await teamXSeries(db, item);
+        : item.source === "teamx"
+          ? await teamXSeries(db, item)
+          : await asqSeries(db, item);
       return json({ item: detail }, 200, shortCache());
     }
 
@@ -99,7 +109,9 @@ export async function onRequest(context) {
       if (!item) return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
       const chapter = item.source === "mangatime"
         ? await mangaTimeChapter(context, db, item, number)
-        : await teamXChapter(db, item, number);
+        : item.source === "teamx"
+          ? await teamXChapter(db, item, number)
+          : await asqChapter(db, item, number);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
@@ -132,7 +144,7 @@ class SourceError extends Error {
 
 function sourceFromQuery(url) {
   const source = String(url.searchParams.get("source") ?? "mangatime").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq") {
     throw new SourceError("UNKNOWN_SOURCE", "المصدر غير معروف.", 400);
   }
   return source;
@@ -145,7 +157,7 @@ function safePage(value) {
 
 function safeSourceKey(value) {
   const key = String(value ?? "").trim();
-  return /^(mt|tx):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
+  return /^(mt|tx|aq):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
 }
 
 function shortCache() {
@@ -591,6 +603,305 @@ function teamXHasNext(html) {
   return /<a[^>]+rel=["']next["'][^>]*href=["'][^"']+["']/i.test(html);
 }
 
+
+// 3asq / Manga Al-Ashiq ------------------------------------------------------
+
+async function asqLatest(db, page) {
+  return asqList(db, { page, order: "latest" });
+}
+
+async function asqPopular(db, page) {
+  return asqList(db, { page, order: "views" });
+}
+
+async function asqList(db, { page, order }) {
+  const path = "/manga/page/" + page + "/?m_orderby=" + encodeURIComponent(order);
+  const html = await asqFetchText(path);
+  const items = await asqItemsFromHtml(html);
+  await rememberItems(db, items);
+  return { items: items.slice(0, 24), hasMore: asqHasNext(html), page };
+}
+
+async function asqSearch(db, query, page) {
+  const prefix = page > 1 ? "/page/" + page + "/" : "/";
+  const html = await asqFetchText(
+    prefix + "?s=" + encodeURIComponent(query) + "&post_type=wp-manga",
+  );
+  const items = await asqItemsFromHtml(html);
+  await rememberItems(db, items);
+  return { items: items.slice(0, 24), hasMore: asqHasNext(html), page };
+}
+
+async function asqItemsFromHtml(html) {
+  const bySlug = new Map();
+  const blocks = madaraBlocksByClass(html, ["c-tabs-item__content", "page-item-detail"]);
+  const candidates = blocks.length ? blocks : [String(html ?? "")];
+
+  for (const block of candidates) {
+    for (const anchor of extractAnchors(block)) {
+      const href = absoluteUrl(ASQ_BASE, anchor.href);
+      if (!href) continue;
+      let parsed;
+      try {
+        parsed = new URL(href);
+      } catch {
+        continue;
+      }
+      if (!/^(?:www\.)?3asq\.online$/i.test(parsed.hostname)) continue;
+      const match = parsed.pathname.match(/^\/manga\/([^/]+)\/?$/i);
+      if (!match) continue;
+
+      const slug = decodeURIComponent(match[1]);
+      if (!slug || bySlug.has(slug)) continue;
+
+      const title = cleanText(
+        anchor.attrs.title ||
+          firstMatch(anchor.inner, /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i) ||
+          firstImgAttr(block, "alt") ||
+          stripTags(anchor.inner),
+      );
+      if (!title || /^image$/i.test(title)) continue;
+
+      const cover = absoluteUrl(ASQ_BASE, asqFirstImage(block));
+      bySlug.set(slug, {
+        key: "aq:" + safeSlugKey(slug),
+        source: "3asq",
+        sourceId: slug,
+        slug,
+        type: "manga",
+        url: ASQ_BASE + "/manga/" + encodeURIComponent(slug) + "/",
+        title,
+        cover,
+        description: "",
+        status: "",
+        genres: [],
+      });
+      break;
+    }
+  }
+
+  return [...bySlug.values()].slice(0, 80);
+}
+
+async function asqSeries(db, item) {
+  const html = await asqFetchText(item.url || "/manga/" + encodeURIComponent(item.slug) + "/", false);
+  const title = cleanText(
+    firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+      firstMatch(html, /id=["']manga-title["'][^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+      firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+      item.title,
+  );
+
+  const summaryImage =
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*\bsummary_image\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+    "";
+  const cover = absoluteUrl(ASQ_BASE, asqFirstImage(summaryImage) || item.cover);
+  const description = cleanText(
+    firstMatch(html, /description-summary[^>]*>([\s\S]*?)<\/div>/i) ||
+      firstMatch(html, /manga-excerpt[^>]*>([\s\S]*?)<\/div>/i) ||
+      "",
+  );
+
+  const plain = cleanText(stripTags(html));
+  const status = normalizeStatus(
+    firstMatch(plain, /الحالة\s*:?[\s-]*(مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك)/i) ||
+      firstMatch(plain, /status\s*:?[\s-]*(ongoing|completed|hiatus|cancelled|canceled)/i) ||
+      "",
+  );
+
+  const genres = asqGenres(html);
+  const chapters = parseAsqChapters(html, item.url || ASQ_BASE + "/manga/" + item.slug + "/");
+  const updated = {
+    ...item,
+    title,
+    cover,
+    description,
+    status,
+    genres,
+    latest: chapters[0]?.number ?? null,
+    chapters,
+  };
+  await rememberItems(db, [updated]);
+  return updated;
+}
+
+function parseAsqChapters(html, seriesUrl) {
+  const base = new URL(seriesUrl, ASQ_BASE);
+  const basePath = base.pathname.replace(/\/$/, "");
+  const found = new Map();
+  const regex = /<li\b[^>]*class=["'][^"']*\bwp-manga-chapter\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+  let match;
+
+  while ((match = regex.exec(String(html ?? "")))) {
+    const block = match[1];
+    const anchor = extractAnchors(block).find((entry) => {
+      const href = absoluteUrl(ASQ_BASE, entry.href);
+      if (!href) return false;
+      try {
+        const parsed = new URL(href);
+        return parsed.pathname.startsWith(basePath + "/") && parsed.pathname !== basePath + "/";
+      } catch {
+        return false;
+      }
+    });
+    if (!anchor) continue;
+
+    const url = absoluteUrl(ASQ_BASE, anchor.href);
+    if (!url) continue;
+    const parsed = new URL(url);
+    const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+    const title = cleanText(stripTags(anchor.inner)) || chapterId;
+    const number = asqChapterNumber(title, chapterId);
+    if (!Number.isFinite(number)) continue;
+
+    found.set(number, {
+      number,
+      title: title || "الفصل " + number,
+      publishedAt: null,
+      url,
+    });
+  }
+
+  return [...found.values()].sort((a, b) => b.number - a.number);
+}
+
+function asqChapterNumber(title, chapterId) {
+  const values = [String(title ?? ""), String(chapterId ?? "").replace(/_/g, ".")];
+  for (const value of values) {
+    const explicit = value.match(/(?:الفصل|chapter|chap|ch)\s*[-#:]?\s*(\d+(?:\.\d+)?)/i);
+    if (explicit) return Number(explicit[1]);
+    const numeric = value.match(/(?:^|[^0-9])(\d+(?:\.\d+)?)(?:[^0-9]|$)/);
+    if (numeric) return Number(numeric[1]);
+  }
+  return Number.NaN;
+}
+
+async function asqChapter(db, item, number) {
+  const series = await asqSeries(db, item);
+  const selected = series.chapters?.find(
+    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  );
+  if (!selected?.url) {
+    throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في العاشق.", 404);
+  }
+
+  const chapterUrl = new URL(selected.url, ASQ_BASE);
+  chapterUrl.searchParams.set("style", "list");
+  const html = await asqFetchText(chapterUrl.toString(), false);
+  const pages = parseAsqPages(html);
+  if (!pages.length) {
+    throw new SourceError("NO_PAGES", "العاشق لم يرجع صور الفصل.", 502);
+  }
+
+  return {
+    item: series,
+    number,
+    title: selected.title || "الفصل " + number,
+    pages,
+    ...chapterNavigation(series.chapters ?? [], number),
+  };
+}
+
+function parseAsqPages(html) {
+  const source = String(html ?? "");
+  const pageBlocks = madaraBlocksByClass(source, ["page-break"]);
+  const pages = [];
+
+  for (const block of pageBlocks) {
+    const image = asqFirstImage(block);
+    const url = absoluteUrl(ASQ_BASE, image);
+    if (url && !isAsqUiImage(url)) pages.push(url);
+  }
+  if (pages.length) return [...new Set(pages)];
+
+  const marker = source.search(/class=["'][^"']*\breading-content\b[^"']*["']/i);
+  const tail = marker >= 0 ? source.slice(marker) : source;
+  const footer = tail.search(/(?:id=["'](?:comments|manga-discussion)["']|<footer\b)/i);
+  const scoped = footer >= 0 ? tail.slice(0, footer) : tail;
+
+  const regex = /<img\b([^>]*)>/gi;
+  let match;
+  while ((match = regex.exec(scoped))) {
+    const attrs = parseAttrs(match[1]);
+    const raw = asqImageFromAttrs(attrs);
+    const url = absoluteUrl(ASQ_BASE, raw);
+    if (!url || isAsqUiImage(url)) continue;
+    pages.push(url);
+  }
+  return [...new Set(pages)];
+}
+
+function asqGenres(html) {
+  const block =
+    firstMatch(html, /genres-content[^>]*>([\s\S]*?)<\/div>/i) ||
+    firstMatch(html, /manga-genres[^>]*>([\s\S]*?)<\/div>/i) ||
+    "";
+  return [...new Set(
+    extractAnchors(block)
+      .map((anchor) => cleanText(stripTags(anchor.inner)))
+      .filter((value) => value && value.length <= 60),
+  )];
+}
+
+function madaraBlocksByClass(html, classNames) {
+  const names = classNames.join("|");
+  const regex = new RegExp(
+    '<div\\b[^>]*class=["\'][^"\']*(?:' + names + ')[^"\']*["\'][^>]*>',
+    "gi",
+  );
+  const source = String(html ?? "");
+  const starts = [];
+  let match;
+  while ((match = regex.exec(source))) starts.push(match.index);
+  return starts.map((start, index) => source.slice(start, starts[index + 1] ?? source.length));
+}
+
+function asqFirstImage(html) {
+  const regex = /<img\b([^>]*)>/gi;
+  let match;
+  while ((match = regex.exec(String(html ?? "")))) {
+    const attrs = parseAttrs(match[1]);
+    const value = asqImageFromAttrs(attrs);
+    if (value && !String(value).startsWith("data:")) return value;
+  }
+  return "";
+}
+
+function asqImageFromAttrs(attrs) {
+  return attrs["data-src"] ||
+    attrs["data-lazy-src"] ||
+    bestSrcset(attrs.srcset) ||
+    attrs.src ||
+    "";
+}
+
+function isAsqUiImage(url) {
+  return /(?:logo|avatar|favicon|icon|profile)(?:[\/_-]|\.)/i.test(url);
+}
+
+async function asqFetchText(pathOrUrl, useBase = true) {
+  const target = new URL(pathOrUrl, ASQ_BASE).toString();
+  const response = await fetch(target, {
+    headers: sourceHeaders(
+      ASQ_BASE,
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    ),
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: true },
+  });
+  if (!response.ok) {
+    if (response.status === 403 || response.status === 503) {
+      throw new SourceError("ASQ_BLOCKED", "العاشق رفض الطلب مؤقتًا.", 502);
+    }
+    throw new SourceError("ASQ_UPSTREAM", "العاشق رجع HTTP " + response.status + ".", 502);
+  }
+  return response.text();
+}
+
+function asqHasNext(html) {
+  return /<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html);
+}
+
 // Shared parsing & transport -------------------------------------------------
 
 function chapterNavigation(chapters, number) {
@@ -604,7 +915,11 @@ function chapterNavigation(chapters, number) {
 }
 
 async function proxyImage(source, rawUrl) {
-  const base = source === "teamx" ? TEAMX_BASE : MANGATIME_BASE;
+  const base = source === "teamx"
+    ? TEAMX_BASE
+    : source === "3asq"
+      ? ASQ_BASE
+      : MANGATIME_BASE;
   const target = absoluteUrl(base, rawUrl);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
 
@@ -817,5 +1132,8 @@ export const __test = {
   extractImages,
   parseTeamXChapters,
   parseTeamXPages,
+  parseAsqChapters,
+  parseAsqPages,
+  asqChapterNumber,
   normalizeStatus,
 };

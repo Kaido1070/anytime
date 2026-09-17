@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import type { SourceManga } from "../types";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
-import { sourceDetailsPath } from "../services/sourceMerge";
+import { preferredSourceCover, sourceDetailsPath } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import { SourceCoverImage } from "./SourceCoverImage";
 
@@ -25,15 +25,16 @@ export function SourceCard({
     ? groupedItems.find((entry) => entry.key === progress.mangaId) ?? item
     : item;
   const displayTitle = sourceDisplayTitle(item);
+  const coverItem = preferredSourceCover(groupedItems) ?? item;
   const sourceNames = [...new Set(groupedItems.map((entry) => sourceService.sourceLabel(entry.source)))];
   const merged = sourceNames.length > 1;
 
   return (
     <Link className="manga-card source-card" to={sourceDetailsPath(linkedItem.key, groupedItems)}>
       <div className="cover-wrap">
-        {item.cover ? (
+        {coverItem.cover ? (
           <SourceCoverImage
-            item={item}
+            item={coverItem}
             alt={`غلاف ${displayTitle}`}
             width="300"
             height="420"

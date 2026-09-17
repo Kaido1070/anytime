@@ -79,7 +79,9 @@ function ReaderChapter({
   const imageReferer =
     payload.item.source === "teamx"
       ? selectedChapter?.url || `${payload.item.url.replace(/\/$/, "")}/${chapter}`
-      : undefined;
+      : payload.item.source === "3asq"
+        ? selectedChapter?.url || payload.item.url
+        : undefined;
   const displayTitle = sourceDisplayTitle(payload.item);
 
   useLayoutEffect(() => {

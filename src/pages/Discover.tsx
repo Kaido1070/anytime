@@ -8,6 +8,7 @@ import type { SourceManga, SourceName } from "../types";
 const SOURCES: { id: SourceName; label: string }[] = [
   { id: "mangatime", label: "MangaTime" },
   { id: "teamx", label: "Team-X" },
+  { id: "3asq", label: "3asq" },
 ];
 
 type SourceFilter = "all" | SourceName;
@@ -30,6 +31,7 @@ type HasMoreBySource = Record<SourceName, boolean>;
 const EMPTY_HAS_MORE: HasMoreBySource = {
   mangatime: false,
   teamx: false,
+  "3asq": false,
 };
 
 const GENRES: { id: GenreId; label: string; aliases: string[] }[] = [
