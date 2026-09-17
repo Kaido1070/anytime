@@ -1,4 +1,16 @@
 /* Mobile-only layout corrections layered after the base stylesheet. */
+
+/* Source chapters must keep each upstream image's intrinsic aspect ratio.
+   The base reader uses a fixed 8/11 ratio for the old mock reader; that
+   distorts real Team-X/MangaTime pages because chapter images vary in height. */
+.source-pages img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+
 @media (max-width: 759px) {
   .login-art {
     min-height: 0;
