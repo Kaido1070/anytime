@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
-import { manga, findManga } from "../data/mock";
-import { MangaCard, SectionTitle, Progress, Icon } from "../components/UI";
+import { SectionTitle, Progress, Icon } from "../components/UI";
 import { SourceCard } from "../components/SourceCard";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
@@ -27,16 +26,15 @@ export function Home() {
   }, [data?.lastOpened?.mangaId, data?.favorites, friends]);
 
   useEffect(() => {
+    let active = true;
     if (!sourceKeys.length) {
       setSourceItems({});
       return;
     }
-    let active = true;
     sourceService
       .resolve(sourceKeys)
       .then((items) => {
-        if (!active) return;
-        setSourceItems(Object.fromEntries(items.map((item) => [item.key, item])));
+        if (active) setSourceItems(Object.fromEntries(items.map((item) => [item.key, item])));
       })
       .catch(() => undefined);
     return () => {
@@ -67,19 +65,10 @@ export function Home() {
   }, []);
 
   const last = data?.lastOpened;
-  const sourceCurrent = last && sourceService.isSourceKey(last.mangaId)
-    ? sourceItems[last.mangaId]
-    : null;
-  const staticCurrent = last && !sourceService.isSourceKey(last.mangaId)
-    ? findManga(last.mangaId)
-    : null;
-  const current = staticCurrent ?? (!last ? manga[0] : null);
-  const chapter = last?.chapter ?? current?.chapters[0] ?? 0;
-  const progressId = sourceCurrent?.key ?? current?.id;
-  const percent = progressId ? data?.progress[`${progressId}:${chapter}`]?.percent ?? 0 : 0;
-
-  const staticFavorites = manga.filter((item) => data?.favorites.includes(item.id));
-  const sourceFavorites = (data?.favorites ?? [])
+  const current = last && sourceService.isSourceKey(last.mangaId) ? sourceItems[last.mangaId] : null;
+  const chapter = current && last ? last.chapter : 0;
+  const percent = current ? data?.progress[`${current.key}:${chapter}`]?.percent ?? 0 : 0;
+  const favorites = (data?.favorites ?? [])
     .filter((id) => sourceService.isSourceKey(id))
     .map((id) => sourceItems[id])
     .filter(Boolean)
@@ -97,22 +86,22 @@ export function Home() {
       </div>
 
       <SectionTitle title="كمل القراءة" />
-      {sourceCurrent ? (
+      {current ? (
         <section className="continue-card">
-          <Link className="continue-cover" to={`/source/${encodeURIComponent(sourceCurrent.key)}`}>
-            {sourceCurrent.cover ? (
+          <Link className="continue-cover" to={`/source/${encodeURIComponent(current.key)}`}>
+            {current.cover ? (
               <img
-                src={sourceService.imageUrl(sourceCurrent.source, sourceCurrent.cover)}
-                alt={`غلاف ${sourceCurrent.title}`}
+                src={sourceService.imageUrl(current.source, current.cover)}
+                alt={`غلاف ${current.title}`}
               />
             ) : (
-              <div className="source-cover-placeholder">{sourceCurrent.title.slice(0, 1)}</div>
+              <div className="source-cover-placeholder">{current.title.slice(0, 1)}</div>
             )}
           </Link>
           <div className="continue-copy">
-            <p className="eyebrow">{sourceService.sourceLabel(sourceCurrent.source)}</p>
-            <Link to={`/source/${encodeURIComponent(sourceCurrent.key)}`}>
-              <h2 dir="auto">{sourceCurrent.title}</h2>
+            <p className="eyebrow">{sourceService.sourceLabel(current.source)}</p>
+            <Link to={`/source/${encodeURIComponent(current.key)}`}>
+              <h2 dir="auto">{current.title}</h2>
             </Link>
             <p className="muted">الفصل {chapter}</p>
             <div className="progress-meta">
@@ -120,43 +109,20 @@ export function Home() {
               <b>{Math.round(percent)}%</b>
             </div>
             <Progress value={percent} />
-            <Link className="primary" to={`/read-source/${encodeURIComponent(sourceCurrent.key)}/${chapter}`}>
-              متابعة القراءة <Icon name="arrow" />
-            </Link>
-          </div>
-        </section>
-      ) : current ? (
-        <section className="continue-card">
-          <Link className="continue-cover" to={`/manga/${current.id}`}>
-            <img src={current.cover} alt={`غلاف ${current.title}`} />
-          </Link>
-          <div className="continue-copy">
-            <p className="eyebrow">من نفس المكان اللي وقفت عنده</p>
-            <Link to={`/manga/${current.id}`}>
-              <h2>{current.title}</h2>
-            </Link>
-            <p className="muted">
-              الفصل {chapter} <span className="dot-separator">·</span> {current.genres[0]}
-            </p>
-            <div className="progress-meta">
-              <span>تقدمك</span>
-              <b>{Math.round(percent)}%</b>
-            </div>
-            <Progress value={percent} />
-            <Link className="primary" to={`/read/${current.id}/${chapter}`}>
+            <Link className="primary" to={`/read-source/${encodeURIComponent(current.key)}/${chapter}`}>
               متابعة القراءة <Icon name="arrow" />
             </Link>
           </div>
         </section>
       ) : (
         <div className="empty">
-          <p>ابدأ عملا من المصادر وراح يظهر تقدمك هنا.</p>
+          <p>ابدأ قراءة عمل من المصادر وراح يظهر تقدمك هنا.</p>
           <Link className="primary" to="/discover">استكشف الأعمال ←</Link>
         </div>
       )}
 
       <section>
-        <SectionTitle title="من المصادر" to="/discover" label="استكشف" />
+        <SectionTitle title="آخر التحديثات" to="/discover" label="استكشف" />
         {latest.length ? (
           <div className="cover-grid home-grid source-grid">
             {latest.map((item) => (
@@ -177,15 +143,12 @@ export function Home() {
       <section>
         <SectionTitle title="مفضلتك" to="/favorites" label="عرض الكل" />
         <div className="cover-grid home-grid">
-          {staticFavorites.slice(0, Math.max(0, 4 - sourceFavorites.length)).map((item) => (
-            <MangaCard key={item.id} item={item} />
-          ))}
-          {sourceFavorites.map((item) => (
+          {favorites.map((item) => (
             <SourceCard key={item.key} item={item} />
           ))}
         </div>
-        {!data?.favorites.length && (
-          <p className="empty">أضف الأعمال اللي تحبها من صفحة العمل عشان تظهر هنا.</p>
+        {!favorites.length && (
+          <p className="empty">أضف الأعمال اللي تحبها من المصادر عشان تظهر هنا.</p>
         )}
       </section>
 
@@ -193,10 +156,11 @@ export function Home() {
         <SectionTitle title="نشاط الأصدقاء" to="/friends" label="الأصدقاء" />
         <div className="activity">
           {friends.map((friend, i) => {
-            const reading = friend.reading;
-            const staticReading = reading ? findManga(reading.mangaId) : null;
-            const sourceReading = reading ? sourceItems[reading.mangaId] : null;
-            const readingTitle = staticReading?.title ?? sourceReading?.title ?? null;
+            const reading = friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
+              ? friend.reading
+              : null;
+            const readingTitle = reading ? sourceItems[reading.mangaId]?.title : null;
+            const favoriteCount = friend.favorites.filter((id) => sourceService.isSourceKey(id)).length;
             return (
               <Link to={`/friends/${friend.user.id}`} key={friend.user.id}>
                 <span className={`avatar tone-${i}`}>{friend.user.name[0]}</span>
@@ -205,12 +169,12 @@ export function Home() {
                     <b>{friend.user.name}</b>{" "}
                     {reading && readingTitle
                       ? `يقرأ ${readingTitle}`
-                      : friend.favorites.length
+                      : favoriteCount
                         ? "حدّث مكتبته"
                         : "ما بدأ قراءة بعد"}
                   </p>
                   <small>
-                    {reading ? `الفصل ${reading.chapter}` : `${friend.favorites.length} في المفضلة`}
+                    {reading ? `الفصل ${reading.chapter}` : `${favoriteCount} في المفضلة`}
                   </small>
                 </div>
                 <span aria-hidden="true">↗</span>
