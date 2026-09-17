@@ -10,8 +10,8 @@ export function Reader() {
   if (!item || !item.chapters.includes(number))
     return (
       <main className="page">
-        <Link to="/">← Home</Link>
-        <h1>Chapter not found</h1>
+        <Link to="/">الرئيسية →</Link>
+        <h1>الفصل غير موجود</h1>
       </main>
     );
   return <ReaderChapter key={`${id}:${number}`} id={id} chapter={number} />;
@@ -73,12 +73,12 @@ function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
   return (
     <main className="reader">
       <header className="reader-header">
-        <Link to={`/manga/${id}`} aria-label="Back to manga">
+        <Link to={`/manga/${id}`} aria-label="العودة إلى صفحة العمل">
           <Icon name="back" />
         </Link>
         <div>
           <small>{item.title}</small>
-          <h1>Chapter {chapter}</h1>
+          <h1>الفصل {chapter}</h1>
         </div>
         <span>{Math.round(percent)}%</span>
       </header>
@@ -89,36 +89,36 @@ function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
             src={`/panels/panel-${i + 1}.svg`}
             width="800"
             height="1100"
-            alt={`Local mock chapter panel ${i + 1}: abstract landscape`}
+            alt={`صفحة تجريبية ${i + 1}`}
             fetchPriority={i === 0 ? "high" : "auto"}
           />
         ))}
       </div>
       <footer className="reader-end">
-        <p className="eyebrow">END OF CHAPTER {chapter}</p>
-        <h2>A little further into the story.</h2>
+        <p className="eyebrow">نهاية الفصل {chapter}</p>
+        <h2>جاهز تكمل؟</h2>
         <div className="reader-links">
           {previous ? (
             <Link className="secondary" to={`/read/${id}/${chapter - 1}`}>
-              ← Previous chapter
+              الفصل السابق →
             </Link>
           ) : (
-            <span>First sample chapter</span>
+            <span>أول فصل تجريبي</span>
           )}
           {next ? (
             <Link className="primary" to={`/read/${id}/${chapter + 1}`}>
-              Next chapter →
+              ← الفصل التالي
             </Link>
           ) : (
             <Link className="primary" to={`/manga/${id}`}>
-              Back to chapters
+              العودة للفصول
             </Link>
           )}
         </div>
       </footer>
       <div className="reader-progress">
         <Progress value={percent} />
-        <span>Reading progress: {Math.round(percent)}%</span>
+        <span>تقدم القراءة: {Math.round(percent)}%</span>
       </div>
     </main>
   );
