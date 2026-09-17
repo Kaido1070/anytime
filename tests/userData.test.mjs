@@ -7,6 +7,10 @@ Object.defineProperty(globalThis, "localStorage", {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, String(value)),
     removeItem: (key) => values.delete(key),
+    key: (index) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
   },
   configurable: true,
 });
@@ -15,7 +19,7 @@ const user = { id: "mahdi", username: "has", name: "Has" };
 let signedIn = false;
 let serverData = {
   version: 2,
-  favorites: ["returner", "solo"],
+  favorites: ["returner", "mt:manhwa:live-title:1"],
   progress: {},
   completed: [],
   lastOpened: null,
@@ -43,12 +47,18 @@ Object.defineProperty(globalThis, "fetch", {
       signedIn = true;
       return response({ user });
     }
+    if (path === "cleanup-demo" && method === "POST") {
+      serverData = {
+        ...serverData,
+        favorites: serverData.favorites.filter((id) => /^(mt|tx):/.test(id)),
+      };
+      return response({ ok: true });
+    }
     if (path === "logout" && method === "POST") {
       signedIn = false;
       return response({ ok: true });
     }
     if (path === "data" && method === "GET") return response({ data: serverData });
-    if (path === "import" && method === "POST") return response({ data: serverData });
     if (path === "favorites" && method === "POST") {
       const body = JSON.parse(String(init.body));
       serverData = {
@@ -86,30 +96,31 @@ Object.defineProperty(globalThis, "fetch", {
   configurable: true,
 });
 
-test("Phase 2 API service logs in and syncs favorites/progress", async () => {
+test("API service keeps only live source favorites and progress", async () => {
   const { userDataService: service } = await import("../src/services/userData.ts");
 
   assert.equal(await service.getUser(), null);
   await assert.rejects(service.signIn("has", "wrong"));
   assert.equal((await service.signIn(" HAS ", "anytime")).name, "Has");
 
-  await service.addFavorite("eleceed");
-  assert.ok((await service.getFavorites()).includes("eleceed"));
+  const txKey = "tx:/series/live-title";
+  await service.addFavorite(txKey);
+  assert.ok((await service.getFavorites()).includes(txKey));
+  assert.equal((await service.getFavorites()).includes("returner"), false);
 
-  await service.removeFavorite("solo");
-  assert.equal((await service.getFavorites()).includes("solo"), false);
-
+  const mtKey = "mt:manhwa:reader-title:2";
   await service.saveReadingProgress({
-    mangaId: "returner",
+    mangaId: mtKey,
     chapter: 148,
     percent: 100,
     updatedAt: 10,
   });
   const data = await service.getData();
-  assert.equal(data.progress["returner:148"].percent, 100);
-  assert.ok(data.completed.includes("returner:148"));
-  assert.deepEqual(data.lastOpened, { mangaId: "returner", chapter: 148 });
+  assert.equal(data.progress[`${mtKey}:148`].percent, 100);
+  assert.ok(data.completed.includes(`${mtKey}:148`));
+  assert.deepEqual(data.lastOpened, { mangaId: mtKey, chapter: 148 });
 
+  await assert.rejects(service.addFavorite("solo"));
   await service.changePassword("anytime", "new-pass");
   await service.signOut();
   assert.equal(await service.getUser(), null);

@@ -1,4 +1,3 @@
-import { mockFriends, users } from "../data/mock.ts";
 import type { Friend, ReadingProgress, User, UserData } from "../types";
 
 export interface UserDataService {
@@ -34,8 +33,32 @@ class ApiError extends Error {
   }
 }
 
+const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx):/.test(value));
+
+function normalizeData(data: UserData): UserData {
+  const favorites = data.favorites.filter((id) => isLiveKey(id));
+  const progress = Object.fromEntries(
+    Object.entries(data.progress).filter(([, item]) => isLiveKey(item.mangaId)),
+  );
+  const completed = data.completed.filter((key) => {
+    const item = data.progress[key];
+    return item ? isLiveKey(item.mangaId) : /^(mt|tx):/.test(key);
+  });
+  const lastOpened = data.lastOpened && isLiveKey(data.lastOpened.mangaId) ? data.lastOpened : null;
+  return { ...data, favorites, progress, completed, lastOpened };
+}
+
+function normalizeFriends(friends: Friend[]): Friend[] {
+  return friends.map((friend) => ({
+    ...friend,
+    reading: friend.reading && isLiveKey(friend.reading.mangaId) ? friend.reading : null,
+    favorites: friend.favorites.filter((id) => isLiveKey(id)),
+  }));
+}
+
 class ApiUserDataService implements UserDataService {
   private currentUser: User | null = null;
+  private cleaned = false;
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     let response: Response;
@@ -71,6 +94,7 @@ class ApiUserDataService implements UserDataService {
   async getUser() {
     const result = await this.request<{ user: User | null }>("session");
     this.currentUser = result.user;
+    this.cleaned = false;
     return result.user;
   }
 
@@ -80,7 +104,8 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
     });
     this.currentUser = result.user;
-    await this.importLegacyData(result.user.id);
+    this.cleaned = false;
+    await this.cleanupDemoData();
     return result.user;
   }
 
@@ -89,18 +114,21 @@ class ApiUserDataService implements UserDataService {
       await this.request<{ ok: boolean }>("logout", { method: "POST" });
     } finally {
       this.currentUser = null;
+      this.cleaned = false;
     }
   }
 
   async getData(): Promise<UserData> {
+    await this.cleanupDemoData();
     try {
       const result = await this.request<{ data: UserData }>("data");
-      this.writeSnapshot("data", result.data);
-      return result.data;
+      const data = normalizeData(result.data);
+      this.writeSnapshot("data", data);
+      return data;
     } catch (error) {
       const snapshot = this.readSnapshot<UserData>("data");
       if (snapshot && error instanceof ApiError && error.code === "NETWORK_ERROR") {
-        return snapshot;
+        return normalizeData(snapshot);
       }
       throw error;
     }
@@ -111,6 +139,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async addFavorite(id: string) {
+    if (!isLiveKey(id)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
     await this.request<{ ok: boolean }>("favorites", {
       method: "POST",
       body: JSON.stringify({ mangaId: id }),
@@ -128,6 +157,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async saveReadingProgress(progress: ReadingProgress) {
+    if (!isLiveKey(progress.mangaId)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
     await this.request<{ ok: boolean }>("progress", {
       method: "PUT",
       body: JSON.stringify(progress),
@@ -136,14 +166,16 @@ class ApiUserDataService implements UserDataService {
   }
 
   async getFriends() {
+    await this.cleanupDemoData();
     try {
       const result = await this.request<{ friends: Friend[] }>("friends");
-      this.writeSnapshot("friends", result.friends);
-      return result.friends;
+      const friends = normalizeFriends(result.friends);
+      this.writeSnapshot("friends", friends);
+      return friends;
     } catch (error) {
       const snapshot = this.readSnapshot<Friend[]>("friends");
       if (snapshot && error instanceof ApiError && error.code === "NETWORK_ERROR") {
-        return snapshot;
+        return normalizeFriends(snapshot);
       }
       throw error;
     }
@@ -167,28 +199,27 @@ class ApiUserDataService implements UserDataService {
     });
   }
 
-  private async importLegacyData(userId: string) {
-    if (typeof localStorage === "undefined") return;
-    const marker = `anytime:v2:migrated:${userId}`;
-    if (localStorage.getItem(marker) === "1") return;
-    const raw = localStorage.getItem(`anytime:v1:user:${userId}`);
-    if (!raw) {
-      localStorage.setItem(marker, "1");
-      localStorage.removeItem("anytime:session");
-      return;
-    }
-
+  private async cleanupDemoData() {
+    if (this.cleaned || !this.currentUser) return;
     try {
-      const data = JSON.parse(raw) as unknown;
-      await this.request("import", {
-        method: "POST",
-        body: JSON.stringify({ data }),
-      });
-      localStorage.setItem(marker, "1");
-      localStorage.removeItem("anytime:session");
-    } catch {
-      // Keep Phase 1 data so migration can retry after the next login.
+      await this.request<{ ok: boolean }>("cleanup-demo", { method: "POST" });
+      this.cleaned = true;
+      this.clearLegacyLocalData();
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "NETWORK_ERROR") return;
+      throw error;
     }
+  }
+
+  private clearLegacyLocalData() {
+    if (typeof localStorage === "undefined") return;
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("anytime:v1:") || key?.startsWith("anytime:v2:migrated:")) {
+        localStorage.removeItem(key);
+      }
+    }
+    localStorage.removeItem("anytime:session");
   }
 
   private snapshotKey(kind: "data" | "friends") {
@@ -219,198 +250,4 @@ class ApiUserDataService implements UserDataService {
   }
 }
 
-const initialLocal = (): UserData => ({
-  version: 2,
-  favorites: ["returner", "solo"],
-  progress: {
-    "returner:143": {
-      mangaId: "returner",
-      chapter: 143,
-      percent: 62,
-      updatedAt: 1,
-    },
-  },
-  completed: ["returner:141", "returner:142"],
-  lastOpened: { mangaId: "returner", chapter: 143 },
-});
-
-class LocalFallbackService implements UserDataService {
-  async getUser() {
-    return (
-      users.find((user) => user.id === localStorage.getItem("anytime:session")) ?? null
-    );
-  }
-
-  async signIn(username: string, password: string) {
-    const user = users.find(
-      (item) => item.username === username.trim().toLowerCase(),
-    );
-    if (!user || password !== "anytime") {
-      throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
-    }
-    localStorage.setItem("anytime:session", user.id);
-    return user;
-  }
-
-  async signOut() {
-    localStorage.removeItem("anytime:session");
-  }
-
-  private async key() {
-    const user = await this.getUser();
-    if (!user) throw new Error("سجل دخولك مرة ثانية.");
-    return `anytime:v1:user:${user.id}`;
-  }
-
-  async getData(): Promise<UserData> {
-    const raw = localStorage.getItem(await this.key());
-    if (!raw) return initialLocal();
-    try {
-      const parsed = JSON.parse(raw) as Omit<UserData, "version"> & { version?: number };
-      if (
-        !Array.isArray(parsed.favorites) ||
-        !Array.isArray(parsed.completed) ||
-        !parsed.progress ||
-        typeof parsed.progress !== "object"
-      ) {
-        throw new Error();
-      }
-      return { ...parsed, version: 2 } as UserData;
-    } catch {
-      return initialLocal();
-    }
-  }
-
-  private async save(data: UserData) {
-    localStorage.setItem(
-      await this.key(),
-      JSON.stringify({ ...data, version: 1 }),
-    );
-  }
-
-  async getFavorites() {
-    return (await this.getData()).favorites;
-  }
-
-  async addFavorite(id: string) {
-    const data = await this.getData();
-    data.favorites = [...new Set([...data.favorites, id])];
-    await this.save(data);
-  }
-
-  async removeFavorite(id: string) {
-    const data = await this.getData();
-    data.favorites = data.favorites.filter((item) => item !== id);
-    await this.save(data);
-  }
-
-  async getReadingProgress() {
-    return (await this.getData()).progress;
-  }
-
-  async saveReadingProgress(progress: ReadingProgress) {
-    const data = await this.getData();
-    const key = `${progress.mangaId}:${progress.chapter}`;
-    data.progress[key] = {
-      ...progress,
-      percent: Math.max(0, Math.min(100, progress.percent)),
-    };
-    data.lastOpened = { mangaId: progress.mangaId, chapter: progress.chapter };
-    if (progress.percent >= 98 && !data.completed.includes(key)) data.completed.push(key);
-    await this.save(data);
-  }
-
-  async getFriends() {
-    const user = await this.getUser();
-    return mockFriends
-      .filter((friend) => friend.user.id !== user?.id)
-      .map((friend) => ({ ...friend, reading: friend.reading ?? null }));
-  }
-
-  async addFriend() {
-    throw new Error("إضافة الأصدقاء تتفعل تلقائيا بعد ربط قاعدة D1.");
-  }
-
-  async removeFriend() {
-    throw new Error("إدارة الأصدقاء تتفعل تلقائيا بعد ربط قاعدة D1.");
-  }
-
-  async changePassword() {
-    throw new Error("تغيير كلمة المرور يتفعل تلقائيا بعد ربط قاعدة D1.");
-  }
-}
-
-class HybridUserDataService implements UserDataService {
-  private readonly api = new ApiUserDataService();
-  private readonly local = new LocalFallbackService();
-  private active: UserDataService | null = null;
-
-  private isD1Missing(error: unknown) {
-    return error instanceof ApiError && error.code === "D1_NOT_CONFIGURED";
-  }
-
-  async getUser() {
-    try {
-      const user = await this.api.getUser();
-      this.active = this.api;
-      return user;
-    } catch (error) {
-      if (!this.isD1Missing(error)) throw error;
-      this.active = this.local;
-      return this.local.getUser();
-    }
-  }
-
-  async signIn(username: string, password: string) {
-    if (this.active === this.local) return this.local.signIn(username, password);
-    try {
-      const user = await this.api.signIn(username, password);
-      this.active = this.api;
-      return user;
-    } catch (error) {
-      if (!this.isD1Missing(error)) throw error;
-      this.active = this.local;
-      return this.local.signIn(username, password);
-    }
-  }
-
-  private service() {
-    return this.active ?? this.api;
-  }
-
-  signOut() {
-    return this.service().signOut();
-  }
-  getData() {
-    return this.service().getData();
-  }
-  getFavorites() {
-    return this.service().getFavorites();
-  }
-  addFavorite(id: string) {
-    return this.service().addFavorite(id);
-  }
-  removeFavorite(id: string) {
-    return this.service().removeFavorite(id);
-  }
-  getReadingProgress() {
-    return this.service().getReadingProgress();
-  }
-  saveReadingProgress(progress: ReadingProgress) {
-    return this.service().saveReadingProgress(progress);
-  }
-  getFriends() {
-    return this.service().getFriends();
-  }
-  addFriend(username: string) {
-    return this.service().addFriend(username);
-  }
-  removeFriend(id: string) {
-    return this.service().removeFriend(id);
-  }
-  changePassword(currentPassword: string, newPassword: string) {
-    return this.service().changePassword(currentPassword, newPassword);
-  }
-}
-
-export const userDataService: UserDataService = new HybridUserDataService();
+export const userDataService: UserDataService = new ApiUserDataService();

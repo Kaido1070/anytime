@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
-import { findManga } from "../data/mock";
-import { Back, MangaCard, SectionTitle } from "../components/UI";
+import { Back, SectionTitle } from "../components/UI";
 import { SourceCard } from "../components/SourceCard";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
@@ -10,6 +9,7 @@ import type { SourceManga } from "../types";
 function useFriendSourceItems(keys: string[]) {
   const [items, setItems] = useState<Record<string, SourceManga>>({});
   const signature = keys.join("|");
+
   useEffect(() => {
     let active = true;
     if (!keys.length) {
@@ -26,6 +26,7 @@ function useFriendSourceItems(keys: string[]) {
       active = false;
     };
   }, [signature]);
+
   return items;
 }
 
@@ -34,6 +35,7 @@ export function Friends() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
   const sourceKeys = useMemo(() => {
     const set = new Set<string>();
     friends.forEach((friend) => {
@@ -94,27 +96,28 @@ export function Friends() {
 
       <div className="friends-list">
         {friends.map((friend, i) => {
-          const reading = friend.reading;
-          const current = reading ? findManga(reading.mangaId) : null;
-          const sourceCurrent = reading ? sourceItems[reading.mangaId] : null;
+          const reading = friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
+            ? friend.reading
+            : null;
+          const current = reading ? sourceItems[reading.mangaId] : null;
           const favorites = friend.favorites
-            .map((id) => findManga(id)?.title ?? sourceItems[id]?.title)
+            .filter((id) => sourceService.isSourceKey(id))
+            .map((id) => sourceItems[id]?.title)
             .filter(Boolean);
+
           return (
             <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
               <span className={`avatar large tone-${i}`}>{friend.user.name[0]}</span>
               <div>
                 <h2>{friend.user.name}</h2>
                 <small>{reading ? "يقرأ حاليا" : "ما بدأ قراءة بعد"}</small>
-                {reading && (current || sourceCurrent) && (
+                {reading && current && (
                   <p dir="auto">
-                    {(current ?? sourceCurrent)?.title} · الفصل {reading.chapter}
+                    {current.title} · الفصل {reading.chapter}
                   </p>
                 )}
                 <small>
-                  {friend.favorites.length
-                    ? `آخر المفضلة: ${favorites.slice(0, 3).join(", ") || `${friend.favorites.length} أعمال`}`
-                    : "المفضلة فارغة"}
+                  {favorites.length ? `آخر المفضلة: ${favorites.slice(0, 3).join(", ")}` : "المفضلة فارغة"}
                 </small>
               </div>
               <span>↗</span>
@@ -134,6 +137,7 @@ export function FriendProfile() {
   const [removeError, setRemoveError] = useState("");
   const [removing, setRemoving] = useState(false);
   const friend = friends.find((item) => item.user.id === id);
+
   const sourceKeys = useMemo(() => {
     if (!friend) return [];
     const set = new Set<string>();
@@ -152,8 +156,11 @@ export function FriendProfile() {
     );
 
   const friendId = friend.user.id;
-  const current = friend.reading ? findManga(friend.reading.mangaId) : null;
-  const sourceCurrent = friend.reading ? sourceItems[friend.reading.mangaId] : null;
+  const reading = friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
+    ? friend.reading
+    : null;
+  const current = reading ? sourceItems[reading.mangaId] : null;
+  const favoriteKeys = friend.favorites.filter((key) => sourceService.isSourceKey(key));
 
   async function remove() {
     setRemoving(true);
@@ -179,23 +186,14 @@ export function FriendProfile() {
       </div>
 
       <SectionTitle title="يقرأ حاليا" />
-      {friend.reading && current ? (
-        <Link className="update-row friend-current" to={`/manga/${current.id}`}>
-          <img src={current.cover} alt="" />
-          <div>
-            <h2>{current.title}</h2>
-            <p>الفصل {friend.reading.chapter}</p>
-          </div>
-          <span>←</span>
-        </Link>
-      ) : friend.reading && sourceCurrent ? (
-        <Link className="update-row friend-current" to={`/source/${encodeURIComponent(sourceCurrent.key)}`}>
-          {sourceCurrent.cover && (
-            <img src={sourceService.imageUrl(sourceCurrent.source, sourceCurrent.cover)} alt="" />
+      {reading && current ? (
+        <Link className="update-row friend-current" to={`/source/${encodeURIComponent(current.key)}`}>
+          {current.cover && (
+            <img src={sourceService.imageUrl(current.source, current.cover)} alt="" />
           )}
           <div>
-            <h2 dir="auto">{sourceCurrent.title}</h2>
-            <p>الفصل {friend.reading.chapter}</p>
+            <h2 dir="auto">{current.title}</h2>
+            <p>الفصل {reading.chapter}</p>
           </div>
           <span>←</span>
         </Link>
@@ -205,14 +203,13 @@ export function FriendProfile() {
 
       <SectionTitle title="المفضلة" />
       <div className="cover-grid">
-        {friend.favorites.map((mangaId) => {
-          const item = findManga(mangaId);
-          const sourceItem = sourceItems[mangaId];
+        {favoriteKeys.map((mangaId) => {
+          const item = sourceItems[mangaId];
+          if (!item) return null;
           const added = data?.favorites.includes(mangaId);
-          if (!item && !sourceItem) return null;
           return (
             <div key={mangaId}>
-              {item ? <MangaCard item={item} /> : <SourceCard item={sourceItem} />}
+              <SourceCard item={item} />
               <button
                 className="secondary copy-button"
                 disabled={added}
@@ -224,7 +221,7 @@ export function FriendProfile() {
           );
         })}
       </div>
-      {!friend.favorites.length && <p className="empty">مفضلته فارغة.</p>}
+      {!favoriteKeys.length && <p className="empty">مفضلته فارغة.</p>}
 
       {removeError && <p className="error">{removeError}</p>}
       <button className="secondary signout" disabled={removing} onClick={() => void remove()}>

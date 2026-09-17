@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useLibrary } from "../hooks/useLibrary";
+import { sourceService } from "../services/sources";
 
 export function Profile() {
   const { user, data, signOut, changePassword } = useLibrary();
@@ -7,8 +8,10 @@ export function Profile() {
   const [passwordError, setPasswordError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const favorites = (data?.favorites ?? []).filter((id) => sourceService.isSourceKey(id)).length;
   const reading = new Set(
     Object.values(data?.progress ?? {})
+      .filter((p) => sourceService.isSourceKey(p.mangaId))
       .filter((p) => !data?.completed.includes(`${p.mangaId}:${p.chapter}`))
       .map((p) => p.mangaId),
   ).size;
@@ -56,7 +59,7 @@ export function Profile() {
       </div>
       <div className="stats">
         <div>
-          <strong>{data?.favorites.length ?? 0}</strong>
+          <strong>{favorites}</strong>
           <span>المفضلة</span>
         </div>
         <div>
@@ -123,11 +126,6 @@ export function Profile() {
       <button className="secondary signout" onClick={signOut}>
         تسجيل الخروج <span>↗</span>
       </button>
-      <p className="demo-note">
-        المرحلة الثانية
-        <br />
-        <span>المفضلة وتقدم القراءة والأصدقاء تتزامن مع حسابك بين أجهزتك.</span>
-      </p>
     </>
   );
 }

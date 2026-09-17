@@ -1,6 +1,4 @@
 import { Link } from "react-router-dom";
-import type { Manga } from "../types";
-import { useLibrary } from "../hooks/useLibrary";
 
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
@@ -43,43 +41,6 @@ export function Progress({ value }: { value: number }) {
     >
       <span style={{ width: `${value}%` }} />
     </div>
-  );
-}
-
-export function MangaCard({
-  item,
-  detail = false,
-}: {
-  item: Manga;
-  detail?: boolean;
-}) {
-  const { data } = useLibrary();
-  const progress = Object.values(data?.progress ?? {})
-    .filter((p) => p.mangaId === item.id)
-    .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-  return (
-    <Link className="manga-card" to={`/manga/${item.id}`}>
-      <div className="cover-wrap">
-        <img
-          src={item.cover}
-          alt={`غلاف ${item.title}`}
-          width="300"
-          height="420"
-        />
-        <span className="cover-label">
-          {item.status === "Completed" ? "مكتمل" : "مستمر"}
-        </span>
-      </div>
-      <h3>{item.title}</h3>
-      <p>
-        {detail
-          ? progress
-            ? `الفصل ${progress.chapter} · قرأت ${Math.round(progress.percent)}%`
-            : "لم تبدأ بعد"
-          : item.genres.join(" · ")}
-      </p>
-      {detail && <small>آخر فصل {item.latest}</small>}
-    </Link>
   );
 }
 
