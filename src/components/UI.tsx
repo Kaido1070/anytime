@@ -8,8 +8,8 @@ export function Icon({ name }: { name: string }) {
     friends:
       "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3 M18 7a3 3 0 0 1 0 6 M22 21v-3a4 4 0 0 0-3-4 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
     profile: "M20 21v-2a8 8 0 0 0-16 0 M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
-    back: "m14 5-7 7 7 7",
-    arrow: "M4 12h16 m-6-6 6 6-6 6",
+    back: "m10 5 7 7-7 7",
+    arrow: "M20 12H4 m6-6-6 6 6 6",
     check: "m5 12 4 4L19 6",
   };
   return (
