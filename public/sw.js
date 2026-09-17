@@ -1,14 +1,11 @@
-const CACHE = "anytime-shell-v1";
+const CACHE = "anytime-shell-v2";
 const PRECACHE = [];
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) =>
-        cache.addAll(PRECACHE),
-      ),
-  );
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
 });
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -23,12 +20,24 @@ self.addEventListener("activate", (event) => {
       .then(() => self.clients.claim()),
   );
 });
+
 self.addEventListener("fetch", (event) => {
   if (
     event.request.method !== "GET" ||
     new URL(event.request.url).origin !== self.location.origin
-  )
+  ) return;
+
+  const isNavigation = event.request.mode === "navigate";
+
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then((response) => response)
+        .catch(async () => (await caches.match("/")) || Response.error()),
+    );
     return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -40,12 +49,6 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(
-        async () =>
-          (await caches.match(event.request)) ||
-          (event.request.mode === "navigate"
-            ? await caches.match("/")
-            : Response.error()),
-      ),
+      .catch(async () => (await caches.match(event.request)) || Response.error()),
   );
 });
