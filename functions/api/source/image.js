@@ -3,6 +3,7 @@ const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
 const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
+const XSANO_BASE = "https://www.xsano-manga.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -16,7 +17,7 @@ export async function onRequest(context) {
 
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") ?? "").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano") {
     return json({ error: "UNKNOWN_SOURCE" }, 400);
   }
 
@@ -26,7 +27,9 @@ export async function onRequest(context) {
       ? ASQ_BASE
       : source === "starzmanga"
         ? STARZ_BASE
-        : MANGATIME_BASE;
+        : source === "xsano"
+          ? XSANO_BASE
+          : MANGATIME_BASE;
   const raw = String(url.searchParams.get("url") ?? "");
   const target = absoluteUrl(base, raw);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
@@ -42,7 +45,9 @@ export async function onRequest(context) {
       ? safeAsqReferer(url.searchParams.get("referer"))
       : source === "starzmanga"
         ? safeStarzReferer(url.searchParams.get("referer"))
-        : `${MANGATIME_BASE}/`;
+        : source === "xsano"
+          ? safeXsanoReferer(url.searchParams.get("referer"))
+          : `${MANGATIME_BASE}/`;
 
   const response = await fetch(target, {
     headers: {
@@ -110,6 +115,17 @@ function safeStarzReferer(value) {
     return parsed.toString();
   } catch {
     return `${STARZ_BASE}/`;
+  }
+}
+
+function safeXsanoReferer(value) {
+  if (!value) return `${XSANO_BASE}/`;
+  try {
+    const parsed = new URL(String(value), XSANO_BASE);
+    if (!/^(?:www\.)?xsano-manga\.com$/i.test(parsed.hostname)) return `${XSANO_BASE}/`;
+    return parsed.toString();
+  } catch {
+    return `${XSANO_BASE}/`;
   }
 }
 
