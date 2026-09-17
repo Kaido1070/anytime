@@ -12,13 +12,15 @@ const SOURCE_PRIORITY: Partial<Record<SourceName, number>> = {
   teamx: 1,
   "3asq": 2,
   starzmanga: 3,
+  xsano: 4,
 };
 
 const COVER_PRIORITY: Partial<Record<SourceName, number>> = {
   teamx: 0,
   "3asq": 1,
   starzmanga: 2,
-  mangatime: 3,
+  xsano: 3,
+  mangatime: 4,
 };
 
 function normalizeIdentity(value: string) {
@@ -148,5 +150,5 @@ export function sourceDetailsPath(key: string, values: Array<SourceManga | strin
 }
 
 function isSourceKey(value: string) {
-  return /^(?:mt|tx|aq|sz):[A-Za-z0-9_-]{1,110}$/.test(value);
+  return /^(?:mt|tx|aq|sz|xs):[A-Za-z0-9_-]{1,110}$/.test(value);
 }
