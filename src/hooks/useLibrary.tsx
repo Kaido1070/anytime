@@ -13,16 +13,19 @@ function useLibraryState() {
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<UserData | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [profilePrivate, setProfilePrivateState] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
-    const [nextData, nextFriends] = await Promise.all([
+    const [nextData, nextFriends, nextProfilePrivate] = await Promise.all([
       service.getData(),
       service.getFriends(),
+      service.getProfilePrivate(),
     ]);
     setData(nextData);
     setFriends(nextFriends);
+    setProfilePrivateState(nextProfilePrivate);
   }, []);
 
   useEffect(() => {
@@ -71,6 +74,7 @@ function useLibraryState() {
     setUser(null);
     setData(null);
     setFriends([]);
+    setProfilePrivateState(false);
   };
 
   const favorite = async (id: string, forceAdd = false) => {
@@ -131,9 +135,9 @@ function useLibraryState() {
 
   const setProfilePrivate = async (value: boolean) => {
     setError("");
-    const profilePrivate = await service.setProfilePrivate(value);
-    setData((current) => current ? { ...current, profilePrivate } : current);
-    return profilePrivate;
+    const nextValue = await service.setProfilePrivate(value);
+    setProfilePrivateState(nextValue);
+    return nextValue;
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
@@ -145,6 +149,7 @@ function useLibraryState() {
     user,
     data,
     friends,
+    profilePrivate,
     loading,
     error,
     refresh,
