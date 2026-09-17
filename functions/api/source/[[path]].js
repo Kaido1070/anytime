@@ -3,6 +3,7 @@ const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
 const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
+const XSANO_BASE = "https://www.xsano-manga.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -22,6 +23,7 @@ export async function onRequest(context) {
         { id: "teamx", name: "Team-X", mode: "html" },
         { id: "3asq", name: "3asq", mode: "html" },
         { id: "starzmanga", name: "StarzManga", mode: "madara" },
+        { id: "xsano", name: "XSano Manga", mode: "blogger" },
       ],
     });
   }
@@ -53,7 +55,9 @@ export async function onRequest(context) {
           ? await teamXLatest(db, page)
           : source === "3asq"
             ? await asqLatest(db, page)
-            : await starzLatest(db, page);
+            : source === "starzmanga"
+              ? await starzLatest(db, page)
+              : await xsanoLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -66,7 +70,9 @@ export async function onRequest(context) {
           ? await teamXPopular(db, page)
           : source === "3asq"
             ? await asqPopular(db, page)
-            : await starzPopular(db, page);
+            : source === "starzmanga"
+              ? await starzPopular(db, page)
+              : await xsanoPopular(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -81,7 +87,9 @@ export async function onRequest(context) {
           ? await teamXSearch(db, query)
           : source === "3asq"
             ? await asqSearch(db, query, page)
-            : await starzSearch(db, query, page);
+            : source === "starzmanga"
+              ? await starzSearch(db, query, page)
+              : await xsanoSearch(db, query, page);
       return json(payload, 200, shortCache());
     }
 
@@ -105,7 +113,9 @@ export async function onRequest(context) {
           ? await teamXSeries(db, item)
           : item.source === "3asq"
             ? await asqSeries(db, item)
-            : await starzSeries(db, item);
+            : item.source === "starzmanga"
+              ? await starzSeries(db, item)
+              : await xsanoSeries(db, item);
       return json({ item: detail }, 200, shortCache());
     }
 
@@ -123,7 +133,9 @@ export async function onRequest(context) {
           ? await teamXChapter(db, item, number)
           : item.source === "3asq"
             ? await asqChapter(db, item, number)
-            : await starzChapter(db, item, number);
+            : item.source === "starzmanga"
+              ? await starzChapter(db, item, number)
+              : await xsanoChapter(db, item, number);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
@@ -156,7 +168,7 @@ class SourceError extends Error {
 
 function sourceFromQuery(url) {
   const source = String(url.searchParams.get("source") ?? "mangatime").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano") {
     throw new SourceError("UNKNOWN_SOURCE", "المصدر غير معروف.", 400);
   }
   return source;
@@ -169,7 +181,7 @@ function safePage(value) {
 
 function safeSourceKey(value) {
   const key = String(value ?? "").trim();
-  return /^(mt|tx|aq|sz):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
+  return /^(mt|tx|aq|sz|xs):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
 }
 
 function shortCache() {
@@ -1219,6 +1231,360 @@ function starzHasNext(html) {
   return /<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html);
 }
 
+
+// XSano Manga / ZeistManga ---------------------------------------------------
+
+async function xsanoLatest(db, page) {
+  return xsanoFeedList(db, { page });
+}
+
+async function xsanoPopular(db, page) {
+  // XSano has no separate popular catalogue; its source implementation mirrors latest.
+  return xsanoFeedList(db, { page });
+}
+
+async function xsanoSearch(db, query, page) {
+  return xsanoFeedList(db, { page, query });
+}
+
+async function xsanoFeedList(db, { page, query = "" }) {
+  const startIndex = 20 * (page - 1) + 1;
+  const url = new URL("/feeds/posts/default/-/Series", XSANO_BASE);
+  url.searchParams.set("alt", "json");
+  url.searchParams.set("orderby", "published");
+  url.searchParams.set("max-results", "21");
+  url.searchParams.set("start-index", String(startIndex));
+  if (query) url.searchParams.set("q", "label:Series " + query);
+
+  const payload = await xsanoFetchJson(url.toString());
+  const entries = Array.isArray(payload?.feed?.entry) ? payload.feed.entry : [];
+  const parsed = [];
+
+  for (const entry of entries) {
+    const categories = xsanoCategories(entry);
+    if (!categories.includes("Series") || categories.includes("Anime")) continue;
+
+    const title = xsanoText(entry?.title);
+    const href = xsanoAlternateLink(entry);
+    if (!title || !href) continue;
+
+    const parsedUrl = new URL(href, XSANO_BASE);
+    const sourceId = parsedUrl.pathname;
+    const key = await makeSourceKey("xs", sourceId);
+    const type = xsanoTypeFromCategories(categories);
+    const genres = xsanoGenresFromCategories(categories, type);
+    parsed.push({
+      key,
+      source: "xsano",
+      sourceId,
+      slug: parsedUrl.pathname.replace(/^\/+|\/+$/g, ""),
+      type,
+      url: parsedUrl.toString(),
+      title,
+      cover: xsanoEntryCover(entry),
+      description: "",
+      status: xsanoStatusFromCategories(categories),
+      genres,
+    });
+  }
+
+  const hasMore = parsed.length > 20;
+  const items = parsed.slice(0, 20);
+  await rememberItems(db, items);
+  return { items, hasMore, page };
+}
+
+async function xsanoSeries(db, item) {
+  const html = await xsanoFetchText(item.url);
+  const mainMarker = html.search(/<main\b/i);
+  const scoped = mainMarker >= 0 ? html.slice(mainMarker) : html;
+  const cover = absoluteUrl(XSANO_BASE, firstImgUrl(scoped)) || item.cover;
+  const description = cleanText(
+    firstMatch(scoped, /id=["']synopsis["'][^>]*>([\s\S]*?)<\/[^>]+>/i) ||
+      firstMatch(scoped, /id=["']synopsis["'][^>]*>([\s\S]*?)(?:<\/section>|<\/div>)/i) ||
+      item.description ||
+      "",
+  );
+
+  const info = xsanoInfoRows(scoped);
+  const status = normalizeStatus(info.status || item.status || "");
+  const detectedType = normalizeAsqType(info.type || item.type || "manga");
+  const genres = [...new Set([
+    ...(item.genres ?? []),
+    ...xsanoGenresFromHtml(scoped),
+    ...(detectedType === "novel" || detectedType === "web-novel" ? ["روايات"] : []),
+  ])];
+
+  const feedUrl = xsanoChapterFeedUrl(html);
+  const chapters = await xsanoFetchChapters(feedUrl);
+  const updated = {
+    ...item,
+    type: detectedType,
+    cover,
+    description,
+    status,
+    genres,
+    latest: chapters[0]?.number ?? null,
+    chapters,
+  };
+  await rememberItems(db, [updated]);
+  return updated;
+}
+
+function xsanoInfoRows(html) {
+  const out = { status: "", type: "" };
+  const marker = String(html ?? "").search(/id=["']extra-info["']/i);
+  const scoped = marker >= 0 ? String(html).slice(marker, marker + 120_000) : String(html ?? "");
+  const regex = /<dl\b[^>]*>([\s\S]*?)<\/dl>/gi;
+  let match;
+  while ((match = regex.exec(scoped))) {
+    const block = match[1];
+    const label = cleanText(firstMatch(block, /<dt\b[^>]*>([\s\S]*?)<\/dt>/i));
+    const value = cleanText(firstMatch(block, /<dd\b[^>]*>([\s\S]*?)<\/dd>/i));
+    if (!value) continue;
+    if (/الحالة|status/i.test(label)) out.status = value;
+    if (/النوع|type/i.test(label)) out.type = value;
+  }
+  return out;
+}
+
+function xsanoGenresFromHtml(html) {
+  const genres = [];
+  for (const anchor of extractAnchors(html)) {
+    if (!/\btag\b/i.test(String(anchor.attrs.rel ?? ""))) continue;
+    const value = cleanText(stripTags(anchor.inner));
+    if (value && value.length <= 60) genres.push(value);
+  }
+  return genres;
+}
+
+function xsanoChapterFeedUrl(html) {
+  const source = String(html ?? "");
+  const clwd = source.match(/clwd\.run\(\s*["']([^"']+)["']\s*\)/i)?.[1];
+  if (clwd) {
+    return new URL(
+      "/feeds/posts/default/-/Chapter/" + encodeURIComponent(clwd) + "?alt=json",
+      XSANO_BASE,
+    ).toString();
+  }
+
+  const oldMarker = source.search(/id=["']myUL["']/i);
+  if (oldMarker >= 0) {
+    const oldScope = source.slice(oldMarker, oldMarker + 80_000);
+    const oldPath = oldScope.match(/<script\b[^>]*src=["']([^"']*\/feeds\/posts\/default\/-\/[^"'?]+)[^"']*["']/i)?.[1];
+    if (oldPath) {
+      const url = new URL(oldPath, XSANO_BASE);
+      url.search = "";
+      url.searchParams.set("alt", "json");
+      return url.toString();
+    }
+  }
+
+  const latestMarker = source.search(/id=["']latest["']/i);
+  if (latestMarker >= 0) {
+    const latestScope = source.slice(latestMarker, latestMarker + 80_000);
+    const label = latestScope.match(/label\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (label) {
+      return new URL(
+        "/feeds/posts/default/-/" + encodeURIComponent(label) + "?alt=json",
+        XSANO_BASE,
+      ).toString();
+    }
+  }
+
+  throw new SourceError("XSANO_CHAPTER_FEED", "تعذر العثور على قائمة فصول XSano.", 502);
+}
+
+async function xsanoFetchChapters(feedUrl) {
+  const all = [];
+  let start = 1;
+  let total = Number.POSITIVE_INFINITY;
+
+  for (let requestIndex = 0; requestIndex < 8 && start <= total; requestIndex += 1) {
+    const url = new URL(feedUrl, XSANO_BASE);
+    url.searchParams.set("alt", "json");
+    url.searchParams.set("start-index", String(start));
+    url.searchParams.set("max-results", "500");
+
+    const payload = await xsanoFetchJson(url.toString());
+    const feed = payload?.feed ?? {};
+    const entries = Array.isArray(feed.entry) ? feed.entry : [];
+    const reportedTotal = Number(xsanoText(feed["openSearch$totalResults"]));
+    if (Number.isFinite(reportedTotal) && reportedTotal >= 0) total = reportedTotal;
+
+    if (!entries.length) break;
+    all.push(...entries);
+    start += entries.length;
+    if (entries.length < 500 && !Number.isFinite(reportedTotal)) break;
+  }
+
+  return xsanoChaptersFromEntries(all);
+}
+
+function xsanoChaptersFromEntries(entries) {
+  const chapters = [];
+  const seen = new Set();
+
+  for (const entry of entries) {
+    const categories = xsanoCategories(entry);
+    if (!categories.includes("Chapter")) continue;
+
+    const title = xsanoText(entry?.title);
+    const url = xsanoAlternateLink(entry);
+    if (!title || !url || seen.has(url)) continue;
+
+    const number = asqChapterNumber(title, new URL(url, XSANO_BASE).pathname);
+    if (!Number.isFinite(number)) continue;
+    seen.add(url);
+    chapters.push({
+      number,
+      title,
+      publishedAt: xsanoText(entry?.published) || null,
+      url: absoluteUrl(XSANO_BASE, url),
+    });
+  }
+
+  return chapters.sort((a, b) => b.number - a.number);
+}
+
+async function xsanoChapter(db, item, number) {
+  const series = await xsanoSeries(db, item);
+  const selected = series.chapters?.find(
+    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  );
+  if (!selected?.url) {
+    throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في XSano.", 404);
+  }
+
+  const html = await xsanoFetchText(selected.url);
+  const pages = parseXsanoPages(html);
+  if (!pages.length) throw new SourceError("NO_PAGES", "XSano لم يرجع صور الفصل.", 502);
+
+  return {
+    item: series,
+    number,
+    title: selected.title || "الفصل " + number,
+    pages,
+    ...chapterNavigation(series.chapters ?? [], number),
+  };
+}
+
+function parseXsanoPages(html) {
+  const source = String(html ?? "");
+  const marker = source.search(/id=["']reader["']/i);
+  const tail = marker >= 0 ? source.slice(marker) : source;
+  const footer = tail.search(/<footer\b/i);
+  const scoped = footer >= 0 ? tail.slice(0, footer) : tail;
+  const blocks = madaraBlocksByClass(scoped, ["separator"]);
+  const pages = [];
+
+  for (const block of blocks) {
+    const image = extractImages(block).find((entry) => Boolean(entry.src));
+    const url = absoluteUrl(XSANO_BASE, image?.src);
+    if (url && !isXsanoUiImage(url)) pages.push(url);
+  }
+
+  if (pages.length) return [...new Set(pages)];
+
+  return [...new Set(
+    extractImages(scoped)
+      .map((image) => absoluteUrl(XSANO_BASE, image.src))
+      .filter((url) => url && !isXsanoUiImage(url)),
+  )];
+}
+
+function isXsanoUiImage(url) {
+  return /(?:logo|avatar|favicon|icon|profile|banner|ads?)(?:[\/_-]|\.)/i.test(url);
+}
+
+function xsanoCategories(entry) {
+  return (Array.isArray(entry?.category) ? entry.category : [])
+    .map((category) => String(category?.term ?? "").trim())
+    .filter(Boolean);
+}
+
+function xsanoTypeFromCategories(categories) {
+  const match = categories.find((value) =>
+    /^(?:manga|manhwa|manhua|novel|web novel(?: \((?:jp|kr|cn)\))?|light novel)$/i.test(value),
+  );
+  return normalizeAsqType(match || "manga");
+}
+
+function xsanoStatusFromCategories(categories) {
+  const match = categories.find((value) =>
+    /^(?:ongoing|completed|hiatus|cancelled|canceled|dropped|مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك)$/i.test(value),
+  );
+  return normalizeStatus(match || "");
+}
+
+function xsanoGenresFromCategories(categories, type) {
+  const ignored = new Set([
+    "series", "anime", "manga", "manhwa", "manhua", "novel", "light novel",
+    "web novel (jp)", "web novel (kr)", "web novel (cn)",
+    "ongoing", "completed", "hiatus", "cancelled", "canceled", "dropped",
+  ]);
+  const genres = categories.filter((value) => !ignored.has(value.toLowerCase()));
+  if (type === "novel" || type === "web-novel") genres.push("روايات");
+  return [...new Set(genres)];
+}
+
+function xsanoEntryCover(entry) {
+  const media = String(entry?.["media$thumbnail"]?.url ?? "").trim();
+  if (media) return xsanoMaximizeImage(media);
+
+  const content = xsanoText(entry?.content);
+  const raw = content ? firstImgUrl(content) : "";
+  return absoluteUrl(XSANO_BASE, xsanoMaximizeImage(raw));
+}
+
+function xsanoMaximizeImage(value) {
+  const absolute = absoluteUrl(XSANO_BASE, value);
+  if (!absolute) return "";
+  return absolute
+    .replace(/\/s\d+(?:-c)?\//i, "/w600/")
+    .replace(/=s\d+(?:-c)?$/i, "=w600");
+}
+
+function xsanoAlternateLink(entry) {
+  const links = Array.isArray(entry?.link) ? entry.link : [];
+  const link = links.find((value) => value?.rel === "alternate" && value?.href);
+  return link?.href ? absoluteUrl(XSANO_BASE, link.href) : "";
+}
+
+function xsanoText(node) {
+  if (node && typeof node === "object" && "$t" in node) return String(node.$t ?? "");
+  return typeof node === "string" ? node : "";
+}
+
+async function xsanoFetchJson(pathOrUrl) {
+  const target = new URL(pathOrUrl, XSANO_BASE).toString();
+  const response = await fetch(target, {
+    headers: sourceHeaders(XSANO_BASE, "application/json,text/plain,*/*"),
+    redirect: "follow",
+    cf: { cacheTtl: 45, cacheEverything: true },
+  });
+  if (!response.ok) {
+    throw new SourceError("XSANO_UPSTREAM", "XSano رجع HTTP " + response.status + ".", 502);
+  }
+  return response.json();
+}
+
+async function xsanoFetchText(pathOrUrl) {
+  const target = new URL(pathOrUrl, XSANO_BASE).toString();
+  const response = await fetch(target, {
+    headers: sourceHeaders(
+      XSANO_BASE,
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    ),
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: true },
+  });
+  if (!response.ok) {
+    throw new SourceError("XSANO_UPSTREAM", "XSano رجع HTTP " + response.status + ".", 502);
+  }
+  return response.text();
+}
+
 // Shared parsing & transport -------------------------------------------------
 
 function chapterNavigation(chapters, number) {
@@ -1238,7 +1604,9 @@ async function proxyImage(source, rawUrl) {
       ? ASQ_BASE
       : source === "starzmanga"
         ? STARZ_BASE
-        : MANGATIME_BASE;
+        : source === "xsano"
+          ? XSANO_BASE
+          : MANGATIME_BASE;
   const target = absoluteUrl(base, rawUrl);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
 
@@ -1456,6 +1824,10 @@ export const __test = {
   parseStarzChapters,
   parseStarzPages,
   starzPostId,
+  parseXsanoPages,
+  xsanoChapterFeedUrl,
+  xsanoChaptersFromEntries,
+  xsanoTypeFromCategories,
   asqChapterNumber,
   normalizeAsqType,
   mangaTimeTypeGenres,
