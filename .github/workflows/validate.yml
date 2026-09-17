@@ -31,4 +31,5 @@ jobs:
       - name: Build
         run: pnpm build
       - name: Check Pages Function syntax
-        run: node --check 'functions/api/[[path]].js'
+        run: |
+          find functions -type f -name '*.js' -print0 | xargs -0 -n1 node --check
