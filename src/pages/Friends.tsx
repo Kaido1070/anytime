@@ -151,6 +151,7 @@ export function FriendProfile() {
       </>
     );
 
+  const friendId = friend.user.id;
   const current = friend.reading ? findManga(friend.reading.mangaId) : null;
   const sourceCurrent = friend.reading ? sourceItems[friend.reading.mangaId] : null;
 
@@ -158,7 +159,7 @@ export function FriendProfile() {
     setRemoving(true);
     setRemoveError("");
     try {
-      await removeFriend(friend.user.id);
+      await removeFriend(friendId);
       navigate("/friends", { replace: true });
     } catch (cause) {
       setRemoveError(cause instanceof Error ? cause.message : "تعذر حذف الصديق.");
