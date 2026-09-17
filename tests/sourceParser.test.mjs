@@ -78,3 +78,12 @@ test("3asq type classifier distinguishes novels and web novels", () => {
   assert.equal(__test.normalizeAsqType("Web Novel"), "web-novel");
   assert.equal(__test.normalizeAsqType("مانجا"), "manga");
 });
+
+
+test("MangaTime novel types receive the Arabic novels category", () => {
+  assert.deepEqual(__test.mangaTimeTypeGenres("novel"), ["novel", "روايات"]);
+  assert.deepEqual(__test.mangaTimeTypeGenres("web_novel"), ["web_novel", "روايات"]);
+  assert.deepEqual(__test.mangaTimeTypeGenres("manga"), ["manga"]);
+  assert.equal(__test.isNovelLabel("Light Novel"), true);
+  assert.equal(__test.isNovelLabel("رواية ويب"), true);
+});
