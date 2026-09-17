@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useLibrary } from "../hooks/useLibrary";
-import { Back, SectionTitle } from "../components/UI";
 import { SourceCard } from "../components/SourceCard";
+import { SourceCoverImage } from "../components/SourceCoverImage";
+import { Back, Progress, SectionTitle } from "../components/UI";
+import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
 
@@ -40,7 +41,12 @@ export function Friends() {
     const set = new Set<string>();
     friends.forEach((friend) => {
       if (sourceService.isSourceKey(friend.reading?.mangaId)) set.add(friend.reading!.mangaId);
-      friend.favorites.filter((id) => sourceService.isSourceKey(id)).forEach((id) => set.add(id));
+      friend.favorites
+        .filter((id) => sourceService.isSourceKey(id))
+        .forEach((id) => set.add(id));
+      friend.history
+        .filter((entry) => sourceService.isSourceKey(entry.mangaId))
+        .forEach((entry) => set.add(entry.mangaId));
     });
     return [...set];
   }, [friends]);
@@ -109,12 +115,21 @@ export function Friends() {
             <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
               <span className={`avatar large tone-${i}`}>{friend.user.name[0]}</span>
               <div>
-                <h2>{friend.user.name}</h2>
-                <small>{reading ? "يقرأ حاليا" : "ما بدأ قراءة بعد"}</small>
-                {reading && current && (
-                  <p dir="auto">
-                    {current.title} · الفصل {reading.chapter}
-                  </p>
+                <div className="friend-row-title">
+                  <h2>{friend.user.name}</h2>
+                  {friend.private && <span className="friend-private-badge">خاص</span>}
+                </div>
+                {friend.private ? (
+                  <small>الحساب خاص · المفضلة فقط ظاهرة</small>
+                ) : (
+                  <>
+                    <small>{reading ? "يقرأ حاليا" : friend.history.length ? "عنده سجل متابعة" : "ما بدأ قراءة بعد"}</small>
+                    {reading && current && (
+                      <p dir="auto">
+                        {current.title} · الفصل {reading.chapter}
+                      </p>
+                    )}
+                  </>
                 )}
                 <small>
                   {favorites.length ? `آخر المفضلة: ${favorites.slice(0, 3).join(", ")}` : "المفضلة فارغة"}
@@ -142,7 +157,12 @@ export function FriendProfile() {
     if (!friend) return [];
     const set = new Set<string>();
     if (sourceService.isSourceKey(friend.reading?.mangaId)) set.add(friend.reading!.mangaId);
-    friend.favorites.filter((key) => sourceService.isSourceKey(key)).forEach((key) => set.add(key));
+    friend.favorites
+      .filter((key) => sourceService.isSourceKey(key))
+      .forEach((key) => set.add(key));
+    friend.history
+      .filter((entry) => sourceService.isSourceKey(entry.mangaId))
+      .forEach((entry) => set.add(entry.mangaId));
     return [...set];
   }, [friend]);
   const sourceItems = useFriendSourceItems(sourceKeys);
@@ -161,6 +181,9 @@ export function FriendProfile() {
     : null;
   const current = reading ? sourceItems[reading.mangaId] : null;
   const favoriteKeys = friend.favorites.filter((key) => sourceService.isSourceKey(key));
+  const history = friend.history
+    .filter((entry) => sourceService.isSourceKey(entry.mangaId))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 
   async function remove() {
     setRemoving(true);
@@ -180,25 +203,71 @@ export function FriendProfile() {
       <div className="friend-heading">
         <span className="avatar large">{friend.user.name[0]}</span>
         <div>
-          <p className="eyebrow">مكتبة صديقك</p>
+          <p className="eyebrow">{friend.private ? "حساب خاص" : "مكتبة صديقك"}</p>
           <h1>{friend.user.name}</h1>
+          <p className="muted">@{friend.user.username}</p>
         </div>
       </div>
 
-      <SectionTitle title="يقرأ حاليا" />
-      {reading && current ? (
-        <Link className="update-row friend-current" to={`/source/${encodeURIComponent(current.key)}`}>
-          {current.cover && (
-            <img src={sourceService.imageUrl(current.source, current.cover)} alt="" />
-          )}
-          <div>
-            <h2 dir="auto">{current.title}</h2>
-            <p>الفصل {reading.chapter}</p>
-          </div>
-          <span>←</span>
-        </Link>
+      {friend.private ? (
+        <div className="friend-private-note">
+          <b>هذا الحساب خاص</b>
+          <p className="muted">صاحب الحساب اختار إخفاء تقدم القراءة وسجل المتابعة. المفضلة فقط ظاهرة.</p>
+        </div>
       ) : (
-        <p className="empty">ما عنده قراءة حالية.</p>
+        <>
+          <SectionTitle title="يقرأ حاليا" />
+          {reading && current ? (
+            <Link className="update-row friend-current" to={`/source/${encodeURIComponent(current.key)}`}>
+              {current.cover && (
+                <SourceCoverImage item={current} alt="" />
+              )}
+              <div>
+                <h2 dir="auto">{current.title}</h2>
+                <p>الفصل {reading.chapter}</p>
+              </div>
+              <span>←</span>
+            </Link>
+          ) : (
+            <p className="empty">ما عنده قراءة حالية.</p>
+          )}
+
+          <SectionTitle title="متابعته" />
+          <div className="friend-history-list">
+            {history.map((progress) => {
+              const item = sourceItems[progress.mangaId];
+              if (!item) return null;
+              return (
+                <Link
+                  key={progress.mangaId}
+                  className="profile-reading-row"
+                  to={`/source/${encodeURIComponent(item.key)}`}
+                >
+                  <div className="profile-reading-cover">
+                    {item.cover ? (
+                      <SourceCoverImage item={item} alt={`غلاف ${item.title}`} />
+                    ) : (
+                      <div className="source-cover-placeholder">{item.title.slice(0, 1)}</div>
+                    )}
+                  </div>
+                  <div className="profile-reading-copy">
+                    <div className="profile-reading-title">
+                      <div>
+                        <small>{sourceService.sourceLabel(item.source)}</small>
+                        <h3 dir="auto">{item.title}</h3>
+                      </div>
+                      <b>{Math.round(progress.percent)}%</b>
+                    </div>
+                    <p>وقف عند الفصل {progress.chapter}</p>
+                    <Progress value={progress.percent} />
+                  </div>
+                  <span className="profile-row-arrow">←</span>
+                </Link>
+              );
+            })}
+          </div>
+          {!history.length && <p className="empty">ما عنده سجل متابعة إلى الآن.</p>}
+        </>
       )}
 
       <SectionTitle title="المفضلة" />

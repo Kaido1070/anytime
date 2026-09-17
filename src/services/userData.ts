@@ -13,6 +13,7 @@ export interface UserDataService {
   getFriends(): Promise<Friend[]>;
   addFriend(username: string): Promise<void>;
   removeFriend(id: string): Promise<void>;
+  setProfilePrivate(value: boolean): Promise<boolean>;
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }
 
@@ -33,7 +34,7 @@ class ApiError extends Error {
   }
 }
 
-const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx):/.test(value));
+const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq):/.test(value));
 
 function normalizeData(data: UserData): UserData {
   const favorites = data.favorites.filter((id) => isLiveKey(id));
@@ -42,7 +43,7 @@ function normalizeData(data: UserData): UserData {
   );
   const completed = data.completed.filter((key) => {
     const item = data.progress[key];
-    return item ? isLiveKey(item.mangaId) : /^(mt|tx):/.test(key);
+    return item ? isLiveKey(item.mangaId) : /^(mt|tx|aq):/.test(key);
   });
   const lastOpened = data.lastOpened && isLiveKey(data.lastOpened.mangaId) ? data.lastOpened : null;
   return { ...data, favorites, progress, completed, lastOpened };
@@ -53,6 +54,7 @@ function normalizeFriends(friends: Friend[]): Friend[] {
     ...friend,
     reading: friend.reading && isLiveKey(friend.reading.mangaId) ? friend.reading : null,
     favorites: friend.favorites.filter((id) => isLiveKey(id)),
+    history: (friend.history ?? []).filter((item) => isLiveKey(item.mangaId)),
   }));
 }
 
@@ -190,6 +192,14 @@ class ApiUserDataService implements UserDataService {
 
   async removeFriend(id: string) {
     await this.request(`friends/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async setProfilePrivate(value: boolean) {
+    const result = await this.request<{ profilePrivate: boolean }>("profile", {
+      method: "PATCH",
+      body: JSON.stringify({ private: value }),
+    });
+    return result.profilePrivate;
   }
 
   async changePassword(currentPassword: string, newPassword: string) {
