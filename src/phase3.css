@@ -1,20 +1,29 @@
-.source-tabs {
+.source-filter-row {
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
 }
 
-.source-tabs button {
-  min-height: 40px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+.source-filter-label {
   color: var(--muted);
-  border-radius: 8px;
-  padding: 8px 15px;
-  font: inherit;
+  font-size: 12px;
+  margin-inline-end: 2px;
 }
 
-.source-tabs button.active {
+.source-filter-row button {
+  min-height: 34px;
+  border: 1px solid #3e4143;
+  background: #202224;
+  color: #b8bcbe;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.source-filter-row button.active {
   color: #222426;
   background: var(--accent);
   border-color: var(--accent);
@@ -112,6 +121,9 @@
   .source-search { flex-wrap: wrap; }
   .source-search input { flex-basis: 100%; }
   .source-search .primary, .source-search .secondary { flex: 1; }
+  .source-filter-row { gap: 7px; }
+  .source-filter-label { width: 100%; margin-bottom: 1px; }
+  .source-filter-row button { flex: 1; min-width: 0; }
   .source-callout { align-items: stretch; flex-direction: column; }
   .source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bottom-nav { width: min(94vw, 430px); padding-inline: 6px; }
