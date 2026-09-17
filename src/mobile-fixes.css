@@ -12,6 +12,39 @@
 }
 
 @media (max-width: 759px) {
+
+  /* Keep the mobile details hero inside the viewport in RTL.
+     The base rule expands the synopsis/actions with a negative left margin,
+     which is the wrong physical side when the grid is RTL and pushes content
+     off-screen. Expand toward the cover column on the right instead. */
+  .details-hero {
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
+
+  .details-hero > div {
+    min-width: 0;
+  }
+
+  .details-hero h1 {
+    overflow-wrap: anywhere;
+  }
+
+  .details-hero .description,
+  .details-hero .detail-actions {
+    margin-left: 0;
+    margin-right: -129px;
+  }
+
+  .details-hero .description {
+    overflow-wrap: anywhere;
+  }
+
+  .details-hero .detail-actions > .primary,
+  .details-hero .detail-actions > .secondary {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .login-art {
     min-height: 0;
     display: flex;
