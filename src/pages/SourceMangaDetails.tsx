@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
@@ -67,7 +68,7 @@ export function SourceMangaDetails() {
     <>
       <Back to="/discover" />
       <div className="details-hero">
-        {item.cover ? <img className="detail-cover" src={sourceService.imageUrl(item.source, item.cover)} alt={`غلاف ${item.title}`} /> :
+        {item.cover ? <SourceCoverImage item={item} className="detail-cover" alt={`غلاف ${item.title}`} /> :
           <div className="detail-cover source-cover-placeholder source-detail-placeholder">{item.title.slice(0, 1)}</div>}
         <div>
           <p className="eyebrow">{sourceService.sourceLabel(item.source)} · {statusLabel(item.status)}</p>
