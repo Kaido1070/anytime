@@ -10,6 +10,13 @@ export interface SourceGroup {
 const SOURCE_PRIORITY: Partial<Record<SourceName, number>> = {
   mangatime: 0,
   teamx: 1,
+  "3asq": 2,
+};
+
+const COVER_PRIORITY: Partial<Record<SourceName, number>> = {
+  teamx: 0,
+  "3asq": 1,
+  mangatime: 2,
 };
 
 function normalizeIdentity(value: string) {
@@ -77,6 +84,16 @@ function pickPrimary(items: SourceManga[]) {
   })[0];
 }
 
+export function preferredSourceCover(items: SourceManga[]) {
+  const candidates = items.filter((item) => Boolean(item.cover));
+  if (!candidates.length) return items[0];
+  return [...candidates].sort((a, b) => {
+    const sourceOrder = (COVER_PRIORITY[a.source] ?? 99) - (COVER_PRIORITY[b.source] ?? 99);
+    if (sourceOrder) return sourceOrder;
+    return a.key.localeCompare(b.key);
+  })[0];
+}
+
 export function mergeSourceItems(items: SourceManga[]): SourceGroup[] {
   const uniqueItems = [...new Map(items.map((item) => [item.key, item])).values()];
   const groups: Array<SourceGroup & { identities: Set<string> }> = [];
@@ -129,5 +146,5 @@ export function sourceDetailsPath(key: string, values: Array<SourceManga | strin
 }
 
 function isSourceKey(value: string) {
-  return /^(?:mt|tx):[A-Za-z0-9_-]{1,110}$/.test(value);
+  return /^(?:mt|tx|aq):[A-Za-z0-9_-]{1,110}$/.test(value);
 }
