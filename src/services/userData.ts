@@ -39,7 +39,7 @@ class LocalUserDataService implements UserDataService {
       (item) => item.username === username.trim().toLowerCase(),
     );
     if (!user || password !== "anytime")
-      throw new Error("Use Mahdi, Kaido, or Ahmed with password anytime.");
+      throw new Error("استخدم Mahdi أو Kaido أو Ahmed وكلمة المرور anytime.");
     localStorage.setItem("anytime:session", user.id);
     return user;
   }
@@ -48,7 +48,7 @@ class LocalUserDataService implements UserDataService {
   }
   private async key() {
     const user = await this.getUser();
-    if (!user) throw new Error("Please sign in again.");
+    if (!user) throw new Error("سجل دخولك مرة ثانية.");
     return `anytime:v1:user:${user.id}`;
   }
   async getData(): Promise<UserData> {
