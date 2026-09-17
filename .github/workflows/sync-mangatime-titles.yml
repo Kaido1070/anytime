@@ -1,0 +1,41 @@
+name: Sync MangaTime English Titles
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/sync-mangatime-english.mjs"
+      - ".github/workflows/sync-mangatime-titles.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify MangaTime English titles
+        run: node scripts/sync-mangatime-english.mjs
+
+      - name: Commit verified title map
+        run: |
+          if git diff --quiet -- src/data/mangatimeEnglishTitles.json data/mangatime-title-report.json; then
+            echo "No title changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/mangatimeEnglishTitles.json data/mangatime-title-report.json
+          git commit -m "Update verified MangaTime English titles"
+          git push
