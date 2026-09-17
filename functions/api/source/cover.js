@@ -1,6 +1,7 @@
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const ASQ_BASE = "https://3asq.online";
+const STARZ_BASE = "https://starzmanga.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -14,7 +15,7 @@ export async function onRequestGet({ request, env }) {
 
   const url = new URL(request.url);
   const key = String(url.searchParams.get("key") ?? "").trim();
-  if (!/^(?:mt|aq):[A-Za-z0-9_-]{1,110}$/.test(key)) {
+  if (!/^(?:mt|aq|sz):[A-Za-z0-9_-]{1,110}$/.test(key)) {
     return json({ error: "INVALID_SOURCE_KEY" }, 400);
   }
 
@@ -23,17 +24,17 @@ export async function onRequestGet({ request, env }) {
     .bind(key)
     .first();
 
-  if (!item || !["mangatime", "3asq"].includes(String(item.source))) {
+  if (!item || !["mangatime", "3asq", "starzmanga"].includes(String(item.source))) {
     return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
   }
 
   const source = String(item.source);
-  const base = source === "3asq" ? ASQ_BASE : MANGATIME_BASE;
+  const base = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : MANGATIME_BASE;
   const storedCover = absoluteUrl(base, item.cover_url);
 
   try {
-    if (source === "3asq") {
-      const detailCovers = await asqDetailCovers(String(item.slug || ""));
+    if (source === "3asq" || source === "starzmanga") {
+      const detailCovers = await madaraDetailCovers(source === "3asq" ? ASQ_BASE : STARZ_BASE, String(item.slug || ""));
       const stableCover = detailCovers[0] || storedCover;
       const covers = buildCoverCandidates(...detailCovers, storedCover);
 
@@ -62,7 +63,7 @@ export async function onRequestGet({ request, env }) {
 
     return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
   } catch (error) {
-    console.error(source === "3asq" ? "3asq cover resolver error" : "MangaTime cover resolver error", error);
+    console.error(source === "mangatime" ? "MangaTime cover resolver error" : `${source} cover resolver error`, error);
     return json(
       { covers: buildCoverCandidates(storedCover) },
       200,
@@ -117,17 +118,17 @@ function unwrapAndMaximize(value) {
   }
 }
 
-async function asqDetailCovers(slug) {
-  const target = new URL(`/manga/${encodeURIComponent(slug)}/`, ASQ_BASE);
+async function madaraDetailCovers(base, slug) {
+  const target = new URL(`/manga/${encodeURIComponent(slug)}/`, base);
   const response = await fetch(target, {
     headers: sourceHeaders(
-      ASQ_BASE,
+      base,
       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     ),
     redirect: "follow",
     cf: { cacheTtl: 3600, cacheEverything: true },
   });
-  if (!response.ok) throw new Error(`3asq HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Madara cover HTTP ${response.status}`);
 
   const html = await response.text();
   const summary =
@@ -141,7 +142,7 @@ async function asqDetailCovers(slug) {
   const candidates = [];
 
   const add = (value) => {
-    const absolute = absoluteUrl(ASQ_BASE, decodeEntities(value));
+    const absolute = absoluteUrl(base, decodeEntities(value));
     if (absolute && !candidates.includes(absolute) && !absolute.startsWith("data:")) {
       candidates.push(absolute);
     }
