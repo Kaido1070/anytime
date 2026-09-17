@@ -271,7 +271,35 @@ export function Discover() {
     setDraftGenres((current) => current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]);
   }
 
+  async function restoreDefaultView() {
+    setFilterLoading(true);
+    setError("");
+    try {
+      const result = await fetchPage("latest", 1);
+      setSourceFilter("all");
+      setGenreFilters([]);
+      setDraftSource("all");
+      setDraftGenres([]);
+      setMode("latest");
+      setPage(1);
+      setQuery("");
+      setItems(result.items);
+      setHasMoreBySource(result.hasMore);
+      setError(result.warning);
+      setFiltersOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذر إعادة الصفحة للوضع الافتراضي.");
+    } finally {
+      setFilterLoading(false);
+    }
+  }
+
   async function applyFilters() {
+    if (draftSource === "all" && draftGenres.length === 0) {
+      await restoreDefaultView();
+      return;
+    }
+
     setFilterLoading(true);
     setError("");
     try {
@@ -285,11 +313,6 @@ export function Discover() {
     } finally {
       setFilterLoading(false);
     }
-  }
-
-  function clearFilters() {
-    setDraftSource("all");
-    setDraftGenres([]);
   }
 
   return (
@@ -363,7 +386,14 @@ export function Discover() {
               <div className="filter-choice-grid source-choice-grid">
                 <button type="button" className={draftSource === "all" ? "selected" : ""} onClick={() => setDraftSource("all")}>كل المصادر</button>
                 {SOURCES.map((entry) => (
-                  <button key={entry.id} type="button" className={draftSource === entry.id ? "selected" : ""} onClick={() => setDraftSource(entry.id)}>{entry.label}</button>
+                  <button
+                    key={entry.id}
+                    type="button"
+                    className={draftSource === entry.id ? "selected" : ""}
+                    onClick={() => setDraftSource((current) => current === entry.id ? "all" : entry.id)}
+                  >
+                    {entry.label}
+                  </button>
                 ))}
               </div>
             </div>
@@ -381,7 +411,9 @@ export function Discover() {
             </div>
 
             <div className="filter-sheet-actions">
-              <button className="secondary" type="button" disabled={filterLoading} onClick={clearFilters}>إعادة تعيين</button>
+              <button className="secondary" type="button" disabled={filterLoading} onClick={() => void restoreDefaultView()}>
+                {filterLoading ? "جاري الإعادة…" : "إعادة تعيين"}
+              </button>
               <button className="primary" type="button" disabled={filterLoading} onClick={() => void applyFilters()}>{filterLoading ? "جاري التطبيق…" : "تطبيق الفلاتر"}</button>
             </div>
           </section>
