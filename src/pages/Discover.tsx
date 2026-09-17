@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { SourceCard } from "../components/SourceCard";
+import { Icon } from "../components/UI";
 import { sourceService } from "../services/sources";
 import type { SourceManga, SourceName } from "../types";
 
@@ -9,6 +10,19 @@ const SOURCES: { id: SourceName; label: string }[] = [
 ];
 
 type SourceFilter = "all" | SourceName;
+type GenreId =
+  | "action"
+  | "fantasy"
+  | "adventure"
+  | "drama"
+  | "comedy"
+  | "romance"
+  | "supernatural"
+  | "martial-arts"
+  | "isekai"
+  | "system"
+  | "school"
+  | "mystery";
 
 type HasMoreBySource = Record<SourceName, boolean>;
 
@@ -17,13 +31,75 @@ const EMPTY_HAS_MORE: HasMoreBySource = {
   teamx: false,
 };
 
-function filterLabel(source: SourceFilter) {
-  if (source === "all") return "كل المصادر";
-  return sourceService.sourceLabel(source);
+const GENRES: { id: GenreId; label: string; aliases: string[] }[] = [
+  { id: "action", label: "أكشن", aliases: ["أكشن", "اكشن", "action"] },
+  { id: "fantasy", label: "فانتزي", aliases: ["فانتزي", "فانتازيا", "fantasy"] },
+  { id: "adventure", label: "مغامرات", aliases: ["مغامرات", "مغامرة", "adventure"] },
+  { id: "drama", label: "دراما", aliases: ["دراما", "drama"] },
+  { id: "comedy", label: "كوميدي", aliases: ["كوميدي", "كوميديا", "comedy"] },
+  { id: "romance", label: "رومانسي", aliases: ["رومانسي", "رومانسية", "romance"] },
+  { id: "supernatural", label: "قوة خارقة", aliases: ["قوة خارقة", "خارق للطبيعة", "supernatural"] },
+  { id: "martial-arts", label: "فنون قتالية", aliases: ["فنون قتالية", "martial arts", "murim", "موريم"] },
+  { id: "isekai", label: "إيسيكاي", aliases: ["إيسيكاي", "ايسيكاي", "isekai"] },
+  { id: "system", label: "نظام", aliases: ["نظام", "system"] },
+  { id: "school", label: "مدرسي", aliases: ["مدرسي", "مدرسة", "school", "school life"] },
+  { id: "mystery", label: "غموض", aliases: ["غموض", "mystery"] },
+];
+
+function normalize(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[^a-z0-9\u0600-\u06ff]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function matchesGenres(item: SourceManga, selected: GenreId[]) {
+  if (!selected.length) return true;
+  const itemGenres = (item.genres ?? []).map((genre) => normalize(String(genre)));
+  if (!itemGenres.length) return false;
+  return selected.some((id) => {
+    const genre = GENRES.find((entry) => entry.id === id);
+    if (!genre) return false;
+    return genre.aliases.some((alias) => {
+      const needle = normalize(alias);
+      return itemGenres.some((value) => value.includes(needle) || needle.includes(value));
+    });
+  });
+}
+
+async function hydrateGenres(items: SourceManga[], sourceFilter: SourceFilter, selectedGenres: GenreId[]) {
+  if (!selectedGenres.length) return items;
+  const candidates = items.filter((item) => sourceFilter === "all" || item.source === sourceFilter);
+  const resolved = new Map<string, SourceManga>();
+
+  for (let index = 0; index < candidates.length; index += 6) {
+    const batch = candidates.slice(index, index + 6);
+    const results = await Promise.allSettled(batch.map((item) => sourceService.getSeries(item.key)));
+    results.forEach((result, resultIndex) => {
+      if (result.status === "fulfilled") resolved.set(batch[resultIndex].key, result.value);
+    });
+  }
+
+  return items.map((item) => resolved.get(item.key) ?? item);
+}
+
+function filterLabel(source: SourceFilter, genres: GenreId[]) {
+  const sourceLabel = source === "all" ? "كل المصادر" : sourceService.sourceLabel(source);
+  if (!genres.length) return sourceLabel;
+  return `${sourceLabel} · ${genres.length} تصنيف`;
 }
 
 export function Discover() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [genreFilters, setGenreFilters] = useState<GenreId[]>([]);
+  const [draftSource, setDraftSource] = useState<SourceFilter>("all");
+  const [draftGenres, setDraftGenres] = useState<GenreId[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterLoading, setFilterLoading] = useState(false);
   const [items, setItems] = useState<SourceManga[]>([]);
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<"latest" | "search">("latest");
@@ -32,14 +108,18 @@ export function Discover() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const visibleItems = useMemo(
-    () => sourceFilter === "all" ? items : items.filter((item) => item.source === sourceFilter),
-    [items, sourceFilter],
-  );
+  const visibleItems = useMemo(() => {
+    return items.filter((item) => {
+      if (sourceFilter !== "all" && item.source !== sourceFilter) return false;
+      return matchesGenres(item, genreFilters);
+    });
+  }, [items, sourceFilter, genreFilters]);
 
   const hasMore = sourceFilter === "all"
     ? Object.values(hasMoreBySource).some(Boolean)
     : hasMoreBySource[sourceFilter];
+
+  const activeFilterCount = (sourceFilter === "all" ? 0 : 1) + genreFilters.length;
 
   async function fetchPage(nextMode: "latest" | "search", nextPage: number, term = "") {
     const results = await Promise.allSettled(
@@ -104,9 +184,10 @@ export function Discover() {
     setError("");
     try {
       const result = await fetchPage("search", 1, term);
+      const hydrated = await hydrateGenres(result.items, sourceFilter, genreFilters);
       setMode("search");
       setPage(1);
-      setItems(result.items);
+      setItems(hydrated);
       setHasMoreBySource(result.hasMore);
       setError(result.warning);
     } catch (cause) {
@@ -121,10 +202,11 @@ export function Discover() {
     setError("");
     try {
       const result = await fetchPage("latest", 1);
+      const hydrated = await hydrateGenres(result.items, sourceFilter, genreFilters);
       setMode("latest");
       setPage(1);
       setQuery("");
-      setItems(result.items);
+      setItems(hydrated);
       setHasMoreBySource(result.hasMore);
       setError(result.warning);
     } catch (cause) {
@@ -163,9 +245,10 @@ export function Discover() {
         }
       });
 
+      const hydratedIncoming = await hydrateGenres(incoming, sourceFilter, genreFilters);
       setItems((current) => {
         const map = new Map(current.map((item) => [item.key, item]));
-        for (const item of incoming) map.set(item.key, item);
+        for (const item of hydratedIncoming) map.set(item.key, item);
         return [...map.values()];
       });
       setHasMoreBySource(nextHasMore);
@@ -176,6 +259,37 @@ export function Discover() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function openFilters() {
+    setDraftSource(sourceFilter);
+    setDraftGenres(genreFilters);
+    setFiltersOpen(true);
+  }
+
+  function toggleDraftGenre(id: GenreId) {
+    setDraftGenres((current) => current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]);
+  }
+
+  async function applyFilters() {
+    setFilterLoading(true);
+    setError("");
+    try {
+      const hydrated = await hydrateGenres(items, draftSource, draftGenres);
+      setItems(hydrated);
+      setSourceFilter(draftSource);
+      setGenreFilters(draftGenres);
+      setFiltersOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذر تطبيق الفلاتر الآن.");
+    } finally {
+      setFilterLoading(false);
+    }
+  }
+
+  function clearFilters() {
+    setDraftSource("all");
+    setDraftGenres([]);
   }
 
   return (
@@ -197,6 +311,11 @@ export function Discover() {
         <button className="primary" disabled={loading || !query.trim()}>
           بحث
         </button>
+        <button className={`secondary filter-trigger ${activeFilterCount ? "active" : ""}`} type="button" onClick={openFilters}>
+          <Icon name="filter" />
+          <span>فلتر</span>
+          {activeFilterCount > 0 && <b>{activeFilterCount}</b>}
+        </button>
         {mode === "search" && (
           <button className="secondary" type="button" onClick={() => void reset()} disabled={loading}>
             الأحدث
@@ -204,36 +323,13 @@ export function Discover() {
         )}
       </form>
 
-      <div className="source-filter-row" aria-label="فلتر المصدر">
-        <span className="source-filter-label">المصدر</span>
-        <button
-          type="button"
-          className={sourceFilter === "all" ? "active" : ""}
-          aria-pressed={sourceFilter === "all"}
-          onClick={() => setSourceFilter("all")}
-        >
-          الكل
-        </button>
-        {SOURCES.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            className={sourceFilter === entry.id ? "active" : ""}
-            aria-pressed={sourceFilter === entry.id}
-            onClick={() => setSourceFilter(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
-
       <div className="section-title">
         <h2>{mode === "search" ? `نتائج ${query}` : "أحدث الأعمال"}</h2>
-        <span className="muted">{filterLabel(sourceFilter)}</span>
+        <span className="muted">{filterLabel(sourceFilter, genreFilters)}</span>
       </div>
 
       {error && <p className="error source-error">{error}</p>}
-      {loading && !items.length && <p className="empty">جاري جلب الأعمال من المصادر…</p>}
+      {(loading || filterLoading) && !visibleItems.length && <p className="empty">جاري جلب الأعمال من المصادر…</p>}
 
       <div className="cover-grid source-grid">
         {visibleItems.map((item) => (
@@ -241,14 +337,55 @@ export function Discover() {
         ))}
       </div>
 
-      {!loading && !visibleItems.length && !error && (
-        <p className="empty">ما لقينا نتائج بهذا الاسم في الفلتر المحدد.</p>
+      {!loading && !filterLoading && !visibleItems.length && !error && (
+        <p className="empty">ما لقينا أعمال تطابق الفلاتر المحددة.</p>
       )}
 
       {hasMore && (
-        <button className="secondary source-more" disabled={loading} onClick={() => void more()}>
+        <button className="secondary source-more" disabled={loading || filterLoading} onClick={() => void more()}>
           {loading ? "جاري التحميل…" : "تحميل المزيد"}
         </button>
+      )}
+
+      {filtersOpen && (
+        <div className="filter-backdrop" onMouseDown={() => !filterLoading && setFiltersOpen(false)}>
+          <section className="filter-sheet" role="dialog" aria-modal="true" aria-label="فلترة الأعمال" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="filter-sheet-header">
+              <div>
+                <p className="eyebrow">تخصيص النتائج</p>
+                <h2>الفلاتر</h2>
+              </div>
+              <button className="filter-close" type="button" aria-label="إغلاق" disabled={filterLoading} onClick={() => setFiltersOpen(false)}>×</button>
+            </div>
+
+            <div className="filter-group">
+              <h3>المصدر</h3>
+              <div className="filter-choice-grid source-choice-grid">
+                <button type="button" className={draftSource === "all" ? "selected" : ""} onClick={() => setDraftSource("all")}>كل المصادر</button>
+                {SOURCES.map((entry) => (
+                  <button key={entry.id} type="button" className={draftSource === entry.id ? "selected" : ""} onClick={() => setDraftSource(entry.id)}>{entry.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <div className="filter-group-title">
+                <h3>التصنيفات</h3>
+                <span>{draftGenres.length ? `${draftGenres.length} محدد` : "اختياري"}</span>
+              </div>
+              <div className="filter-choice-grid genre-choice-grid">
+                {GENRES.map((genre) => (
+                  <button key={genre.id} type="button" className={draftGenres.includes(genre.id) ? "selected" : ""} aria-pressed={draftGenres.includes(genre.id)} onClick={() => toggleDraftGenre(genre.id)}>{genre.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="filter-sheet-actions">
+              <button className="secondary" type="button" disabled={filterLoading} onClick={clearFilters}>إعادة تعيين</button>
+              <button className="primary" type="button" disabled={filterLoading} onClick={() => void applyFilters()}>{filterLoading ? "جاري التطبيق…" : "تطبيق الفلاتر"}</button>
+            </div>
+          </section>
+        </div>
       )}
     </>
   );
