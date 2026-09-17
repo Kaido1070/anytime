@@ -2,6 +2,8 @@
   "id": "/",
   "name": "Anytime",
   "short_name": "Anytime",
+  "lang": "ar",
+  "dir": "rtl",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
