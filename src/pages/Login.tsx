@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useLibrary } from "../hooks/useLibrary";
+
 export function Login() {
   const { signIn } = useLibrary();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -11,12 +13,13 @@ export function Login() {
     const form = new FormData(event.currentTarget);
     try {
       await signIn(String(form.get("username")), String(form.get("password")));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "تعذر تسجيل الدخول.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذر تسجيل الدخول.");
     } finally {
       setBusy(false);
     }
   }
+
   return (
     <main className="login">
       <div className="login-art">
@@ -34,7 +37,7 @@ export function Login() {
       <div className="login-form">
         <p className="eyebrow">أهلا بك في ANYTIME</p>
         <h2>مكانك داخل القصة.</h2>
-        <p className="muted">سجل دخولك إلى مكتبتك الخاصة.</p>
+        <p className="muted">سجل دخولك للوصول إلى مكتبتك المتزامنة.</p>
         <form onSubmit={submit}>
           <label>
             اسم المستخدم
@@ -67,11 +70,9 @@ export function Login() {
           </button>
         </form>
         <p className="demo-note">
-          المرحلة الأولى · تسجيل تجريبي
+          المرحلة الثانية
           <br />
-          <span>
-            Mahdi أو Kaido أو Ahmed · كلمة المرور: <b>anytime</b>
-          </span>
+          <span>جلسة خاصة ومزامنة عبر الحساب.</span>
         </p>
       </div>
     </main>

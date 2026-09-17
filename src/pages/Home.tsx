@@ -2,12 +2,14 @@ import { Link } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 import { manga, findManga } from "../data/mock";
 import { MangaCard, SectionTitle, Progress, Icon } from "../components/UI";
+
 export function Home() {
   const { user, data, friends } = useLibrary();
   const last = data?.lastOpened;
   const current = findManga(last?.mangaId ?? "returner") ?? manga[0];
-  const chapter = last?.chapter ?? 143;
+  const chapter = last?.chapter ?? current.chapters[0];
   const percent = data?.progress[`${current.id}:${chapter}`]?.percent ?? 0;
+
   return (
     <>
       <div className="greeting">
@@ -18,6 +20,7 @@ export function Home() {
         </h1>
         <p className="muted">فصلك الجاي ينتظرك.</p>
       </div>
+
       <SectionTitle title="كمل القراءة" />
       <section className="continue-card">
         <Link className="continue-cover" to={`/manga/${current.id}`}>
@@ -42,6 +45,7 @@ export function Home() {
           </Link>
         </div>
       </section>
+
       <section>
         <SectionTitle title="آخر التحديثات" />
         <div className="updates">
@@ -58,6 +62,7 @@ export function Home() {
           ))}
         </div>
       </section>
+
       <section>
         <SectionTitle title="مفضلتك" to="/favorites" label="عرض الكل" />
         <div className="cover-grid home-grid">
@@ -68,39 +73,40 @@ export function Home() {
             ))}
         </div>
         {!data?.favorites.length && (
-          <p className="empty">
-            أضف الأعمال اللي تحبها من صفحة العمل عشان تظهر هنا.
-          </p>
+          <p className="empty">أضف الأعمال اللي تحبها من صفحة العمل عشان تظهر هنا.</p>
         )}
       </section>
+
       <section>
         <SectionTitle title="نشاط الأصدقاء" to="/friends" label="الأصدقاء" />
         <div className="activity">
-          {friends.map((friend, i) => (
-            <Link to={`/friends/${friend.user.id}`} key={friend.user.id}>
-              <span className={`avatar tone-${i}`}>{friend.user.name[0]}</span>
-              <div>
-                <p>
-                  <b>{friend.user.name}</b>{" "}
-                  {friend.user.id === "ahmed"
-                    ? "أضاف Solo Leveling إلى المفضلة"
-                    : `كمل قراءة ${findManga(friend.reading.mangaId)?.title}`}
-                </p>
-                <small>
-                  {friend.user.id === "ahmed"
-                    ? "عمل جديد في مكتبته"
-                    : `الفصل ${friend.reading.chapter}`}{" "}
-                  · منذ {i + 1} س
-                </small>
-              </div>
-              <span aria-hidden="true">↗</span>
-            </Link>
-          ))}
+          {friends.map((friend, i) => {
+            const reading = friend.reading;
+            const readingTitle = reading ? findManga(reading.mangaId)?.title : null;
+            return (
+              <Link to={`/friends/${friend.user.id}`} key={friend.user.id}>
+                <span className={`avatar tone-${i}`}>{friend.user.name[0]}</span>
+                <div>
+                  <p>
+                    <b>{friend.user.name}</b>{" "}
+                    {reading && readingTitle
+                      ? `يقرأ ${readingTitle}`
+                      : friend.favorites.length
+                        ? "حدّث مكتبته"
+                        : "ما بدأ قراءة بعد"}
+                  </p>
+                  <small>
+                    {reading ? `الفصل ${reading.chapter}` : `${friend.favorites.length} في المفضلة`}
+                  </small>
+                </div>
+                <span aria-hidden="true">↗</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
-      <footer className="page-footer">
-        مكان هادي وقصة حلوة في أي وقت.
-      </footer>
+
+      <footer className="page-footer">مكان هادي وقصة حلوة في أي وقت.</footer>
     </>
   );
 }

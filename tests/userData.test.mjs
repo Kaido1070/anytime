@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { userDataService as service } from "../src/services/userData.ts";
+
 const values = new Map();
 Object.defineProperty(globalThis, "localStorage", {
   value: {
@@ -10,59 +10,107 @@ Object.defineProperty(globalThis, "localStorage", {
   },
   configurable: true,
 });
-test("mock login, isolated favorites, chapter progress, completion, and sign-out", async () => {
+
+const user = { id: "mahdi", username: "mahdi", name: "Mahdi" };
+let signedIn = false;
+let serverData = {
+  version: 2,
+  favorites: ["returner", "solo"],
+  progress: {},
+  completed: [],
+  lastOpened: null,
+};
+
+function response(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+Object.defineProperty(globalThis, "fetch", {
+  value: async (input, init = {}) => {
+    const url = String(input);
+    const path = url.replace(/^.*\/api\//, "");
+    const method = init.method ?? "GET";
+
+    if (path === "session" && method === "GET")
+      return response({ user: signedIn ? user : null });
+    if (path === "login" && method === "POST") {
+      const body = JSON.parse(String(init.body));
+      if (body.username !== "mahdi" || body.password !== "anytime")
+        return response({ message: "bad login" }, 401);
+      signedIn = true;
+      return response({ user });
+    }
+    if (path === "logout" && method === "POST") {
+      signedIn = false;
+      return response({ ok: true });
+    }
+    if (path === "data" && method === "GET") return response({ data: serverData });
+    if (path === "import" && method === "POST") return response({ data: serverData });
+    if (path === "favorites" && method === "POST") {
+      const body = JSON.parse(String(init.body));
+      serverData = {
+        ...serverData,
+        favorites: [...new Set([...serverData.favorites, body.mangaId])],
+      };
+      return response({ ok: true });
+    }
+    if (path.startsWith("favorites/") && method === "DELETE") {
+      const id = decodeURIComponent(path.slice("favorites/".length));
+      serverData = {
+        ...serverData,
+        favorites: serverData.favorites.filter((item) => item !== id),
+      };
+      return response({ ok: true });
+    }
+    if (path === "progress" && method === "PUT") {
+      const progress = JSON.parse(String(init.body));
+      const key = `${progress.mangaId}:${progress.chapter}`;
+      serverData = {
+        ...serverData,
+        progress: { ...serverData.progress, [key]: progress },
+        completed:
+          progress.percent >= 98
+            ? [...new Set([...serverData.completed, key])]
+            : serverData.completed,
+        lastOpened: { mangaId: progress.mangaId, chapter: progress.chapter },
+      };
+      return response({ ok: true });
+    }
+    if (path === "friends" && method === "GET") return response({ friends: [] });
+    if (path === "change-password" && method === "POST") return response({ ok: true });
+    return response({ message: `Unhandled ${method} ${path}` }, 500);
+  },
+  configurable: true,
+});
+
+test("Phase 2 API service logs in and syncs favorites/progress", async () => {
+  const { userDataService: service } = await import("../src/services/userData.ts");
+
   assert.equal(await service.getUser(), null);
-  await assert.rejects(service.signIn("Mahdi", "wrong"));
-  await service.signIn(" MAHDI ", "anytime");
-  assert.equal((await service.getUser()).name, "Mahdi");
+  await assert.rejects(service.signIn("mahdi", "wrong"));
+  assert.equal((await service.signIn(" MAHDI ", "anytime")).name, "Mahdi");
+
   await service.addFavorite("eleceed");
-  await service.addFavorite("eleceed");
-  assert.equal(
-    (await service.getFavorites()).filter((id) => id === "eleceed").length,
-    1,
-  );
+  assert.ok((await service.getFavorites()).includes("eleceed"));
+
   await service.removeFavorite("solo");
   assert.equal((await service.getFavorites()).includes("solo"), false);
-  await service.saveReadingProgress({
-    mangaId: "returner",
-    chapter: 148,
-    percent: 64,
-    updatedAt: 10,
-  });
-  assert.equal(
-    (await service.getReadingProgress())["returner:148"].percent,
-    64,
-  );
-  assert.deepEqual((await service.getData()).lastOpened, {
-    mangaId: "returner",
-    chapter: 148,
-  });
+
   await service.saveReadingProgress({
     mangaId: "returner",
     chapter: 148,
     percent: 100,
-    updatedAt: 11,
+    updatedAt: 10,
   });
-  assert.ok((await service.getData()).completed.includes("returner:148"));
+  const data = await service.getData();
+  assert.equal(data.progress["returner:148"].percent, 100);
+  assert.ok(data.completed.includes("returner:148"));
+  assert.deepEqual(data.lastOpened, { mangaId: "returner", chapter: 148 });
+
+  await service.changePassword("anytime", "new-pass");
   await service.signOut();
   assert.equal(await service.getUser(), null);
-  await assert.rejects(service.getFavorites());
-  await service.signIn("Kaido", "anytime");
-  assert.equal((await service.getFavorites()).includes("eleceed"), false);
-  assert.equal(
-    (await service.getFriends()).some((friend) => friend.user.id === "kaido"),
-    false,
-  );
-  await service.signIn("Mahdi", "anytime");
-  assert.equal((await service.getFavorites()).includes("eleceed"), true);
-  assert.equal(
-    (await service.getReadingProgress())["returner:148"].percent,
-    100,
-  );
-});
-test("corrupt storage recovers a usable library", async () => {
-  values.set("anytime:v1:user:mahdi", "{broken");
-  assert.deepEqual(await service.getFavorites(), ["returner", "solo"]);
-  await service.addFavorite("horizon");
-  assert.ok((await service.getFavorites()).includes("horizon"));
 });

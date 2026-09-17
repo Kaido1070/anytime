@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 import { findManga } from "../data/mock";
 import { Back, MangaCard, SectionTitle } from "../components/UI";
+
 export function Friends() {
   const { friends } = useLibrary();
   return (
@@ -10,37 +11,45 @@ export function Friends() {
       <h1>
         الأصدقاء<span className="accent">.</span>
       </h1>
-      <p className="muted page-intro">
-        شوف وش يقرؤون وخذ من مفضلتهم.
-      </p>
+      <p className="muted page-intro">شوف وش يقرؤون وخذ من مفضلتهم.</p>
       <div className="friends-list">
-        {friends.map((friend, i) => (
-          <Link
-            key={friend.user.id}
-            to={`/friends/${friend.user.id}`}
-            className="friend-row"
-          >
-            <span className={`avatar large tone-${i}`}>
-              {friend.user.name[0]}
-            </span>
-            <div>
-              <h2>{friend.user.name}</h2>
-              <small>يقرأ حاليا</small>
-              <p>
-                {findManga(friend.reading.mangaId)?.title} · الفصل {friend.reading.chapter}
-              </p>
-              <small>
-                آخر المفضلة:{" "}
-                {friend.favorites.map((id) => findManga(id)?.title).join(", ")}
-              </small>
-            </div>
-            <span>↗</span>
-          </Link>
-        ))}
+        {friends.map((friend, i) => {
+          const current = friend.reading ? findManga(friend.reading.mangaId) : null;
+          return (
+            <Link
+              key={friend.user.id}
+              to={`/friends/${friend.user.id}`}
+              className="friend-row"
+            >
+              <span className={`avatar large tone-${i}`}>
+                {friend.user.name[0]}
+              </span>
+              <div>
+                <h2>{friend.user.name}</h2>
+                <small>{friend.reading ? "يقرأ حاليا" : "ما بدأ قراءة بعد"}</small>
+                {friend.reading && current && (
+                  <p>
+                    {current.title} · الفصل {friend.reading.chapter}
+                  </p>
+                )}
+                <small>
+                  {friend.favorites.length
+                    ? `آخر المفضلة: ${friend.favorites
+                        .map((id) => findManga(id)?.title)
+                        .filter(Boolean)
+                        .join(", ")}`
+                    : "المفضلة فارغة"}
+                </small>
+              </div>
+              <span>↗</span>
+            </Link>
+          );
+        })}
       </div>
     </>
   );
 }
+
 export function FriendProfile() {
   const { id } = useParams();
   const { friends, data, favorite } = useLibrary();
@@ -52,7 +61,8 @@ export function FriendProfile() {
         <h1>الصديق غير موجود</h1>
       </>
     );
-  const current = findManga(friend.reading.mangaId)!;
+
+  const current = friend.reading ? findManga(friend.reading.mangaId) : null;
   return (
     <>
       <Back to="/friends" />
@@ -63,27 +73,34 @@ export function FriendProfile() {
           <h1>{friend.user.name}</h1>
         </div>
       </div>
+
       <SectionTitle title="يقرأ حاليا" />
-      <Link className="update-row friend-current" to={`/manga/${current.id}`}>
-        <img src={current.cover} alt="" />
-        <div>
-          <h2>{current.title}</h2>
-          <p>الفصل {friend.reading.chapter}</p>
-        </div>
-        <span>←</span>
-      </Link>
+      {friend.reading && current ? (
+        <Link className="update-row friend-current" to={`/manga/${current.id}`}>
+          <img src={current.cover} alt="" />
+          <div>
+            <h2>{current.title}</h2>
+            <p>الفصل {friend.reading.chapter}</p>
+          </div>
+          <span>←</span>
+        </Link>
+      ) : (
+        <p className="empty">ما عنده قراءة حالية.</p>
+      )}
+
       <SectionTitle title="المفضلة" />
       <div className="cover-grid">
-        {friend.favorites.map((id) => {
-          const item = findManga(id)!;
-          const added = data?.favorites.includes(id);
+        {friend.favorites.map((mangaId) => {
+          const item = findManga(mangaId);
+          if (!item) return null;
+          const added = data?.favorites.includes(mangaId);
           return (
-            <div key={id}>
+            <div key={mangaId}>
               <MangaCard item={item} />
               <button
                 className="secondary copy-button"
                 disabled={added}
-                onClick={() => favorite(id, true)}
+                onClick={() => favorite(mangaId, true)}
               >
                 {added ? "✓ موجود في مفضلتك" : "أضف إلى مفضلتي"}
               </button>
@@ -91,6 +108,7 @@ export function FriendProfile() {
           );
         })}
       </div>
+      {!friend.favorites.length && <p className="empty">مفضلته فارغة.</p>}
     </>
   );
 }

@@ -22,7 +22,7 @@ export interface ReadingProgress {
   updatedAt: number;
 }
 export interface UserData {
-  version: 1;
+  version: 2;
   favorites: string[];
   progress: Record<string, ReadingProgress>;
   completed: string[];
@@ -30,6 +30,6 @@ export interface UserData {
 }
 export interface Friend {
   user: User;
-  reading: { mangaId: string; chapter: number };
+  reading: { mangaId: string; chapter: number } | null;
   favorites: string[];
 }

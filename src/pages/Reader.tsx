@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { findManga } from "../data/mock";
 import { useLibrary } from "../hooks/useLibrary";
 import { Icon, Progress } from "../components/UI";
+
 export function Reader() {
   const { id = "", chapter = "" } = useParams();
   const item = findManga(id);
@@ -16,6 +17,7 @@ export function Reader() {
     );
   return <ReaderChapter key={`${id}:${number}`} id={id} chapter={number} />;
 }
+
 function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
   const item = findManga(id)!;
   const { data, saveProgress } = useLibrary();
@@ -23,12 +25,14 @@ function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
   const [percent, setPercent] = useState(saved);
   const saveRef = useRef(saveProgress);
   saveRef.current = saveProgress;
+
   useLayoutEffect(() => {
     const previousRestoration = history.scrollRestoration;
     history.scrollRestoration = "manual";
     let ready = false;
     let timer: ReturnType<typeof setTimeout>;
     let latest = saved;
+
     const persist = () => {
       void saveRef.current({
         mangaId: id,
@@ -37,12 +41,14 @@ function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
         updatedAt: Date.now(),
       });
     };
+
     const frame = requestAnimationFrame(() => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       window.scrollTo(0, (max * saved) / 100);
       ready = true;
       persist();
     });
+
     const scroll = () => {
       if (!ready) return;
       const max = document.documentElement.scrollHeight - window.innerHeight;
@@ -50,14 +56,17 @@ function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
         max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
       setPercent(latest);
       clearTimeout(timer);
-      timer = setTimeout(persist, 250);
+      timer = setTimeout(persist, 1200);
     };
+
     const hidden = () => {
       if (document.visibilityState === "hidden") persist();
     };
+
     window.addEventListener("scroll", scroll, { passive: true });
     window.addEventListener("pagehide", persist);
     document.addEventListener("visibilitychange", hidden);
+
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(timer);
@@ -68,8 +77,10 @@ function ReaderChapter({ id, chapter }: { id: string; chapter: number }) {
       history.scrollRestoration = previousRestoration;
     };
   }, [id, chapter]);
+
   const previous = item.chapters.includes(chapter - 1);
   const next = item.chapters.includes(chapter + 1);
+
   return (
     <main className="reader">
       <header className="reader-header">
