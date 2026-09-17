@@ -63,31 +63,11 @@ CREATE TABLE IF NOT EXISTS friendships (
   FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Stable internal IDs are retained so existing favorites, progress, friendships and sessions survive account renames.
+-- Stable internal IDs are retained so existing sessions and friendships survive account renames.
 INSERT OR IGNORE INTO users VALUES
   ('mahdi','has','Has','nckWsLoOqPQ2ko0y6KFcdQ','Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE',210000,unixepoch()*1000,unixepoch()*1000),
   ('kaido','yas','Yas','w-fi6L0FIdkx0NNSYyhvdg','g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y',210000,unixepoch()*1000,unixepoch()*1000),
   ('ahmed','mah','Mah','4ueIIy1PaWKbbDjqIkf39g','Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI',210000,unixepoch()*1000,unixepoch()*1000);
-
-INSERT OR IGNORE INTO favorites VALUES
-  ('mahdi','returner',unixepoch()*1000),
-  ('mahdi','solo',unixepoch()*1000),
-  ('kaido','eleceed',unixepoch()*1000),
-  ('kaido','horizon',unixepoch()*1000),
-  ('ahmed','solo',unixepoch()*1000),
-  ('ahmed','returner',unixepoch()*1000);
-
-INSERT OR IGNORE INTO reading_progress VALUES
-  ('mahdi','returner',141,100,1,unixepoch()*1000),
-  ('mahdi','returner',142,100,1,unixepoch()*1000),
-  ('mahdi','returner',143,62,0,unixepoch()*1000),
-  ('kaido','eleceed',315,45,0,unixepoch()*1000),
-  ('ahmed','solo',197,55,0,unixepoch()*1000);
-
-INSERT OR IGNORE INTO user_state VALUES
-  ('mahdi','returner',143,unixepoch()*1000),
-  ('kaido','eleceed',315,unixepoch()*1000),
-  ('ahmed','solo',197,unixepoch()*1000);
 
 INSERT OR IGNORE INTO friendships VALUES
   ('mahdi','kaido',unixepoch()*1000),
