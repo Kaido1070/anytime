@@ -15,7 +15,7 @@ export default function App() {
   useEffect(() => {
     if (!pathname.startsWith("/read/")) window.scrollTo(0, 0);
   }, [pathname]);
-  if (loading) return <div className="loading">Opening your reading room…</div>;
+  if (loading) return <div className="loading">جاري فتح مكتبتك…</div>;
   return (
     <>
       {error && (
@@ -39,8 +39,8 @@ export default function App() {
               path="*"
               element={
                 <>
-                  <h1>Page not found</h1>
-                  <Link to="/">Return home</Link>
+                  <h1>الصفحة غير موجودة</h1>
+                  <Link to="/">العودة للرئيسية</Link>
                 </>
               }
             />
