@@ -2,6 +2,7 @@ const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
+const XSANO_BASE = "https://www.xsano-manga.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -15,24 +16,40 @@ export async function onRequestGet({ request, env }) {
 
   const url = new URL(request.url);
   const key = String(url.searchParams.get("key") ?? "").trim();
-  if (!/^(?:mt|aq|sz):[A-Za-z0-9_-]{1,110}$/.test(key)) {
+  if (!/^(?:mt|aq|sz|xs):[A-Za-z0-9_-]{1,110}$/.test(key)) {
     return json({ error: "INVALID_SOURCE_KEY" }, 400);
   }
 
   const item = await env.DB
-    .prepare("SELECT source_key, source, slug, cover_url FROM source_items WHERE source_key = ? LIMIT 1")
+    .prepare("SELECT source_key, source, slug, url, cover_url FROM source_items WHERE source_key = ? LIMIT 1")
     .bind(key)
     .first();
 
-  if (!item || !["mangatime", "3asq", "starzmanga"].includes(String(item.source))) {
+  if (!item || !["mangatime", "3asq", "starzmanga", "xsano"].includes(String(item.source))) {
     return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
   }
 
   const source = String(item.source);
-  const base = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : MANGATIME_BASE;
+  const base = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : source === "xsano" ? XSANO_BASE : MANGATIME_BASE;
   const storedCover = absoluteUrl(base, item.cover_url);
 
   try {
+    if (source === "xsano") {
+      const detailCovers = await bloggerDetailCovers(String(item.url || ""));
+      const stableCover = detailCovers[0] || storedCover;
+      const covers = buildCoverCandidates(...detailCovers, storedCover);
+
+      if (stableCover) {
+        await env.DB
+          .prepare("UPDATE source_items SET cover_url = ?, updated_at = ? WHERE source_key = ?")
+          .bind(stableCover, Date.now(), key)
+          .run()
+          .catch(() => undefined);
+      }
+
+      return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
+    }
+
     if (source === "3asq" || source === "starzmanga") {
       const detailCovers = await madaraDetailCovers(source === "3asq" ? ASQ_BASE : STARZ_BASE, String(item.slug || ""));
       const stableCover = detailCovers[0] || storedCover;
@@ -110,12 +127,50 @@ function unwrapAndMaximize(value) {
     parsed.pathname = parsed.pathname
       .replace(/\/(?:thumb|thumbnail|thumbnails|small|medium)\//gi, "/")
       .replace(/(?:_|-)(?:thumb|thumbnail)(?=\.[a-z0-9]{2,5}$)/i, "")
-      .replace(/[-_]\d{2,4}x\d{2,4}(?=\.[a-z0-9]{2,5}$)/i, "");
+      .replace(/[-_]\d{2,4}x\d{2,4}(?=\.[a-z0-9]{2,5}$)/i, "")
+      .replace(/\/w\d+\//i, "/s0/")
+      .replace(/\/s\d+(?:-c)?\//i, "/s0/")
+      .replace(/=w\d+$/i, "=s0")
+      .replace(/=s\d+(?:-c)?$/i, "=s0");
 
     return parsed.toString();
   } catch {
     return current;
   }
+}
+
+async function bloggerDetailCovers(itemUrl) {
+  const target = new URL(itemUrl || "/", XSANO_BASE);
+  const response = await fetch(target, {
+    headers: sourceHeaders(
+      XSANO_BASE,
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    ),
+    redirect: "follow",
+    cf: { cacheTtl: 3600, cacheEverything: true },
+  });
+  if (!response.ok) throw new Error(`XSano cover HTTP ${response.status}`);
+
+  const html = await response.text();
+  const marker = html.search(/<main\b/i);
+  const scoped = marker >= 0 ? html.slice(marker) : html;
+  const imageMatch = scoped.match(/<img\b([^>]*)>/i);
+  if (!imageMatch) return [];
+
+  const attrs = parseAttrs(imageMatch[1]);
+  const candidates = [];
+  const add = (value) => {
+    const absolute = absoluteUrl(XSANO_BASE, decodeEntities(value));
+    if (absolute && !candidates.includes(absolute) && !absolute.startsWith("data:")) {
+      candidates.push(absolute);
+    }
+  };
+
+  add(attrs["data-src"]);
+  add(attrs["data-lazy-src"]);
+  for (const value of srcsetCandidates(attrs.srcset)) add(value);
+  add(attrs.src);
+  return candidates;
 }
 
 async function madaraDetailCovers(base, slug) {
