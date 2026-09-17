@@ -129,6 +129,13 @@ function useLibraryState() {
     setFriends(await service.getFriends());
   };
 
+  const setProfilePrivate = async (value: boolean) => {
+    setError("");
+    const profilePrivate = await service.setProfilePrivate(value);
+    setData((current) => current ? { ...current, profilePrivate } : current);
+    return profilePrivate;
+  };
+
   const changePassword = async (currentPassword: string, newPassword: string) => {
     setError("");
     await service.changePassword(currentPassword, newPassword);
@@ -147,6 +154,7 @@ function useLibraryState() {
     saveProgress,
     addFriend,
     removeFriend,
+    setProfilePrivate,
     changePassword,
   };
 }
