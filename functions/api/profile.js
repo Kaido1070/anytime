@@ -47,7 +47,10 @@ async function ensureProfileColumn(db) {
   if (!exists) {
     await db
       .prepare("ALTER TABLE users ADD COLUMN profile_private INTEGER NOT NULL DEFAULT 0")
-      .run();
+      .run()
+      .catch((error) => {
+        if (!/duplicate column|already exists/i.test(String(error?.message ?? error))) throw error;
+      });
   }
 }
 
