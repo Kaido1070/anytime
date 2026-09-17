@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { SourceManga } from "../types";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
+import { SourceCoverImage } from "./SourceCoverImage";
 
 export function SourceCard({
   item,
@@ -19,8 +20,8 @@ export function SourceCard({
     <Link className="manga-card source-card" to={`/source/${encodeURIComponent(item.key)}`}>
       <div className="cover-wrap">
         {item.cover ? (
-          <img
-            src={sourceService.imageUrl(item.source, item.cover)}
+          <SourceCoverImage
+            item={item}
             alt={`غلاف ${item.title}`}
             width="300"
             height="420"
