@@ -10,16 +10,8 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - name: Query production diagnostic endpoint
         run: |
-          for i in {1..12}; do
-            echo "Attempt $i"
-            if curl -fsSL --max-time 20 https://anytimee.pages.dev/api/teamx-debug -o /tmp/teamx.json; then
-              cat /tmp/teamx.json
-              exit 0
-            fi
-            sleep 5
-          done
-          exit 1
+          curl -sS -i --max-time 40 https://anytimee.pages.dev/api/teamx-debug || true
