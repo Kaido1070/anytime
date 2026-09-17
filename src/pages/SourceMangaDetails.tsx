@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
+import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
 
@@ -51,6 +52,7 @@ export function SourceMangaDetails() {
   const firstChapter = [...chapters].sort((a, b) => a.number - b.number)[0]?.number;
   const startChapter = saved?.chapter ?? firstChapter;
   const isFavorite = data?.favorites.includes(sourceKey);
+  const displayTitle = sourceDisplayTitle(item);
 
   const jumpToChapter = () => {
     const raw = chapterJump.trim().replace(",", ".");
@@ -68,11 +70,11 @@ export function SourceMangaDetails() {
     <>
       <Back to="/discover" />
       <div className="details-hero">
-        {item.cover ? <SourceCoverImage item={item} className="detail-cover" alt={`غلاف ${item.title}`} /> :
+        {item.cover ? <SourceCoverImage item={item} className="detail-cover" alt={`غلاف ${displayTitle}`} /> :
           <div className="detail-cover source-cover-placeholder source-detail-placeholder">{item.title.slice(0, 1)}</div>}
         <div>
           <p className="eyebrow">{sourceService.sourceLabel(item.source)} · {statusLabel(item.status)}</p>
-          <h1 dir="auto">{item.title}</h1>
+          <h1 dir="auto">{displayTitle}</h1>
           <div className="genres">{(item.genres ?? []).slice(0, 10).map((genre) => <span key={genre}>{genre}</span>)}</div>
           {item.description && <p className="description" dir="auto">{item.description}</p>}
           <div className="detail-actions">
