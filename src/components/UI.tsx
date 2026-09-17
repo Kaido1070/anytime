@@ -11,6 +11,7 @@ export function Icon({ name }: { name: string }) {
     back: "m10 5 7 7-7 7",
     arrow: "M20 12H4 m6-6-6 6 6 6",
     check: "m5 12 4 4L19 6",
+    filter: "M4 5h16l-6.5 7.2V18l-3 1.5v-7.3Z",
   };
   return (
     <svg
