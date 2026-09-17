@@ -21,11 +21,11 @@ export function Login() {
     <main className="login">
       <div className="login-art">
         <span className="brand-mark">a</span>
-        <p>استراحة صغيرة في أي وقت</p>
+        <p>تابع قصتك</p>
         <h1>
-          فصل آخر
+          في أي وقت
           <br />
-          وبس<span>.</span>
+          وأي مكان<span>.</span>
         </h1>
         <div className="login-covers">
           <img src="/covers/eleceed.svg" alt="" />
