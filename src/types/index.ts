@@ -35,11 +35,18 @@ export interface SourceListResponse {
   page: number;
 }
 
+export interface SourcePageMeta {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
 export interface SourceChapterPayload {
   item: SourceManga;
   number: number;
   title: string;
   pages: string[];
+  pageMeta?: SourcePageMeta[];
   previous: number | null;
   next: number | null;
 }
