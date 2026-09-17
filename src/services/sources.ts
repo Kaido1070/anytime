@@ -51,6 +51,15 @@ function wordpressOriginalCover(url?: string) {
   }
 }
 
+function bloggerOriginalCover(url?: string) {
+  if (!url) return "";
+  return url
+    .replace(/\/w\d+\//i, "/s0/")
+    .replace(/\/s\d+(?:-c)?\//i, "/s0/")
+    .replace(/=w\d+$/i, "=s0")
+    .replace(/=s\d+(?:-c)?$/i, "=s0");
+}
+
 function uniqueCovers(values: Array<string | undefined>) {
   return values.filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index);
 }
@@ -99,8 +108,10 @@ export const sourceService = {
   async coverCandidates(item: SourceManga) {
     const fallback = item.source === "3asq" || item.source === "starzmanga"
       ? uniqueCovers([wordpressOriginalCover(item.cover), item.cover])
-      : uniqueCovers([item.cover]);
-    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga") return fallback;
+      : item.source === "xsano"
+        ? uniqueCovers([bloggerOriginalCover(item.cover), item.cover])
+        : uniqueCovers([item.cover]);
+    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga" && item.source !== "xsano") return fallback;
 
     const cached = coverRequests.get(item.key);
     if (cached) return cached;
@@ -122,13 +133,14 @@ export const sourceService = {
   },
 
   isSourceKey(key?: string | null) {
-    return Boolean(key && /^(mt|tx|aq|sz):/.test(key));
+    return Boolean(key && /^(mt|tx|aq|sz|xs):/.test(key));
   },
 
   sourceLabel(source: SourceName) {
     if (source === "mangatime") return "MangaTime";
     if (source === "teamx") return "Team-X";
     if (source === "3asq") return "3asq";
-    return "StarzManga";
+    if (source === "starzmanga") return "StarzManga";
+    return "XSano Manga";
   },
 };
