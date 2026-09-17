@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { SourceCard } from "../components/SourceCard";
 import { Icon } from "../components/UI";
-import { mergeSourceItems } from "../services/sourceMerge";
+import { mergeSourceItems, rankSourceGroupsByQuery } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import type { SourceManga, SourceName } from "../types";
 
@@ -14,6 +14,8 @@ const SOURCES: { id: SourceName; label: string }[] = [
 ];
 
 type SourceFilter = "all" | SourceName;
+type WorkTypeFilter = "all" | "manga" | "manhwa" | "manhua" | "webtoon" | "novel" | "comic";
+type StatusFilter = "all" | "ongoing" | "completed" | "hiatus" | "cancelled";
 type GenreId =
   | "action"
   | "fantasy"
@@ -27,7 +29,36 @@ type GenreId =
   | "system"
   | "school"
   | "mystery"
-  | "novel";
+  | "novel"
+  | "sci-fi"
+  | "horror"
+  | "thriller"
+  | "psychological"
+  | "historical"
+  | "military"
+  | "sports"
+  | "slice-of-life"
+  | "tragedy"
+  | "reincarnation"
+  | "regression"
+  | "cultivation"
+  | "magic"
+  | "demons"
+  | "monsters"
+  | "survival"
+  | "game"
+  | "dungeon"
+  | "hunter"
+  | "villainess"
+  | "royalty"
+  | "medical"
+  | "cooking"
+  | "business"
+  | "crime"
+  | "shounen"
+  | "shoujo"
+  | "seinen"
+  | "josei";
 
 type HasMoreBySource = Record<SourceName, boolean>;
 
@@ -39,6 +70,22 @@ const EMPTY_HAS_MORE: HasMoreBySource = {
   xsano: false,
 };
 
+const WORK_TYPES: { id: Exclude<WorkTypeFilter, "all">; label: string }[] = [
+  { id: "manga", label: "مانجا" },
+  { id: "manhwa", label: "مانهوا" },
+  { id: "manhua", label: "مانها" },
+  { id: "webtoon", label: "ويب تون" },
+  { id: "novel", label: "روايات" },
+  { id: "comic", label: "كوميك" },
+];
+
+const STATUSES: { id: Exclude<StatusFilter, "all">; label: string }[] = [
+  { id: "ongoing", label: "مستمر" },
+  { id: "completed", label: "مكتمل" },
+  { id: "hiatus", label: "متوقف" },
+  { id: "cancelled", label: "متروك" },
+];
+
 const GENRES: { id: GenreId; label: string; aliases: string[] }[] = [
   { id: "action", label: "أكشن", aliases: ["أكشن", "اكشن", "action"] },
   { id: "fantasy", label: "فانتزي", aliases: ["فانتزي", "فانتازيا", "fantasy"] },
@@ -46,13 +93,42 @@ const GENRES: { id: GenreId; label: string; aliases: string[] }[] = [
   { id: "drama", label: "دراما", aliases: ["دراما", "drama"] },
   { id: "comedy", label: "كوميدي", aliases: ["كوميدي", "كوميديا", "comedy"] },
   { id: "romance", label: "رومانسي", aliases: ["رومانسي", "رومانسية", "romance"] },
-  { id: "supernatural", label: "قوة خارقة", aliases: ["قوة خارقة", "خارق للطبيعة", "supernatural"] },
+  { id: "supernatural", label: "خارق للطبيعة", aliases: ["قوة خارقة", "خارق للطبيعة", "supernatural"] },
   { id: "martial-arts", label: "فنون قتالية", aliases: ["فنون قتالية", "martial arts", "murim", "موريم"] },
   { id: "isekai", label: "إيسيكاي", aliases: ["إيسيكاي", "ايسيكاي", "isekai"] },
   { id: "system", label: "نظام", aliases: ["نظام", "system"] },
   { id: "school", label: "مدرسي", aliases: ["مدرسي", "مدرسة", "school", "school life"] },
   { id: "mystery", label: "غموض", aliases: ["غموض", "mystery"] },
   { id: "novel", label: "روايات", aliases: ["روايات", "رواية", "رواية ويب", "novel", "web novel", "light novel"] },
+  { id: "sci-fi", label: "خيال علمي", aliases: ["خيال علمي", "science fiction", "sci fi", "sci-fi"] },
+  { id: "horror", label: "رعب", aliases: ["رعب", "horror"] },
+  { id: "thriller", label: "إثارة", aliases: ["إثارة", "اثارة", "thriller", "suspense"] },
+  { id: "psychological", label: "نفسي", aliases: ["نفسي", "psychological"] },
+  { id: "historical", label: "تاريخي", aliases: ["تاريخي", "historical", "history"] },
+  { id: "military", label: "عسكري", aliases: ["عسكري", "military", "war"] },
+  { id: "sports", label: "رياضة", aliases: ["رياضة", "رياضي", "sports"] },
+  { id: "slice-of-life", label: "شريحة من الحياة", aliases: ["شريحة من الحياة", "slice of life"] },
+  { id: "tragedy", label: "مأساة", aliases: ["مأساة", "ماساة", "tragedy"] },
+  { id: "reincarnation", label: "تناسخ", aliases: ["تناسخ", "reincarnation", "reincarnated"] },
+  { id: "regression", label: "عودة بالزمن", aliases: ["عودة بالزمن", "رجوع", "regression", "regressor", "returner"] },
+  { id: "cultivation", label: "زراعة", aliases: ["زراعة", "cultivation", "xianxia", "wuxia"] },
+  { id: "magic", label: "سحر", aliases: ["سحر", "magic", "magical"] },
+  { id: "demons", label: "شياطين", aliases: ["شياطين", "شيطان", "demon", "demons"] },
+  { id: "monsters", label: "وحوش", aliases: ["وحوش", "وحش", "monster", "monsters"] },
+  { id: "survival", label: "بقاء", aliases: ["بقاء", "survival"] },
+  { id: "game", label: "ألعاب", aliases: ["ألعاب", "العاب", "game", "gaming", "virtual reality"] },
+  { id: "dungeon", label: "زنزانات", aliases: ["زنزانة", "زنزانات", "dungeon", "dungeons"] },
+  { id: "hunter", label: "صيادون", aliases: ["صياد", "صيادون", "hunter", "hunters"] },
+  { id: "villainess", label: "شريرة", aliases: ["شريرة", "villainess", "villain"] },
+  { id: "royalty", label: "ملكي", aliases: ["ملكي", "ملوك", "أميرة", "اميرة", "royalty", "royal", "nobility"] },
+  { id: "medical", label: "طبي", aliases: ["طبي", "طب", "medical", "doctor"] },
+  { id: "cooking", label: "طبخ", aliases: ["طبخ", "طهي", "cooking", "food"] },
+  { id: "business", label: "أعمال", aliases: ["أعمال", "اعمال", "business", "economics"] },
+  { id: "crime", label: "جريمة", aliases: ["جريمة", "جرائم", "crime", "mafia"] },
+  { id: "shounen", label: "شونين", aliases: ["شونين", "shounen", "shonen"] },
+  { id: "shoujo", label: "شوجو", aliases: ["شوجو", "shoujo", "shojo"] },
+  { id: "seinen", label: "سينين", aliases: ["سينين", "seinen"] },
+  { id: "josei", label: "جوسي", aliases: ["جوسي", "josei"] },
 ];
 
 function normalize(value: string) {
@@ -62,6 +138,8 @@ function normalize(value: string) {
     .replace(/[أإآ]/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
     .replace(/[^a-z0-9\u0600-\u06ff]+/g, " ")
     .replace(/\s+/g, " ");
 }
@@ -80,8 +158,50 @@ function matchesGenres(item: SourceManga, selected: GenreId[]) {
   });
 }
 
-async function hydrateGenres(items: SourceManga[], sourceFilter: SourceFilter, selectedGenres: GenreId[]) {
-  if (!selectedGenres.length) return items;
+function normalizedWorkType(item: SourceManga): Exclude<WorkTypeFilter, "all"> | "" {
+  const raw = normalize([item.type, ...(item.genres ?? [])].filter(Boolean).join(" "));
+  if (/رواي|web novel|light novel|\bnovel\b/.test(raw)) return "novel";
+  if (/مانهوا|\bmanhwa\b/.test(raw)) return "manhwa";
+  if (/مانها|مانهوا صيني|\bmanhua\b/.test(raw)) return "manhua";
+  if (/ويب تون|مانجا ويب|\bwebtoon\b/.test(raw)) return "webtoon";
+  if (/كوميك|\bcomic\b/.test(raw)) return "comic";
+  if (/مانجا|\bmanga\b/.test(raw)) return "manga";
+  return "";
+}
+
+function normalizedStatus(item: SourceManga): Exclude<StatusFilter, "all"> | "" {
+  const raw = normalize(item.status ?? "");
+  if (["ongoing", "مستمر", "مستمره"].includes(raw)) return "ongoing";
+  if (["completed", "مكتمل", "مكتمله"].includes(raw)) return "completed";
+  if (["hiatus", "متوقف", "موسم منتهي"].includes(raw)) return "hiatus";
+  if (["cancelled", "canceled", "dropped", "متروك", "ملغي"].includes(raw)) return "cancelled";
+  return "";
+}
+
+function matchesMetadata(
+  item: SourceManga,
+  genres: GenreId[],
+  type: WorkTypeFilter,
+  status: StatusFilter,
+) {
+  if (!matchesGenres(item, genres)) return false;
+  if (type !== "all" && normalizedWorkType(item) !== type) return false;
+  if (status !== "all" && normalizedStatus(item) !== status) return false;
+  return true;
+}
+
+function needsMetadata(genres: GenreId[], type: WorkTypeFilter, status: StatusFilter) {
+  return genres.length > 0 || type !== "all" || status !== "all";
+}
+
+async function hydrateMetadata(
+  items: SourceManga[],
+  sourceFilter: SourceFilter,
+  selectedGenres: GenreId[],
+  typeFilter: WorkTypeFilter,
+  statusFilter: StatusFilter,
+) {
+  if (!needsMetadata(selectedGenres, typeFilter, statusFilter)) return items;
   const candidates = items.filter((item) => sourceFilter === "all" || item.source === sourceFilter);
   const resolved = new Map<string, SourceManga>();
 
@@ -96,17 +216,27 @@ async function hydrateGenres(items: SourceManga[], sourceFilter: SourceFilter, s
   return items.map((item) => resolved.get(item.key) ?? item);
 }
 
-function filterLabel(source: SourceFilter, genres: GenreId[]) {
+function filterLabel(
+  source: SourceFilter,
+  genres: GenreId[],
+  type: WorkTypeFilter,
+  status: StatusFilter,
+) {
   const sourceLabel = source === "all" ? "كل المصادر" : sourceService.sourceLabel(source);
-  if (!genres.length) return sourceLabel;
-  return `${sourceLabel} · ${genres.length} تصنيف`;
+  const extraCount = genres.length + (type === "all" ? 0 : 1) + (status === "all" ? 0 : 1);
+  if (!extraCount) return sourceLabel;
+  return `${sourceLabel} · ${extraCount} فلتر`;
 }
 
 export function Discover() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [genreFilters, setGenreFilters] = useState<GenreId[]>([]);
+  const [typeFilter, setTypeFilter] = useState<WorkTypeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [draftSource, setDraftSource] = useState<SourceFilter>("all");
   const [draftGenres, setDraftGenres] = useState<GenreId[]>([]);
+  const [draftType, setDraftType] = useState<WorkTypeFilter>("all");
+  const [draftStatus, setDraftStatus] = useState<StatusFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterLoading, setFilterLoading] = useState(false);
   const [items, setItems] = useState<SourceManga[]>([]);
@@ -120,16 +250,21 @@ export function Discover() {
   const visibleGroups = useMemo(() => {
     const filtered = items.filter((item) => {
       if (sourceFilter !== "all" && item.source !== sourceFilter) return false;
-      return matchesGenres(item, genreFilters);
+      return matchesMetadata(item, genreFilters, typeFilter, statusFilter);
     });
-    return mergeSourceItems(filtered);
-  }, [items, sourceFilter, genreFilters]);
+    const merged = mergeSourceItems(filtered);
+    return mode === "search" ? rankSourceGroupsByQuery(merged, query) : merged;
+  }, [items, sourceFilter, genreFilters, typeFilter, statusFilter, mode, query]);
 
   const hasMore = sourceFilter === "all"
     ? Object.values(hasMoreBySource).some(Boolean)
     : hasMoreBySource[sourceFilter];
 
-  const activeFilterCount = (sourceFilter === "all" ? 0 : 1) + genreFilters.length;
+  const activeFilterCount =
+    (sourceFilter === "all" ? 0 : 1) +
+    genreFilters.length +
+    (typeFilter === "all" ? 0 : 1) +
+    (statusFilter === "all" ? 0 : 1);
 
   async function fetchPage(nextMode: "latest" | "search", nextPage: number, term = "") {
     const results = await Promise.allSettled(
@@ -194,7 +329,13 @@ export function Discover() {
     setError("");
     try {
       const result = await fetchPage("search", 1, term);
-      const hydrated = await hydrateGenres(result.items, sourceFilter, genreFilters);
+      const hydrated = await hydrateMetadata(
+        result.items,
+        sourceFilter,
+        genreFilters,
+        typeFilter,
+        statusFilter,
+      );
       setMode("search");
       setPage(1);
       setItems(hydrated);
@@ -212,7 +353,13 @@ export function Discover() {
     setError("");
     try {
       const result = await fetchPage("latest", 1);
-      const hydrated = await hydrateGenres(result.items, sourceFilter, genreFilters);
+      const hydrated = await hydrateMetadata(
+        result.items,
+        sourceFilter,
+        genreFilters,
+        typeFilter,
+        statusFilter,
+      );
       setMode("latest");
       setPage(1);
       setQuery("");
@@ -255,7 +402,13 @@ export function Discover() {
         }
       });
 
-      const hydratedIncoming = await hydrateGenres(incoming, sourceFilter, genreFilters);
+      const hydratedIncoming = await hydrateMetadata(
+        incoming,
+        sourceFilter,
+        genreFilters,
+        typeFilter,
+        statusFilter,
+      );
       setItems((current) => {
         const map = new Map(current.map((item) => [item.key, item]));
         for (const item of hydratedIncoming) map.set(item.key, item);
@@ -274,6 +427,8 @@ export function Discover() {
   function openFilters() {
     setDraftSource(sourceFilter);
     setDraftGenres(genreFilters);
+    setDraftType(typeFilter);
+    setDraftStatus(statusFilter);
     setFiltersOpen(true);
   }
 
@@ -288,8 +443,12 @@ export function Discover() {
       const result = await fetchPage("latest", 1);
       setSourceFilter("all");
       setGenreFilters([]);
+      setTypeFilter("all");
+      setStatusFilter("all");
       setDraftSource("all");
       setDraftGenres([]);
+      setDraftType("all");
+      setDraftStatus("all");
       setMode("latest");
       setPage(1);
       setQuery("");
@@ -305,7 +464,12 @@ export function Discover() {
   }
 
   async function applyFilters() {
-    if (draftSource === "all" && draftGenres.length === 0) {
+    if (
+      draftSource === "all" &&
+      draftGenres.length === 0 &&
+      draftType === "all" &&
+      draftStatus === "all"
+    ) {
       await restoreDefaultView();
       return;
     }
@@ -313,10 +477,18 @@ export function Discover() {
     setFilterLoading(true);
     setError("");
     try {
-      const hydrated = await hydrateGenres(items, draftSource, draftGenres);
+      const hydrated = await hydrateMetadata(
+        items,
+        draftSource,
+        draftGenres,
+        draftType,
+        draftStatus,
+      );
       setItems(hydrated);
       setSourceFilter(draftSource);
       setGenreFilters(draftGenres);
+      setTypeFilter(draftType);
+      setStatusFilter(draftStatus);
       setFiltersOpen(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تطبيق الفلاتر الآن.");
@@ -358,7 +530,7 @@ export function Discover() {
 
       <div className="section-title">
         <h2>{mode === "search" ? `نتائج ${query}` : "أحدث الأعمال"}</h2>
-        <span className="muted">{filterLabel(sourceFilter, genreFilters)}</span>
+        <span className="muted">{filterLabel(sourceFilter, genreFilters, typeFilter, statusFilter)}</span>
       </div>
 
       {error && <p className="error source-error">{error}</p>}
@@ -402,6 +574,30 @@ export function Discover() {
                     className={draftSource === entry.id ? "selected" : ""}
                     onClick={() => setDraftSource((current) => current === entry.id ? "all" : entry.id)}
                   >
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <h3>نوع العمل</h3>
+              <div className="filter-choice-grid source-choice-grid">
+                <button type="button" className={draftType === "all" ? "selected" : ""} onClick={() => setDraftType("all")}>كل الأنواع</button>
+                {WORK_TYPES.map((entry) => (
+                  <button key={entry.id} type="button" className={draftType === entry.id ? "selected" : ""} onClick={() => setDraftType(entry.id)}>
+                    {entry.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="filter-group">
+              <h3>الحالة</h3>
+              <div className="filter-choice-grid source-choice-grid">
+                <button type="button" className={draftStatus === "all" ? "selected" : ""} onClick={() => setDraftStatus("all")}>كل الحالات</button>
+                {STATUSES.map((entry) => (
+                  <button key={entry.id} type="button" className={draftStatus === entry.id ? "selected" : ""} onClick={() => setDraftStatus(entry.id)}>
                     {entry.label}
                   </button>
                 ))}

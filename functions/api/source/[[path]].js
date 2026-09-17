@@ -785,6 +785,7 @@ function normalizeAsqType(value) {
   if (/رواية\s*ويب|web\s*novel/.test(type)) return "web-novel";
   if (/رواية|light\s*novel|novel/.test(type)) return "novel";
   if (/مانهوا|manhwa/.test(type)) return "manhwa";
+  if (/مانها|manhua/.test(type)) return "manhua";
   if (/مانجا\s*ويب|webtoon/.test(type)) return "webtoon";
   if (/مانجا|manga/.test(type)) return "manga";
   if (/كوميك|comic/.test(type)) return "comic";
