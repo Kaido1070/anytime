@@ -10,7 +10,7 @@ export function MangaDetails() {
     return (
       <>
         <Back />
-        <h1>Story not found</h1>
+        <h1>العمل غير موجود</h1>
       </>
     );
   const saved = Object.values(data?.progress ?? {})
@@ -25,10 +25,10 @@ export function MangaDetails() {
         <img
           className="detail-cover"
           src={item.cover}
-          alt={`${item.title} placeholder cover`}
+          alt={`غلاف ${item.title}`}
         />
         <div>
-          <p className="eyebrow">{item.status} · MANHWA</p>
+          <p className="eyebrow">{item.status === "Completed" ? "مكتمل" : "مستمر"} · مانهوا</p>
           <h1>{item.title}</h1>
           {item.alternative && (
             <p className="alternative">{item.alternative}</p>
@@ -41,7 +41,7 @@ export function MangaDetails() {
           <p className="description">{item.description}</p>
           <div className="detail-actions">
             <Link className="primary" to={`/read/${id}/${chapter}`}>
-              {saved ? "Continue reading" : "Start reading"}{" "}
+              {saved ? "متابعة القراءة" : "ابدأ القراءة"}{" "}
               <Icon name="arrow" />
             </Link>
             <button
@@ -50,14 +50,14 @@ export function MangaDetails() {
               onClick={() => favorite(id)}
             >
               <Icon name={isFavorite ? "check" : "favorites"} />
-              {isFavorite ? "Favorited" : "Favorite"}
+              {isFavorite ? "في المفضلة" : "إضافة للمفضلة"}
             </button>
           </div>
         </div>
       </div>
       <div className="section-title">
-        <h2>Chapters</h2>
-        <span className="muted">{item.chapters.length} sample chapters</span>
+        <h2>الفصول</h2>
+        <span className="muted">{item.chapters.length} فصول تجريبية</span>
       </div>
       <div className="chapter-list">
         {item.chapters.map((number) => {
@@ -74,13 +74,13 @@ export function MangaDetails() {
                 {String(number).padStart(3, "0")}
               </span>
               <div>
-                <h3>Chapter {number}</h3>
+                <h3>الفصل {number}</h3>
                 <small>
                   {done
-                    ? "Completed"
+                    ? "مقروء"
                     : progress
-                      ? `Currently reading · ${Math.round(progress.percent)}%`
-                      : "Unread"}
+                      ? `قيد القراءة · ${Math.round(progress.percent)}%`
+                      : "غير مقروء"}
                 </small>
               </div>
               {done ? <Icon name="check" /> : <Icon name="arrow" />}
