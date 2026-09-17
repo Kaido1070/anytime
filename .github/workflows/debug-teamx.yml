@@ -1,0 +1,113 @@
+name: Debug TeamX Dimensions
+
+on:
+  push:
+    branches: [debug-teamx-dimensions]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install helpers
+        run: pip install requests beautifulsoup4 pillow
+      - name: Inspect Team-X chapter 1
+        run: |
+          python - <<'PY'
+          import io, re, requests
+          from bs4 import BeautifulSoup
+          from PIL import Image
+          from urllib.parse import urljoin
+
+          BASE = 'https://olympustaff.com'
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+              'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
+              'Referer': BASE + '/',
+          }
+          s = requests.Session()
+          s.headers.update(headers)
+
+          # Try both the current and legacy search routes.
+          series_url = None
+          for path in ['/search?keyword=The%20Long%20Way%20Of%20The%20Warrior', '/ajax/search?keyword=The%20Long%20Way%20Of%20The%20Warrior']:
+              r = s.get(BASE + path, timeout=20)
+              print('SEARCH', path, r.status_code, len(r.text), r.url)
+              soup = BeautifulSoup(r.text, 'html.parser')
+              for a in soup.select('a[href]'):
+                  text = ' '.join(a.stripped_strings)
+                  if 'Long Way Of The Warrior' in text or 'Long Way of The Warrior' in text:
+                      series_url = urljoin(BASE, a.get('href'))
+                      print('SERIES LINK', series_url, 'TEXT=', text[:120])
+                      break
+              if series_url:
+                  break
+
+          if not series_url:
+              # Fallback: scrape series pages until the title appears.
+              for page in range(1, 70):
+                  r = s.get(f'{BASE}/series?page={page}', timeout=20)
+                  soup = BeautifulSoup(r.text, 'html.parser')
+                  for a in soup.select('a[href]'):
+                      title = (a.get('title') or ' '.join(a.stripped_strings)).strip()
+                      if title == 'The Long Way Of The Warrior':
+                          series_url = urljoin(BASE, a.get('href'))
+                          print('SERIES LINK FALLBACK', series_url, 'PAGE', page)
+                          break
+                  if series_url:
+                      break
+
+          if not series_url:
+              raise SystemExit('Series not found')
+
+          r = s.get(series_url, timeout=20)
+          print('SERIES', r.status_code, len(r.text), r.url)
+          soup = BeautifulSoup(r.text, 'html.parser')
+          chapter_url = None
+          # Prefer actual chapter-card data-number=1; otherwise exact /1 link.
+          for card in soup.select('div.chapter-card'):
+              if (card.get('data-number') or '').strip() in {'1', '1.0'} and not card.select_one('span.locked'):
+                  a = card.select_one('a[href]')
+                  if a:
+                      chapter_url = urljoin(BASE, a.get('href'))
+                      break
+          if not chapter_url:
+              base_path = requests.utils.urlparse(series_url).path.rstrip('/')
+              for a in soup.select('a[href]'):
+                  href = urljoin(BASE, a.get('href'))
+                  if requests.utils.urlparse(href).path.rstrip('/') == base_path + '/1':
+                      chapter_url = href
+                      break
+          print('CHAPTER LINK', chapter_url)
+          if not chapter_url:
+              raise SystemExit('Chapter 1 not found')
+
+          r = s.get(chapter_url, timeout=20)
+          print('CHAPTER', r.status_code, len(r.text), r.url)
+          soup = BeautifulSoup(r.text, 'html.parser')
+          container = soup.select_one('div.image_list')
+          if not container:
+              raise SystemExit('image_list missing')
+          elems = container.select('canvas[data-src], canvas[data-lazy-src], img[src], img[data-src]')
+          print('ELEMENT COUNT', len(elems))
+          for i, el in enumerate(elems[:12]):
+              raw = el.get('src') or el.get('data-src') or el.get('data-lazy-src')
+              print('TAG', i, el.name, 'width=', el.get('width'), 'height=', el.get('height'), 'style=', el.get('style'), 'class=', el.get('class'), 'url=', raw)
+              if not raw or raw.startswith('data:'):
+                  continue
+              u = urljoin(BASE, raw)
+              ir = s.get(u, timeout=20)
+              print('IMAGE HTTP', i, ir.status_code, ir.headers.get('content-type'), len(ir.content), u)
+              try:
+                  im = Image.open(io.BytesIO(ir.content))
+                  print('IMAGE DIM', i, im.size, im.format)
+              except Exception as e:
+                  print('IMAGE DIM ERROR', i, repr(e))
+          PY
