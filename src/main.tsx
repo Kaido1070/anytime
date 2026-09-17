@@ -4,9 +4,11 @@ import { LibraryProvider } from "./hooks/useLibrary";
 import App from "./App";
 import "./styles.css";
 import "./mobile-fixes.css";
+
 const root =
   import.meta.hot?.data.root ?? createRoot(document.getElementById("root")!);
 if (import.meta.hot) import.meta.hot.data.root = root;
+
 root.render(
   <BrowserRouter>
     <LibraryProvider>
@@ -14,9 +16,16 @@ root.render(
     </LibraryProvider>
   </BrowserRouter>,
 );
-if (import.meta.env.PROD && "serviceWorker" in navigator)
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .catch((error) => console.warn("Offline support unavailable", error));
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("/sw.js", {
+        updateViaCache: "none",
+      });
+      await registration.update();
+    } catch (error) {
+      console.warn("Offline support unavailable", error);
+    }
   });
+}
