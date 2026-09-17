@@ -11,7 +11,7 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
 });
 
-const user = { id: "mahdi", username: "mahdi", name: "Mahdi" };
+const user = { id: "mahdi", username: "has", name: "Has" };
 let signedIn = false;
 let serverData = {
   version: 2,
@@ -38,7 +38,7 @@ Object.defineProperty(globalThis, "fetch", {
       return response({ user: signedIn ? user : null });
     if (path === "login" && method === "POST") {
       const body = JSON.parse(String(init.body));
-      if (body.username !== "mahdi" || body.password !== "anytime")
+      if (body.username !== "has" || body.password !== "anytime")
         return response({ message: "bad login" }, 401);
       signedIn = true;
       return response({ user });
@@ -90,8 +90,8 @@ test("Phase 2 API service logs in and syncs favorites/progress", async () => {
   const { userDataService: service } = await import("../src/services/userData.ts");
 
   assert.equal(await service.getUser(), null);
-  await assert.rejects(service.signIn("mahdi", "wrong"));
-  assert.equal((await service.signIn(" MAHDI ", "anytime")).name, "Mahdi");
+  await assert.rejects(service.signIn("has", "wrong"));
+  assert.equal((await service.signIn(" HAS ", "anytime")).name, "Has");
 
   await service.addFavorite("eleceed");
   assert.ok((await service.getFavorites()).includes("eleceed"));
