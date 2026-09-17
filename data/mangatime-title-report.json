@@ -1,0 +1,5522 @@
+{
+  "generatedAt": "2026-09-17T21:30:25.422Z",
+  "totalCatalog": 1289,
+  "arabicTitles": 625,
+  "verifiedTitles": 369,
+  "unresolvedTitles": 256,
+  "googleAvailableAtEnd": false,
+  "items": [
+    {
+      "slug": "the-tutorial-is-too-hard",
+      "arabic": "التدريب أصعب مما ينبغي",
+      "english": "The Tutorial Is Too Hard",
+      "method": "MangaDex",
+      "candidate": "The Tutorial Is Too Hard",
+      "confidence": 1
+    },
+    {
+      "slug": "starting-from-today-ill-work-as-a-city-lord",
+      "arabic": "من اليوم أتولّى المدينة",
+      "english": "Starting From Today I'll Work as a City Lord",
+      "method": "MangaDex",
+      "candidate": "Starting from Today ILL Work as a City Lord",
+      "confidence": 0.9772727272727273
+    },
+    {
+      "slug": "im-gonna-annihilate-this-land",
+      "arabic": "سأمحو هذه المملكة",
+      "english": "I'm Gonna Annihilate This Land",
+      "method": "MangaDex",
+      "candidate": "IM Gonna Annihilate This Land",
+      "confidence": 0.9666666666666667
+    },
+    {
+      "slug": "wistorias-wand-and-sword",
+      "arabic": "ويستوريا: العصا والسيف",
+      "english": "Wistoria: Wand and Sword",
+      "method": "MangaDex",
+      "candidate": "Wistorias Wand and Sword",
+      "confidence": 0.9583333333333334
+    },
+    {
+      "slug": "classmate",
+      "arabic": "زميل الصف",
+      "english": "Classmate",
+      "method": "AniList",
+      "candidate": "Classmate",
+      "confidence": 1
+    },
+    {
+      "slug": "my-pirate-prince",
+      "arabic": "أميري القرصان",
+      "english": "My Pirate Prince",
+      "method": "AniList",
+      "candidate": "My Pirate Prince",
+      "confidence": 1
+    },
+    {
+      "slug": "for-your-murder",
+      "arabic": "من أجل جريمتك",
+      "english": "For Your Murder",
+      "method": "MangaDex",
+      "candidate": "For Your Murder",
+      "confidence": 1
+    },
+    {
+      "slug": "wee",
+      "arabic": "وي!!!",
+      "english": "WEE",
+      "method": "AniList",
+      "candidate": "Wee",
+      "confidence": 1
+    },
+    {
+      "slug": "noblesse",
+      "arabic": "النبلاء",
+      "english": "Noblesse",
+      "method": "MangaDex",
+      "candidate": "Noblesse",
+      "confidence": 1
+    },
+    {
+      "slug": "return-of-the-mount-hua-sect",
+      "arabic": "عودة طائفة جبل هوا",
+      "english": "Return of the Mount Hua Sect",
+      "method": "MangaDex",
+      "candidate": "Return of the Mount Hua Sect",
+      "confidence": 1
+    },
+    {
+      "slug": "wind-breaker",
+      "arabic": "كاسر الرياح",
+      "english": "WIND BREAKER",
+      "method": "MangaDex",
+      "candidate": "Wind Breaker",
+      "confidence": 1
+    },
+    {
+      "slug": "kagurabachi",
+      "arabic": "كاغوراباتشي",
+      "english": "Kagurabachi",
+      "method": "MangaDex",
+      "candidate": "Kagurabachi",
+      "confidence": 1
+    },
+    {
+      "slug": "haikyuu",
+      "arabic": "هايكيو!!",
+      "english": "Haikyu!!",
+      "method": "MangaDex",
+      "candidate": "Haikyuu",
+      "confidence": 0.9885714285714287
+    },
+    {
+      "slug": "toilet-bound-hanako-kun",
+      "arabic": "هاناكو-كن المقيد بالمرحاض",
+      "english": "Toilet-Bound Hanako-kun",
+      "method": "MangaDex",
+      "candidate": "Toilet Bound Hanako Kun",
+      "confidence": 1
+    },
+    {
+      "slug": "murim-login",
+      "arabic": "تسجيل الدخول إلى الموريم",
+      "english": "Murim Login",
+      "method": "MangaDex",
+      "candidate": "Murim Login",
+      "confidence": 1
+    },
+    {
+      "slug": "solo-leveling",
+      "arabic": "سولو ليفلينج",
+      "english": "Solo Leveling",
+      "method": "MangaDex",
+      "candidate": "Solo Leveling",
+      "confidence": 1
+    },
+    {
+      "slug": "trait-hoarder",
+      "arabic": "جامع الصفات",
+      "english": "Trait Hoarder",
+      "method": "MangaDex",
+      "candidate": "Trait Hoarder",
+      "confidence": 1
+    },
+    {
+      "slug": "the-beginning-after-the-end",
+      "arabic": "البداية بعد النهاية",
+      "english": "The Beginning After the End",
+      "method": "MangaDex",
+      "candidate": "The Beginning After the End",
+      "confidence": 1
+    },
+    {
+      "slug": "dandadan",
+      "arabic": "داندادان",
+      "english": "Dandadan",
+      "method": "MangaDex",
+      "candidate": "Dandadan",
+      "confidence": 1
+    },
+    {
+      "slug": "kiyora-tamayura",
+      "arabic": "كيورا تامايورا",
+      "english": "Kiyora Tamayura",
+      "method": "MangaDex",
+      "candidate": "Kiyora Tamayura",
+      "confidence": 1
+    },
+    {
+      "slug": "hells-paradise-jigokuraku",
+      "arabic": "جنّة الجحيم",
+      "english": "Hell's Paradise: Jigokuraku",
+      "method": "MangaDex",
+      "candidate": "Hells Paradise Jigokuraku",
+      "confidence": 0.9615384615384616
+    },
+    {
+      "slug": "return-of-the-first-generation-the-strongest-in-hi",
+      "arabic": "عودة المؤسس الأول بعد ألف عام",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Return of the First Generation the Strongest in Hi",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "berserk-official-guidebook",
+      "arabic": "بيرسيرك — الدليل الرسمي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Berserk Official Guidebook",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "smoking-behind-the-supermarket-with-you",
+      "arabic": "التدخين معك خلف السوبرماركت",
+      "english": "Smoking Behind the Supermarket with You",
+      "method": "MangaDex",
+      "candidate": "Smoking Behind the Supermarket with You",
+      "confidence": 1
+    },
+    {
+      "slug": "reborn-as-the-heavenly-martial-demon",
+      "arabic": "بعد موتي، تحولت إلى شيطان الفنون القتالية",
+      "english": "Reborn as the Heavenly Martial Demon",
+      "method": "MangaDex",
+      "candidate": "Reborn as the Heavenly Martial Demon",
+      "confidence": 1
+    },
+    {
+      "slug": "blue-lock",
+      "arabic": "بلو لوك",
+      "english": "Blue Lock",
+      "method": "MangaDex",
+      "candidate": "Blue Lock",
+      "confidence": 1
+    },
+    {
+      "slug": "kimetsu-no-yaiba",
+      "arabic": "قاتل الشياطين",
+      "english": "Demon Slayer: Kimetsu no Yaiba",
+      "method": "AniList",
+      "candidate": "Kimetsu No Yaiba",
+      "confidence": 1
+    },
+    {
+      "slug": "oshi-no-ko",
+      "arabic": "أوشي نو كو",
+      "english": "[Oshi no Ko]",
+      "method": "MangaDex",
+      "candidate": "Oshi No Ko",
+      "confidence": 1
+    },
+    {
+      "slug": "eleceed",
+      "arabic": "إليسيد",
+      "english": "Eleceed",
+      "method": "MangaDex",
+      "candidate": "Eleceed",
+      "confidence": 1
+    },
+    {
+      "slug": "solo-max-level-newbie",
+      "arabic": "أنا المبتدئ ذو المستوى الأقصى",
+      "english": "Solo Max-Level Newbie",
+      "method": "MangaDex",
+      "candidate": "Solo Max Level Newbie",
+      "confidence": 1
+    },
+    {
+      "slug": "infinite-level-up-in-murim",
+      "arabic": "ارتقاء بلا حدود في الموريم",
+      "english": "Infinite Level Up in Murim",
+      "method": "MangaDex",
+      "candidate": "Infinite Level Up in Murim",
+      "confidence": 1
+    },
+    {
+      "slug": "berserk-of-gluttony-webtoon",
+      "arabic": "بيرسيرك الشراهة — النسخة الملوّنة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Berserk of Gluttony Webtoon",
+      "confidence": 0.7037037037037037,
+      "mangaDex": "Berserk of Gluttony",
+      "aniList": ""
+    },
+    {
+      "slug": "jujutsu-kaisen",
+      "arabic": "جوجوتسو كايسن",
+      "english": "Jujutsu Kaisen",
+      "method": "MangaDex",
+      "candidate": "Jujutsu Kaisen",
+      "confidence": 1
+    },
+    {
+      "slug": "return-of-the-sss-class-ranker",
+      "arabic": "عودة المصنف من فئة SSS",
+      "english": "Return of the SSS-Class Ranker",
+      "method": "MangaDex",
+      "candidate": "Return of the Sss Class Ranker",
+      "confidence": 1
+    },
+    {
+      "slug": "douluo-dalu-3-the-legend-of-the-dragon-king",
+      "arabic": "أرض الأرواح 3: أسطورة ملك التنين",
+      "english": "Douluo Dalu III - The Legend of the Dragon King",
+      "method": "MangaDex",
+      "candidate": "Douluo Dalu 3 the Legend of the Dragon King",
+      "confidence": 0.9333333333333333
+    },
+    {
+      "slug": "the-jinxs-strategy-for-domination",
+      "arabic": "استراتيجية نذير الشؤم للهيمنة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Jinxs Strategy for Domination",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "junji-ito-horror-collection",
+      "arabic": "مجموعة جونجي إيتو للرعب",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Junji Ito Horror Collection",
+      "confidence": 0.8181818181818181,
+      "mangaDex": "Junji Ito Horror Manga Collection",
+      "aniList": "Junji Ito Horror Comic Collection"
+    },
+    {
+      "slug": "legend-of-the-norther-blade",
+      "arabic": "أسطورة النصل الشمالي",
+      "english": "Legend of the Northern Blade",
+      "method": "MangaDex",
+      "candidate": "Legend of the Norther Blade",
+      "confidence": 0.9642857142857143
+    },
+    {
+      "slug": "star-embracing-swordmaster",
+      "arabic": "سيد السيف المحتضن للنجوم",
+      "english": "The Stellar Swordmaster",
+      "method": "AniList",
+      "candidate": "Star Embracing Swordmaster",
+      "confidence": 1
+    },
+    {
+      "slug": "kengan-omega",
+      "arabic": "كينغان أوميغا",
+      "english": "Kengan Omega",
+      "method": "MangaDex",
+      "candidate": "Kengan Omega",
+      "confidence": 1
+    },
+    {
+      "slug": "gachiakuta",
+      "arabic": "غاتشياكوتا",
+      "english": "Gachiakuta",
+      "method": "MangaDex",
+      "candidate": "Gachiakuta",
+      "confidence": 1
+    },
+    {
+      "slug": "sakamoto-days",
+      "arabic": "أيام ساكاموتو",
+      "english": "Sakamoto Days",
+      "method": "MangaDex",
+      "candidate": "Sakamoto Days",
+      "confidence": 1
+    },
+    {
+      "slug": "the-divine-demons-grand-ascension",
+      "arabic": "الصعود العظيم للشيطان الإلهي",
+      "english": "The Divine Demon’s Grand Ascension",
+      "method": "MangaDex",
+      "candidate": "The Divine Demons Grand Ascension",
+      "confidence": 0.9705882352941176
+    },
+    {
+      "slug": "tonari-no-kaibutsu-kun",
+      "arabic": "وحشي الصغير",
+      "english": "Tonari no Kaibutsu-kun",
+      "method": "MangaDex",
+      "candidate": "Tonari No Kaibutsu Kun",
+      "confidence": 1
+    },
+    {
+      "slug": "baki-revenge-tokyo",
+      "arabic": "باكي: إنتقام طوكيو",
+      "english": "Baki: Revenge Tokyo",
+      "method": "MangaDex",
+      "candidate": "Baki Revenge Tokyo",
+      "confidence": 1
+    },
+    {
+      "slug": "dragon-ball-kakumei",
+      "arabic": "دراغون بول: الثورة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dragon Ball Kakumei",
+      "confidence": 0.6551724137931034,
+      "mangaDex": "Dragon Ball Kakumei (Doujinshi)",
+      "aniList": ""
+    },
+    {
+      "slug": "housekeeping",
+      "arabic": "التنظيف الفندقي",
+      "english": "Housekeeping",
+      "method": "AniList",
+      "candidate": "Housekeeping",
+      "confidence": 1
+    },
+    {
+      "slug": "beastly-things",
+      "arabic": "غرائز متوحشة",
+      "english": "Beastly Things",
+      "method": "MangaDex",
+      "candidate": "Beastly Things",
+      "confidence": 1
+    },
+    {
+      "slug": "terror-hunter",
+      "arabic": "صيّاد الرعب",
+      "english": "Terror Hunter",
+      "method": "MangaDex",
+      "candidate": "Terror Hunter",
+      "confidence": 1
+    },
+    {
+      "slug": "limit-breaking-genius-mage",
+      "arabic": "الساحر العبقري محطم الحدود",
+      "english": "Limit-Breaking Genius Mage",
+      "method": "MangaDex",
+      "candidate": "Limit Breaking Genius Mage",
+      "confidence": 1
+    },
+    {
+      "slug": "return-of-the-frozen-player",
+      "arabic": "عودة اللاعب المتجمد",
+      "english": "Return of the Frozen Player",
+      "method": "MangaDex",
+      "candidate": "Return of the Frozen Player",
+      "confidence": 1
+    },
+    {
+      "slug": "the-last-human",
+      "arabic": "آخر البشر",
+      "english": "The Last Human",
+      "method": "MangaDex",
+      "candidate": "The Last Human",
+      "confidence": 1
+    },
+    {
+      "slug": "the-descent-of-the-demonic-master",
+      "arabic": "نزول سيّد الشياطين",
+      "english": "The Descent of the Demonic Master",
+      "method": "MangaDex",
+      "candidate": "The Descent of the Demonic Master",
+      "confidence": 1
+    },
+    {
+      "slug": "the-player-that-cant-level-up",
+      "arabic": "اللاعب الذي لا يستطيع رفع مستواه",
+      "english": "The Player That Can’t Level Up",
+      "method": "MangaDex",
+      "candidate": "The Player That Cant Level Up",
+      "confidence": 0.9666666666666667
+    },
+    {
+      "slug": "genius-of-the-unique-lineage",
+      "arabic": "الهجين المثالي",
+      "english": "Genius of the Unique Lineage",
+      "method": "MangaDex",
+      "candidate": "Genius of the Unique Lineage",
+      "confidence": 1
+    },
+    {
+      "slug": "black-clover",
+      "arabic": "بلاك كلوفر",
+      "english": "Black Clover",
+      "method": "MangaDex",
+      "candidate": "Black Clover",
+      "confidence": 1
+    },
+    {
+      "slug": "reincarnation-of-the-fist-king",
+      "arabic": "عودة ملك القبضة",
+      "english": "Reincarnation of the Fist King",
+      "method": "AniList",
+      "candidate": "Reincarnation of the Fist King",
+      "confidence": 1
+    },
+    {
+      "slug": "i-became-the-rogue-first-prince",
+      "arabic": "أصبحت الأمير الأول المارق",
+      "english": "I Became The Rogue First Prince",
+      "method": "MangaDex",
+      "candidate": "I Became the Rogue First Prince",
+      "confidence": 1
+    },
+    {
+      "slug": "chronicles-of-the-lazy-sovereign",
+      "arabic": "سجلات الحاكم الكسول",
+      "english": "Chronicles of the Lazy Sovereign",
+      "method": "MangaDex",
+      "candidate": "Chronicles of the Lazy Sovereign",
+      "confidence": 1
+    },
+    {
+      "slug": "snow-mountain-monster-princess",
+      "arabic": "الأميرة الوحشية للجبل الثلجي",
+      "english": "Monster Princess of the Snowy Mountain",
+      "method": "AniList",
+      "candidate": "Snow Mountain Monster Princess",
+      "confidence": 1
+    },
+    {
+      "slug": "daoist-master-wants-to-ascend",
+      "arabic": "سيد الطاوية يريد الصعود",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Daoist Master Wants to Ascend",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "sword-devouring-swordmaster",
+      "arabic": "سيد السيف ملتهم السيوف",
+      "english": "Sword Devouring Swordmaster",
+      "method": "MangaDex",
+      "candidate": "Sword Devouring Swordmaster",
+      "confidence": 1
+    },
+    {
+      "slug": "blue-lock-episode-nagi",
+      "arabic": "بلو لوك: حلقة ناغي",
+      "english": "Blue Lock - Episode Nagi",
+      "method": "MangaDex",
+      "candidate": "Blue Lock Episode Nagi",
+      "confidence": 1
+    },
+    {
+      "slug": "magi-the-adventures-of-sinbad",
+      "arabic": "المجوس: مغامرات سندباد",
+      "english": "Magi: The Adventures Of Sinbad",
+      "method": "MangaDex",
+      "candidate": "Magi the Adventures of Sinbad",
+      "confidence": 1
+    },
+    {
+      "slug": "overgeared",
+      "arabic": "أوفرغيرد",
+      "english": "Overgeared",
+      "method": "MangaDex",
+      "candidate": "Overgeared",
+      "confidence": 1
+    },
+    {
+      "slug": "the-worlds-best-martial-arts-instructor",
+      "arabic": "أفضل مدرّب فنون قتالية في العالم",
+      "english": "The World's Best Martial Arts Instructor",
+      "method": "MangaDex",
+      "candidate": "The Worlds Best Martial Arts Instructor",
+      "confidence": 0.975
+    },
+    {
+      "slug": "cosmic-heavenly-demon-3077",
+      "arabic": "الشيطان السماوي 3077",
+      "english": "Cosmic Heavenly Demon 3077",
+      "method": "MangaDex",
+      "candidate": "Cosmic Heavenly Demon 3077",
+      "confidence": 1
+    },
+    {
+      "slug": "magic-emperor",
+      "arabic": "إمبراطور السحر",
+      "english": "Magic Emperor",
+      "method": "MangaDex",
+      "candidate": "Magic Emperor",
+      "confidence": 1
+    },
+    {
+      "slug": "mercenary-enrollment",
+      "arabic": "المرتزق المراهق",
+      "english": "Mercenary Enrollment",
+      "method": "MangaDex",
+      "candidate": "Mercenary Enrollment",
+      "confidence": 1
+    },
+    {
+      "slug": "academys-genius-swordmaster",
+      "arabic": "سياف الأكاديمية العبقري",
+      "english": "Academy's Genius Swordmaster",
+      "method": "MangaDex",
+      "candidate": "Academys Genius Swordmaster",
+      "confidence": 0.9642857142857143
+    },
+    {
+      "slug": "the-worlds-best-kunlun-tavern",
+      "arabic": "أفضل حانة كونلون في العالم",
+      "english": "The World's Best Kunlun Tavern",
+      "method": "MangaDex",
+      "candidate": "The Worlds Best Kunlun Tavern",
+      "confidence": 0.9666666666666667
+    },
+    {
+      "slug": "writers-legacy",
+      "arabic": "إرث الكاتب",
+      "english": "Writers Legacy",
+      "method": "MangaDex",
+      "candidate": "Writers Legacy",
+      "confidence": 1
+    },
+    {
+      "slug": "convenience-store-worker-from-another-world",
+      "arabic": "موظف متجر من عالم آخر",
+      "english": "Convenience Store Worker From Another World",
+      "method": "MangaDex",
+      "candidate": "Convenience Store Worker from Another World",
+      "confidence": 1
+    },
+    {
+      "slug": "unordinary",
+      "arabic": "غير عادي",
+      "english": "unOrdinary",
+      "method": "MangaDex",
+      "candidate": "Unordinary",
+      "confidence": 1
+    },
+    {
+      "slug": "fog-land",
+      "arabic": "أرض الضباب",
+      "english": "Fog Land",
+      "method": "MangaDex",
+      "candidate": "Fog Land",
+      "confidence": 1
+    },
+    {
+      "slug": "eat-and-go",
+      "arabic": "تناول طعامك قبل أن ترحل",
+      "english": "Eat and Go!",
+      "method": "MangaDex",
+      "candidate": "Eat and Go",
+      "confidence": 1
+    },
+    {
+      "slug": "one-piece-sbs",
+      "arabic": "ون بيس: ركن أسئلة القرّاء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "One Piece Sbs",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "secret-family",
+      "arabic": "العائلة السرية",
+      "english": "Secret Family",
+      "method": "MangaDex",
+      "candidate": "Secret Family",
+      "confidence": 1
+    },
+    {
+      "slug": "blue-city-echoes",
+      "arabic": "أصداء المدينة الزرقاء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Blue City Echoes",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-hero-returns",
+      "arabic": "عودة البطل",
+      "english": "The Hero Returns",
+      "method": "MangaDex",
+      "candidate": "The Hero Returns",
+      "confidence": 1
+    },
+    {
+      "slug": "yukoku-no-moriarty",
+      "arabic": "يوكوكو نو موريارتي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Yukoku No Moriarty",
+      "confidence": 0.15625,
+      "mangaDex": "Moriarty the Patriot: The Remains",
+      "aniList": ""
+    },
+    {
+      "slug": "wild-west-murim",
+      "arabic": "موريم الغرب المتوحش",
+      "english": "Wild West Murim",
+      "method": "MangaDex",
+      "candidate": "Wild West Murim",
+      "confidence": 1
+    },
+    {
+      "slug": "lord-level-assassin-i-am-the-shadow",
+      "arabic": "القاتل الإلهي: أنا الظل",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Lord Level Assassin I Am the Shadow",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-mad-dog",
+      "arabic": "الكلب المسعور",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Mad Dog",
+      "confidence": 0.6470588235294117,
+      "mangaDex": "Hachi The Mad Dog",
+      "aniList": "Hachi the Mad Dog"
+    },
+    {
+      "slug": "swordmaster-s-youngest-son",
+      "arabic": "الابن الأصغر لسيد السيف",
+      "english": "Swordmaster's Youngest Son",
+      "method": "MangaDex",
+      "candidate": "Swordmaster S Youngest Son",
+      "confidence": 1
+    },
+    {
+      "slug": "wind-breaker-manhwa",
+      "arabic": "ويند بريكر: الدرّاجات",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Wind Breaker Manhwa",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "magic-academy-s-genius-blinker",
+      "arabic": "سيد الوميض في أكاديمية السحر",
+      "english": "Magic Academy's Genius Blinker",
+      "method": "MangaDex",
+      "candidate": "Magic Academy S Genius Blinker",
+      "confidence": 1
+    },
+    {
+      "slug": "a-dragonslayer-s-peerless-regression",
+      "arabic": "عودة قاتل التنانين التي لا تُضاهى",
+      "english": "A Dragonslayer's Peerless Regression",
+      "method": "MangaDex",
+      "candidate": "A Dragonslayer S Peerless Regression",
+      "confidence": 1
+    },
+    {
+      "slug": "yuan-zun",
+      "arabic": "يوان زون",
+      "english": "Dragon Prince Yuan",
+      "method": "AniList",
+      "candidate": "Yuan Zun",
+      "confidence": 1
+    },
+    {
+      "slug": "contract-admission",
+      "arabic": "عقد الالتحاق",
+      "english": "Contract Admission",
+      "method": "MangaDex",
+      "candidate": "Contract Admission",
+      "confidence": 1
+    },
+    {
+      "slug": "my-levels-the-best",
+      "arabic": "مستواي هو الأفضل",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "My Levels the Best",
+      "confidence": 0.6086956521739131,
+      "mangaDex": "My Hometown Is the Best!",
+      "aniList": ""
+    },
+    {
+      "slug": "the-misfit-of-the-martial-world",
+      "arabic": "نَشاز عالم القتال",
+      "english": "The Misfit of the Martial World",
+      "method": "AniList",
+      "candidate": "The Misfit of the Martial World",
+      "confidence": 1
+    },
+    {
+      "slug": "black-butler",
+      "arabic": "الخادم الأسود",
+      "english": "Black Butler",
+      "method": "MangaDex",
+      "candidate": "Black Butler",
+      "confidence": 1
+    },
+    {
+      "slug": "limit-breaker",
+      "arabic": "تخطّي الحدّ الأقصى",
+      "english": "Limit Breaker",
+      "method": "MangaDex",
+      "candidate": "Limit Breaker",
+      "confidence": 1
+    },
+    {
+      "slug": "how-to-fight-viral-hit",
+      "arabic": "تعلّم القتال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "How to Fight Viral Hit",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "margraves-bastard-son-was-the-emperor",
+      "arabic": "ابن المركيز غير الشرعيّ كان الإمبراطور",
+      "english": "Margrave's Bastard Son Was the Emperor",
+      "method": "MangaDex",
+      "candidate": "Margraves Bastard Son Was the Emperor",
+      "confidence": 0.9736842105263158
+    },
+    {
+      "slug": "tokyo-ghoul-re",
+      "arabic": "طوكيو غول: ري",
+      "english": "Tokyo Ghoul: re",
+      "method": "MangaDex",
+      "candidate": "Tokyo Ghoul Re",
+      "confidence": 1
+    },
+    {
+      "slug": "reincarnators-stream",
+      "arabic": "بث العائد من جديد",
+      "english": "Reincarnator’s Stream",
+      "method": "MangaDex",
+      "candidate": "Reincarnators Stream",
+      "confidence": 0.9523809523809523
+    },
+    {
+      "slug": "hunter-x-hunter",
+      "arabic": "هانتر × هانتر",
+      "english": "Hunter x Hunter",
+      "method": "MangaDex",
+      "candidate": "Hunter X Hunter",
+      "confidence": 1
+    },
+    {
+      "slug": "raising-villains-the-right-way",
+      "arabic": "أصبحت راعي الأشرار",
+      "english": "Raising Villains the Right Way",
+      "method": "MangaDex",
+      "candidate": "Raising Villains the Right Way",
+      "confidence": 1
+    },
+    {
+      "slug": "gantz",
+      "arabic": "غانتز",
+      "english": "Gantz",
+      "method": "MangaDex",
+      "candidate": "Gantz",
+      "confidence": 1
+    },
+    {
+      "slug": "madan-no-ichi",
+      "arabic": "إيتشي الساحر",
+      "english": "Ichi the Witch",
+      "method": "AniList",
+      "candidate": "Madan No Ichi",
+      "confidence": 1
+    },
+    {
+      "slug": "apocalyptic-super-farm",
+      "arabic": "مزرعة نهاية العالم الخارقة",
+      "english": "Apocalyptic Super Farm",
+      "method": "MangaDex",
+      "candidate": "Apocalyptic Super Farm",
+      "confidence": 1
+    },
+    {
+      "slug": "one-operation-joker",
+      "arabic": "عملية جوكر",
+      "english": "One Operation Joker",
+      "method": "MangaDex",
+      "candidate": "One Operation Joker",
+      "confidence": 1
+    },
+    {
+      "slug": "anne-no-aijou",
+      "arabic": "حبّ آن",
+      "english": "Anne no Aijou",
+      "method": "AniList",
+      "candidate": "Anne No Aijou",
+      "confidence": 1
+    },
+    {
+      "slug": "ao-ashi",
+      "arabic": "آو آشي",
+      "english": "Aoashi",
+      "method": "MangaDex+AniList",
+      "candidate": "Ao Ashi",
+      "confidence": 0.8571428571428572
+    },
+    {
+      "slug": "red-storm",
+      "arabic": "العاصفة الحمراء",
+      "english": "Red Storm",
+      "method": "MangaDex",
+      "candidate": "Red Storm",
+      "confidence": 1
+    },
+    {
+      "slug": "true-martial-world",
+      "arabic": "العالم القتالي الحقيقي",
+      "english": "A True Martial World",
+      "method": "MangaDex",
+      "candidate": "True Martial World",
+      "confidence": 0.992
+    },
+    {
+      "slug": "gosu",
+      "arabic": "غوسو — الأستاذ",
+      "english": "Gosu",
+      "method": "MangaDex",
+      "candidate": "Gosu",
+      "confidence": 1
+    },
+    {
+      "slug": "my-exclusive-tower-guide",
+      "arabic": "دليل البرج الذي أراه وحدي",
+      "english": "My Exclusive Tower Guide",
+      "method": "MangaDex",
+      "candidate": "My Exclusive Tower Guide",
+      "confidence": 1
+    },
+    {
+      "slug": "a-transmigrators-privilege",
+      "arabic": "امتياز المتناسخة",
+      "english": "A Transmigrator's Privilege",
+      "method": "MangaDex",
+      "candidate": "A Transmigrators Privilege",
+      "confidence": 0.962962962962963
+    },
+    {
+      "slug": "study-group",
+      "arabic": "مجموعة الدراسة",
+      "english": "Study Group",
+      "method": "MangaDex",
+      "candidate": "Study Group",
+      "confidence": 1
+    },
+    {
+      "slug": "medical-return",
+      "arabic": "العودة الطبّية",
+      "english": "Medical Return",
+      "method": "MangaDex",
+      "candidate": "Medical Return",
+      "confidence": 1
+    },
+    {
+      "slug": "tomodachi-game",
+      "arabic": "لعبة الأصدقاء",
+      "english": "Tomodachi Game",
+      "method": "AniList",
+      "candidate": "Tomodachi Game",
+      "confidence": 1
+    },
+    {
+      "slug": "attack-on-titan-chibi-training-squad",
+      "arabic": "هجوم العمالقة: فرقة التدريب — أربع لوحات",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Attack on Titan Chibi Training Squad",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "lemon-tree-forest",
+      "arabic": "غابة شجرة الليمون",
+      "english": "Lemon Tree Forest",
+      "method": "AniList",
+      "candidate": "Lemon Tree Forest",
+      "confidence": 1
+    },
+    {
+      "slug": "the-back-alley-mage-s-return",
+      "arabic": "الحياة الثانية لساحر الأزقة",
+      "english": "The Back Alley Mage's Second Life",
+      "method": "AniList",
+      "candidate": "The Back Alley Mage S Return",
+      "confidence": 1
+    },
+    {
+      "slug": "jiyujiyo",
+      "arabic": "جيويجيو",
+      "english": "Jiyujiyo",
+      "method": "AniList",
+      "candidate": "Jiyujiyo",
+      "confidence": 1
+    },
+    {
+      "slug": "skeleton-soldier-couldnt-protect-the-dungeon",
+      "arabic": "الجنديّ الهيكل العظميّ لم يستطع حماية الزنزانة",
+      "english": "Skeleton Soldier Couldn't Protect the Dungeon",
+      "method": "MangaDex",
+      "candidate": "Skeleton Soldier Couldnt Protect the Dungeon",
+      "confidence": 0.9777777777777777
+    },
+    {
+      "slug": "peerless-dad",
+      "arabic": "الأب الذي لا يُبارى",
+      "english": "Peerless Dad",
+      "method": "MangaDex",
+      "candidate": "Peerless Dad",
+      "confidence": 1
+    },
+    {
+      "slug": "seoul-station-barbarian",
+      "arabic": "بربري محطة سيول",
+      "english": "Seoul Station Barbarian",
+      "method": "MangaDex",
+      "candidate": "Seoul Station Barbarian",
+      "confidence": 1
+    },
+    {
+      "slug": "chronicles-of-the-demon-faction",
+      "arabic": "سجلات الطائفة الشيطانية",
+      "english": "Chronicles of the Demon Faction",
+      "method": "MangaDex",
+      "candidate": "Chronicles of the Demon Faction",
+      "confidence": 1
+    },
+    {
+      "slug": "king-of-apocalypse",
+      "arabic": "ملك نهاية العالم",
+      "english": "King of Apocalypse",
+      "method": "MangaDex",
+      "candidate": "King of Apocalypse",
+      "confidence": 1
+    },
+    {
+      "slug": "from-child-actor-to-world-star",
+      "arabic": "من ممثّل طفل إلى نجم عالمي",
+      "english": "From Child Actor to World Star!",
+      "method": "AniList",
+      "candidate": "From Child Actor to World Star",
+      "confidence": 1
+    },
+    {
+      "slug": "kaya-chan-wa-kowakunai",
+      "arabic": "كايا تشان ليست مخيفة",
+      "english": "Kaya-chan Isn’t Scary",
+      "method": "AniList",
+      "candidate": "Kaya Chan Wa Kowakunai",
+      "confidence": 1
+    },
+    {
+      "slug": "bad-boy",
+      "arabic": "باد بوي: قصة ليفاي",
+      "english": "Bad Boy",
+      "method": "AniList",
+      "candidate": "Bad Boy",
+      "confidence": 1
+    },
+    {
+      "slug": "special-civil-servant",
+      "arabic": "الموظف الحكومي الخاص",
+      "english": "Special Civil Servant",
+      "method": "MangaDex",
+      "candidate": "Special CIVIL Servant",
+      "confidence": 1
+    },
+    {
+      "slug": "catastrophic-necromancer",
+      "arabic": "مستحضر الأرواح الكارثي",
+      "english": "Catastrophic Necromancer",
+      "method": "MangaDex",
+      "candidate": "Catastrophic Necromancer",
+      "confidence": 1
+    },
+    {
+      "slug": "shamo",
+      "arabic": "شامو",
+      "english": "Shamo",
+      "method": "AniList",
+      "candidate": "Shamo",
+      "confidence": 1
+    },
+    {
+      "slug": "is-it-bad-that-the-main-characters-a-roleplayer",
+      "arabic": "هل من السيئ أن يكون البطل مهووساً بتقمص الأدوار؟",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Is It Bad That the Main Characters a Roleplayer",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "kingdom-hearts-358-2-days",
+      "arabic": "كينغدوم هارتس 358/2 أيام",
+      "english": "Kingdom Hearts 358/2 Days",
+      "method": "MangaDex",
+      "candidate": "Kingdom Hearts 358 2 Days",
+      "confidence": 1
+    },
+    {
+      "slug": "volcanic-age",
+      "arabic": "عصر البركان",
+      "english": "Volcanic Age",
+      "method": "MangaDex",
+      "candidate": "Volcanic Age",
+      "confidence": 1
+    },
+    {
+      "slug": "secretly-more-powerful-than-the-hero",
+      "arabic": "أقوى من البطل سراً",
+      "english": "Secretly More Powerful than the Hero",
+      "method": "MangaDex",
+      "candidate": "Secretly More Powerful Than the Hero",
+      "confidence": 1
+    },
+    {
+      "slug": "worlds-strongest-troll",
+      "arabic": "أقوى ترول في العالم",
+      "english": "World's Strongest Troll",
+      "method": "MangaDex",
+      "candidate": "Worlds Strongest Troll",
+      "confidence": 0.9565217391304348
+    },
+    {
+      "slug": "the-holy-power-of-modern-medicine",
+      "arabic": "القوة المقدسة للطب الحديث",
+      "english": "The Holy Power of Modern Medicine",
+      "method": "MangaDex",
+      "candidate": "The Holy Power of Modern Medicine",
+      "confidence": 1
+    },
+    {
+      "slug": "captain-tsubasa-world-youth",
+      "arabic": "الكابتن تسوباسا: شباب العالم",
+      "english": "Captain Tsubasa: World Youth",
+      "method": "MangaDex",
+      "candidate": "Captain Tsubasa World Youth",
+      "confidence": 1
+    },
+    {
+      "slug": "escort-warrior",
+      "arabic": "مرافق القوافل المتجسد",
+      "english": "Escort Warrior",
+      "method": "MangaDex",
+      "candidate": "Escort Warrior",
+      "confidence": 1
+    },
+    {
+      "slug": "imouto-wa-siscon-ani-ga-mendokusai",
+      "arabic": "أخي المهووس بأخته مزعج",
+      "english": "Imouto wa Siscon Ani ga Mendokusai",
+      "method": "AniList",
+      "candidate": "Imouto Wa Siscon Ani Ga Mendokusai",
+      "confidence": 1
+    },
+    {
+      "slug": "lu-bu-life-s-story-immortal-updates",
+      "arabic": "محاكي حياة لو بو",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Lu Bu Life S Story Immortal Updates",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "amelia-no-koukiteki-romance",
+      "arabic": "رومانسية أميليا الفضولية",
+      "english": "Amelia no Koukiteki Romance",
+      "method": "AniList",
+      "candidate": "Amelia No Koukiteki Romance",
+      "confidence": 1
+    },
+    {
+      "slug": "light-of-the-dawn-remake",
+      "arabic": "شعلة الفجر",
+      "english": "Light of the Dawn (Remake)",
+      "method": "MangaDex",
+      "candidate": "Light of the Dawn Remake",
+      "confidence": 1
+    },
+    {
+      "slug": "olgami-trapped",
+      "arabic": "الأُحبولة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Olgami Trapped",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "terminally-ill-genius-dark-knight",
+      "arabic": "عبقرية فارس الظلام محدودة الوقت",
+      "english": "Terminally-Ill Genius Dark Knight",
+      "method": "MangaDex",
+      "candidate": "Terminally ILL Genius Dark Knight",
+      "confidence": 1
+    },
+    {
+      "slug": "the-house-without-time",
+      "arabic": "المنزل الذي توقف فيه الزمن",
+      "english": "The House Without Time",
+      "method": "MangaDex",
+      "candidate": "The House Without Time",
+      "confidence": 1
+    },
+    {
+      "slug": "villain-is-here",
+      "arabic": "أنا الشرير المقدّر من السماء",
+      "english": "Villain Is Here",
+      "method": "MangaDex",
+      "candidate": "Villain Is Here",
+      "confidence": 1
+    },
+    {
+      "slug": "solo-strike-a-hundred-million-damage",
+      "arabic": "ضرري أعلى بمئة مليون نقطة",
+      "english": "Solo Strike: A Hundred Million Damage",
+      "method": "MangaDex",
+      "candidate": "Solo Strike a Hundred Million Damage",
+      "confidence": 1
+    },
+    {
+      "slug": "im-going-to-destroy-this-country",
+      "arabic": "أنا ذاهب لتدمير هذا البلد",
+      "english": "I'm Going to Destroy This Country",
+      "method": "MangaDex",
+      "candidate": "IM Going to Destroy This Country",
+      "confidence": 0.9696969696969697
+    },
+    {
+      "slug": "one-punch-man",
+      "arabic": "ون بنش مان",
+      "english": "One-Punch Man",
+      "method": "MangaDex",
+      "candidate": "One Punch Man",
+      "confidence": 1
+    },
+    {
+      "slug": "yuan-long",
+      "arabic": "التنين يوان",
+      "english": "Yuan Long",
+      "method": "MangaDex",
+      "candidate": "Yuan Long",
+      "confidence": 1
+    },
+    {
+      "slug": "boruto-naruto-next-generation",
+      "arabic": "بوروتو: أجيال ناروتو القادمة",
+      "english": "Boruto: Naruto Next Generations",
+      "method": "MangaDex",
+      "candidate": "Boruto Naruto Next Generation",
+      "confidence": 0.9973333333333334
+    },
+    {
+      "slug": "seabird-and-the-wolf",
+      "arabic": "طائر البحر والذئب",
+      "english": "Seabird and the Wolf",
+      "method": "AniList",
+      "candidate": "Seabird and the Wolf",
+      "confidence": 1
+    },
+    {
+      "slug": "aku-no-higan",
+      "arabic": "ما وراء الشر",
+      "english": "Beyond Evil",
+      "method": "AniList",
+      "candidate": "Aku No Higan",
+      "confidence": 1
+    },
+    {
+      "slug": "bastard-manhwa",
+      "arabic": "باستارد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Bastard Manhwa",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "i-am-sorry-for-being-a-fool",
+      "arabic": "أنا آسف لكوني أحمق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "I Am Sorry for Being a Fool",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "boruto-two-blue-vortex",
+      "arabic": "بوروتو: الدوامتان الزرقاوان",
+      "english": "Boruto: Two Blue Vortex",
+      "method": "MangaDex",
+      "candidate": "Boruto Two Blue Vortex",
+      "confidence": 1
+    },
+    {
+      "slug": "evolution-begins-with-a-big-tree",
+      "arabic": "التطور يبدأ من شجرة عملاقة",
+      "english": "Evolution Begins With a Big Tree",
+      "method": "MangaDex",
+      "candidate": "Evolution Begins with a Big Tree",
+      "confidence": 1
+    },
+    {
+      "slug": "the-invisible-one",
+      "arabic": "غير المرئي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Invisible One",
+      "confidence": 0.39534883720930236,
+      "mangaDex": "The Fallen Summoner and I, The Invisible One",
+      "aniList": "The Fallen Summoner and I, the Invisible One"
+    },
+    {
+      "slug": "the-roguish-guard-in-a-medieval-fantasy",
+      "arabic": "قائد الحرس المتهوّر في عالم القرون الوسطى",
+      "english": "The Roguish Guard in a Medieval Fantasy",
+      "method": "MangaDex",
+      "candidate": "The Roguish Guard in a Medieval Fantasy",
+      "confidence": 1
+    },
+    {
+      "slug": "naruto-gaiden-the-seventh-hokage",
+      "arabic": "ناروتو غايدن: الهوكاجي السابع",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Naruto Gaiden the Seventh Hokage",
+      "confidence": 0.5818181818181818,
+      "mangaDex": "Naruto Gaiden: The Seventh Hokage and the Scarlet Spring",
+      "aniList": ""
+    },
+    {
+      "slug": "pigpen",
+      "arabic": "زريبة الخنازير",
+      "english": "PIGPEN",
+      "method": "MangaDex",
+      "candidate": "Pigpen",
+      "confidence": 1
+    },
+    {
+      "slug": "anne-no-seishun",
+      "arabic": "شباب آن",
+      "english": "Anne no Seishun",
+      "method": "AniList",
+      "candidate": "Anne No Seishun",
+      "confidence": 1
+    },
+    {
+      "slug": "the-day-naruto-became-hokage",
+      "arabic": "اليوم الذي أصبح فيه ناروتو هوكاجي",
+      "english": "The Day Naruto Became Hokage",
+      "method": "MangaDex",
+      "candidate": "The Day Naruto Became Hokage",
+      "confidence": 1
+    },
+    {
+      "slug": "past-life-returner",
+      "arabic": "العائد من الحياة السابقة",
+      "english": "Past Life Returner",
+      "method": "MangaDex",
+      "candidate": "Past Life Returner",
+      "confidence": 1
+    },
+    {
+      "slug": "even-if-i-fall-into-a-horror-story-i-still-have-to-go-to-work",
+      "arabic": "حتى لو سقطتُ في قصة رعب، فعليّ الذهاب إلى العمل",
+      "english": "Even if I fall into a ghost story, I still have to go to work",
+      "method": "MangaDex",
+      "candidate": "Even If I Fall into a Horror Story I Still Have to Go to Work",
+      "confidence": 0.9180327868852459
+    },
+    {
+      "slug": "red-riding-hood",
+      "arabic": "الذئب تلميذ ذات الرداء الأحمر",
+      "english": "Red Riding Hood",
+      "method": "AniList",
+      "candidate": "Red Riding Hood",
+      "confidence": 1
+    },
+    {
+      "slug": "solo-leveling-ragnarok",
+      "arabic": "سولو ليفلينج: راغناروك",
+      "english": "Solo Leveling: Ragnarok",
+      "method": "MangaDex",
+      "candidate": "Solo Leveling Ragnarok",
+      "confidence": 1
+    },
+    {
+      "slug": "the-beloved-gardener-of-the-world-tree",
+      "arabic": "بستانية شجرة العالم المحبوبة",
+      "english": "The Beloved Gardener of the World Tree",
+      "method": "AniList",
+      "candidate": "The Beloved Gardener of the World Tree",
+      "confidence": 1
+    },
+    {
+      "slug": "365-days-to-the-wedding",
+      "arabic": "365 يومًا حتى الزفاف",
+      "english": "365 Days to the Wedding",
+      "method": "MangaDex",
+      "candidate": "365 Days to the Wedding",
+      "confidence": 1
+    },
+    {
+      "slug": "the-scholars-reincarnation",
+      "arabic": "عودة العالم",
+      "english": "The Scholar's Reincarnation",
+      "method": "MangaDex",
+      "candidate": "The Scholars Reincarnation",
+      "confidence": 0.962962962962963
+    },
+    {
+      "slug": "when-the-system-opens-after-the-age-of-100-all-gra",
+      "arabic": "نظام المئة عام: الأحفاد يملؤون الجبال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "When the System Opens After the Age of 100 All Gra",
+      "confidence": 0.5882352941176471,
+      "mangaDex": "When The System Opens After The Age Of 100, All Grandchildren Kneel Upon The Mountains!",
+      "aniList": ""
+    },
+    {
+      "slug": "the-cold-blooded-warrior",
+      "arabic": "المحارب عديم الرحمة",
+      "english": "The Cold-Blooded Warrior",
+      "method": "MangaDex",
+      "candidate": "The Cold Blooded Warrior",
+      "confidence": 1
+    },
+    {
+      "slug": "cube-arts",
+      "arabic": "فنون المكعب",
+      "english": "Cube Arts",
+      "method": "MangaDex",
+      "candidate": "Cube Arts",
+      "confidence": 1
+    },
+    {
+      "slug": "id-invaded",
+      "arabic": "آي دي: إنفيدد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "ID Invaded",
+      "confidence": 0.4347826086956522,
+      "mangaDex": "ID:INVADED #BRAKE BROKEN",
+      "aniList": "ID:Invaded #Brake-Broken"
+    },
+    {
+      "slug": "kaiju-no-8",
+      "arabic": "كايجو رقم 8",
+      "english": "Kaiju No. 8",
+      "method": "MangaDex",
+      "candidate": "Kaiju No 8",
+      "confidence": 1
+    },
+    {
+      "slug": "ihoujin",
+      "arabic": "غريب في الزنزانة",
+      "english": "Ihoujin",
+      "method": "AniList",
+      "candidate": "Ihoujin",
+      "confidence": 1
+    },
+    {
+      "slug": "the-supreme-demonic-sword",
+      "arabic": "السيف الشيطاني الأعلى",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Supreme Demonic Sword",
+      "confidence": 0.4814814814814815,
+      "mangaDex": "The Supreme Sword Intention",
+      "aniList": "The Demonic Supreme Sword"
+    },
+    {
+      "slug": "attack-on-titan-before-the-fall",
+      "arabic": "هجوم العمالقة: قبل السقوط",
+      "english": "Attack on Titan: Before the Fall",
+      "method": "MangaDex",
+      "candidate": "Attack on Titan Before the Fall",
+      "confidence": 1
+    },
+    {
+      "slug": "maou-jou-de-oyasumi",
+      "arabic": "الأميرة النائمة في قلعة الشيطان",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Maou Jou De Oyasumi",
+      "confidence": 0.19999999999999996,
+      "mangaDex": "Sleepy Princess in the Demon Castle",
+      "aniList": ""
+    },
+    {
+      "slug": "my-disciples-are-all-big-villains",
+      "arabic": "تلاميذي كلهم أشرار كبار",
+      "english": "My Disciples Are All Big Villains",
+      "method": "MangaDex",
+      "candidate": "My Disciples Are All Big Villains",
+      "confidence": 1
+    },
+    {
+      "slug": "neko-no-massajiya-san",
+      "arabic": "مدلّك القطط",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Neko No Massajiya San",
+      "confidence": 0.2962962962962963,
+      "mangaDex": "Miori & Mountain God–sama",
+      "aniList": ""
+    },
+    {
+      "slug": "attack-on-titan",
+      "arabic": "هجوم العمالقة",
+      "english": "Attack on Titan",
+      "method": "MangaDex",
+      "candidate": "Attack on Titan",
+      "confidence": 1
+    },
+    {
+      "slug": "real",
+      "arabic": "ريال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Real",
+      "confidence": 0.12121212121212122,
+      "mangaDex": "I’m Really Not the Devil’s Lackey",
+      "aniList": ""
+    },
+    {
+      "slug": "the-demon-king-overrun-by-heroes",
+      "arabic": "أنا ملك الشياطين، لكن الأبطال أكثر من اللازم",
+      "english": "The Demon King Overrun by Heroes",
+      "method": "MangaDex",
+      "candidate": "The Demon King Overrun by Heroes",
+      "confidence": 1
+    },
+    {
+      "slug": "red-shirt",
+      "arabic": "القميص الأحمر",
+      "english": "Red Shirt",
+      "method": "MangaDex",
+      "candidate": "Red Shirt",
+      "confidence": 1
+    },
+    {
+      "slug": "groundless",
+      "arabic": "بلا أساس",
+      "english": "GROUNDLESS",
+      "method": "MangaDex",
+      "candidate": "Groundless",
+      "confidence": 1
+    },
+    {
+      "slug": "house-of-the-sun",
+      "arabic": "بيت الشمس",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "House of the Sun",
+      "confidence": 0.27450980392156865,
+      "mangaDex": "NIPPON SANGOKU: The Three Nations of the Crimson Sun",
+      "aniList": ""
+    },
+    {
+      "slug": "frozen-hearts",
+      "arabic": "القلوب المجمدة",
+      "english": "Frozen Hearts",
+      "method": "MangaDex",
+      "candidate": "Frozen Hearts",
+      "confidence": 1
+    },
+    {
+      "slug": "became-a-medieval-fantasy-wizard",
+      "arabic": "أصبحت ساحرًا في عالم فانتازيا من العصور الوسطى",
+      "english": "Became a Medieval Fantasy Wizard",
+      "method": "MangaDex",
+      "candidate": "Became a Medieval Fantasy Wizard",
+      "confidence": 1
+    },
+    {
+      "slug": "zombie-fight",
+      "arabic": "قتال الزومبي",
+      "english": "Zombie Fight",
+      "method": "MangaDex",
+      "candidate": "Zombie Fight",
+      "confidence": 1
+    },
+    {
+      "slug": "level-999-goblin",
+      "arabic": "عفريت المستوى 999",
+      "english": "Level 999 Goblin",
+      "method": "MangaDex",
+      "candidate": "Level 999 Goblin",
+      "confidence": 1
+    },
+    {
+      "slug": "tenju-no-kuni",
+      "arabic": "بلاد تنجو",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Tenju No Kuni",
+      "confidence": 0.23529411764705888,
+      "mangaDex": "Land of the Tengu",
+      "aniList": ""
+    },
+    {
+      "slug": "bad-born-blood",
+      "arabic": "دم ملعون منذ الولادة",
+      "english": "Bad Born Blood",
+      "method": "MangaDex",
+      "candidate": "Bad Born Blood",
+      "confidence": 1
+    },
+    {
+      "slug": "return-of-the-high-ranking-civil-servant",
+      "arabic": "عودة الموظف الحكومي برتبة إله السيف",
+      "english": "Return of the High-Ranking Civil Servant",
+      "method": "MangaDex",
+      "candidate": "Return of the High Ranking CIVIL Servant",
+      "confidence": 1
+    },
+    {
+      "slug": "spy-x-family",
+      "arabic": "سباي × فاميلي | spy x family",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Spy X Family",
+      "confidence": 0.8333333333333334,
+      "mangaDex": "SPY×FAMILY",
+      "aniList": ""
+    },
+    {
+      "slug": "global-job-change-hidden-class-necromancer-lord",
+      "arabic": "تغيير الوظائف العالمي: سيّد الأرواح ذو الفئة الخفية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Global Job Change Hidden Class Necromancer Lord",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "animeta",
+      "arabic": "أنيميتا!",
+      "english": "Animeta!",
+      "method": "MangaDex",
+      "candidate": "Animeta",
+      "confidence": 1
+    },
+    {
+      "slug": "after-becoming-a-dumpling-the-villain-family-all-wants-to-kill-me",
+      "arabic": "بعد أن أصبحت طفلة صغيرة، عائلة الأشرار تريد قتلي!",
+      "english": "Turned a Toddler: The Villain Family Wants Me Dead!",
+      "method": "AniList",
+      "candidate": "After Becoming a Dumpling the Villain Family All Wants to Kill Me",
+      "confidence": 1
+    },
+    {
+      "slug": "the-genius-martial-artist-who-remembers-everything",
+      "arabic": "المحارب العبقري الذي يتذكّر كل شيء",
+      "english": "The Martial Genius Who Remembers Everything",
+      "method": "AniList",
+      "candidate": "The Genius Martial Artist Who Remembers Everything",
+      "confidence": 1
+    },
+    {
+      "slug": "regressing-with-the-kings-power",
+      "arabic": "العودة بقوة الملك",
+      "english": "Regressing with the King’s Power",
+      "method": "MangaDex",
+      "candidate": "Regressing with the Kings Power",
+      "confidence": 0.96875
+    },
+    {
+      "slug": "naruto-konoha-shinden-steam-ninja-scrolls",
+      "arabic": "ناروتو: مخطوطات النينجا البخارية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Naruto Konoha Shinden Steam Ninja Scrolls",
+      "confidence": 0.6363636363636364,
+      "mangaDex": "Naruto: Konoha’s Story—The Steam Ninja Scrolls: The Manga",
+      "aniList": ""
+    },
+    {
+      "slug": "detective-conan-hanzawa-the-criminal",
+      "arabic": "المحقق كونان: المجرم هانزاوا",
+      "english": "Detective Conan: Hanzawa the Criminal",
+      "method": "AniList",
+      "candidate": "Detective Conan Hanzawa the Criminal",
+      "confidence": 1
+    },
+    {
+      "slug": "all-hail-the-sect-leader",
+      "arabic": "في حضرة زعيم الطائفة",
+      "english": "All Hail the Sect Leader",
+      "method": "MangaDex",
+      "candidate": "All Hail the Sect Leader",
+      "confidence": 1
+    },
+    {
+      "slug": "the-girl-from-the-other-side",
+      "arabic": "الفتاة من الجانب الآخر",
+      "english": "The Girl From the Other Side",
+      "method": "MangaDex",
+      "candidate": "The Girl from the Other Side",
+      "confidence": 1
+    },
+    {
+      "slug": "chichikogusa",
+      "arabic": "عشب الأب والابن",
+      "english": "Chichikogusa",
+      "method": "MangaDex",
+      "candidate": "Chichikogusa",
+      "confidence": 1
+    },
+    {
+      "slug": "noah-s-tube",
+      "arabic": "أنبوب نوح",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Noah S Tube",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "kimi-wa-yotsuba-no-clover",
+      "arabic": "أنت ورقة برسيم رباعية",
+      "english": "You are a Four Leaf Clover",
+      "method": "AniList",
+      "candidate": "Kimi Wa Yotsuba No Clover",
+      "confidence": 1
+    },
+    {
+      "slug": "if-i-don-t-die-soon-i-will-rule-the-demon-realm",
+      "arabic": "إن لم أمت قريبًا فسأحكم عالم الشياطين",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "If I Don T Die Soon I Will Rule the Demon Realm",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "top-tier-providence-secretly-cultivate-for-a-thousand-years",
+      "arabic": "عناية من الدرجة الأولى",
+      "english": "Top Tier Providence: Secretly Cultivate for a Thousand Years",
+      "method": "MangaDex",
+      "candidate": "Top Tier Providence Secretly Cultivate for a Thousand Years",
+      "confidence": 1
+    },
+    {
+      "slug": "tomie",
+      "arabic": "تومي",
+      "english": "Tomie",
+      "method": "MangaDex",
+      "candidate": "Tomie",
+      "confidence": 1
+    },
+    {
+      "slug": "third-rate-martial-family-becomes-the-best-under-heaven",
+      "arabic": "عائلة قتالية من الدرجة الثالثة تصير الأولى تحت السماء",
+      "english": "Third-Rate Martial Family Becomes the Best Under Heaven",
+      "method": "MangaDex",
+      "candidate": "Third Rate Martial Family Becomes the Best Under Heaven",
+      "confidence": 1
+    },
+    {
+      "slug": "villain-to-kill",
+      "arabic": "شرير للقتل",
+      "english": "Villain to Kill",
+      "method": "MangaDex",
+      "candidate": "Villain to Kill",
+      "confidence": 1
+    },
+    {
+      "slug": "ana-no-mujina",
+      "arabic": "أنا نو موجينا",
+      "english": "Ana no Mujina",
+      "method": "AniList",
+      "candidate": "Ana No Mujina",
+      "confidence": 1
+    },
+    {
+      "slug": "death-note-special-one-shot",
+      "arabic": "مذكّرة الموت: الفصل الخاص",
+      "english": "Death Note Special Oneshot",
+      "method": "MangaDex",
+      "candidate": "Death Note Special One Shot",
+      "confidence": 0.962962962962963
+    },
+    {
+      "slug": "a-dragonslayers-peerless-regression",
+      "arabic": "قاتل التنين يعود بمستوى آخر",
+      "english": "A Dragonslayer's Peerless Regression",
+      "method": "MangaDex",
+      "candidate": "A Dragonslayers Peerless Regression",
+      "confidence": 0.9722222222222222
+    },
+    {
+      "slug": "top-1-fighting-tutoring",
+      "arabic": "دروس قتال من الدرجة الأولى",
+      "english": "Top 1 Fighting Tutoring",
+      "method": "MangaDex",
+      "candidate": "Top 1 Fighting Tutoring",
+      "confidence": 1
+    },
+    {
+      "slug": "ore-gentei",
+      "arabic": "خجلي محدود النطاق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Ore Gentei",
+      "confidence": 0.41666666666666663,
+      "mangaDex": "Ore, Gentei Commusho Nande",
+      "aniList": "Ore Gentei Chikan Densha"
+    },
+    {
+      "slug": "resurrection-boy",
+      "arabic": "فتى البعث",
+      "english": "Resurrection Boy",
+      "method": "MangaDex",
+      "candidate": "Resurrection Boy",
+      "confidence": 1
+    },
+    {
+      "slug": "the-archmage-s-restaurant",
+      "arabic": "مطعم الساحر الأعظم",
+      "english": "The Archmage's Restaurant",
+      "method": "MangaDex",
+      "candidate": "The Archmage S Restaurant",
+      "confidence": 1
+    },
+    {
+      "slug": "a-secretly-capable-child-is-seeking-for-her-dad",
+      "arabic": "طفلةٌ خفيّة القدرات تبحث عن أبيها",
+      "english": "Secretly Strong and Searching for My Daddy",
+      "method": "AniList",
+      "candidate": "A Secretly Capable Child Is Seeking for Her Dad",
+      "confidence": 1
+    },
+    {
+      "slug": "the-zenith",
+      "arabic": "الذروة",
+      "english": "The Zenith",
+      "method": "MangaDex",
+      "candidate": "The Zenith",
+      "confidence": 1
+    },
+    {
+      "slug": "rank-no-ura-soubi-musou",
+      "arabic": "معدات الرتبة الخفية التي لا تُضاهى",
+      "english": "The Unparalleled Hidden Rank Equipment",
+      "method": "AniList",
+      "candidate": "Rank No Ura Soubi Musou",
+      "confidence": 1
+    },
+    {
+      "slug": "the-genius-spirited-streamer",
+      "arabic": "عبقري البث ذو البصيرة الخارقة",
+      "english": "The Genius Spirited Streamer",
+      "method": "MangaDex",
+      "candidate": "The Genius Spirited Streamer",
+      "confidence": 1
+    },
+    {
+      "slug": "kimetsu-gakuenn",
+      "arabic": "أكاديمية قاتل الشياطين",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kimetsu Gakuenn",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "i-alone-am-an-ex-class-summoner",
+      "arabic": "أنا وحدي مستدعٍ من فئة EX",
+      "english": "I Alone Am an EX-Class Summoner",
+      "method": "AniList",
+      "candidate": "I Alone Am an Ex Class Summoner",
+      "confidence": 1
+    },
+    {
+      "slug": "from-useless-to-peerless-a-barrier-mages-journey",
+      "arabic": "من عديمة الفائدة إلى منقطعة النظير: رحلة ساحر الحاجز",
+      "english": "From Useless to Peerless: A Barrier Mage's Journey",
+      "method": "MangaDex",
+      "candidate": "From Useless to Peerless a Barrier Mages Journey",
+      "confidence": 0.9795918367346939
+    },
+    {
+      "slug": "attack-on-titan-marley-academy",
+      "arabic": "هجوم العمالقة: أكاديمية مارلي المجاورة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Attack on Titan Marley Academy",
+      "confidence": 0.4838709677419355,
+      "mangaDex": "Attack on Titan: High School – Youth! The Marley Academy Next Door",
+      "aniList": ""
+    },
+    {
+      "slug": "genius-prismatic-mage",
+      "arabic": "الساحر العبقري متعدد الأطياف",
+      "english": "The Genius Prismatic Mage",
+      "method": "MangaDex",
+      "candidate": "Genius Prismatic Mage",
+      "confidence": 0.9872000000000001
+    },
+    {
+      "slug": "the-summer-hikaru-died",
+      "arabic": "الصيف الذي مات فيه هيكارو",
+      "english": "The Summer Hikaru Died",
+      "method": "MangaDex",
+      "candidate": "The Summer Hikaru Died",
+      "confidence": 1
+    },
+    {
+      "slug": "sweet-home",
+      "arabic": "سويت هوم",
+      "english": "Sweet Home",
+      "method": "MangaDex",
+      "candidate": "Sweet Home",
+      "confidence": 1
+    },
+    {
+      "slug": "astral-pet-store",
+      "arabic": "متجر الوحوش الأليفة الخارق",
+      "english": "Astral Pet Store",
+      "method": "MangaDex",
+      "candidate": "Astral Pet Store",
+      "confidence": 1
+    },
+    {
+      "slug": "the-smiling-boxer",
+      "arabic": "الملاكم المبتسم",
+      "english": "The Smiling Boxer",
+      "method": "MangaDex",
+      "candidate": "The Smiling Boxer",
+      "confidence": 1
+    },
+    {
+      "slug": "im-a-villainess-but-im-good-at-cooking",
+      "arabic": "أنا شريرة، لكنني بارعة في الطهي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "IM a Villainess But IM Good at Cooking",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "surviving-in-another-world",
+      "arabic": "النجاة في عالم آخر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Surviving in Another World",
+      "confidence": 0.7307692307692308,
+      "mangaDex": "Samurai in Another World",
+      "aniList": ""
+    },
+    {
+      "slug": "made-in-abyss",
+      "arabic": "صُنع في الهاوية",
+      "english": "Made In Abyss",
+      "method": "MangaDex",
+      "candidate": "Made in Abyss",
+      "confidence": 1
+    },
+    {
+      "slug": "garouden",
+      "arabic": "جارودين",
+      "english": "Garouden",
+      "method": "MangaDex",
+      "candidate": "Garouden",
+      "confidence": 1
+    },
+    {
+      "slug": "surviving-the-apocalypse",
+      "arabic": "النجاة من نهاية العالم",
+      "english": "Surviving the Apocalypse",
+      "method": "MangaDex",
+      "candidate": "Surviving the Apocalypse",
+      "confidence": 1
+    },
+    {
+      "slug": "forty-millenniums-of-cultivation",
+      "arabic": "أربعون ألف عام من الصقل",
+      "english": "Forty Millenniums of Cultivation",
+      "method": "MangaDex",
+      "candidate": "Forty Millenniums of Cultivation",
+      "confidence": 1
+    },
+    {
+      "slug": "yong-heng-zhi-zun",
+      "arabic": "السيد الأبدي",
+      "english": "Yong Heng Zhi Zun",
+      "method": "MangaDex",
+      "candidate": "Yong Heng Zhi Zun",
+      "confidence": 1
+    },
+    {
+      "slug": "sword-of-benevolence",
+      "arabic": "سيف الإحسان",
+      "english": "Sword of Benevolence",
+      "method": "MangaDex",
+      "candidate": "Sword of Benevolence",
+      "confidence": 1
+    },
+    {
+      "slug": "death-note-one-shot",
+      "arabic": "ديث نوت: الفصل الخاص",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Death Note One Shot",
+      "confidence": 0.6538461538461539,
+      "mangaDex": "Death Note Special Oneshot",
+      "aniList": ""
+    },
+    {
+      "slug": "boukensha",
+      "arabic": "المغامر الذي أحلم به",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Boukensha",
+      "confidence": 0.09090909090909094,
+      "mangaDex": "The Abandoned Reincarnated Young Lady Aims to Become the Strongest Adventurer!",
+      "aniList": ""
+    },
+    {
+      "slug": "the-ultimate-weapon-returns-after-100-million-years",
+      "arabic": "عودة السلاح النهائي بعد مئة مليون عام",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Ultimate Weapon Returns After 100 Million Years",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "kaoru-hana-wa-rin-to-saku",
+      "arabic": "الزهرة العطرة تتفتح بكرامة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kaoru Hana Wa Rin to Saku",
+      "confidence": 0.23076923076923073,
+      "mangaDex": "The Fragrant Flower Blooms with Dignity",
+      "aniList": ""
+    },
+    {
+      "slug": "past-live-regressor-remake",
+      "arabic": "العائد من حياة سابقة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Past Live Regressor Remake",
+      "confidence": 0.7307692307692308,
+      "mangaDex": "Past Life Regressor (2022)",
+      "aniList": ""
+    },
+    {
+      "slug": "1",
+      "arabic": "إلى من لا يرى نفسه شئ1",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "1",
+      "confidence": 0.038461538461538436,
+      "mangaDex": "FAIRY TAIL: 100 Years Quest",
+      "aniList": ""
+    },
+    {
+      "slug": "shinigami-no-hanayome-yomei-7-nichi-kara-no-koufuku",
+      "arabic": "عروس إله الموت",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shinigami No Hanayome Yomei 7 Nichi Kara No Koufuku",
+      "confidence": 0.21875,
+      "mangaDex": "The Bride of the Death God: Happiness from My 7 Days Left to Live",
+      "aniList": ""
+    },
+    {
+      "slug": "the-fable-the-third-secret",
+      "arabic": "ذا فابل: السر الثالث",
+      "english": "The Fable: The third secret",
+      "method": "MangaDex",
+      "candidate": "The Fable the Third Secret",
+      "confidence": 1
+    },
+    {
+      "slug": "sword-king-high-school-the-talentless-underachiever-becomes-the-strongest",
+      "arabic": "ثانوية سيف الأساطير: الفاشل بلا موهبة يصبح الأقوى",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Sword King High School the Talentless Underachiever Becomes the Strongest",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "dao-of-the-bizarre-immortal",
+      "arabic": "الخالدون الجامحون",
+      "english": "Dao of the Bizarre Immortal",
+      "method": "MangaDex",
+      "candidate": "Dao of the Bizarre Immortal",
+      "confidence": 1
+    },
+    {
+      "slug": "how-a-terminally-ill-genius-survives",
+      "arabic": "نجاة العبقري في الوقت المستعار",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "How a Terminally ILL Genius Survives",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "rise-of-the-devourer-king",
+      "arabic": "صعود الملتهم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rise of the Devourer King",
+      "confidence": 0.5517241379310345,
+      "mangaDex": "The Glutton: Devourer of Kings",
+      "aniList": ""
+    },
+    {
+      "slug": "one-piece-episode-a",
+      "arabic": "ون بيس: قصة آيس",
+      "english": "One Piece Episode A",
+      "method": "MangaDex",
+      "candidate": "One Piece Episode a",
+      "confidence": 1
+    },
+    {
+      "slug": "osananajimi-to-koisuru-hohou",
+      "arabic": "كيف تقع في حب صديق طفولتك",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Osananajimi to Koisuru Hohou",
+      "confidence": 0.25373134328358204,
+      "mangaDex": "Munching ♡ Kanna-chan ~A recipe for making gyaru fall in love with you~",
+      "aniList": ""
+    },
+    {
+      "slug": "the-main-heroines-are-trying-to-kill-me",
+      "arabic": "البطلات يريدونني ميتا!",
+      "english": "The Main Heroines Are Trying to Kill Me",
+      "method": "MangaDex",
+      "candidate": "The Main Heroines Are Trying to Kill Me",
+      "confidence": 1
+    },
+    {
+      "slug": "whats-our-hero-doing",
+      "arabic": "ماذا يفعل بطلنا؟",
+      "english": "What's Our Hero Doing?",
+      "method": "MangaDex",
+      "candidate": "Whats Our Hero Doing",
+      "confidence": 0.9523809523809523
+    },
+    {
+      "slug": "apocalypse-bringer-mynoghra",
+      "arabic": "مينوغرا، جالب نهاية العالم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Apocalypse Bringer Mynoghra",
+      "confidence": 0.3417721518987342,
+      "mangaDex": "Apocalypse Bringer Mynoghra: World Conquest Starts with the Civilization of Ruin",
+      "aniList": ""
+    },
+    {
+      "slug": "fate-type-redline",
+      "arabic": "فيت/تايب ريدلاين",
+      "english": "Fate/type Redline",
+      "method": "MangaDex",
+      "candidate": "Fate Type Redline",
+      "confidence": 1
+    },
+    {
+      "slug": "salon-diana",
+      "arabic": "صالون ديانا",
+      "english": "Salon Diana",
+      "method": "MangaDex",
+      "candidate": "Salon Diana",
+      "confidence": 1
+    },
+    {
+      "slug": "revenge-of-the-top-ranker",
+      "arabic": "الانتقام من أعلى رتبة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Revenge of the Top Ranker",
+      "confidence": 0.4878048780487805,
+      "mangaDex": "A Tale of Revenge of the Incompetent Hero",
+      "aniList": ""
+    },
+    {
+      "slug": "return-of-the-apocalypse-class-death-knight",
+      "arabic": "عودة فارس الموت بمستوى نهاية العالم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Return of the Apocalypse Class Death Knight",
+      "confidence": 0.813953488372093,
+      "mangaDex": "Return of the Calamity-Class Death Knight",
+      "aniList": ""
+    },
+    {
+      "slug": "a-wimps-strategy-guide-to-conquer-the-tower",
+      "arabic": "دليل الجبان لغزو البرج",
+      "english": "A Wimp’s Strategy Guide to Conquer the Tower",
+      "method": "MangaDex",
+      "candidate": "A Wimps Strategy Guide to Conquer the Tower",
+      "confidence": 0.9772727272727273
+    },
+    {
+      "slug": "baby-steps",
+      "arabic": "خطوات صغيرة",
+      "english": "Baby Steps",
+      "method": "MangaDex",
+      "candidate": "Baby Steps",
+      "confidence": 1
+    },
+    {
+      "slug": "requiem-of-the-shogun",
+      "arabic": "مرثية الشوغون",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Requiem of the Shogun",
+      "confidence": 0.7307692307692308,
+      "mangaDex": "Requiem of the Shinsengumi",
+      "aniList": ""
+    },
+    {
+      "slug": "black-terror",
+      "arabic": "الرعب الأسود",
+      "english": "Black Terror",
+      "method": "MangaDex",
+      "candidate": "Black Terror",
+      "confidence": 1
+    },
+    {
+      "slug": "noble-lady-reformation-guide",
+      "arabic": "دليل إصلاح السيدة النبيلة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Noble Lady Reformation Guide",
+      "confidence": 0.28125,
+      "mangaDex": "The Lazy Prince Becomes a Genius",
+      "aniList": ""
+    },
+    {
+      "slug": "ikoku-nikki",
+      "arabic": "مذكرات بلد غريب",
+      "english": "Ikoku Nikki",
+      "method": "MangaDex",
+      "candidate": "Ikoku Nikki",
+      "confidence": 1
+    },
+    {
+      "slug": "the-youngest-daughter-of-the-great-magician-of-a-famous-swordsmanship-family",
+      "arabic": "الابنة الصغرى للساحر العظيم من عائلة المبارزة الشهيرة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Youngest Daughter of the Great Magician of a Famous Swordsmanship Family",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "hello-lady",
+      "arabic": "مرحباً سيدتي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hello Lady",
+      "confidence": 0.6666666666666667,
+      "mangaDex": "Hello! Lady Lynn",
+      "aniList": ""
+    },
+    {
+      "slug": "kengan-ashua",
+      "arabic": "كينغان أشورا",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kengan Ashua",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "fate-prototype-sougin-no-fragments",
+      "arabic": "فيت/بروتوتايب: شظايا الفضة",
+      "english": "Fate/Prototype: Sougin no Fragments",
+      "method": "MangaDex",
+      "candidate": "Fate Prototype Sougin No Fragments",
+      "confidence": 1
+    },
+    {
+      "slug": "the-ruler-of-darkness",
+      "arabic": "سيد الظلام",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Ruler of Darkness",
+      "confidence": 0.7727272727272727,
+      "mangaDex": "The Wizard of Darkness",
+      "aniList": ""
+    },
+    {
+      "slug": "shin-garouden",
+      "arabic": "شين جارودين",
+      "english": "Shin Garouden",
+      "method": "MangaDex",
+      "candidate": "Shin Garouden",
+      "confidence": 1
+    },
+    {
+      "slug": "swordsman-of-sichuan-tang-family",
+      "arabic": "السيد الشاب لعائلة تانغ بمستوى إله السيف",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Swordsman of Sichuan Tang Family",
+      "confidence": 0.4626865671641791,
+      "mangaDex": "Becoming the Swordmaster Rank Young Lord of the Sichuan Tang Family",
+      "aniList": ""
+    },
+    {
+      "slug": "midnight-rhapsody",
+      "arabic": "رابسودي منتصف الليل",
+      "english": "Midnight Rhapsody",
+      "method": "MangaDex",
+      "candidate": "Midnight Rhapsody",
+      "confidence": 1
+    },
+    {
+      "slug": "with-you-through-the-window",
+      "arabic": "معك من خلال النافذة",
+      "english": "With You Through the Window",
+      "method": "MangaDex",
+      "candidate": "With You Through the Window",
+      "confidence": 1
+    },
+    {
+      "slug": "shadows-house",
+      "arabic": "بيت الظلال",
+      "english": "Shadows House × Kuro",
+      "method": "MangaDex",
+      "candidate": "Shadows House",
+      "confidence": 0.9777777777777779
+    },
+    {
+      "slug": "hero-i-quit-that-a-long-time-ago",
+      "arabic": "اعتزلت البطولة منذ زمن",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hero I Quit That a Long Time Ago",
+      "confidence": 0.84375,
+      "mangaDex": "Hero? I Quit a Long Time Ago",
+      "aniList": ""
+    },
+    {
+      "slug": "a-spy-s-survival-in-the-demonic-cult",
+      "arabic": "حياة جاسوس في الطائفة الشيطانية",
+      "english": "A Spy's Survival in the Demonic Cult",
+      "method": "MangaDex",
+      "candidate": "A Spy S Survival in the Demonic Cult",
+      "confidence": 1
+    },
+    {
+      "slug": "super-dragon-ball-heroes-meteor-mission",
+      "arabic": "سوبر دراغون بول هيروز: مهمّة النيزك",
+      "english": "Super Dragon Ball Heroes: Meteor Mission!",
+      "method": "MangaDex",
+      "candidate": "Super Dragon Ball Heroes Meteor Mission",
+      "confidence": 1
+    },
+    {
+      "slug": "bungou-stray-dogs-the-day-i-picked-up-dazai",
+      "arabic": "كلاب بونغو الضالة: اليوم الذي أخذت فيه دازاي",
+      "english": "Bungou Stray Dogs: The Day I Picked Up Dazai",
+      "method": "MangaDex",
+      "candidate": "Bungou Stray Dogs the Day I Picked Up Dazai",
+      "confidence": 1
+    },
+    {
+      "slug": "souten-no-ken",
+      "arabic": "قبضة السماء الزرقاء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Souten No Ken",
+      "confidence": 0.5416666666666667,
+      "mangaDex": "Souten no Ken - Re:Genesis",
+      "aniList": ""
+    },
+    {
+      "slug": "doukutsu-ou-kara-hajimeru-rakuen-life",
+      "arabic": "حياة الفردوس تبدأ من ملك الكهف",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Doukutsu Ou Kara Hajimeru Rakuen Life",
+      "confidence": 0.3571428571428571,
+      "mangaDex": "The King of Cave Will Live a Paradise Life",
+      "aniList": ""
+    },
+    {
+      "slug": "beyblade-burst",
+      "arabic": "بيبليد بيرست",
+      "english": "Beyblade Burst",
+      "method": "MangaDex",
+      "candidate": "Beyblade Burst",
+      "confidence": 1
+    },
+    {
+      "slug": "detective-conan-police-academy-arc",
+      "arabic": "المحقق كونان: قوس أكاديمية الشرطة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Detective Conan Police Academy Arc",
+      "confidence": 0.6538461538461539,
+      "mangaDex": "Detective Conan: Police Academy Arc Wild Police Story",
+      "aniList": ""
+    },
+    {
+      "slug": "rebirth-of-the-urban-immortal-emperor",
+      "arabic": "عودة إمبراطور الخلود الحضري",
+      "english": "Rebirth of the Urban Immortal Emperor",
+      "method": "MangaDex",
+      "candidate": "Rebirth of the Urban Immortal Emperor",
+      "confidence": 1
+    },
+    {
+      "slug": "omukae-shibuya",
+      "arabic": "أهلاً شيبويا",
+      "english": "Omukae Shibuya-kun",
+      "method": "MangaDex",
+      "candidate": "Omukae Shibuya",
+      "confidence": 0.9822222222222222
+    },
+    {
+      "slug": "beyond-the-bad-dream",
+      "arabic": "ما بعد الحلم السيئ",
+      "english": "Beyond the Bad Dream...",
+      "method": "MangaDex",
+      "candidate": "Beyond the Bad Dream",
+      "confidence": 1
+    },
+    {
+      "slug": "the-villain-wants-to-live",
+      "arabic": "الشرير يريد أن يعيش",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Villain Wants to Live",
+      "confidence": 0.53125,
+      "mangaDex": "The Hunter Wants to Live Quietly",
+      "aniList": ""
+    },
+    {
+      "slug": "lucifer-no-migite",
+      "arabic": "يمين لوسيفر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Lucifer No Migite",
+      "confidence": 0.55,
+      "mangaDex": "Lucifer's Right Hand",
+      "aniList": ""
+    },
+    {
+      "slug": "tefuda-ga-oume-no-victoria",
+      "arabic": "فيكتوريا صاحبة الأوراق الرابحة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Tefuda Ga Oume No Victoria",
+      "confidence": 0.23076923076923073,
+      "mangaDex": "Victoria of Many Faces",
+      "aniList": ""
+    },
+    {
+      "slug": "kaijuu-kamui",
+      "arabic": "كايجو كاموي",
+      "english": "Kaiju Kamui",
+      "method": "MangaDex",
+      "candidate": "Kaijuu Kamui",
+      "confidence": 0.9166666666666666
+    },
+    {
+      "slug": "chiyoku-no-karyudo",
+      "arabic": "تشيوكو نو كاريودو",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Chiyoku No Karyudo",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "love-thy-neighbou",
+      "arabic": "أحبب جارك",
+      "english": "Love Thy Neighbour",
+      "method": "MangaDex",
+      "candidate": "Love Thy Neighbou",
+      "confidence": 0.9955555555555556
+    },
+    {
+      "slug": "star-instructor-master-baek",
+      "arabic": "المدرب النجم بايك",
+      "english": "Star Instructor, Master Baek",
+      "method": "MangaDex",
+      "candidate": "Star Instructor Master Baek",
+      "confidence": 1
+    },
+    {
+      "slug": "beastars",
+      "arabic": "بيستارز",
+      "english": "BEASTARS",
+      "method": "MangaDex",
+      "candidate": "Beastars",
+      "confidence": 1
+    },
+    {
+      "slug": "the-case-study-of-vanitas",
+      "arabic": "مذكّرة فانيتاس",
+      "english": "The Case Study of Vanitas",
+      "method": "MangaDex",
+      "candidate": "The Case Study of Vanitas",
+      "confidence": 1
+    },
+    {
+      "slug": "haikyuu-bu",
+      "arabic": "نادي هايكيو!!",
+      "english": "Haikyu-bu!!",
+      "method": "MangaDex",
+      "candidate": "Haikyuu Bu",
+      "confidence": 0.9
+    },
+    {
+      "slug": "1a",
+      "arabic": "اسطورة الكتاب المسروق1a",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "1a",
+      "confidence": 0.33333333333333337,
+      "mangaDex": "Aya",
+      "aniList": ""
+    },
+    {
+      "slug": "code-geass-lelouch-of-the-rebellion",
+      "arabic": "كود غياس: ليلوش المتمرّد",
+      "english": "Code Geass: Lelouch of the Rebellion",
+      "method": "MangaDex",
+      "candidate": "Code Geass Lelouch of the Rebellion",
+      "confidence": 1
+    },
+    {
+      "slug": "one-step-closer-to-the-demon-king",
+      "arabic": "خطوة واحدة نحو ملك الشياطين",
+      "english": "One Step Closer to the Demon King",
+      "method": "MangaDex",
+      "candidate": "One Step Closer to the Demon King",
+      "confidence": 1
+    },
+    {
+      "slug": "baki-gaiden-kenjin-2",
+      "arabic": "باكي جايدن: كينجين",
+      "english": "Baki Gaiden: Kenjin",
+      "method": "MangaDex",
+      "candidate": "Baki Gaiden Kenjin 2",
+      "confidence": 0.992
+    },
+    {
+      "slug": "piano-forest",
+      "arabic": "غابة البيانو",
+      "english": "Piano Forest",
+      "method": "MangaDex",
+      "candidate": "Piano Forest",
+      "confidence": 1
+    },
+    {
+      "slug": "genshin-impact",
+      "arabic": "غينشن إمباكت",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Genshin Impact",
+      "confidence": 0.6666666666666667,
+      "mangaDex": "Genshin Impact 4-koma",
+      "aniList": ""
+    },
+    {
+      "slug": "call-of-the-night-paradise-arc",
+      "arabic": "أغنية السهر — فصل الفردوس",
+      "english": "Call of the Night: Paradise Arc",
+      "method": "MangaDex",
+      "candidate": "Call of the Night Paradise Arc",
+      "confidence": 1
+    },
+    {
+      "slug": "arm-of-the-abomination",
+      "arabic": "ذراع الرجس",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Arm of the Abomination",
+      "confidence": 0.34693877551020413,
+      "mangaDex": "Classroom of the Elite 2nd Year Edition 2nd Stage",
+      "aniList": ""
+    },
+    {
+      "slug": "a-returners-magic-should-bespecial",
+      "arabic": "سحر العائد استثنائي",
+      "english": "A Returner's Magic Should Be Special",
+      "method": "MangaDex",
+      "candidate": "A Returners Magic Should Bespecial",
+      "confidence": 0.9444444444444444
+    },
+    {
+      "slug": "maigo-ni-natte-ita-youjou-wo-tasuketara-otonari-ni-sumu-bishoujou",
+      "arabic": "أنقذت طفلة ضائعة، فإذا بالفتاة الجميلة التي تسكن بجواري",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Maigo Ni Natte Ita Youjou Wo Tasuketara Otonari Ni Sumu Bishoujou",
+      "confidence": 0.2338709677419355,
+      "mangaDex": "The Story of How a Beautiful Foreign Student Who Lives Next Door Started to Visit My House After I Helped a Lost Little Girl",
+      "aniList": ""
+    },
+    {
+      "slug": "planetes",
+      "arabic": "بلانيتس",
+      "english": "Planetes",
+      "method": "MangaDex",
+      "candidate": "Planetes",
+      "confidence": 1
+    },
+    {
+      "slug": "invasion-of-the-myriad-races",
+      "arabic": "غزو الأجناس العديدة: بترويض وحشٍ أسطوري",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Invasion of the Myriad Races",
+      "confidence": 0.4307692307692308,
+      "mangaDex": "Invasion of the Myriad Races: Starting by Taming a Legendary Beast",
+      "aniList": ""
+    },
+    {
+      "slug": "frieren-beyond-journeys-end",
+      "arabic": "فرييرن: ما بعد نهاية الرحلة",
+      "english": "Frieren: Beyond Journey's End",
+      "method": "MangaDex",
+      "candidate": "Frieren Beyond Journeys End",
+      "confidence": 0.9642857142857143
+    },
+    {
+      "slug": "girl-of-the-time",
+      "arabic": "فتاة العصر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Girl of the Time",
+      "confidence": 0.2666666666666667,
+      "mangaDex": "The Story of a Scary Consignee",
+      "aniList": ""
+    },
+    {
+      "slug": "weak-hero",
+      "arabic": "البطل الضعيف",
+      "english": "Weak Hero",
+      "method": "MangaDex",
+      "candidate": "Weak Hero",
+      "confidence": 1
+    },
+    {
+      "slug": "doctor-reborn",
+      "arabic": "طبيب يُبعث من جديد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Doctor Reborn",
+      "confidence": 0.21739130434782605,
+      "mangaDex": "The Reborn Super Doctor",
+      "aniList": ""
+    },
+    {
+      "slug": "tousei-gensou",
+      "arabic": "موسوعة أوهام هذا العصر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Tousei Gensou",
+      "confidence": 0.21875,
+      "mangaDex": "History of Present Day Illusions",
+      "aniList": ""
+    },
+    {
+      "slug": "reincarnated-as-a-genius-prodigy-of-a-prestigious-family",
+      "arabic": "التناسخ كعبقريٍّ نابغة في عائلةٍ عريقة",
+      "english": "Reincarnated as a Genius Prodigy of a Prestigious Family",
+      "method": "MangaDex",
+      "candidate": "Reincarnated as a Genius Prodigy of a Prestigious Family",
+      "confidence": 1
+    },
+    {
+      "slug": "the-new-beggars-sect",
+      "arabic": "طائفة المتسولين الجديدة",
+      "english": "The New Beggars' Sect",
+      "method": "MangaDex",
+      "candidate": "The New Beggars Sect",
+      "confidence": 1
+    },
+    {
+      "slug": "damn-demonic-swords",
+      "arabic": "السيوف الشيطانية اللعينة",
+      "english": "Damn Demonic Swords",
+      "method": "MangaDex",
+      "candidate": "Damn Demonic Swords",
+      "confidence": 1
+    },
+    {
+      "slug": "the-horizon",
+      "arabic": "الأفق",
+      "english": "The Horizon",
+      "method": "MangaDex",
+      "candidate": "The Horizon",
+      "confidence": 1
+    },
+    {
+      "slug": "everyone-start-with-synthesizing-the-undead-army",
+      "arabic": "الجميع يبدأ بتجميع جيش الموتى",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Everyone Start with Synthesizing the Undead Army",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "surviving-the-heat-apocalypse-with-my-god-tier-safehouse",
+      "arabic": "النجاة من كارثة الحرارة بملجئي الأسطوري",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Surviving the Heat Apocalypse with My God Tier Safehouse",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "i-gained-power-in-a-post-apocalyptic-world",
+      "arabic": "اكتسبت القوة في عالم ما بعد الكارثة وأصبحت الأقوى في العالم الحقيقي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "I Gained Power in a Post Apocalyptic World",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "dragon-ball-episode-of-bardock",
+      "arabic": "دراغون بول: حلقة باردوك",
+      "english": "Dragon Ball - Episode of Bardock",
+      "method": "MangaDex",
+      "candidate": "Dragon Ball Episode of Bardock",
+      "confidence": 1
+    },
+    {
+      "slug": "psycho-pass-kanshikan-kogami-shinya",
+      "arabic": "سايكو باس: المفتش شينيا كوغامي",
+      "english": "Psycho-Pass - Kanshikan Kougami Shinya",
+      "method": "MangaDex",
+      "candidate": "Psycho Pass Kanshikan Kogami Shinya",
+      "confidence": 0.9722222222222222
+    },
+    {
+      "slug": "apocalyptic-chef-awakening",
+      "arabic": "طاهي العالم المنهار",
+      "english": "Apocalyptic Chef Awakening",
+      "method": "MangaDex",
+      "candidate": "Apocalyptic Chef Awakening",
+      "confidence": 1
+    },
+    {
+      "slug": "sekai-no-ai",
+      "arabic": "كلمة سر العالم ماء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Sekai No Ai",
+      "confidence": 0.41666666666666663,
+      "mangaDex": "From a Monochrome World, With Love",
+      "aniList": "Sekai wa Ai wo Sukuwanai"
+    },
+    {
+      "slug": "i-became-the-tyrant-of-a-defense-game",
+      "arabic": "طاغية لعبة الدفاع",
+      "english": "I Became the Tyrant of a Defense Game",
+      "method": "MangaDex",
+      "candidate": "I Became the Tyrant of a Defense Game",
+      "confidence": 1
+    },
+    {
+      "slug": "the-heavenly-demons-apocalypse",
+      "arabic": "نهاية العالم للشيطان السماوي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Heavenly Demons Apocalypse",
+      "confidence": 0.5294117647058824,
+      "mangaDex": "The Great Heavenly Demon Sovereign",
+      "aniList": ""
+    },
+    {
+      "slug": "tokyo-ghoul-draft",
+      "arabic": "مسودة طوكيو غول",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Tokyo Ghoul Draft",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-max-level-hero-has-returned",
+      "arabic": "البطل الأقصى مستوًى سيعود!",
+      "english": "The Max Level Hero Has Returned!",
+      "method": "MangaDex",
+      "candidate": "The Max Level Hero Has Returned",
+      "confidence": 1
+    },
+    {
+      "slug": "archmage-transcending-through-regression",
+      "arabic": "كبير السحرة يتجاوز بالرجوع",
+      "english": "Archmage Transcending Through Regression",
+      "method": "MangaDex",
+      "candidate": "Archmage Transcending Through Regression",
+      "confidence": 1
+    },
+    {
+      "slug": "kara-no-kyoukai-the-garden-of-sinners",
+      "arabic": "حديقة الآثمين",
+      "english": "Kara no Kyoukai: the Garden of sinners",
+      "method": "MangaDex",
+      "candidate": "Kara No Kyoukai the Garden of Sinners",
+      "confidence": 1
+    },
+    {
+      "slug": "hunter-age",
+      "arabic": "عصر الصيّاد",
+      "english": "Hunter Age",
+      "method": "MangaDex",
+      "candidate": "Hunter Age",
+      "confidence": 1
+    },
+    {
+      "slug": "until-i-meet-you",
+      "arabic": "حتى ألتقي بك",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Until I Meet You",
+      "confidence": 0.625,
+      "mangaDex": "Unnie, I like you!",
+      "aniList": ""
+    },
+    {
+      "slug": "mount-hua-sects-genius-phantom-swordsman",
+      "arabic": "عبقري سيف هواشان الشبحي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Mount Hua Sects Genius Phantom Swordsman",
+      "confidence": 0.25,
+      "mangaDex": "The Genius Swordsman of Mount Hua",
+      "aniList": ""
+    },
+    {
+      "slug": "the-youngest-son-of-the-eunhae-merchant-group",
+      "arabic": "الابن الأصغر لتجّار أونهاه",
+      "english": "The Youngest Son of the Eunhae Merchant Group",
+      "method": "MangaDex",
+      "candidate": "The Youngest Son of the Eunhae Merchant Group",
+      "confidence": 1
+    },
+    {
+      "slug": "murims-youngest-miracle-demon-doctor",
+      "arabic": "أصغر طبيب شيطاني في الموريم",
+      "english": "Murim's Youngest Miracle Demon Doctor",
+      "method": "MangaDex",
+      "candidate": "Murims Youngest Miracle Demon Doctor",
+      "confidence": 0.972972972972973
+    },
+    {
+      "slug": "the-tang-clan-chronicles",
+      "arabic": "سجلات عشيرة تانغ",
+      "english": "The Tang Clan Chronicles",
+      "method": "MangaDex",
+      "candidate": "The Tang Clan Chronicles",
+      "confidence": 1
+    },
+    {
+      "slug": "what-a-bountiful-harvest-demon-lord",
+      "arabic": "يا له من حصادٍ وفير، يا سيّد الشياطين!",
+      "english": "What a Bountiful Harvest, Demon Lord!",
+      "method": "MangaDex",
+      "candidate": "What a Bountiful Harvest Demon Lord",
+      "confidence": 1
+    },
+    {
+      "slug": "code-geass-nightmare-of-nunnally",
+      "arabic": "كود غياس: كابوس نانالي",
+      "english": "Code Geass: Nightmare of Nunnally",
+      "method": "MangaDex",
+      "candidate": "Code Geass Nightmare of Nunnally",
+      "confidence": 1
+    },
+    {
+      "slug": "i-became-the-berserker-of-the-world-i-created",
+      "arabic": "صرتُ المحارب الهائج في العالم الذي ابتكرته",
+      "english": "I Became the Berserker of the World I Created",
+      "method": "AniList",
+      "candidate": "I Became the Berserker of the World I Created",
+      "confidence": 1
+    },
+    {
+      "slug": "omniscient-cultivator",
+      "arabic": "سالك الخلود كلّي المعرفة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Omniscient Cultivator",
+      "confidence": 0.7,
+      "mangaDex": "Omniscient Immortal Cultivator",
+      "aniList": "Omniscient Immortal Cultivator"
+    },
+    {
+      "slug": "the-genius-midfielder-s-passes-are-special",
+      "arabic": "عبقري خط الوسط ذو التمريرات القاتلة",
+      "english": "The Genius Midfielder’s Passes are Special",
+      "method": "MangaDex",
+      "candidate": "The Genius Midfielder S Passes Are Special",
+      "confidence": 1
+    },
+    {
+      "slug": "suspicion-of-plagiarism",
+      "arabic": "شبهة انتحال",
+      "english": "Suspicion of Plagiarism",
+      "method": "MangaDex",
+      "candidate": "Suspicion of Plagiarism",
+      "confidence": 1
+    },
+    {
+      "slug": "genius-bastard-of-the-dark-clan",
+      "arabic": "صرتُ نابغة العائلة المظلمة المستهتر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Genius Bastard of the Dark Clan",
+      "confidence": 0.6041666666666667,
+      "mangaDex": "I Became the Genius Bastard of a Noble Dark Clan",
+      "aniList": "The Unorthodox Genius of the House of Darkness"
+    },
+    {
+      "slug": "the-strongest-level-0",
+      "arabic": "الأقوى في المستوى صفر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Strongest Level 0",
+      "confidence": 0.5121951219512195,
+      "mangaDex": "Level 0 Demon King Becomes an Adventurer in Another World",
+      "aniList": "INFINITE DECRYPTION: THE STRONGEST LEVEL 0"
+    },
+    {
+      "slug": "barakamon",
+      "arabic": "باراكامون",
+      "english": "Barakamon",
+      "method": "MangaDex",
+      "candidate": "Barakamon",
+      "confidence": 1
+    },
+    {
+      "slug": "lunch-doki-wa-koishi-doki",
+      "arabic": "وقت الغداء، وقت الحب",
+      "english": "Lunch doki wa koishi doki",
+      "method": "MangaDex",
+      "candidate": "Lunch Doki Wa Koishi Doki",
+      "confidence": 1
+    },
+    {
+      "slug": "yoru-no-manimani",
+      "arabic": "ليالينا بلا هدف",
+      "english": "Our Aimless Nights",
+      "method": "AniList",
+      "candidate": "Yoru No Manimani",
+      "confidence": 1
+    },
+    {
+      "slug": "مصير-القارئ",
+      "arabic": "مصير القارئ",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "مصير القارئ",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "return-of-the-runebound-professor",
+      "arabic": "عودة أستاذ الرونيات",
+      "english": "Return of the Runebound Professor",
+      "method": "MangaDex",
+      "candidate": "Return of the Runebound Professor",
+      "confidence": 1
+    },
+    {
+      "slug": "the-marriage-of-the-unseen-duke",
+      "arabic": "زواج الدوق غير المرئي",
+      "english": "The Marriage of the Unseen Duke",
+      "method": "MangaDex",
+      "candidate": "The Marriage of the Unseen Duke",
+      "confidence": 1
+    },
+    {
+      "slug": "never-mind-the-heir-ill-focus-on-healing",
+      "arabic": "لا تهتم بالوريث، سأركز على الشفاء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Never Mind the Heir ILL Focus on Healing",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "omoide-poro-poro",
+      "arabic": "ذكريات متساقطة",
+      "english": "Omoide Poro Poro",
+      "method": "AniList",
+      "candidate": "Omoide Poro Poro",
+      "confidence": 1
+    },
+    {
+      "slug": "fasl-al-nukhba",
+      "arabic": "فصل النخبة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Fasl Al Nukhba",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "i-alone-am-the-real-chaebol",
+      "arabic": "أنا وحدي تشايبول الحقيقي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "I Alone Am the Real Chaebol",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadow-city",
+      "arabic": "ظل المدينة اللامع",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadow City",
+      "confidence": 0.17948717948717952,
+      "mangaDex": "Blue Dragon: Battle in the Floating City",
+      "aniList": ""
+    },
+    {
+      "slug": "munou-na-nana",
+      "arabic": "نانا عديمة الموهبة",
+      "english": "Munou na Nana",
+      "method": "MangaDex",
+      "candidate": "Munou Na Nana",
+      "confidence": 1
+    },
+    {
+      "slug": "boukyaku-battery",
+      "arabic": "بطارية النسيان",
+      "english": "Oblivion Battery",
+      "method": "AniList",
+      "candidate": "Boukyaku Battery",
+      "confidence": 1
+    },
+    {
+      "slug": "a-journal-of-my-father",
+      "arabic": "يوميّات أبي",
+      "english": "A Journal Of My Father",
+      "method": "MangaDex",
+      "candidate": "A Journal of My Father",
+      "confidence": 1
+    },
+    {
+      "slug": "attack-on-titan-requiem",
+      "arabic": "هجوم العمالقة: قدّاس الفجر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Attack on Titan Requiem",
+      "confidence": 0.6521739130434783,
+      "mangaDex": "Attack on Titan",
+      "aniList": ""
+    },
+    {
+      "slug": "the-red-yaksha",
+      "arabic": "الياكشا الأحمر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Red Yaksha",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "chis-sweet-home",
+      "arabic": "تشي: بيتنا الصغير",
+      "english": "Chi's Sweet Home",
+      "method": "MangaDex",
+      "candidate": "Chis Sweet Home",
+      "confidence": 0.9375
+    },
+    {
+      "slug": "sherlock-a-study-in-pink",
+      "arabic": "شيرلوك: دراسة في اللون الوردي",
+      "english": "Sherlock: A Study in Pink",
+      "method": "MangaDex",
+      "candidate": "Sherlock a Study in Pink",
+      "confidence": 1
+    },
+    {
+      "slug": "fighting-girls",
+      "arabic": "فايتينغ غيرلز",
+      "english": "Fighting Girls",
+      "method": "MangaDex",
+      "candidate": "Fighting Girls",
+      "confidence": 1
+    },
+    {
+      "slug": "killing-guard",
+      "arabic": "الحارس الذي يسبق الخطر",
+      "english": "Killing Guard",
+      "method": "AniList",
+      "candidate": "Killing Guard",
+      "confidence": 1
+    },
+    {
+      "slug": "mizutamari",
+      "arabic": "جزيرة في بركة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Mizutamari",
+      "confidence": 0.4,
+      "mangaDex": "Boku no Hero Academia - Puddled Fermata (Doujinshi)",
+      "aniList": "Island in a Puddle"
+    },
+    {
+      "slug": "amata",
+      "arabic": "أماتا",
+      "english": "Amata",
+      "method": "MangaDex",
+      "candidate": "Amata",
+      "confidence": 1
+    },
+    {
+      "slug": "gakuen-babysitters",
+      "arabic": "مربية الأكاديمية",
+      "english": "Gakuen Babysitters",
+      "method": "MangaDex",
+      "candidate": "Gakuen Babysitters",
+      "confidence": 1
+    },
+    {
+      "slug": "kodomo",
+      "arabic": "طفل بالغ",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kodomo",
+      "confidence": 0.4285714285714286,
+      "mangaDex": "Kodomo Dorobou",
+      "aniList": "Kodomo no Kodomo"
+    },
+    {
+      "slug": "inkling-alice",
+      "arabic": "إنكلينغ أليس",
+      "english": "Inkling Alice",
+      "method": "MangaDex",
+      "candidate": "Inkling Alice",
+      "confidence": 1
+    },
+    {
+      "slug": "jujutsu-kaisen-dj-toumin",
+      "arabic": "بيات شتوي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Jujutsu Kaisen Dj Toumin",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "mortal-kombat-x",
+      "arabic": "مورتال كومبات X",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Mortal Kombat X",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-return-of-the-back-alley-sorcerer",
+      "arabic": "عودة ساحر الأزقّة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Return of the Back Alley Sorcerer",
+      "confidence": 0.7027027027027026,
+      "mangaDex": "Return of the Back Alley Wizard",
+      "aniList": ""
+    },
+    {
+      "slug": "ordinary-emperor",
+      "arabic": "الإمبراطور العادي",
+      "english": "Ordinary Emperor",
+      "method": "MangaDex",
+      "candidate": "Ordinary Emperor",
+      "confidence": 1
+    },
+    {
+      "slug": "planet-of-wheat",
+      "arabic": "كوكب القمح",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Planet of Wheat",
+      "confidence": 0.7894736842105263,
+      "mangaDex": "Planet of the Wheat",
+      "aniList": "Planet of the Wheat"
+    },
+    {
+      "slug": "makui-no",
+      "arabic": "ماكي نو رياس",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Makui No",
+      "confidence": 0.5714285714285714,
+      "mangaDex": "Machino-san, Waiting for a Comeback",
+      "aniList": "Makui no Rease"
+    },
+    {
+      "slug": "hoshizora-no-karasu",
+      "arabic": "غراب سماء النجوم",
+      "english": "Hoshizora no Karasu",
+      "method": "AniList",
+      "candidate": "Hoshizora No Karasu",
+      "confidence": 1
+    },
+    {
+      "slug": "dear-anemone",
+      "arabic": "عزيزي أنيمون",
+      "english": "Dear Anemone",
+      "method": "MangaDex",
+      "candidate": "Dear Anemone",
+      "confidence": 1
+    },
+    {
+      "slug": "red-hood",
+      "arabic": "الرداء الأحمر",
+      "english": "Red Hood",
+      "method": "MangaDex",
+      "candidate": "Red Hood",
+      "confidence": 1
+    },
+    {
+      "slug": "versus",
+      "arabic": "فيرسوس",
+      "english": "Versus",
+      "method": "MangaDex",
+      "candidate": "Versus",
+      "confidence": 1
+    },
+    {
+      "slug": "somali",
+      "arabic": "سومالي وروح الغابة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Somali",
+      "confidence": 0.26086956521739135,
+      "mangaDex": "Somali and the Forest Spirit",
+      "aniList": "Somali and the Forest Spirit"
+    },
+    {
+      "slug": "eighty-six",
+      "arabic": "ستة وثمانون",
+      "english": "86—EIGHTY-SIX",
+      "method": "MangaDex",
+      "candidate": "Eighty Six",
+      "confidence": 0.9815384615384616
+    },
+    {
+      "slug": "alpen-rose",
+      "arabic": "ورد الألب",
+      "english": "Alpen Rose",
+      "method": "MangaDex",
+      "candidate": "Alpen Rose",
+      "confidence": 1
+    },
+    {
+      "slug": "kimi-no-koe",
+      "arabic": "صوتك",
+      "english": "Kimi no Koe",
+      "method": "AniList",
+      "candidate": "Kimi No Koe",
+      "confidence": 1
+    },
+    {
+      "slug": "dandara-gohan",
+      "arabic": "طعام داندارا",
+      "english": "Dandara Gohan",
+      "method": "MangaDex",
+      "candidate": "Dandara Gohan",
+      "confidence": 1
+    },
+    {
+      "slug": "cool-doji",
+      "arabic": "فتيان رائعون خرقون",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Cool Doji",
+      "confidence": 0.2941176470588235,
+      "mangaDex": "Play It Cool, Guys",
+      "aniList": ""
+    },
+    {
+      "slug": "shrink",
+      "arabic": "شرينك: الطبيب يواي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shrink",
+      "confidence": 0.23529411764705888,
+      "mangaDex": "The Lord of Coins",
+      "aniList": ""
+    },
+    {
+      "slug": "hikari-no-iroha",
+      "arabic": "إيروها النور",
+      "english": "Hikari no Iroha",
+      "method": "MangaDex",
+      "candidate": "Hikari No Iroha",
+      "confidence": 1
+    },
+    {
+      "slug": "boku-dake",
+      "arabic": "المدينة التي أُمحيت منها",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Boku Dake",
+      "confidence": 0.4,
+      "mangaDex": "Four Pages",
+      "aniList": ""
+    },
+    {
+      "slug": "hokuou-kizoku",
+      "arabic": "نبيل الشمال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hokuou Kizoku",
+      "confidence": 0.10256410256410253,
+      "mangaDex": "The Snow Country Hunting Life of the Northern Nobleman and the Eagle-like Wife",
+      "aniList": ""
+    },
+    {
+      "slug": "toorigakari",
+      "arabic": "نصائح الجانح العابر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Toorigakari",
+      "confidence": 0.12,
+      "mangaDex": "A Delinquent's Life Hacks",
+      "aniList": ""
+    },
+    {
+      "slug": "shoujo",
+      "arabic": "فتاة غير مكتملة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shoujo",
+      "confidence": 0.10344827586206895,
+      "mangaDex": "Comrade Girls, Shoot the Enemy",
+      "aniList": ""
+    },
+    {
+      "slug": "rokusen",
+      "arabic": "ستة آلاف",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rokusen",
+      "confidence": 0.1071428571428571,
+      "mangaDex": "6000 - The Deep Sea of Madness",
+      "aniList": ""
+    },
+    {
+      "slug": "killing-morph",
+      "arabic": "مورف القتل",
+      "english": "Killing Morph",
+      "method": "MangaDex",
+      "candidate": "Killing Morph",
+      "confidence": 1
+    },
+    {
+      "slug": "marchen-crown",
+      "arabic": "تاج الحكاية",
+      "english": "Marchen Crown",
+      "method": "MangaDex",
+      "candidate": "Marchen Crown",
+      "confidence": 1
+    },
+    {
+      "slug": "tower-of-god-urek-mazino",
+      "arabic": "تاور أوف غود: يورك مازينو",
+      "english": "Tower of God: Urek Mazino",
+      "method": "MangaDex",
+      "candidate": "Tower of God Urek Mazino",
+      "confidence": 1
+    },
+    {
+      "slug": "yozakura-family",
+      "arabic": "مهمة عائلة يوزاكورا",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Yozakura Family",
+      "confidence": 0.6521739130434783,
+      "mangaDex": "Mission: Yozakura Family",
+      "aniList": ""
+    },
+    {
+      "slug": "gokushufudou",
+      "arabic": "طريقة رب المنزل المتشدد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Gokushufudou",
+      "confidence": 0.2264150943396226,
+      "mangaDex": "Gokushufudou: The Way of the House Husband (Fan Colored)",
+      "aniList": ""
+    },
+    {
+      "slug": "the-enigma-of-amigara-fault",
+      "arabic": "لغز فالق أميغارا",
+      "english": "The Enigma of Amigara Fault",
+      "method": "MangaDex",
+      "candidate": "The Enigma of Amigara Fault",
+      "confidence": 1
+    },
+    {
+      "slug": "hon-nara-uru-hodo-furuhonya-juugatsudou-to-sono-kyaku",
+      "arabic": "كلما بيعت الكتب: مكتبة أكتوبر القديمة وزبائنها",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hon Nara Uru Hodo Furuhonya Juugatsudou to Sono Kyaku",
+      "confidence": 0.19480519480519476,
+      "mangaDex": "All the Books You Can Sell: The Used Book Store October Hall and Its Customers",
+      "aniList": ""
+    },
+    {
+      "slug": "to-aru-majutsu-no-index",
+      "arabic": "فهرس السحر المحرّم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "To Aru Majutsu No Index",
+      "confidence": 0.5555555555555556,
+      "mangaDex": "Toaru Nichijou no Index-san",
+      "aniList": ""
+    },
+    {
+      "slug": "sunny-taiyo-matsumoto",
+      "arabic": "ساني",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Sunny Taiyo Matsumoto",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "administrator-kang-jin-lee",
+      "arabic": "الحاكم لي كانغ جين",
+      "english": "Administrator Kang Jin Lee",
+      "method": "MangaDex",
+      "candidate": "Administrator Kang Jin Lee",
+      "confidence": 1
+    },
+    {
+      "slug": "disappearance-diary",
+      "arabic": "يوميّات الاختفاء",
+      "english": "Disappearance Diary",
+      "method": "MangaDex",
+      "candidate": "Disappearance Diary",
+      "confidence": 1
+    },
+    {
+      "slug": "the-skeleton-became-a-cat-dad",
+      "arabic": "الهيكل العظميّ صار أباً لقطّة",
+      "english": "The Skeleton Becomes a Cat Dad",
+      "method": "MangaDex",
+      "candidate": "The Skeleton Became a Cat Dad",
+      "confidence": 0.9333333333333333
+    },
+    {
+      "slug": "moonlight-hair",
+      "arabic": "شَعر ضوء القمر",
+      "english": "Moonlight Hair",
+      "method": "MangaDex",
+      "candidate": "Moonlight Hair",
+      "confidence": 1
+    },
+    {
+      "slug": "skeleton-warrior",
+      "arabic": "المحارب الهيكل العظميّ",
+      "english": "Skeleton Warrior",
+      "method": "MangaDex",
+      "candidate": "Skeleton Warrior",
+      "confidence": 1
+    },
+    {
+      "slug": "martial-inheritance",
+      "arabic": "ميراث القتال",
+      "english": "Martial Inheritance",
+      "method": "MangaDex",
+      "candidate": "Martial Inheritance",
+      "confidence": 1
+    },
+    {
+      "slug": "to-hell-with-the-status-window",
+      "arabic": "إلى الجحيم مع نافذة الحالة",
+      "english": "To Hell With the Status Window",
+      "method": "MangaDex",
+      "candidate": "To Hell with the Status Window",
+      "confidence": 1
+    },
+    {
+      "slug": "emperor-of-solo-play",
+      "arabic": "إمبراطور اللعب الفردي",
+      "english": "Emperor of Solo Play",
+      "method": "MangaDex",
+      "candidate": "Emperor of Solo Play",
+      "confidence": 1
+    },
+    {
+      "slug": "omniscient-reader",
+      "arabic": "القارئ العليم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Omniscient Reader",
+      "confidence": 0.5862068965517242,
+      "mangaDex": "Omniscient Reader's Viewpoint",
+      "aniList": ""
+    },
+    {
+      "slug": "bug-player",
+      "arabic": "لاعب الأخطاء",
+      "english": "Bug Player",
+      "method": "MangaDex",
+      "candidate": "Bug Player",
+      "confidence": 1
+    },
+    {
+      "slug": "bestiarius",
+      "arabic": "بيستياريوس",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Bestiarius",
+      "confidence": 0.37037037037037035,
+      "mangaDex": "Bestiarius the Beastfighter",
+      "aniList": ""
+    },
+    {
+      "slug": "death-note-pilot-chapter",
+      "arabic": "مذكّرة الموت: الفصل التجريبي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Death Note Pilot Chapter",
+      "confidence": 0.7916666666666666,
+      "mangaDex": "Death Note Extra Chapter",
+      "aniList": ""
+    },
+    {
+      "slug": "monster-eater",
+      "arabic": "آكل الوحوش",
+      "english": "Monster Eater",
+      "method": "MangaDex",
+      "candidate": "Monster Eater",
+      "confidence": 1
+    },
+    {
+      "slug": "one-piece-academy",
+      "arabic": "أكاديمية ون بيس",
+      "english": "One Piece Academy",
+      "method": "MangaDex",
+      "candidate": "One Piece Academy",
+      "confidence": 1
+    },
+    {
+      "slug": "one-million-times-of-suffocation-with-you",
+      "arabic": "مليون مرة من الاختناق معك",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "One Million Times of Suffocation with You",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "kurasu-≪mushoku≫-no-eiyuu-tan-～koushaku-ka-o-tsuihou-sareta-ga-jitsu-wa-nagutta-dake-de-sukiru-o-kakutoku-dekiru-to-wakari-tairiku-ichi-no-eiyuu-ni-noboritsumeru～",
+      "arabic": "سجل بطل من فئة بلا مهنة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kurasu ≪mushoku≫ No Eiyuu Tan ～koushaku Ka O Tsuihou Sareta Ga Jitsu Wa Nagutta Dake De Sukiru O Kakutoku Dekiru to Wakari Tairiku Ichi No Eiyuu Ni Noboritsumeru～",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "you-like-a-sunflower",
+      "arabic": "أنتَ كعبّاد الشمس",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "You Like a Sunflower",
+      "confidence": 0.30000000000000004,
+      "mangaDex": "Poker-Face Junior",
+      "aniList": ""
+    },
+    {
+      "slug": "attack-on-school-castes",
+      "arabic": "هجوم الطبقات المدرسية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Attack on School Castes",
+      "confidence": 0.4137931034482759,
+      "mangaDex": "Attack on Titan! Middle School",
+      "aniList": ""
+    },
+    {
+      "slug": "dragon-ball-kame",
+      "arabic": "دراغون بول كامي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dragon Ball Kame",
+      "confidence": 0.6153846153846154,
+      "mangaDex": "Dragon Ball - Kame (Doujinshi)",
+      "aniList": ""
+    },
+    {
+      "slug": "dragon-ball-rebirth",
+      "arabic": "دراغون بول: البعث",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dragon Ball Rebirth",
+      "confidence": 0.7307692307692308,
+      "mangaDex": "Dragon Ball Z - Rebirth of F",
+      "aniList": ""
+    },
+    {
+      "slug": "return-of-the-genius-swordmaster",
+      "arabic": "عودة سيد السيف العبقري",
+      "english": "Return of The Genius Swordmaster",
+      "method": "MangaDex",
+      "candidate": "Return of the Genius Swordmaster",
+      "confidence": 1
+    },
+    {
+      "slug": "soul-of-burning-steel",
+      "arabic": "روح الفولاذ المشتعل",
+      "english": "Soul of Burning Steel",
+      "method": "MangaDex",
+      "candidate": "Soul of Burning Steel",
+      "confidence": 1
+    },
+    {
+      "slug": "dragon-ball-pride-of-the-beast",
+      "arabic": "دراغون بول: كبرياء الوحش",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dragon Ball Pride of the Beast",
+      "confidence": 0.6521739130434783,
+      "mangaDex": "Dragon Ball Super - Pride Of The Beast (Doujinshi)",
+      "aniList": ""
+    },
+    {
+      "slug": "world-saving-is-a-skill",
+      "arabic": "إنقاذ العالم مهارة",
+      "english": "World-Saving Is a Skill",
+      "method": "MangaDex",
+      "candidate": "World Saving Is a Skill",
+      "confidence": 1
+    },
+    {
+      "slug": "an-equation-without-wrong-answers",
+      "arabic": "معادلةٌ بلا إجاباتٍ خاطئة",
+      "english": "An Equation with No Wrong Answers",
+      "method": "MangaDex",
+      "candidate": "An Equation Without Wrong Answers",
+      "confidence": 0.9090909090909091
+    },
+    {
+      "slug": "my-hero-academia",
+      "arabic": "أكاديمية بطلي",
+      "english": "My Hero Academia",
+      "method": "MangaDex",
+      "candidate": "My Hero Academia",
+      "confidence": 1
+    },
+    {
+      "slug": "global-game-amplify-everything-hundred-times",
+      "arabic": "اللعبة العالمية: تضخيم كل شيء مئة ضعف",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Global Game Amplify Everything Hundred Times",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "omniscient-readers-viewpoint",
+      "arabic": "وجهة نظر القارئ كلّي المعرفة",
+      "english": "Omniscient Reader's Viewpoint",
+      "method": "MangaDex",
+      "candidate": "Omniscient Readers Viewpoint",
+      "confidence": 0.9655172413793104
+    },
+    {
+      "slug": "the-theory-of-useless-magic",
+      "arabic": "نظرية السحر عديم الفائدة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Theory of Useless Magic",
+      "confidence": 0.4375,
+      "mangaDex": "The Overly-Efficient Genius Mage",
+      "aniList": ""
+    },
+    {
+      "slug": "moonlight-sculptor-4-koma",
+      "arabic": "نحّات ضوء القمر — النسخة الكوميدية القصيرة",
+      "english": "Moonlight Sculptor (4-Koma)",
+      "method": "MangaDex",
+      "candidate": "Moonlight Sculptor 4 Koma",
+      "confidence": 1
+    },
+    {
+      "slug": "attack-on-titan-junior-high",
+      "arabic": "هجوم العمالقة: المدرسة الإعدادية",
+      "english": "Attack on Titan: Junior High",
+      "method": "MangaDex",
+      "candidate": "Attack on Titan Junior High",
+      "confidence": 1
+    },
+    {
+      "slug": "naruto-the-path-shone-by-the-full-moons-light",
+      "arabic": "ناروتو: الطريق الذي أناره البدر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Naruto the Path Shone by the Full Moons Light",
+      "confidence": 0.7894736842105263,
+      "mangaDex": "Naruto Side Story - The Path Shone By The Full Moon's Light",
+      "aniList": ""
+    },
+    {
+      "slug": "dragon-ball-vs",
+      "arabic": "دراغون بول VS",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dragon Ball Vs",
+      "confidence": 0.6190476190476191,
+      "mangaDex": "Dragon Ball x Saitama",
+      "aniList": ""
+    },
+    {
+      "slug": "attack-on-titan-anthology",
+      "arabic": "هجوم العمالقة: مختارات",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Attack on Titan Anthology",
+      "confidence": 0.6,
+      "mangaDex": "Attack on Titan",
+      "aniList": ""
+    },
+    {
+      "slug": "spoof-on-titan",
+      "arabic": "سخرية العمالقة",
+      "english": "Spoof on Titan",
+      "method": "MangaDex",
+      "candidate": "Spoof on Titan",
+      "confidence": 1
+    },
+    {
+      "slug": "kakashi-x-mina",
+      "arabic": "كاكاشي × مينا",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kakashi X Mina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "dragon-ball-yardrats-the-story-of-a-survivor",
+      "arabic": "دراغون بول: يادرات — قصّة ناجٍ",
+      "english": "Dragon Ball - Yardrats, The Story of a Survivor",
+      "method": "MangaDex",
+      "candidate": "Dragon Ball Yardrats the Story of a Survivor",
+      "confidence": 1
+    },
+    {
+      "slug": "dragon-ball-jankushon",
+      "arabic": "دراغون بول: جانكوشون",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dragon Ball Jankushon",
+      "confidence": 0.7619047619047619,
+      "mangaDex": "Dragon Ball Junction",
+      "aniList": ""
+    },
+    {
+      "slug": "my-hero-academia-fan-comics",
+      "arabic": "أكاديمية بطلي: قصص المعجبين",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "My Hero Academia Fan Comics",
+      "confidence": 0.8214285714285714,
+      "mangaDex": "My Hero Academia (Fan Colored)",
+      "aniList": ""
+    },
+    {
+      "slug": "one-piece-what-if-kaido-arrived-at-marineford",
+      "arabic": "ون بيس: ماذا لو وصل كايدو إلى مارين فورد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "One Piece What If Kaido Arrived at Marineford",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "one-piece-straw-hat-theater",
+      "arabic": "ون بيس: مسرح قبّعة القش",
+      "english": "One Piece: Straw Hat Theater",
+      "method": "MangaDex",
+      "candidate": "One Piece Straw Hat Theater",
+      "confidence": 1
+    },
+    {
+      "slug": "one-piece-vivre-card",
+      "arabic": "ون بيس: بطاقات فيفر — المعجم المصوّر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "One Piece Vivre Card",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "urareta-henkyou-haku-reijou-wa-ringoku-no-outaishi-ni-dekiai-sareru",
+      "arabic": "السيدة الحدودية المباعة تحظى بحب ولي عهد المملكة المجاورة",
+      "english": "Urareta Henkyou Haku Reijou wa Ringoku no Outaishi ni Dekiai Sareru",
+      "method": "MangaDex",
+      "candidate": "Urareta Henkyou Haku Reijou Wa Ringoku No Outaishi Ni Dekiai Sareru",
+      "confidence": 1
+    },
+    {
+      "slug": "baki-gaiden-gaia-to-sikorsky",
+      "arabic": "باكي جايدن: جايا إلى سيكورسكي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Baki Gaiden Gaia to Sikorsky",
+      "confidence": 0.3835616438356164,
+      "mangaDex": "Baki Side Story: Gaia & Sikorsky - Sometimes Nomura—Two yet Three People Living Together",
+      "aniList": "Baki Gaiden: Gaia to Sikorsky - Tokidoki Nomura Futari Dakedo Sannin Kurashi"
+    },
+    {
+      "slug": "shibuya-ninja",
+      "arabic": "شيبويا نينجا",
+      "english": "Shibuya Ninja",
+      "method": "MangaDex",
+      "candidate": "Shibuya Ninja",
+      "confidence": 1
+    },
+    {
+      "slug": "home-at-the-horizon",
+      "arabic": "المنزل في الأفق",
+      "english": "Home at the Horizon",
+      "method": "MangaDex",
+      "candidate": "Home at the Horizon",
+      "confidence": 1
+    },
+    {
+      "slug": "sword-of-the-demon-hunter",
+      "arabic": "سيف صائد الشياطين",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Sword of the Demon Hunter",
+      "confidence": 0.625,
+      "mangaDex": "Sword of the Demon Hunter: Kijin Gentosho",
+      "aniList": "Sword of the Demon Hunter: Kijin Gentosho"
+    },
+    {
+      "slug": "وهجة-فضية",
+      "arabic": "وهجة فضية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "وهجة فضية",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "fiction-of-deception-and-shadow",
+      "arabic": "رواية الخداع والظل",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Fiction of Deception and Shadow",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "breakup",
+      "arabic": "انفصل",
+      "english": "Breakup",
+      "method": "MangaDex",
+      "candidate": "Breakup",
+      "confidence": 1
+    },
+    {
+      "slug": "uratarou",
+      "arabic": "أوراتارو",
+      "english": "Uratarou",
+      "method": "MangaDex",
+      "candidate": "Uratarou",
+      "confidence": 1
+    },
+    {
+      "slug": "زهوري-الحزينة",
+      "arabic": "زهوري الحزينة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "زهوري الحزينة",
+      "confidence": 0,
+      "mangaDex": "Boku ni Hana no Melancholy",
+      "aniList": ""
+    },
+    {
+      "slug": "keijis-kabuki-adventure",
+      "arabic": "مغامرة كيجي كابوكي",
+      "english": "Keiji's Kabuki Adventure",
+      "method": "MangaDex",
+      "candidate": "Keijis Kabuki Adventure",
+      "confidence": 0.9583333333333334
+    },
+    {
+      "slug": "akari",
+      "arabic": "أكاري",
+      "english": "Akari",
+      "method": "MangaDex",
+      "candidate": "Akari",
+      "confidence": 1
+    },
+    {
+      "slug": "magical-flowers-age",
+      "arabic": "عمر الزهور السحرية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Magical Flowers Age",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "medalist",
+      "arabic": "ميداليست",
+      "english": "Medalist",
+      "method": "MangaDex",
+      "candidate": "Medalist",
+      "confidence": 1
+    },
+    {
+      "slug": "classi9",
+      "arabic": "كلاسي9",
+      "english": "Classi9",
+      "method": "MangaDex",
+      "candidate": "Classi9",
+      "confidence": 1
+    },
+    {
+      "slug": "the-silver-wheat-field",
+      "arabic": "حقل القمح الفضي",
+      "english": "The Silver Wheat Field",
+      "method": "MangaDex",
+      "candidate": "The Silver Wheat Field",
+      "confidence": 1
+    },
+    {
+      "slug": "mairimashita-iruma-kun-boku-doumei-no-game-michi",
+      "arabic": "مرحباً بك في مدرسة الشياطين يا إيروما: طريق نادي الألعاب",
+      "english": "Mairimashita! Iruma-kun: Boku Doumei no Game-michi",
+      "method": "AniList",
+      "candidate": "Mairimashita Iruma Kun Boku Doumei No Game Michi",
+      "confidence": 1
+    },
+    {
+      "slug": "i-didnt-know-my-talent",
+      "arabic": "لم أكن أعرف موهبتي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "I Didnt Know My Talent",
+      "confidence": 0.48275862068965514,
+      "mangaDex": "Things I Didn't Know at First",
+      "aniList": ""
+    },
+    {
+      "slug": "sakamoto-holidays",
+      "arabic": "عطلات ساكاموتو",
+      "english": "Sakamoto Holidays",
+      "method": "AniList",
+      "candidate": "Sakamoto Holidays",
+      "confidence": 1
+    },
+    {
+      "slug": "capgras",
+      "arabic": "كابجراس",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Capgras",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "kimi-ga-kemono-ni-naru-mae-ni",
+      "arabic": "قبل أن تتحول إلى وحش",
+      "english": "Kimi ga Kemono ni Naru Mae ni",
+      "method": "AniList",
+      "candidate": "Kimi Ga Kemono Ni Naru Mae Ni",
+      "confidence": 1
+    },
+    {
+      "slug": "monster-no-niku-wo-kutte-itara-oui-no-tsuita-ken",
+      "arabic": "حين أكلت لحم وحش، نلت لقب الملك",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Monster No Niku Wo Kutte Itara Oui No Tsuita Ken",
+      "confidence": 0.2545454545454545,
+      "mangaDex": "The Case Of Taking The Throne After Eating Monster Meat",
+      "aniList": ""
+    },
+    {
+      "slug": "indians-movie-in-high-school",
+      "arabic": "فيلم هندي في الثانوي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Indians Movie in High School",
+      "confidence": 0.234375,
+      "mangaDex": "CHOYOYU!: High School Prodigies Have It Easy Even in Another World!",
+      "aniList": ""
+    },
+    {
+      "slug": "old-newbie-kim-chunshik",
+      "arabic": "تشونشيك المبتدئ القديم",
+      "english": "Old Newbie Kim Chun",
+      "method": "MangaDex",
+      "candidate": "Old Newbie Kim Chunshik",
+      "confidence": 0.9860869565217392
+    },
+    {
+      "slug": "life-after",
+      "arabic": "الحياة بعد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Life After",
+      "confidence": 0.19999999999999996,
+      "mangaDex": "Re-Living My Life with a Boyfriend Who Doesn't Remember Me",
+      "aniList": "After Life"
+    },
+    {
+      "slug": "my-disciples-are-all-invincible-monsters",
+      "arabic": "تلاميذي جميعهم وحوش لا تقهر",
+      "english": "My Disciples are All Invincible Monsters",
+      "method": "MangaDex",
+      "candidate": "My Disciples Are All Invincible Monsters",
+      "confidence": 1
+    },
+    {
+      "slug": "hard-carry-support",
+      "arabic": "الداعم الذي يحمل الفريق",
+      "english": "Hard Carry Support",
+      "method": "MangaDex",
+      "candidate": "Hard Carry Support",
+      "confidence": 1
+    },
+    {
+      "slug": "double-click",
+      "arabic": "انقر نقراً مزدوجاً",
+      "english": "Double Click",
+      "method": "MangaDex",
+      "candidate": "Double Click",
+      "confidence": 1
+    },
+    {
+      "slug": "the-final-boss-became-a-player",
+      "arabic": "الزعيم الأخير أصبح لاعباً",
+      "english": "The Final Boss Became a Player",
+      "method": "MangaDex",
+      "candidate": "The Final Boss Became a Player",
+      "confidence": 1
+    },
+    {
+      "slug": "jujutsu-kaisen-hibernation-doujinshi",
+      "arabic": "جوجوتسو كايسن – السبات (دوجينشي)",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Jujutsu Kaisen Hibernation Doujinshi",
+      "confidence": 0.6,
+      "mangaDex": "Jujutsu Kaisen - Itoki Akebono Ten ni Haru (Doujinshi)",
+      "aniList": ""
+    },
+    {
+      "slug": "mushaghib-aelat-alqant",
+      "arabic": "مشاغب عائلة الكونت",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Mushaghib Aelat Alqant",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "jujutsu-kaisen-hibernation",
+      "arabic": "جوجوتسو كايسن: سُبات",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Jujutsu Kaisen Hibernation",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "calamity-hunter-i-have-an-exp-system",
+      "arabic": "صياد الكوارث: لديّ نظام خبرة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Calamity Hunter I Have an Exp System",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "green-skin",
+      "arabic": "الجلد الأخضر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Green Skin",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "red-human",
+      "arabic": "الإنسان الأحمر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Red Human",
+      "confidence": 0.375,
+      "mangaDex": "Renlei Jinhualun",
+      "aniList": ""
+    },
+    {
+      "slug": "my-boss-doesnt-have-face",
+      "arabic": "رئيسي ليس لديه وجه",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "My Boss Doesnt Have Face",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-rogue-10th-class-of-the-frontier-count",
+      "arabic": "المارق من الدرجة العاشرة لدى كونت الحدود",
+      "english": "The Rogue 10th-Class of the Frontier Count",
+      "method": "MangaDex",
+      "candidate": "The Rogue 10th Class of the Frontier Count",
+      "confidence": 1
+    },
+    {
+      "slug": "this-martial-saint-is-way-too-generous",
+      "arabic": "هذا القديس القتالي كريم جدًا",
+      "english": "This Martial Saint Is Way Too Generous",
+      "method": "MangaDex",
+      "candidate": "This Martial Saint Is Way Too Generous",
+      "confidence": 1
+    },
+    {
+      "slug": "rihlat-ma-wara-al-ofuq",
+      "arabic": "رحلة ما وراء الأفق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rihlat Ma Wara Al Ofuq",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "winds-of-time-ar",
+      "arabic": "عهد الرياح",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Winds of Time Ar",
+      "confidence": 0.3529411764705882,
+      "mangaDex": "Girls That Get It",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-alkhafa",
+      "arabic": "ظل الخفاء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Alkhafa",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zil-al-madina",
+      "arabic": "ظل المدينة العتيقة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zil Al Madina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadows-of-the-beginning",
+      "arabic": "ظلال البداية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadows of the Beginning",
+      "confidence": 0.37037037037037035,
+      "mangaDex": "Daemons of the Shadow Realm",
+      "aniList": ""
+    },
+    {
+      "slug": "asda-al-fajr-al-baeed",
+      "arabic": "أصداء الفجر البعيد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Asda Al Fajr Al Baeed",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadows-of-the-city",
+      "arabic": "ظل النور في المدينة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadows of the City",
+      "confidence": 0.48275862068965514,
+      "mangaDex": "Fragments of the Layered City",
+      "aniList": ""
+    },
+    {
+      "slug": "mghamra-bla-hdwd",
+      "arabic": "مغامرة بلا حدود",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Mghamra Bla Hdwd",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "world-without-gods",
+      "arabic": "عالم بلا آلهة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "World Without Gods",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "a-sounds-from-an-unknown-world",
+      "arabic": "أصداء من عالم بعيد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "A Sounds from an Unknown World",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-city-shadow-underground",
+      "arabic": "ظل المدينة: ممرات الضوء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The City Shadow Underground",
+      "confidence": 0.4444444444444444,
+      "mangaDex": "The Dark Underground City",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-aldaw",
+      "arabic": "ظل الضوء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Aldaw",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "work-unspecified",
+      "arabic": "العمل غير محدد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Work Unspecified",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "noor-shadows-arabic-manga",
+      "arabic": "ظل النور في المدينة المفقودة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Noor Shadows Arabic Manga",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "echoes-of-the-hidden-city-ar",
+      "arabic": "أصداء المدينة المخبأة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Echoes of the Hidden City Ar",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zilal-alhikaya",
+      "arabic": "ظلال الحكاية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zilal Alhikaya",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "thl-almdyn-mghmrt-bla-qd",
+      "arabic": "ظل المدينة: مغامرات بلا قيود",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Thl Almdyn Mghmrt Bla Qd",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "al-amal-al-mafqood",
+      "arabic": "أسرار العمل المفقود",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Al Amal Al Mafqood",
+      "confidence": 0.22857142857142854,
+      "mangaDex": "Ore wo Suki Nano wa Omae Dake ka yo",
+      "aniList": ""
+    },
+    {
+      "slug": "city-behind-the-mist",
+      "arabic": "مدينة خلف الضباب",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "City Behind the Mist",
+      "confidence": 0.35,
+      "mangaDex": "Beyond the Clouds",
+      "aniList": ""
+    },
+    {
+      "slug": "moon-pulse",
+      "arabic": "ظل القمر: مغامرات عبر العوالم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Moon Pulse",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadow-city-edge",
+      "arabic": "ظل المدينة الغريب",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadow City Edge",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadows-of-the-distant-city",
+      "arabic": "ظلال المدينة البعيدة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadows of the Distant City",
+      "confidence": 0.3846153846153846,
+      "mangaDex": "Blue Dragon: Battle in the Floating City",
+      "aniList": ""
+    },
+    {
+      "slug": "the-last-city-of-mirrors",
+      "arabic": "مدينة المرايا الأخيرة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Last City of Mirrors",
+      "confidence": 0.2962962962962963,
+      "mangaDex": "The Survived Alchemist With a Dream of Quiet Town Life",
+      "aniList": ""
+    },
+    {
+      "slug": "ashda-alghad",
+      "arabic": "أصداء الغد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Ashda Alghad",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "hikayat-alzilal-almutanathira",
+      "arabic": "حكاية الظلال المتناثرة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hikayat Alzilal Almutanathira",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zhal-almadina",
+      "arabic": "ظلال المدينة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zhal Almadina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "un-title-work",
+      "arabic": "عمل غير معنون",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Un Title Work",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "thil-al-noor",
+      "arabic": "ظل النور",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Thil Al Noor",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "asrar-ma-wara-al-ufuq",
+      "arabic": "أسرار ما وراء الأفق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Asrar Ma Wara Al Ufuq",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "unknown-manga",
+      "arabic": "عمل مانجا غير مُسمّى",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Unknown Manga",
+      "confidence": 0.15000000000000002,
+      "mangaDex": "The Story When I Was Confined by an Unknown High School Girl",
+      "aniList": ""
+    },
+    {
+      "slug": "untitled-journey-city-light",
+      "arabic": "رحلة بلا عنوان في مدينة الضوء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Untitled Journey City Light",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "city-shadow-light-enigma",
+      "arabic": "ظل المدينة: لغز الضوء المجهول",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "City Shadow Light Enigma",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "amal-bla-onwan",
+      "arabic": "عملٌ بلا عنوان",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Amal Bla Onwan",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "asda-al-fajr",
+      "arabic": "أصداء الفجر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Asda Al Fajr",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "dhil-al-hikayat",
+      "arabic": "ظل الحكايات",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Dhil Al Hikayat",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "incomplete-work-data",
+      "arabic": "بيانات العمل غير مكتملة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Incomplete Work Data",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-shadow-city-dawn-of-warriors",
+      "arabic": "ظل المدينة: فجر المحاربين",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Shadow City Dawn of Warriors",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "data-unavailable-2",
+      "arabic": "مغامرة جديدة في عالم غير معروف",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Data Unavailable 2",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "incomplete-data",
+      "arabic": "بيانات غير مكتملة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Incomplete Data",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "crimson-echoes-hidden-city",
+      "arabic": "أصداء قرمزية في المدينة الخفية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Crimson Echoes Hidden City",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "hikayat-jadida",
+      "arabic": "حكاية جديدة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hikayat Jadida",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "arabic-title-sample",
+      "arabic": "عنوان عربي جذّاب (بلا إله/آلهة)",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Arabic Title Sample",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "al-amal-ghayr-al-munwan",
+      "arabic": "العمل غير المعنون",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Al Amal Ghayr Al Munwan",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "asrar-almadeena-alsamitah",
+      "arabic": "أسرار المدينة الصامتة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Asrar Almadeena Alsamitah",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-almadina",
+      "arabic": "ظل المدينة: حين تقود الظلال الطريق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Almadina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zilal-alfajr",
+      "arabic": "ظلال الفجر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zilal Alfajr",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "city-of-light-no-gods",
+      "arabic": "المدينة المضيئة: لغز في الظل",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "City of Light No Gods",
+      "confidence": 0.20253164556962022,
+      "mangaDex": "Disciple of the Lich: Or How I Was Cursed by the Gods and Dropped Into the Abyss!",
+      "aniList": ""
+    },
+    {
+      "slug": "work-undefined",
+      "arabic": "عمل مانجا غير محدد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Work Undefined",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "asrar-safhat-manga-ghamida",
+      "arabic": "أسرار صفحة مانغا غامضة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Asrar Safhat Manga Ghamida",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-city-shadow-neon-run",
+      "arabic": "ظل المدينة: رحلة رقمية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The City Shadow Neon Run",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "rihlat-fi-zilal-al-madina",
+      "arabic": "رحلة في ظلال المدينة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rihlat Fi Zilal Al Madina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadow-kingdom",
+      "arabic": "مملكة الظلال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadow Kingdom",
+      "confidence": 0.27450980392156865,
+      "mangaDex": "The Shadow Messenger from the Kingdom of Siegerland",
+      "aniList": ""
+    },
+    {
+      "slug": "shadows-beyond-the-horizon",
+      "arabic": "ظلال ما وراء الأفق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadows Beyond the Horizon",
+      "confidence": 0.7692307692307692,
+      "mangaDex": "The Sun Beyond the Horizon",
+      "aniList": ""
+    },
+    {
+      "slug": "data-unavailable-1",
+      "arabic": "رحلة بلا آلهة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Data Unavailable 1",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-al-fajr",
+      "arabic": "ظلّ الفجر",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Al Fajr",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-al-madina-al-mafquudah",
+      "arabic": "ظل المدينة المفقودة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Al Madina Al Mafquudah",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadow-of-the-hero",
+      "arabic": "ظل البطل",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadow of the Hero",
+      "confidence": 0.4137931034482759,
+      "mangaDex": "Legend of the Galactic Heroes",
+      "aniList": ""
+    },
+    {
+      "slug": "time-odyssey-the-hidden-passage",
+      "arabic": "مغامرة الزمن: سرّ الممر الخفي",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Time Odyssey the Hidden Passage",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "ana-ankaboot-fa-madha-baad",
+      "arabic": "أنا عنكبوت، فماذا بعد؟",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Ana Ankaboot Fa Madha Baad",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "true-beauty",
+      "arabic": "الجمال الحقيقي",
+      "english": "True Beauty",
+      "method": "MangaDex",
+      "candidate": "True Beauty",
+      "confidence": 1
+    },
+    {
+      "slug": "naruto-sasukes-story-the-uchiha-and-the-heavenly-stardust",
+      "arabic": "ناروتو: قصّة ساسكي — الأوتشيها وغبار النجوم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Naruto Sasukes Story the Uchiha and the Heavenly Stardust",
+      "confidence": 0.8382352941176471,
+      "mangaDex": "Naruto: Sasuke’s Story—The Uchiha and the Heavenly Stardust: The Manga",
+      "aniList": ""
+    },
+    {
+      "slug": "shadow-road-tangled",
+      "arabic": "ظلال الطريق المتشابك",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadow Road Tangled",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "asatir-al-shayatin-wal-arwah",
+      "arabic": "أساطير الشياطين والأرواح",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Asatir Al Shayatin Wal Arwah",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "the-third-prince-of-the-fallen-kingdom-has-regress",
+      "arabic": "عودة الأمير الثالث للمملكة المنهارة",
+      "english": "The Third Prince of the Fallen Kingdom Has Regressed",
+      "method": "MangaDex",
+      "candidate": "The Third Prince of the Fallen Kingdom Has Regress",
+      "confidence": 0.996923076923077
+    },
+    {
+      "slug": "dragon-ball",
+      "arabic": "دراغون بول",
+      "english": "Dragon Ball",
+      "method": "MangaDex",
+      "candidate": "Dragon Ball",
+      "confidence": 1
+    },
+    {
+      "slug": "tokyo-ghoul",
+      "arabic": "طوكيو غول",
+      "english": "TOKYO GHOUL",
+      "method": "MangaDex",
+      "candidate": "Tokyo Ghoul",
+      "confidence": 1
+    },
+    {
+      "slug": "kill-the-hero",
+      "arabic": "اقتل البطل",
+      "english": "Kill the Hero",
+      "method": "MangaDex",
+      "candidate": "Kill the Hero",
+      "confidence": 1
+    },
+    {
+      "slug": "dr-stone-4d-science",
+      "arabic": "دكتور ستون: العلوم رباعية الأبعاد",
+      "english": "Dr. STONE: 4D Science",
+      "method": "MangaDex",
+      "candidate": "Dr Stone 4d Science",
+      "confidence": 1
+    },
+    {
+      "slug": "dorohedoro",
+      "arabic": "دوروهيدورو",
+      "english": "Dorohedoro",
+      "method": "MangaDex",
+      "candidate": "Dorohedoro",
+      "confidence": 1
+    },
+    {
+      "slug": "paradise-on-earth",
+      "arabic": "الفردوس الأرضي",
+      "english": "Paradise on Earth",
+      "method": "MangaDex",
+      "candidate": "Paradise on Earth",
+      "confidence": 1
+    },
+    {
+      "slug": "shadow-slave",
+      "arabic": "عبد الظل",
+      "english": "Shadow Slave",
+      "method": "MangaDex",
+      "candidate": "Shadow Slave",
+      "confidence": 1
+    },
+    {
+      "slug": "vagabond-digital-colored",
+      "arabic": "فاغابوند — النسخة الملوّنة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Vagabond Digital Colored",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "beyblade-burst-sparking",
+      "arabic": "بيبليد بيرست سباركينغ",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Beyblade Burst Sparking",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "47",
+      "arabic": "عميل 47",
+      "english": "47 Хромосом",
+      "method": "MangaDex",
+      "candidate": "47",
+      "confidence": 1
+    },
+    {
+      "slug": "martial-peak",
+      "arabic": "ذروة الفنون القتالية",
+      "english": "Martial Peak",
+      "method": "MangaDex",
+      "candidate": "Martial Peak",
+      "confidence": 1
+    },
+    {
+      "slug": "code-geass-suzaku-of-the-counterattack",
+      "arabic": "كود غياس: سوزاكو المضادّ",
+      "english": "Code Geass: Suzaku of the Counterattack",
+      "method": "MangaDex",
+      "candidate": "Code Geass Suzaku of the Counterattack",
+      "confidence": 1
+    },
+    {
+      "slug": "shihou-yuugi",
+      "arabic": "شيهو يوغي",
+      "english": "Shihou Yuugi",
+      "method": "MangaDex",
+      "candidate": "Shihou Yuugi",
+      "confidence": 1
+    },
+    {
+      "slug": "bleach-official-colored",
+      "arabic": "بليتش – النسخة الملونة الرسمية",
+      "english": "Bleach (Official Colored)",
+      "method": "MangaDex",
+      "candidate": "Bleach Official Colored",
+      "confidence": 1
+    },
+    {
+      "slug": "death-note-color-edition",
+      "arabic": "مذكّرة الموت — النسخة الملوّنة",
+      "english": "Death Note [Colored Edition]",
+      "method": "MangaDex",
+      "candidate": "Death Note Color Edition",
+      "confidence": 0.9230769230769231
+    },
+    {
+      "slug": "witchriv",
+      "arabic": "ويتشريف",
+      "english": "WITCHRIV",
+      "method": "MangaDex",
+      "candidate": "Witchriv",
+      "confidence": 1
+    },
+    {
+      "slug": "blue-box",
+      "arabic": "الصندوق الأزرق",
+      "english": "Blue Box",
+      "method": "MangaDex",
+      "candidate": "Blue Box",
+      "confidence": 1
+    },
+    {
+      "slug": "kaguya-sama",
+      "arabic": "كاغويا-ساما: الحب حرب",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Kaguya Sama",
+      "confidence": 0.5,
+      "mangaDex": "Kaguya-sama: Love Is War",
+      "aniList": "Kaguya-sama no Himitsu"
+    },
+    {
+      "slug": "bleach-digital-colored",
+      "arabic": "بليتش – النسخة الملونة رقمياً",
+      "english": "Bleach - Digital Colored Comics",
+      "method": "MangaDex",
+      "candidate": "Bleach Digital Colored",
+      "confidence": 0.9806896551724138
+    },
+    {
+      "slug": "burn-the-witch",
+      "arabic": "احرقوا الساحرة",
+      "english": "Burn the Witch",
+      "method": "MangaDex",
+      "candidate": "Burn the Witch",
+      "confidence": 1
+    },
+    {
+      "slug": "mashle-magic-and-muscles",
+      "arabic": "ماشل: سحرٌ وعضلات",
+      "english": "Mashle: Magic and Muscles",
+      "method": "MangaDex",
+      "candidate": "Mashle Magic and Muscles",
+      "confidence": 1
+    },
+    {
+      "slug": "ana-alsharir-alladhi-ikhtarahu-almasir",
+      "arabic": "أنا الشرير الذي اختاره المصير",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Ana Alsharir Alladhi Ikhtarahu Almasir",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "emperor-of-martial-arts",
+      "arabic": "إمبراطور الفنون القتالية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Emperor of Martial Arts",
+      "confidence": 0.6428571428571428,
+      "mangaDex": "The Pinnacle of Martial Arts",
+      "aniList": "Martial Arts Emperor"
+    },
+    {
+      "slug": "lola",
+      "arabic": "كائن طفيلي - parasitic organism",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Lola",
+      "confidence": 0.36363636363636365,
+      "mangaDex": "Lola Mameng",
+      "aniList": "Monster Girl Honey"
+    },
+    {
+      "slug": "naruto-digital-colored",
+      "arabic": "ناروتو — النسخة الملوّنة",
+      "english": "Naruto - Digital Colored Comics",
+      "method": "MangaDex",
+      "candidate": "Naruto Digital Colored",
+      "confidence": 0.9806896551724138
+    },
+    {
+      "slug": "alhubb-ala-alhawa",
+      "arabic": "الحب في جلسة المواعدة المدرسية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Alhubb Ala Alhawa",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "overlord",
+      "arabic": "أوفرلورد: حاكم العالم الآخر",
+      "english": "Overlord",
+      "method": "AniList",
+      "candidate": "Overlord",
+      "confidence": 1
+    },
+    {
+      "slug": "vagabond",
+      "arabic": "المتشرد: درب السيف",
+      "english": "Vagabond",
+      "method": "MangaDex",
+      "candidate": "Vagabond",
+      "confidence": 1
+    },
+    {
+      "slug": "death-note",
+      "arabic": "مذكّرة الموت",
+      "english": "Death Note",
+      "method": "MangaDex",
+      "candidate": "Death Note",
+      "confidence": 1
+    },
+    {
+      "slug": "al-tariq-al-akhir",
+      "arabic": "الطريق الأخير",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Al Tariq Al Akhir",
+      "confidence": 0.26190476190476186,
+      "mangaDex": "Touhou - Taira no Miyako All Stars!! (Doujinshi)",
+      "aniList": ""
+    },
+    {
+      "slug": "fullmetal-alchemist-webtoon",
+      "arabic": "الخيميائي المعدني الكامل — نسخة ويبتون الملوّنة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Fullmetal Alchemist Webtoon",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "uchiha-sasuke-no-sharingan-den",
+      "arabic": "أسطورة شارينغان ساسكي أوتشيها",
+      "english": "Naruto: Chibi Sasuke's Sharingan Legend",
+      "method": "AniList",
+      "candidate": "Uchiha Sasuke No Sharingan Den",
+      "confidence": 1
+    },
+    {
+      "slug": "rihla-lil-majhool",
+      "arabic": "رحلة إلى المجهول",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rihla LIL Majhool",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "jaco-the-galactic-patrolman",
+      "arabic": "جاكو دوريّة المجرّة",
+      "english": "Jaco the Galactic Patrolman",
+      "method": "MangaDex",
+      "candidate": "Jaco the Galactic Patrolman",
+      "confidence": 1
+    },
+    {
+      "slug": "one-piece-x-toriko",
+      "arabic": "ون بيس × توريكو: مذاق فاكهة الشيطان",
+      "english": "One Piece x Toriko: Taste of the Devil Fruit",
+      "method": "AniList",
+      "candidate": "One Piece X Toriko",
+      "confidence": 1
+    },
+    {
+      "slug": "fate-samurai-remnant",
+      "arabic": "فيت/ساموراي ريمنانت",
+      "english": "Fate/Samurai Remnant",
+      "method": "MangaDex",
+      "candidate": "Fate Samurai Remnant",
+      "confidence": 1
+    },
+    {
+      "slug": "kaiten-no-albus",
+      "arabic": "كايتن نو ألبوس",
+      "english": "Albus Changes the World",
+      "method": "AniList",
+      "candidate": "Kaiten No Albus",
+      "confidence": 1
+    },
+    {
+      "slug": "hikaya-bila-ism",
+      "arabic": "حكاية بلا اسم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hikaya Bila Ism",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "ibn-al-qatil",
+      "arabic": "ابن القاتل",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Ibn Al Qatil",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "sayed-alzlal-alakher",
+      "arabic": "سيد الظلال الأخير",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Sayed Alzlal Alakher",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "latin-slug-from-title",
+      "arabic": "غموض في عالم المانغا",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Latin Slug from Title",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "thl-almdynh-almdhyh",
+      "arabic": "ظل المدينة المضيئة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Thl Almdynh Almdhyh",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "tower-of-the-summit",
+      "arabic": "برج القمة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Tower of the Summit",
+      "confidence": 0.7894736842105263,
+      "mangaDex": "Tower of the Sun",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-al-madina",
+      "arabic": "ظل المدينة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Al Madina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "hikayat-ma-wara-alufuq",
+      "arabic": "حكاية ما وراء الأفق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hikayat Ma Wara Alufuq",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "shadow-city-mystery-journey",
+      "arabic": "ظل المدينة: مغامرة غموض مستقبلية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Shadow City Mystery Journey",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zhilal-fi-madinat-al-samt",
+      "arabic": "ظلال في مدينة الصمت",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zhilal Fi Madinat Al Samt",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "rihlat-aldhilal",
+      "arabic": "رحلة الظلال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rihlat Aldhilal",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "echoes-of-twilight",
+      "arabic": "أصداء الغسق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Echoes of Twilight",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "20th-century-boys",
+      "arabic": "فتيان القرن العشرين",
+      "english": "20th Century Boys",
+      "method": "AniList",
+      "candidate": "20th Century Boys",
+      "confidence": 1
+    },
+    {
+      "slug": "unavailable-work",
+      "arabic": "قصة جديدة تقبع في الظلال",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Unavailable Work",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-almada-fajr-al-madina",
+      "arabic": "ظل المدى: فجر المدينة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Almada Fajr Al Madina",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "hikayat-majhula",
+      "arabic": "حكاية مجهولة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hikayat Majhula",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "sahar-al-aed-yajeb-an-yakoon-astithnaeyyan",
+      "arabic": "سحر العائد يجب أن يكون استثنائياً",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Sahar Al Aed Yajeb an Yakoon Astithnaeyyan",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "hikayat-bila-unwan",
+      "arabic": "حكاية بلا عنوان",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Hikayat Bila Unwan",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "alhakim-alazam",
+      "arabic": "الحاكم الأعظم",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Alhakim Alazam",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "zill-al-madina-alghamid",
+      "arabic": "ظل المدينة الغامض",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Zill Al Madina Alghamid",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "dragon-prince-yuan",
+      "arabic": "الأمير التنين يوان",
+      "english": "Dragon Prince Yuan",
+      "method": "MangaDex",
+      "candidate": "Dragon Prince Yuan",
+      "confidence": 1
+    },
+    {
+      "slug": "the-legendary-mechanic",
+      "arabic": "الميكانيكي الأسطوري",
+      "english": "The Legendary Mechanic",
+      "method": "MangaDex",
+      "candidate": "The Legendary Mechanic",
+      "confidence": 1
+    },
+    {
+      "slug": "unknown-title",
+      "arabic": "عمل غير محدد",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Unknown Title",
+      "confidence": 0.16129032258064513,
+      "mangaDex": "Touhou - Danmaku Kekkai (Doujinshi)",
+      "aniList": ""
+    },
+    {
+      "slug": "nabd-alhikaya",
+      "arabic": "نبض الحكاية",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Nabd Alhikaya",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "yotsuba",
+      "arabic": "يُوتسوبا!",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Yotsuba",
+      "confidence": 0.6363636363636364,
+      "mangaDex": "Yotsuba&!",
+      "aniList": ""
+    },
+    {
+      "slug": "the-town-where-only-i-am-missing",
+      "arabic": "المدينة التي اختفيتُ منها",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "The Town Where Only I Am Missing",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "slam-dunk",
+      "arabic": "سلام دانك",
+      "english": "Slam Dunk!",
+      "method": "MangaDex",
+      "candidate": "Slam Dunk",
+      "confidence": 1
+    },
+    {
+      "slug": "golden-kamuy",
+      "arabic": "غولدن كاموي",
+      "english": "Golden Kamuy",
+      "method": "MangaDex",
+      "candidate": "Golden Kamuy",
+      "confidence": 1
+    },
+    {
+      "slug": "golden-kamuy-colored",
+      "arabic": "غولدن كاموي — النسخة الملوّنة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Golden Kamuy Colored",
+      "confidence": 0.6896551724137931,
+      "mangaDex": "Golden Kamuy (Official Colored)",
+      "aniList": ""
+    },
+    {
+      "slug": "ran-and-the-gray-world",
+      "arabic": "ران وعالم الرماد",
+      "english": "Ran and the Gray World",
+      "method": "MangaDex",
+      "candidate": "Ran and the Gray World",
+      "confidence": 1
+    },
+    {
+      "slug": "abath-min-alzalam",
+      "arabic": "أبعث من الظلام",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Abath Min Alzalam",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "ranking-of-kings",
+      "arabic": "ترتيب الملوك",
+      "english": "Ranking of Kings",
+      "method": "MangaDex",
+      "candidate": "Ranking of Kings",
+      "confidence": 1
+    },
+    {
+      "slug": "kaiju-no-8-relax-ar",
+      "arabic": "كايجو رقم 8: استراحة",
+      "english": "Kaiju No. 8: Relax",
+      "method": "MangaDex",
+      "candidate": "Kaiju No 8 Relax Ar",
+      "confidence": 0.9873684210526317
+    },
+    {
+      "slug": "out-code",
+      "arabic": "أوت كود: محققة الجرائم الخارقة",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Out Code",
+      "confidence": 0.125,
+      "mangaDex": "Outcode: Special Investigation Unit for Paranormal Crimes",
+      "aniList": ""
+    },
+    {
+      "slug": "jujutsu-kaisen-0",
+      "arabic": "جوجوتسو كايسن 0: ثانوية طوكيو للفنون الملعونة",
+      "english": "Jujutsu Kaisen 0",
+      "method": "MangaDex",
+      "candidate": "Jujutsu Kaisen 0",
+      "confidence": 1
+    },
+    {
+      "slug": "fullmetal-alchemist",
+      "arabic": "الخيميائي المعدني الكامل",
+      "english": "Fullmetal Alchemist",
+      "method": "MangaDex",
+      "candidate": "Fullmetal Alchemist",
+      "confidence": 1
+    },
+    {
+      "slug": "slam-dunk-10-days-after",
+      "arabic": "سلام دانك: بعد عشرة أيام",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Slam Dunk 10 Days After",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "houkago-bokura-wa-uchuu-ni-madou-oneshot",
+      "arabic": "بعد المدرسة، نضل طريقنا في الفضاء",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Houkago Bokura Wa Uchuu Ni Madou Oneshot",
+      "confidence": 0.22499999999999998,
+      "mangaDex": "After School, We Wander in Space",
+      "aniList": ""
+    },
+    {
+      "slug": "ultimate-exorcist-kiyoshi",
+      "arabic": "كيوشي، أقوى طارد أرواح",
+      "english": "Ultimate Exorcist Kiyoshi",
+      "method": "MangaDex",
+      "candidate": "Ultimate Exorcist Kiyoshi",
+      "confidence": 1
+    },
+    {
+      "slug": "clever-cleaning-life-of-the-returned-genius-hunter",
+      "arabic": "حياة تنظيف الزنزانات للصياد العبقري السابق",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Clever Cleaning Life of the Returned Genius Hunter",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    },
+    {
+      "slug": "overloard-of-insects",
+      "arabic": "سيد سلالة الحشرات",
+      "english": "Overlord of Insects",
+      "method": "MangaDex",
+      "candidate": "Overloard of Insects",
+      "confidence": 0.95
+    },
+    {
+      "slug": "rushan",
+      "arabic": "روشان",
+      "english": "",
+      "method": "unresolved",
+      "candidate": "Rushan",
+      "confidence": 0,
+      "mangaDex": "",
+      "aniList": ""
+    }
+  ]
+}
