@@ -1,9 +1,11 @@
 import type { Manga, User, Friend } from "../types";
-export const users: User[] = ["Mahdi", "Kaido", "Ahmed"].map((name) => ({
-  id: name.toLowerCase(),
-  username: name.toLowerCase(),
-  name,
-}));
+
+export const users: User[] = [
+  { id: "mahdi", username: "has", name: "Has" },
+  { id: "kaido", username: "yas", name: "Yas" },
+  { id: "ahmed", username: "mah", name: "Mah" },
+];
+
 export const manga: Manga[] = [
   {
     id: "returner",
@@ -55,7 +57,9 @@ export const manga: Manga[] = [
     cover: "/covers/horizon.svg",
   },
 ];
+
 export const findManga = (id: string) => manga.find((item) => item.id === id);
+
 export const mockFriends: Friend[] = [
   {
     user: users[1],
