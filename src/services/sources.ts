@@ -5,6 +5,8 @@ import type {
   SourceName,
 } from "../types";
 
+const coverRequests = new Map<string, Promise<string[]>>();
+
 async function api<T>(path: string): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -29,9 +31,12 @@ function originalImageUrl(source: SourceName, url: string) {
   if (source !== "teamx") return url;
 
   // Team-X/OlympusStaff uses `thumbnail_` copies for list/search cards.
-  // Removing that prefix points to the original full-size cover, which is
-  // also how current Team-X reader extensions obtain the non-thumbnail art.
+  // Removing that prefix points to the original full-size cover.
   return url.replace(/thumbnail_/gi, "");
+}
+
+function uniqueCovers(values: Array<string | undefined>) {
+  return values.filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index);
 }
 
 export const sourceService = {
@@ -73,6 +78,23 @@ export const sourceService = {
       `/api/source/resolve?${params({ keys: keys.join(",") })}`,
     );
     return payload.items;
+  },
+
+  async coverCandidates(item: SourceManga) {
+    const fallback = uniqueCovers([item.cover]);
+    if (item.source !== "mangatime") return fallback;
+
+    const cached = coverRequests.get(item.key);
+    if (cached) return cached;
+
+    const request = api<{ covers?: string[] }>(
+      `/api/source/cover?${params({ key: item.key })}`,
+    )
+      .then((payload) => uniqueCovers([...(payload.covers ?? []), item.cover]))
+      .catch(() => fallback);
+
+    coverRequests.set(item.key, request);
+    return request;
   },
 
   imageUrl(source: SourceName, url?: string, referer?: string) {
