@@ -116,3 +116,55 @@ test("StarzManga page parser keeps chapter images only", () => {
     "https://cdn.example.com/chapter/002.webp",
   ]);
 });
+
+
+test("XSano detects its Zeist chapter feed", () => {
+  const html = `
+    <main>
+      <div id="clwd"><script>clwd.run("Ao-Ashi")</script></div>
+    </main>
+  `;
+  assert.equal(
+    __test.xsanoChapterFeedUrl(html),
+    "https://www.xsano-manga.com/feeds/posts/default/-/Chapter/Ao-Ashi?alt=json",
+  );
+});
+
+test("XSano parses Blogger chapter entries", () => {
+  const entries = [
+    {
+      title: { "$t": "الفصل 410" },
+      published: { "$t": "2026-02-03T00:00:00.000Z" },
+      category: [{ term: "Chapter" }],
+      link: [{ rel: "alternate", href: "https://www.xsano-manga.com/2026/02/ao-ashi-410.html" }],
+    },
+    {
+      title: { "$t": "Chapter 409.5" },
+      category: [{ term: "Chapter" }],
+      link: [{ rel: "alternate", href: "https://www.xsano-manga.com/2026/02/ao-ashi-409-5.html" }],
+    },
+  ];
+  const chapters = __test.xsanoChaptersFromEntries(entries);
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [410, 409.5]);
+});
+
+test("XSano reader parser uses images inside reader separators", () => {
+  const html = `
+    <main>
+      <div id="reader">
+        <div class="separator"><img src="https://blogger.googleusercontent.com/001.webp"></div>
+        <div class="separator"><img src="https://blogger.googleusercontent.com/002.webp"></div>
+      </div>
+    </main>
+    <footer><img src="/logo.png"></footer>
+  `;
+  assert.deepEqual(__test.parseXsanoPages(html), [
+    "https://blogger.googleusercontent.com/001.webp",
+    "https://blogger.googleusercontent.com/002.webp",
+  ]);
+});
+
+test("XSano category type recognizes novels", () => {
+  assert.equal(__test.xsanoTypeFromCategories(["Series", "Manga", "Drama"]), "manga");
+  assert.equal(__test.xsanoTypeFromCategories(["Series", "Novel", "Fantasy"]), "novel");
+});
