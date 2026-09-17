@@ -3,6 +3,7 @@ export interface User {
   name: string;
   username: string;
 }
+
 export interface Manga {
   id: string;
   title: string;
@@ -15,12 +16,54 @@ export interface Manga {
   color: string;
   cover: string;
 }
+
+export type SourceName = "mangatime" | "teamx";
+
+export interface SourceChapter {
+  number: number;
+  title: string;
+  publishedAt?: string | null;
+  url?: string;
+}
+
+export interface SourceManga {
+  key: string;
+  source: SourceName;
+  sourceId: string;
+  slug: string;
+  type: string;
+  url: string;
+  title: string;
+  cover: string;
+  description?: string;
+  status?: string;
+  genres: string[];
+  latest?: number | null;
+  chapters?: SourceChapter[];
+}
+
+export interface SourceListResponse {
+  items: SourceManga[];
+  hasMore: boolean;
+  page: number;
+}
+
+export interface SourceChapterPayload {
+  item: SourceManga;
+  number: number;
+  title: string;
+  pages: string[];
+  previous: number | null;
+  next: number | null;
+}
+
 export interface ReadingProgress {
   mangaId: string;
   chapter: number;
   percent: number;
   updatedAt: number;
 }
+
 export interface UserData {
   version: 2;
   favorites: string[];
@@ -28,6 +71,7 @@ export interface UserData {
   completed: string[];
   lastOpened: { mangaId: string; chapter: number } | null;
 }
+
 export interface Friend {
   user: User;
   reading: { mangaId: string; chapter: number } | null;
