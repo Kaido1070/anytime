@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseTeamXCanvasPages } from "../functions/api/source/chapter.js";
+import {
+  parseTeamXCanvasPageMeta,
+  parseTeamXCanvasPages,
+} from "../functions/api/source/chapter.js";
 
 test("Team-X reader prefers lazy canvas pages over a promo image", () => {
   const html = `
@@ -18,6 +21,35 @@ test("Team-X reader prefers lazy canvas pages over a promo image", () => {
     "https://olympustaff.com/uploads/chapter-1/001.webp",
     "https://cdn.example.com/chapter-1/002.webp",
     "https://olympustaff.com/uploads/chapter-1/003.webp",
+  ]);
+});
+
+test("Team-X reader preserves canvas display dimensions", () => {
+  const html = `
+    <div class="image_list reader-images">
+      <canvas width="900" height="1350" data-src="/uploads/chapter-1/001.webp"></canvas>
+      <canvas data-width="800" data-height="1200" data-src="/uploads/chapter-1/002.webp"></canvas>
+      <canvas style="width: 700px; height: 1050px" data-src="/uploads/chapter-1/003.webp"></canvas>
+    </div>
+    <footer></footer>
+  `;
+
+  assert.deepEqual(parseTeamXCanvasPageMeta(html), [
+    {
+      url: "https://olympustaff.com/uploads/chapter-1/001.webp",
+      width: 900,
+      height: 1350,
+    },
+    {
+      url: "https://olympustaff.com/uploads/chapter-1/002.webp",
+      width: 800,
+      height: 1200,
+    },
+    {
+      url: "https://olympustaff.com/uploads/chapter-1/003.webp",
+      width: 700,
+      height: 1050,
+    },
   ]);
 });
 
