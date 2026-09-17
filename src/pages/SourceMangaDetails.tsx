@@ -5,6 +5,7 @@ import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { parseSourceGroupKeys, preferredSourceCover, sourceDetailsPath } from "../services/sourceMerge";
 import { sourceDisplayTitle } from "../services/sourceTitles";
+import { formatGregorianDate } from "../services/dateFormat";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
 
@@ -153,7 +154,7 @@ export function SourceMangaDetails() {
           const done = data?.completed.includes(progressKey);
           return <Link key={`${chapter.number}:${chapter.title}`} to={`/read-source/${encodeURIComponent(sourceKey)}/${chapter.number}`} className={progress && !done ? "reading" : ""}>
             <span className="chapter-number">{chapter.number}</span>
-            <div><h3 dir="auto">{chapter.title || `الفصل ${chapter.number}`}</h3><small>{done ? "مقروء" : progress ? `قيد القراءة · ${Math.round(progress.percent)}%` : chapter.publishedAt ? new Date(chapter.publishedAt).toLocaleDateString("ar-SA") : "غير مقروء"}</small></div>
+            <div><h3 dir="auto">{chapter.title || `الفصل ${chapter.number}`}</h3><small>{done ? "مقروء" : progress ? `قيد القراءة · ${Math.round(progress.percent)}%` : chapter.publishedAt ? formatGregorianDate(chapter.publishedAt) : "غير مقروء"}</small></div>
             {done ? <Icon name="check" /> : <Icon name="arrow" />}
           </Link>;
         })}
