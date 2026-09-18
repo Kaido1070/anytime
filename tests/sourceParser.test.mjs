@@ -198,3 +198,48 @@ test("MangaLik reader parser keeps chapter images from its CDN", () => {
     "https://s2solo.mangalik.net/manga/a/chapter/image-02.jpg",
   ]);
 });
+
+
+test("MangaTime transport uses current web headers and retries the batch shape", async () => {
+  const mangaHeaders = __test.sourceHeaders("https://mangatime.org", "application/json");
+  assert.equal(mangaHeaders["X-MT-Platform"], "web");
+  assert.equal(mangaHeaders["X-MT-UIMode"], "standard");
+
+  const otherHeaders = __test.sourceHeaders("https://olympustaff.com", "text/html");
+  assert.equal(otherHeaders["X-MT-Platform"], undefined);
+  assert.equal(otherHeaders["X-MT-UIMode"], undefined);
+
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (calls.length === 1) {
+      return new Response(
+        JSON.stringify({ error: { json: { message: "single transport rejected" } } }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return new Response(
+      JSON.stringify([{ result: { data: { json: { results: [{ id: "ok" }] } } } }]),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+
+  try {
+    const payload = await __test.mangaTimeTrpc("search.searchSeries", {
+      page: 1,
+      limit: 1,
+      sortBy: "recent",
+      sortOrder: "desc",
+      query: null,
+    });
+    assert.equal(payload.results[0].id, "ok");
+    assert.equal(calls.length, 2);
+    assert.equal(new URL(calls[0].url).searchParams.get("batch"), null);
+    assert.equal(new URL(calls[1].url).searchParams.get("batch"), "1");
+    assert.equal(calls[0].options.headers["X-MT-Platform"], "web");
+    assert.equal(calls[0].options.headers["X-MT-UIMode"], "standard");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
