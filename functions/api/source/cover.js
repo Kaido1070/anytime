@@ -253,18 +253,68 @@ function decodeEntities(value) {
 }
 
 async function mangaTimeTrpc(endpoint, input) {
-  const url = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
-  url.searchParams.set("batch", "1");
-  url.searchParams.set("input", JSON.stringify({ "0": { json: input } }));
-  const response = await fetch(url, {
-    headers: sourceHeaders(MANGATIME_BASE, "application/json,text/plain,*/*"),
-    cf: { cacheTtl: 3600, cacheEverything: true },
-  });
-  if (!response.ok) throw new Error(`MangaTime HTTP ${response.status}`);
-  const payload = await response.json();
-  const first = Array.isArray(payload) ? payload[0] : null;
-  if (first?.error) throw new Error(first.error?.json?.message || "MangaTime API error");
-  return first?.result?.data?.json;
+  const headers = sourceHeaders(MANGATIME_BASE, "application/json,text/plain,*/*");
+  const attempts = [
+    {
+      batched: false,
+      url: (() => {
+        const value = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
+        value.searchParams.set("input", JSON.stringify({ json: input }));
+        return value;
+      })(),
+    },
+    {
+      batched: true,
+      url: (() => {
+        const value = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
+        value.searchParams.set("batch", "1");
+        value.searchParams.set("input", JSON.stringify({ "0": { json: input } }));
+        return value;
+      })(),
+    },
+  ];
+
+  let lastError = "MangaTime API error";
+  for (const attempt of attempts) {
+    let response;
+    try {
+      response = await fetch(attempt.url, {
+        headers,
+        redirect: "follow",
+        cf: { cacheTtl: 3600, cacheEverything: true },
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      continue;
+    }
+
+    if (!response.ok) {
+      lastError = `MangaTime HTTP ${response.status}`;
+      continue;
+    }
+
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      lastError = "MangaTime returned invalid JSON";
+      continue;
+    }
+
+    const envelope = attempt.batched
+      ? (Array.isArray(payload) ? payload[0] : null)
+      : (Array.isArray(payload) ? payload[0] : payload);
+    if (envelope?.error) {
+      lastError = envelope.error?.json?.message || envelope.error?.message || "MangaTime API error";
+      continue;
+    }
+
+    const data = envelope?.result?.data?.json;
+    if (data !== undefined) return data;
+    lastError = "MangaTime returned an empty response";
+  }
+
+  throw new Error(lastError);
 }
 
 function sourceHeaders(base, accept) {
@@ -273,7 +323,12 @@ function sourceHeaders(base, accept) {
     "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
     Referer: `${base}/`,
     "User-Agent": SOURCE_UA,
-    "X-MT-Platform": "web",
+    ...(base === MANGATIME_BASE
+      ? {
+          "X-MT-Platform": "web",
+          "X-MT-UIMode": "standard",
+        }
+      : {}),
   };
 }
 
