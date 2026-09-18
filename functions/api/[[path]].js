@@ -81,7 +81,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 3, database: "ready" });
+    return json({ ok: true, phase: 4, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -153,6 +153,33 @@ async function route(request, url, db) {
     return json({ data: await getUserData(db, user.id) });
   }
 
+  if (request.method === "GET" && path === "profile/sections") {
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 8);
+    const previewLimit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(10, Math.trunc(requestedLimit)))
+      : 8;
+    return json({ sections: await getUserProfileSections(db, user.id, previewLimit) });
+  }
+
+  if (request.method === "PUT" && path === "profile/sections") {
+    const body = await readJson(request);
+    const sections = normalizeProfileSectionInput(body?.sections);
+    if (!sections) {
+      return json(
+        { error: "INVALID_PROFILE_SECTIONS", message: "ترتيب أقسام الصفحة غير صالح." },
+        400,
+      );
+    }
+    const saved = await saveUserProfileSections(db, user.id, sections);
+    if (!saved.ok) {
+      return json(
+        { error: saved.error, message: "تعذر حفظ ترتيب الأقسام لأن بيانات الصفحة تغيرت." },
+        saved.status,
+      );
+    }
+    return json({ sections: await getUserProfileSections(db, user.id, 8) });
+  }
+
   if (request.method === "GET" && path === "lists") {
     return json({ lists: await getUserLists(db, user.id) });
   }
@@ -166,10 +193,17 @@ async function route(request, url, db) {
         400,
       );
     }
-    const last = await db
-      .prepare("SELECT MAX(position) AS position FROM user_lists WHERE user_id = ?")
-      .bind(user.id)
-      .first();
+    await syncUserProfileSections(db, user.id);
+    const [last, lastProfile] = await Promise.all([
+      db
+        .prepare("SELECT MAX(position) AS position FROM user_lists WHERE user_id = ?")
+        .bind(user.id)
+        .first(),
+      db
+        .prepare("SELECT MAX(position) AS position FROM user_profile_sections WHERE user_id = ?")
+        .bind(user.id)
+        .first(),
+    ]);
     const now = Date.now();
     const list = {
       id: crypto.randomUUID(),
@@ -180,22 +214,36 @@ async function route(request, url, db) {
       createdAt: now,
       updatedAt: now,
     };
-    await db
-      .prepare(
-        `INSERT INTO user_lists
-          (id, user_id, name, description, position, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        list.id,
-        user.id,
-        list.name,
-        list.description,
-        list.position,
-        list.createdAt,
-        list.updatedAt,
-      )
-      .run();
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO user_lists
+            (id, user_id, name, description, position, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          list.id,
+          user.id,
+          list.name,
+          list.description,
+          list.position,
+          list.createdAt,
+          list.updatedAt,
+        ),
+      db
+        .prepare(
+          `INSERT INTO user_profile_sections
+            (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+           VALUES (?, 'custom_list', ?, ?, 1, ?, ?)`,
+        )
+        .bind(
+          user.id,
+          list.id,
+          Number(lastProfile?.position ?? 2048) + 1024,
+          now,
+          now,
+        ),
+    ]);
     return json({ list }, 201);
   }
 
@@ -359,10 +407,16 @@ async function route(request, url, db) {
     }
 
     if (request.method === "DELETE") {
-      const result = await db
-        .prepare("DELETE FROM user_lists WHERE id = ? AND user_id = ?")
-        .bind(listId, user.id)
-        .run();
+      const [, result] = await db.batch([
+        db
+          .prepare(
+            "DELETE FROM user_profile_sections WHERE user_id = ? AND reference_id = ? AND section_type = 'custom_list'",
+          )
+          .bind(user.id, listId),
+        db
+          .prepare("DELETE FROM user_lists WHERE id = ? AND user_id = ?")
+          .bind(listId, user.id),
+      ]);
       if (!result.meta?.changes) return json({ error: "LIST_NOT_FOUND" }, 404);
       return json({ ok: true });
     }
@@ -720,11 +774,19 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "4") return;
+  if (version?.value === "5") return;
+  if (version?.value === "4") {
+    await db.batch([
+      ...profileSectionSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+    ]);
+    return;
+  }
   if (version?.value === "3") {
     await db.batch([
       ...listSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '4')"),
+      ...profileSectionSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
     ]);
     return;
   }
@@ -733,7 +795,8 @@ async function ensureDatabase(db) {
       ...librarySchemaStatements(db),
       ...libraryBackfillStatements(db),
       ...listSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '4')"),
+      ...profileSectionSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
     ]);
     return;
   }
@@ -796,6 +859,7 @@ async function ensureDatabase(db) {
     )`),
     ...librarySchemaStatements(db),
     ...listSchemaStatements(db),
+    ...profileSectionSchemaStatements(db),
   ];
 
   for (const seeded of SEEDED_USERS) {
@@ -869,7 +933,7 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '4')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
   );
   await db.batch(statements);
 }
@@ -1010,6 +1074,245 @@ function listSchemaStatements(db) {
       "CREATE INDEX IF NOT EXISTS idx_user_list_items_work ON user_list_items(manga_id, list_id)",
     ),
   ];
+}
+
+function profileSectionSchemaStatements(db) {
+  return [
+    db.prepare(`CREATE TABLE IF NOT EXISTS user_profile_sections (
+      user_id TEXT NOT NULL,
+      section_type TEXT NOT NULL CHECK (section_type IN ('continue_reading','favorites','custom_list')),
+      reference_id TEXT NOT NULL DEFAULT '',
+      position REAL NOT NULL DEFAULT 0,
+      is_visible INTEGER NOT NULL DEFAULT 1 CHECK (is_visible IN (0,1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, section_type, reference_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
+    ),
+  ];
+}
+
+async function syncUserProfileSections(db, userId) {
+  const now = Date.now();
+  await db.batch([
+    db
+      .prepare(
+        `DELETE FROM user_profile_sections
+         WHERE user_id = ? AND section_type = 'custom_list'
+           AND NOT EXISTS (
+             SELECT 1 FROM user_lists l
+             WHERE l.id = user_profile_sections.reference_id AND l.user_id = ?
+           )`,
+      )
+      .bind(userId, userId),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO user_profile_sections
+          (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+         VALUES (?, 'continue_reading', '', 1024, 1, ?, ?)`,
+      )
+      .bind(userId, now, now),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO user_profile_sections
+          (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+         VALUES (?, 'favorites', '', 2048, 1, ?, ?)`,
+      )
+      .bind(userId, now, now),
+  ]);
+
+  const missing = await db
+    .prepare(
+      `SELECT l.id
+       FROM user_lists l
+       LEFT JOIN user_profile_sections s
+         ON s.user_id = l.user_id
+        AND s.section_type = 'custom_list'
+        AND s.reference_id = l.id
+       WHERE l.user_id = ? AND s.reference_id IS NULL
+       ORDER BY l.position ASC, l.created_at ASC, l.id ASC`,
+    )
+    .bind(userId)
+    .all();
+
+  if (!(missing.results ?? []).length) return;
+  const last = await db
+    .prepare("SELECT MAX(position) AS position FROM user_profile_sections WHERE user_id = ?")
+    .bind(userId)
+    .first();
+  let position = Number(last?.position ?? 2048);
+  const statements = (missing.results ?? []).map((row) => {
+    position += 1024;
+    return db
+      .prepare(
+        `INSERT OR IGNORE INTO user_profile_sections
+          (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+         VALUES (?, 'custom_list', ?, ?, 1, ?, ?)`,
+      )
+      .bind(userId, row.id, position, now, now);
+  });
+  if (statements.length) await db.batch(statements);
+}
+
+async function getUserProfileSections(db, userId, previewLimit = 8) {
+  await syncUserProfileSections(db, userId);
+  const sectionResult = await db
+    .prepare(
+      `SELECT
+         s.section_type, s.reference_id, s.position, s.is_visible, s.created_at, s.updated_at,
+         l.id AS list_id, l.name AS list_name, l.description AS list_description,
+         l.position AS list_position, l.created_at AS list_created_at, l.updated_at AS list_updated_at,
+         COALESCE(c.item_count, 0) AS item_count
+       FROM user_profile_sections s
+       LEFT JOIN user_lists l
+         ON s.section_type = 'custom_list'
+        AND l.id = s.reference_id
+        AND l.user_id = s.user_id
+       LEFT JOIN (
+         SELECT list_id, COUNT(*) AS item_count
+         FROM user_list_items
+         GROUP BY list_id
+       ) c ON c.list_id = l.id
+       WHERE s.user_id = ?
+         AND (s.section_type <> 'custom_list' OR l.id IS NOT NULL)
+       ORDER BY s.position ASC, s.created_at ASC, s.section_type ASC, s.reference_id ASC`,
+    )
+    .bind(userId)
+    .all();
+
+  const previewResult = await db
+    .prepare(
+      `WITH ranked AS (
+         SELECT
+           i.list_id,
+           i.manga_id,
+           i.position,
+           i.added_at,
+           ROW_NUMBER() OVER (PARTITION BY i.list_id ORDER BY i.position ASC, i.added_at ASC, i.manga_id ASC) AS row_number
+         FROM user_list_items i
+         JOIN user_lists l ON l.id = i.list_id
+         WHERE l.user_id = ?
+       )
+       SELECT list_id, manga_id, position, added_at
+       FROM ranked
+       WHERE row_number <= ?
+       ORDER BY list_id ASC, row_number ASC`,
+    )
+    .bind(userId, previewLimit)
+    .all();
+
+  const previews = new Map();
+  for (const row of previewResult.results ?? []) {
+    const values = previews.get(row.list_id) ?? [];
+    values.push(row.manga_id);
+    previews.set(row.list_id, values);
+  }
+
+  return (sectionResult.results ?? []).map((row) => {
+    const custom = row.section_type === "custom_list";
+    const referenceId = custom ? row.reference_id : null;
+    return {
+      key: custom ? `list:${row.reference_id}` : `system:${row.section_type}`,
+      sectionType: row.section_type,
+      referenceId,
+      position: Number(row.position),
+      isVisible: Number(row.is_visible) === 1,
+      list: custom
+        ? {
+            id: row.list_id,
+            name: row.list_name,
+            description: row.list_description ?? null,
+            position: Number(row.list_position),
+            itemCount: Number(row.item_count ?? 0),
+            createdAt: Number(row.list_created_at),
+            updatedAt: Number(row.list_updated_at),
+          }
+        : null,
+      previewItems: custom ? previews.get(row.reference_id) ?? [] : [],
+    };
+  });
+}
+
+function normalizeProfileSectionInput(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 100) return null;
+  const seen = new Set();
+  const normalized = [];
+  for (const section of value) {
+    const sectionType =
+      section?.sectionType === "continue_reading" ||
+      section?.sectionType === "favorites" ||
+      section?.sectionType === "custom_list"
+        ? section.sectionType
+        : "";
+    if (!sectionType || typeof section?.isVisible !== "boolean") return null;
+    const referenceId = sectionType === "custom_list" ? safeId(section.referenceId) : "";
+    if (sectionType === "custom_list" && !referenceId) return null;
+    const key = `${sectionType}:${referenceId}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    normalized.push({ sectionType, referenceId, isVisible: section.isVisible });
+  }
+  return normalized;
+}
+
+async function saveUserProfileSections(db, userId, sections) {
+  await syncUserProfileSections(db, userId);
+  const customIds = sections
+    .filter((section) => section.sectionType === "custom_list")
+    .map((section) => section.referenceId);
+
+  if (customIds.length) {
+    const placeholders = customIds.map(() => "?").join(",");
+    const owned = await db
+      .prepare(`SELECT id FROM user_lists WHERE user_id = ? AND id IN (${placeholders})`)
+      .bind(userId, ...customIds)
+      .all();
+    if ((owned.results ?? []).length !== customIds.length) {
+      return { ok: false, error: "PROFILE_SECTION_NOT_OWNED", status: 403 };
+    }
+  }
+
+  const existing = await db
+    .prepare(
+      "SELECT section_type, reference_id FROM user_profile_sections WHERE user_id = ? ORDER BY section_type, reference_id",
+    )
+    .bind(userId)
+    .all();
+  const expectedKeys = (existing.results ?? [])
+    .map((row) => `${row.section_type}:${row.reference_id}`)
+    .sort();
+  const requestedKeys = sections
+    .map((section) => `${section.sectionType}:${section.referenceId}`)
+    .sort();
+  if (
+    expectedKeys.length !== requestedKeys.length ||
+    expectedKeys.some((key, index) => key !== requestedKeys[index])
+  ) {
+    return { ok: false, error: "PROFILE_SECTIONS_CHANGED", status: 409 };
+  }
+
+  const now = Date.now();
+  const statements = sections.map((section, index) =>
+    db
+      .prepare(
+        `UPDATE user_profile_sections
+         SET position = ?, is_visible = ?, updated_at = ?
+         WHERE user_id = ? AND section_type = ? AND reference_id = ?`,
+      )
+      .bind(
+        (index + 1) * 1024,
+        section.isVisible ? 1 : 0,
+        now,
+        userId,
+        section.sectionType,
+        section.referenceId,
+      ),
+  );
+  await db.batch(statements);
+  return { ok: true };
 }
 
 async function getUserLists(db, userId) {
