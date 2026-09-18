@@ -7,9 +7,18 @@ const RECOVERY_ITERATIONS = 210000;
 const RECOVERY_SEEDS = [
   ["admin", "iXMrYFxlRGeNeXtahvJrxg", "qB91GPghZPSkaJ4EkLZlQ4O33bYMktRSEWQ8TzHiJ08"],
   ["m", "DQKmZM9LWDe-yvsralJ3NA", "gk2_0df_3o7dJprXj1IzLcRnJUUmiGF1YgfjXKhe0T8"],
-  ["Y", "yzbZYsIxWd_q11a259Vekg", "JkkmyqM-AxXhtFvjyuGw2_tgIOix_C1O0Zww0gEowC0"],
-  ["H", "kfncionM84kNNDTiZGagDQ", "hYOzUUBxo4VWBLVZHUpPbWyufAcPqN11e6GckRtyO_c"],
+  ["yas", "yzbZYsIxWd_q11a259Vekg", "JkkmyqM-AxXhtFvjyuGw2_tgIOix_C1O0Zww0gEowC0"],
+  ["has", "kfncionM84kNNDTiZGagDQ", "hYOzUUBxo4VWBLVZHUpPbWyufAcPqN11e6GckRtyO_c"],
 ];
+
+const RECOVERY_ACCOUNT_IDS = {
+  admin: "admin",
+  m: "m",
+  y: "yas",
+  yas: "yas",
+  h: "has",
+  has: "has",
+};
 
 export async function onRequestPost(context) {
   const { request } = context;
@@ -27,10 +36,11 @@ export async function onRequestPost(context) {
 
     const body = await request.json().catch(() => ({}));
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
+    const accountId = RECOVERY_ACCOUNT_IDS[username] ?? null;
     const recoveryCode = typeof body.recoveryCode === "string" ? body.recoveryCode.trim() : "";
     const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
 
-    if (!/^[a-z0-9_-]{1,64}$/.test(username) || recoveryCode.length < 20 || recoveryCode.length > 128) {
+    if (!accountId || recoveryCode.length < 20 || recoveryCode.length > 128) {
       await sleep(250);
       return invalidRecovery();
     }
@@ -41,8 +51,8 @@ export async function onRequestPost(context) {
     const row = await db.prepare(`
       SELECT u.id, r.recovery_salt, r.recovery_hash, r.recovery_iterations
       FROM users u JOIN account_recovery r ON r.user_id = u.id
-      WHERE u.username = ? COLLATE NOCASE LIMIT 1
-    `).bind(username).first();
+      WHERE u.id = ? LIMIT 1
+    `).bind(accountId).first();
 
     if (!row || !(await verifyRecoveryCode(recoveryCode, row))) {
       await sleep(250);
@@ -78,16 +88,16 @@ async function ensureRecoveryCodes(db) {
   )`).run();
 
   const now = Date.now();
-  for (const [username, salt, hash] of RECOVERY_SEEDS) {
+  for (const [userId, salt, hash] of RECOVERY_SEEDS) {
     await db.prepare(`
       INSERT INTO account_recovery
         (user_id, recovery_salt, recovery_hash, recovery_iterations, created_at)
-      SELECT id, ?, ?, ?, ? FROM users WHERE username = ? COLLATE NOCASE LIMIT 1
+      SELECT id, ?, ?, ?, ? FROM users WHERE id = ? LIMIT 1
       ON CONFLICT(user_id) DO UPDATE SET
         recovery_salt = excluded.recovery_salt,
         recovery_hash = excluded.recovery_hash,
         recovery_iterations = excluded.recovery_iterations
-    `).bind(salt, hash, RECOVERY_ITERATIONS, now, username).run();
+    `).bind(salt, hash, RECOVERY_ITERATIONS, now, userId).run();
   }
 }
 
