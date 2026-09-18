@@ -89,7 +89,7 @@ function ReaderChapter({
   sourceKey: string;
   payload: SourceChapterPayload;
 }) {
-  const { data, saveProgress } = useLibrary();
+  const { data, saveProgress, recordChapterOpen } = useLibrary();
   const chapter = payload.number;
   const saved = data?.progress[`${sourceKey}:${chapter}`]?.percent ?? 0;
   const [percent, setPercent] = useState(saved);
@@ -106,6 +106,10 @@ function ReaderChapter({
   );
   const prefetchedNextRef = useRef<number | null>(null);
   saveRef.current = saveProgress;
+
+  useEffect(() => {
+    void recordChapterOpen(sourceKey, chapter);
+  }, [chapter, recordChapterOpen, sourceKey]);
 
   const pumpImageQueue = useCallback(() => {
     let changed = false;

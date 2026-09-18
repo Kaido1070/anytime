@@ -153,6 +153,114 @@ async function route(request, url, db) {
     return json({ data: await getUserData(db, user.id) });
   }
 
+  if (request.method === "GET" && path === "library") {
+    const data = await getUserData(db, user.id);
+    return json({ library: data.library });
+  }
+
+  if (request.method === "POST" && path === "library") {
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    const status = libraryStatus(body.status) || "planned";
+    if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+    const now = Date.now();
+    await db
+      .prepare(`INSERT INTO user_library
+        (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+        VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL)
+        ON CONFLICT(user_id, manga_id) DO UPDATE SET
+          status = excluded.status,
+          updated_at = excluded.updated_at`)
+      .bind(user.id, mangaId, status, now, now)
+      .run();
+    return json({ ok: true }, 201);
+  }
+
+  if (request.method === "PUT" && path === "library") {
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    const status = libraryStatus(body.status);
+    if (!mangaId || !status) return json({ error: "INVALID_LIBRARY_ITEM" }, 400);
+    const result = await db
+      .prepare("UPDATE user_library SET status = ?, updated_at = ? WHERE user_id = ? AND manga_id = ?")
+      .bind(status, Date.now(), user.id, mangaId)
+      .run();
+    if (!result.meta?.changes) return json({ error: "LIBRARY_ITEM_NOT_FOUND" }, 404);
+    return json({ ok: true });
+  }
+
+  const libraryMatch = path.match(/^library\/([^/]+)$/);
+  if (request.method === "DELETE" && libraryMatch) {
+    const mangaId = safeId(decodeURIComponent(libraryMatch[1]));
+    if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+    await db
+      .prepare("DELETE FROM user_library WHERE user_id = ? AND manga_id = ?")
+      .bind(user.id, mangaId)
+      .run();
+    return json({ ok: true });
+  }
+
+  if (request.method === "POST" && path === "reading/open") {
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    const chapter = Number(body.chapter);
+    if (!mangaId || !Number.isFinite(chapter) || chapter < 0) {
+      return json({ error: "INVALID_READING_EVENT" }, 400);
+    }
+    const now = Date.now();
+    await db.batch([
+      db
+        .prepare("INSERT INTO reading_history (user_id, manga_id, chapter, read_at) VALUES (?, ?, ?, ?)")
+        .bind(user.id, mangaId, chapter, now),
+      db
+        .prepare(`INSERT INTO user_library
+          (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+          VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, manga_id) DO UPDATE SET
+            status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
+            updated_at = excluded.updated_at,
+            last_read_at = excluded.last_read_at,
+            last_read_chapter = excluded.last_read_chapter,
+            highest_reached_chapter = CASE
+              WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+              ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
+            END`)
+        .bind(user.id, mangaId, now, now, now, chapter, chapter),
+      db
+        .prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            last_manga_id = excluded.last_manga_id,
+            last_chapter = excluded.last_chapter,
+            updated_at = excluded.updated_at`)
+        .bind(user.id, mangaId, chapter, now),
+    ]);
+    return json({ ok: true, readAt: now });
+  }
+
+  if (request.method === "GET" && path === "reading/history") {
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 100);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(200, Math.trunc(requestedLimit)))
+      : 100;
+    const result = await db
+      .prepare(`SELECT id, manga_id, chapter, read_at
+        FROM reading_history
+        WHERE user_id = ?
+        ORDER BY read_at DESC, id DESC
+        LIMIT ?`)
+      .bind(user.id, limit)
+      .all();
+    return json({
+      history: (result.results ?? []).map((row) => ({
+        id: Number(row.id),
+        mangaId: row.manga_id,
+        chapter: Number(row.chapter),
+        readAt: Number(row.read_at),
+      })),
+    });
+  }
+
   if (request.method === "POST" && path === "favorites") {
     const body = await readJson(request);
     const mangaId = safeId(body.mangaId);
@@ -183,7 +291,7 @@ async function route(request, url, db) {
     const clientUpdatedAt = Number(body.updatedAt);
     if (
       !mangaId ||
-      !Number.isInteger(chapter) ||
+      !Number.isFinite(chapter) ||
       chapter < 0 ||
       !Number.isFinite(percent)
     ) {
@@ -220,6 +328,28 @@ async function route(request, url, db) {
            WHERE excluded.updated_at >= user_state.updated_at`,
         )
         .bind(user.id, mangaId, chapter, updatedAt),
+      db
+        .prepare(`INSERT INTO user_library
+          (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+         VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, manga_id) DO UPDATE SET
+           status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
+           updated_at = MAX(user_library.updated_at, excluded.updated_at),
+           last_read_at = CASE
+             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
+               THEN excluded.last_read_at
+             ELSE user_library.last_read_at
+           END,
+           last_read_chapter = CASE
+             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
+               THEN excluded.last_read_chapter
+             ELSE user_library.last_read_chapter
+           END,
+           highest_reached_chapter = CASE
+             WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+             ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
+           END`)
+        .bind(user.id, mangaId, updatedAt, updatedAt, updatedAt, chapter, chapter),
     ]);
 
     return json({ ok: true });
@@ -316,7 +446,15 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "2") return;
+  if (version?.value === "3") return;
+  if (version?.value === "2") {
+    await db.batch([
+      ...librarySchemaStatements(db),
+      ...libraryBackfillStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '3')"),
+    ]);
+    return;
+  }
 
   const now = Date.now();
   const statements = [
@@ -374,6 +512,7 @@ async function ensureDatabase(db) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
     )`),
+    ...librarySchemaStatements(db),
   ];
 
   for (const seeded of SEEDED_USERS) {
@@ -444,11 +583,118 @@ async function ensureDatabase(db) {
     }
   }
 
+  statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '2')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '3')"),
   );
   await db.batch(statements);
+}
+
+function librarySchemaStatements(db) {
+  return [
+    db.prepare(`CREATE TABLE IF NOT EXISTS user_library (
+      user_id TEXT NOT NULL,
+      manga_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('reading','completed','paused','planned')),
+      added_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      last_read_at INTEGER,
+      last_read_chapter REAL,
+      highest_reached_chapter REAL,
+      PRIMARY KEY (user_id, manga_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_recent ON user_library(user_id, last_read_at DESC, updated_at DESC)"),
+    db.prepare(`CREATE TABLE IF NOT EXISTS reading_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      manga_id TEXT NOT NULL,
+      chapter REAL NOT NULL,
+      read_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_time ON reading_history(user_id, read_at DESC, id DESC)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_work ON reading_history(user_id, manga_id, read_at DESC)"),
+  ];
+}
+
+function libraryBackfillStatements(db) {
+  return [
+    db.prepare(`INSERT OR IGNORE INTO user_library
+      (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+      SELECT user_id, manga_id, 'planned', created_at, created_at, NULL, NULL, NULL
+      FROM favorites`),
+    db.prepare(`INSERT OR IGNORE INTO user_library
+      (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+      SELECT
+        p.user_id,
+        p.manga_id,
+        'reading',
+        MIN(p.updated_at),
+        MAX(p.updated_at),
+        MAX(p.updated_at),
+        (
+          SELECT rp.chapter
+          FROM reading_progress rp
+          WHERE rp.user_id = p.user_id AND rp.manga_id = p.manga_id
+          ORDER BY rp.updated_at DESC, rp.chapter DESC
+          LIMIT 1
+        ),
+        MAX(p.chapter)
+      FROM reading_progress p
+      GROUP BY p.user_id, p.manga_id`),
+    db.prepare(`UPDATE user_library
+      SET
+        status = CASE
+          WHEN status = 'planned' AND EXISTS (
+            SELECT 1 FROM reading_progress rp
+            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+          ) THEN 'reading'
+          ELSE status
+        END,
+        updated_at = MAX(
+          updated_at,
+          COALESCE((
+            SELECT MAX(rp.updated_at)
+            FROM reading_progress rp
+            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+          ), updated_at)
+        ),
+        last_read_at = COALESCE((
+          SELECT MAX(rp.updated_at)
+          FROM reading_progress rp
+          WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+        ), last_read_at),
+        last_read_chapter = COALESCE((
+          SELECT rp.chapter
+          FROM reading_progress rp
+          WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+          ORDER BY rp.updated_at DESC, rp.chapter DESC
+          LIMIT 1
+        ), last_read_chapter),
+        highest_reached_chapter = CASE
+          WHEN (
+            SELECT MAX(rp.chapter)
+            FROM reading_progress rp
+            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+          ) IS NULL THEN highest_reached_chapter
+          WHEN highest_reached_chapter IS NULL THEN (
+            SELECT MAX(rp.chapter)
+            FROM reading_progress rp
+            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+          )
+          ELSE MAX(highest_reached_chapter, (
+            SELECT MAX(rp.chapter)
+            FROM reading_progress rp
+            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+          ))
+        END
+      WHERE EXISTS (
+        SELECT 1 FROM reading_progress rp
+        WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
+      )`),
+  ];
 }
 
 async function getSession(request, db) {
@@ -482,7 +728,7 @@ async function getSession(request, db) {
 }
 
 async function getUserData(db, userId) {
-  const [favoriteResult, progressResult, state] = await Promise.all([
+  const [favoriteResult, progressResult, state, libraryResult] = await Promise.all([
     db
       .prepare("SELECT manga_id FROM favorites WHERE user_id = ? ORDER BY created_at ASC")
       .bind(userId)
@@ -497,6 +743,14 @@ async function getUserData(db, userId) {
       .prepare("SELECT last_manga_id, last_chapter FROM user_state WHERE user_id = ? LIMIT 1")
       .bind(userId)
       .first(),
+    db
+      .prepare(`SELECT
+        manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter
+       FROM user_library
+       WHERE user_id = ?
+       ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC`)
+      .bind(userId)
+      .all(),
   ]);
 
   const progress = {};
@@ -512,9 +766,21 @@ async function getUserData(db, userId) {
     if (Number(row.completed) === 1) completed.push(key);
   }
 
+  const library = (libraryResult.results ?? []).map((row) => ({
+    mangaId: row.manga_id,
+    status: row.status,
+    addedAt: Number(row.added_at),
+    updatedAt: Number(row.updated_at),
+    lastReadAt: row.last_read_at == null ? null : Number(row.last_read_at),
+    lastReadChapter: row.last_read_chapter == null ? null : Number(row.last_read_chapter),
+    highestReachedChapter:
+      row.highest_reached_chapter == null ? null : Number(row.highest_reached_chapter),
+  }));
+
   return {
-    version: 2,
+    version: 3,
     favorites: (favoriteResult.results ?? []).map((row) => row.manga_id),
+    library,
     progress,
     completed,
     lastOpened:
@@ -747,6 +1013,12 @@ function normalizeUsername(value) {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase();
   return /^[a-z0-9_-]{2,32}$/.test(normalized) ? normalized : "";
+}
+
+function libraryStatus(value) {
+  return value === "reading" || value === "completed" || value === "paused" || value === "planned"
+    ? value
+    : "";
 }
 
 function safeId(value) {

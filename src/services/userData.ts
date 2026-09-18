@@ -1,4 +1,11 @@
-import type { Friend, ReadingProgress, User, UserData } from "../types";
+import type {
+  Friend,
+  LibraryStatus,
+  ReadingHistoryEntry,
+  ReadingProgress,
+  User,
+  UserData,
+} from "../types";
 
 export interface UserDataService {
   getUser(): Promise<User | null>;
@@ -8,6 +15,11 @@ export interface UserDataService {
   getFavorites(): Promise<string[]>;
   addFavorite(id: string): Promise<void>;
   removeFavorite(id: string): Promise<void>;
+  addToLibrary(id: string, status?: LibraryStatus): Promise<void>;
+  setLibraryStatus(id: string, status: LibraryStatus): Promise<void>;
+  removeFromLibrary(id: string): Promise<void>;
+  recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
+  getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
   saveReadingProgress(progress: ReadingProgress): Promise<void>;
   getFriends(): Promise<Friend[]>;
@@ -36,16 +48,17 @@ class ApiError extends Error {
 const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|ml):/.test(value));
 
 function normalizeData(data: UserData): UserData {
-  const favorites = data.favorites.filter((id) => isLiveKey(id));
+  const favorites = (data.favorites ?? []).filter((id) => isLiveKey(id));
+  const library = (data.library ?? []).filter((item) => isLiveKey(item.mangaId));
   const progress = Object.fromEntries(
-    Object.entries(data.progress).filter(([, item]) => isLiveKey(item.mangaId)),
+    Object.entries(data.progress ?? {}).filter(([, item]) => isLiveKey(item.mangaId)),
   );
-  const completed = data.completed.filter((key) => {
-    const item = data.progress[key];
+  const completed = (data.completed ?? []).filter((key) => {
+    const item = progress[key];
     return item ? isLiveKey(item.mangaId) : /^(mt|tx|aq|sz|xs|ml):/.test(key);
   });
   const lastOpened = data.lastOpened && isLiveKey(data.lastOpened.mangaId) ? data.lastOpened : null;
-  return { ...data, favorites, progress, completed, lastOpened };
+  return { ...data, version: 3, favorites, library, progress, completed, lastOpened };
 }
 
 function normalizeFriends(friends: Friend[]): Friend[] {
@@ -150,6 +163,47 @@ class ApiUserDataService implements UserDataService {
     await this.request<{ ok: boolean }>(`favorites/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+  }
+
+  async addToLibrary(id: string, status: LibraryStatus = "planned") {
+    if (!isLiveKey(id)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    await this.request<{ ok: boolean }>("library", {
+      method: "POST",
+      body: JSON.stringify({ mangaId: id, status }),
+    });
+  }
+
+  async setLibraryStatus(id: string, status: LibraryStatus) {
+    if (!isLiveKey(id)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    await this.request<{ ok: boolean }>("library", {
+      method: "PUT",
+      body: JSON.stringify({ mangaId: id, status }),
+    });
+  }
+
+  async removeFromLibrary(id: string) {
+    await this.request<{ ok: boolean }>(`library/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  }
+
+  async recordChapterOpen(mangaId: string, chapter: number) {
+    if (!isLiveKey(mangaId) || !Number.isFinite(chapter) || chapter < 0) {
+      throw new Error("بيانات الفصل غير صالحة.");
+    }
+    return await this.request<{ ok: boolean; readAt: number }>("reading/open", {
+      method: "POST",
+      body: JSON.stringify({ mangaId, chapter }),
+      keepalive: true,
+    });
+  }
+
+  async getReadingHistory(limit = 100) {
+    const normalizedLimit = Math.max(1, Math.min(200, Math.trunc(limit)));
+    const result = await this.request<{ history: ReadingHistoryEntry[] }>(
+      `reading/history?limit=${normalizedLimit}`,
+    );
+    return result.history.filter((item) => isLiveKey(item.mangaId));
   }
 
   async getReadingProgress() {

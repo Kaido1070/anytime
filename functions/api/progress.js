@@ -13,6 +13,8 @@ export async function onRequestPut(context) {
   if (!session) return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
 
   try {
+    await ensureLibrarySchema(db);
+
     const body = await request.json();
     const mangaId = safeId(body.mangaId);
     const chapter = Number(body.chapter);
@@ -48,6 +50,28 @@ export async function onRequestPut(context) {
            updated_at = excluded.updated_at
          WHERE excluded.updated_at >= user_state.updated_at`)
         .bind(session.userId, mangaId, chapter, updatedAt),
+      db
+        .prepare(`INSERT INTO user_library
+          (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+         VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, manga_id) DO UPDATE SET
+           status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
+           updated_at = MAX(user_library.updated_at, excluded.updated_at),
+           last_read_at = CASE
+             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
+               THEN excluded.last_read_at
+             ELSE user_library.last_read_at
+           END,
+           last_read_chapter = CASE
+             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
+               THEN excluded.last_read_chapter
+             ELSE user_library.last_read_chapter
+           END,
+           highest_reached_chapter = CASE
+             WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+             ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
+           END`)
+        .bind(session.userId, mangaId, updatedAt, updatedAt, updatedAt, chapter, chapter),
     ]);
 
     return json({ ok: true });
@@ -55,6 +79,24 @@ export async function onRequestPut(context) {
     console.error("Anytime progress error", error);
     return json({ error: "SERVER_ERROR", message: "تعذر حفظ تقدم القراءة." }, 500);
   }
+}
+
+async function ensureLibrarySchema(db) {
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS user_library (
+      user_id TEXT NOT NULL,
+      manga_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('reading','completed','paused','planned')),
+      added_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      last_read_at INTEGER,
+      last_read_chapter REAL,
+      highest_reached_chapter REAL,
+      PRIMARY KEY (user_id, manga_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_recent ON user_library(user_id, last_read_at DESC, updated_at DESC)"),
+  ]);
 }
 
 async function getSession(request, db) {

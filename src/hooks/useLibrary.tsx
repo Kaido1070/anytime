@@ -6,8 +6,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { mergeLibraryRead } from "../services/reading";
 import { userDataService as service } from "../services/userData";
-import type { User, UserData, Friend, ReadingProgress } from "../types";
+import type {
+  Friend,
+  LibraryStatus,
+  ReadingProgress,
+  User,
+  UserData,
+} from "../types";
 
 function useLibraryState() {
   const [user, setUser] = useState<User | null>(null);
@@ -87,6 +94,63 @@ function useLibraryState() {
     }
   };
 
+  const addToLibrary = async (id: string, status: LibraryStatus = "planned") => {
+    try {
+      setError("");
+      await service.addToLibrary(id, status);
+      setData(await service.getData());
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تعذر إضافة العمل إلى المكتبة.",
+      );
+    }
+  };
+
+  const setLibraryStatus = async (id: string, status: LibraryStatus) => {
+    try {
+      setError("");
+      await service.setLibraryStatus(id, status);
+      setData(await service.getData());
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تعذر تحديث حالة العمل.",
+      );
+    }
+  };
+
+  const removeFromLibrary = async (id: string) => {
+    try {
+      setError("");
+      await service.removeFromLibrary(id);
+      setData(await service.getData());
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تعذر حذف العمل من المكتبة.",
+      );
+    }
+  };
+
+  const recordChapterOpen = useCallback(async (mangaId: string, chapter: number) => {
+    const readAt = Date.now();
+    setData((current) => {
+      if (!current) return current;
+      const existing = current.library.find((item) => item.mangaId === mangaId);
+      const next = mergeLibraryRead(existing, mangaId, chapter, readAt);
+      return {
+        ...current,
+        library: [next, ...current.library.filter((item) => item.mangaId !== mangaId)],
+        lastOpened: { mangaId, chapter },
+      };
+    });
+    try {
+      await service.recordChapterOpen(mangaId, chapter);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تعذر تسجيل فتح الفصل.",
+      );
+    }
+  }, []);
+
   const saveProgress = async (progress: ReadingProgress) => {
     const key = `${progress.mangaId}:${progress.chapter}`;
     setData((current) => {
@@ -95,8 +159,19 @@ function useLibraryState() {
         progress.percent >= 98 && !current.completed.includes(key)
           ? [...current.completed, key]
           : current.completed;
+      const existing = current.library.find((item) => item.mangaId === progress.mangaId);
+      const libraryEntry = mergeLibraryRead(
+        existing,
+        progress.mangaId,
+        progress.chapter,
+        progress.updatedAt,
+      );
       return {
         ...current,
+        library: [
+          libraryEntry,
+          ...current.library.filter((item) => item.mangaId !== progress.mangaId),
+        ],
         progress: {
           ...current.progress,
           [key]: {
@@ -144,6 +219,10 @@ function useLibraryState() {
     signIn,
     signOut,
     favorite,
+    addToLibrary,
+    setLibraryStatus,
+    removeFromLibrary,
+    recordChapterOpen,
     saveProgress,
     addFriend,
     removeFriend,

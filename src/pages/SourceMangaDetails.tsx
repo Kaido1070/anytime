@@ -4,10 +4,11 @@ import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { parseSourceGroupKeys, preferredSourceCover, sourceDetailsPath } from "../services/sourceMerge";
+import { getContinueChapter } from "../services/reading";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { formatGregorianDate } from "../services/dateFormat";
 import { sourceService } from "../services/sources";
-import type { SourceManga } from "../types";
+import type { LibraryStatus, SourceManga } from "../types";
 
 function statusLabel(status?: string) {
   switch (status) {
@@ -27,7 +28,7 @@ export function SourceMangaDetails() {
   const sourceGroupParam = searchParams.get("sources");
   const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
   const requestedSourceSignature = requestedSourceKeys.join("|");
-  const { data, favorite } = useLibrary();
+  const { data, favorite, addToLibrary, setLibraryStatus } = useLibrary();
   const [item, setItem] = useState<SourceManga | null>(null);
   const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,9 +61,10 @@ export function SourceMangaDetails() {
     return () => { active = false; };
   }, [requestedSourceSignature]);
 
-  const saved = useMemo(() => Object.values(data?.progress ?? {})
-    .filter((progress) => progress.mangaId === sourceKey)
-    .sort((a, b) => b.updatedAt - a.updatedAt)[0], [data?.progress, sourceKey]);
+  const libraryEntry = useMemo(
+    () => data?.library.find((entry) => entry.mangaId === sourceKey),
+    [data?.library, sourceKey],
+  );
 
   if (loading) return <><Back to="/discover" /><p className="empty">جاري تحميل العمل والفصول من المصدر…</p></>;
   if (!item || error) return <><Back to="/discover" /><h1>تعذر فتح العمل</h1><p className="error source-error">{error || "العمل غير موجود في المصدر."}</p></>;
@@ -75,7 +77,13 @@ export function SourceMangaDetails() {
   const chapters = item.chapters ?? [];
   const orderedChapters = [...chapters].sort((a, b) => ascending ? a.number - b.number : b.number - a.number);
   const firstChapter = [...chapters].sort((a, b) => a.number - b.number)[0]?.number;
-  const startChapter = saved?.chapter ?? firstChapter;
+  const highestChapter = libraryEntry?.highestReachedChapter ?? null;
+  const highestCompleted =
+    highestChapter != null && Boolean(data?.completed.includes(`${sourceKey}:${highestChapter}`));
+  const startChapter =
+    highestChapter != null
+      ? getContinueChapter(chapters, highestChapter, highestCompleted)
+      : firstChapter;
   const isFavorite = data?.favorites.includes(sourceKey);
   const displayTitle = sourceDisplayTitle(item);
   const coverItem = preferredSourceCover(sourceChoices.length ? sourceChoices : [item]) ?? item;
@@ -122,7 +130,31 @@ export function SourceMangaDetails() {
           <div className="genres">{(item.genres ?? []).slice(0, 10).map((genre) => <span key={genre}>{genre}</span>)}</div>
           {item.description && <p className="description" dir="auto">{item.description}</p>}
           <div className="detail-actions">
-            {startChapter != null && <Link className="primary" to={`/read-source/${encodeURIComponent(sourceKey)}/${startChapter}`}>{saved ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
+            {startChapter != null && <Link className="primary" to={`/read-source/${encodeURIComponent(sourceKey)}/${startChapter}`}>{highestChapter != null ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
+            <button
+              className="secondary"
+              aria-pressed={Boolean(libraryEntry)}
+              disabled={Boolean(libraryEntry)}
+              onClick={() => void addToLibrary(sourceKey, "planned")}
+            >
+              <Icon name={libraryEntry ? "check" : "favorites"} />
+              {libraryEntry ? "في مكتبتي" : "إضافة لمكتبتي"}
+            </button>
+            {libraryEntry && (
+              <select
+                className="library-status-select"
+                aria-label="حالة العمل في المكتبة"
+                value={libraryEntry.status}
+                onChange={(event) =>
+                  void setLibraryStatus(sourceKey, event.target.value as LibraryStatus)
+                }
+              >
+                <option value="reading">أقرأ الآن</option>
+                <option value="completed">مكتمل</option>
+                <option value="paused">متوقف مؤقتًا</option>
+                <option value="planned">مخطط له</option>
+              </select>
+            )}
             <button className="secondary" aria-pressed={isFavorite} onClick={() => void favorite(sourceKey)}><Icon name={isFavorite ? "check" : "favorites"} />{isFavorite ? "في المفضلة" : "إضافة للمفضلة"}</button>
           </div>
         </div>
