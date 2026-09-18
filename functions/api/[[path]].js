@@ -1765,14 +1765,13 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version === "14") return;
+      if (version === "13") return;
 
       await ensureDatabase(db);
       await ensureAdminSchema(db);
       await applyRuntimeOptimizationMigration(db);
       await applyUsernameMigration(db);
       await applyUsernameMigrationV13(db);
-      await applyFriendshipCleanupMigration(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -1862,32 +1861,6 @@ async function applyUsernameMigrationV13(db) {
 
   await db
     .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '13')")
-    .run();
-}
-
-async function applyFriendshipCleanupMigration(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "14") return;
-  if (version?.value !== "13") return;
-
-  // Phase 2 originally seeded every demo account as a mutual friend. Remove
-  // only those known demo pairs; normal friendships created by users remain.
-  const seededIds = SEEDED_USERS.map((user) => user.id);
-  for (let i = 0; i < seededIds.length; i += 1) {
-    for (let j = i + 1; j < seededIds.length; j += 1) {
-      const a = seededIds[i];
-      const b = seededIds[j];
-      await db.batch([
-        db.prepare("DELETE FROM friendships WHERE user_id = ? AND friend_id = ?").bind(a, b),
-        db.prepare("DELETE FROM friendships WHERE user_id = ? AND friend_id = ?").bind(b, a),
-      ]);
-    }
-  }
-
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '14')")
     .run();
 }
 
@@ -2105,6 +2078,17 @@ async function ensureDatabase(db) {
         )
         .bind(userId, mangaId, chapter, now),
     );
+  }
+
+  for (const user of SEEDED_USERS) {
+    for (const friend of SEEDED_USERS) {
+      if (user.id === friend.id) continue;
+      statements.push(
+        db
+          .prepare("INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)")
+          .bind(user.id, friend.id, now),
+      );
+    }
   }
 
   statements.push(...libraryBackfillStatements(db));
