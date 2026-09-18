@@ -1,4 +1,4 @@
-export const RECOMMENDATION_ALGORITHM_VERSION = "10.5.1";
+export const RECOMMENDATION_ALGORITHM_VERSION = "10.5.2";
 export const RECOMMENDATION_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export const RECOMMENDATION_WEIGHTS = {
@@ -20,7 +20,7 @@ export const RECOMMENDATION_WEIGHTS = {
   freshnessTieBreaker: 0.15,
   typeFeatureWeight: 0.45,
   minimumConfidence: 0.14,
-  diversityPenalty: 0.55,
+  diversityPenalty: 0.7,
 } as const;
 
 export const FYP_INITIAL_COUNT = 20;
