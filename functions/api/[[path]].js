@@ -81,7 +81,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 4, database: "ready" });
+    return json({ ok: true, phase: 5, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -94,7 +94,7 @@ async function route(request, url, db) {
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, profile_visibility, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
       )
       .bind(username)
       .first();
@@ -148,6 +148,42 @@ async function route(request, url, db) {
     return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
   }
   const user = session.user;
+
+  if (request.method === "PUT" && path === "profile/visibility") {
+    const body = await readJson(request);
+    const visibility = profileVisibility(body?.visibility);
+    if (!visibility) {
+      return json(
+        { error: "INVALID_PROFILE_VISIBILITY", message: "إعداد الخصوصية غير صالح." },
+        400,
+      );
+    }
+    const now = Date.now();
+    await db
+      .prepare("UPDATE users SET profile_visibility = ?, updated_at = ? WHERE id = ?")
+      .bind(visibility, now, user.id)
+      .run();
+    const updated = await db
+      .prepare("SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1")
+      .bind(user.id)
+      .first();
+    return json({ user: publicUser(updated) });
+  }
+
+  const profileMatch = path.match(/^profiles\/([^/]+)$/);
+  if (request.method === "GET" && profileMatch) {
+    const targetId = safeId(decodeURIComponent(profileMatch[1]));
+    if (!targetId) return json({ error: "INVALID_USER" }, 400);
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 8);
+    const previewLimit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(10, Math.trunc(requestedLimit)))
+      : 8;
+    const profile = await getUserProfileView(db, user, targetId, previewLimit);
+    if (!profile) {
+      return json({ error: "USER_NOT_FOUND", message: "الحساب غير موجود." }, 404);
+    }
+    return json({ profile });
+  }
 
   if (request.method === "GET" && path === "data") {
     return json({ data: await getUserData(db, user.id) });
@@ -341,14 +377,33 @@ async function route(request, url, db) {
     if (request.method === "GET") {
       const listRow = await db
         .prepare(
-          `SELECT id, name, description, position, created_at, updated_at
-           FROM user_lists
-           WHERE id = ? AND user_id = ?
+          `SELECT
+             l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+             u.id AS owner_id, u.username AS owner_username, u.name AS owner_name,
+             u.profile_visibility AS owner_profile_visibility
+           FROM user_lists l
+           JOIN users u ON u.id = l.user_id
+           WHERE l.id = ?
            LIMIT 1`,
         )
-        .bind(listId, user.id)
+        .bind(listId)
         .first();
       if (!listRow) return json({ error: "LIST_NOT_FOUND" }, 404);
+
+      const owner = publicUser({
+        id: listRow.owner_id,
+        username: listRow.owner_username,
+        name: listRow.owner_name,
+        profile_visibility: listRow.owner_profile_visibility,
+      });
+      const access = getProfileAccess(user, {
+        id: owner.id,
+        profile_visibility: owner.profileVisibility,
+      });
+      if (access === "private") {
+        return json({ error: "LIST_NOT_FOUND" }, 404);
+      }
+
       const itemResult = await db
         .prepare(
           `SELECT manga_id, position, added_at
@@ -367,6 +422,8 @@ async function route(request, url, db) {
         list: {
           ...mapUserList(listRow),
           itemCount: items.length,
+          owner,
+          canManage: access === "owner",
         },
         items,
       });
@@ -692,7 +749,7 @@ async function route(request, url, db) {
     const username = normalizeUsername(body.username);
     if (!username) return json({ error: "INVALID_USERNAME" }, 400);
     const friend = await db
-      .prepare("SELECT id, username, name FROM users WHERE username = ? LIMIT 1")
+      .prepare("SELECT id, username, name, profile_visibility FROM users WHERE username = ? LIMIT 1")
       .bind(username)
       .first();
     if (!friend || friend.id === user.id) {
@@ -774,11 +831,19 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "5") return;
+  if (version?.value === "6") return;
+  if (version?.value === "5") {
+    await db.batch([
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+    ]);
+    return;
+  }
   if (version?.value === "4") {
     await db.batch([
       ...profileSectionSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
     ]);
     return;
   }
@@ -786,7 +851,8 @@ async function ensureDatabase(db) {
     await db.batch([
       ...listSchemaStatements(db),
       ...profileSectionSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
     ]);
     return;
   }
@@ -796,7 +862,8 @@ async function ensureDatabase(db) {
       ...libraryBackfillStatements(db),
       ...listSchemaStatements(db),
       ...profileSectionSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
     ]);
     return;
   }
@@ -807,6 +874,8 @@ async function ensureDatabase(db) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE COLLATE NOCASE,
       name TEXT NOT NULL,
+      profile_visibility TEXT NOT NULL DEFAULT 'private'
+        CHECK (profile_visibility IN ('public','private')),
       password_salt TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_iterations INTEGER NOT NULL DEFAULT 210000,
@@ -933,7 +1002,7 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
   );
   await db.batch(statements);
 }
@@ -1091,6 +1160,17 @@ function profileSectionSchemaStatements(db) {
     )`),
     db.prepare(
       "CREATE INDEX IF NOT EXISTS idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
+    ),
+  ];
+}
+
+function profileVisibilitySchemaStatements(db) {
+  return [
+    db.prepare(`ALTER TABLE users
+      ADD COLUMN profile_visibility TEXT NOT NULL DEFAULT 'private'
+      CHECK (profile_visibility IN ('public','private'))`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_users_profile_visibility ON users(profile_visibility, id)",
     ),
   ];
 }
@@ -1434,7 +1514,7 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name
+         u.id, u.username, u.name, u.profile_visibility
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -1451,7 +1531,7 @@ async function getSession(request, db) {
   }
   return {
     tokenHash,
-    user: { id: row.id, username: row.username, name: row.name },
+    user: publicUser(row),
   };
 }
 
@@ -1518,68 +1598,277 @@ async function getUserData(db, userId) {
   };
 }
 
+export function getProfileAccess(viewer, target) {
+  if (viewer?.id && target?.id && viewer.id === target.id) return "owner";
+  return target?.profile_visibility === "public" ? "public" : "private";
+}
+
+async function getUserProfileView(db, viewer, targetId, previewLimit) {
+  const target = await db
+    .prepare("SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1")
+    .bind(targetId)
+    .first();
+  if (!target) return null;
+
+  const access = getProfileAccess(viewer, target);
+  const favoriteResult = await db
+    .prepare(`SELECT manga_id, COUNT(*) OVER() AS total_count
+      FROM favorites
+      WHERE user_id = ?
+      ORDER BY created_at ASC, manga_id ASC
+      LIMIT ?`)
+    .bind(targetId, previewLimit)
+    .all();
+  const favoriteRows = favoriteResult.results ?? [];
+  const profile = {
+    user: publicUser(target),
+    access,
+    favorites: favoriteRows.map((row) => row.manga_id),
+    favoriteCount: Number(favoriteRows[0]?.total_count ?? 0),
+  };
+
+  // Private profiles stop here: hidden data is never queried or serialized.
+  if (access === "private") return profile;
+
+  const [
+    libraryResult,
+    listResult,
+    listPreviewResult,
+    systemSectionResult,
+    friendResult,
+    stats,
+  ] = await Promise.all([
+    db
+      .prepare(`WITH ranked AS (
+        SELECT
+          manga_id,
+          status,
+          highest_reached_chapter,
+          ROW_NUMBER() OVER (
+            PARTITION BY status
+            ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC, manga_id ASC
+          ) AS row_number
+        FROM user_library
+        WHERE user_id = ?
+      )
+      SELECT manga_id, status, highest_reached_chapter, row_number
+      FROM ranked
+      WHERE row_number <= ?
+      ORDER BY
+        CASE status
+          WHEN 'reading' THEN 1
+          WHEN 'completed' THEN 2
+          WHEN 'paused' THEN 3
+          ELSE 4
+        END,
+        row_number ASC`)
+      .bind(targetId, previewLimit)
+      .all(),
+    db
+      .prepare(`SELECT
+        l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+        COALESCE(s.position, 3072 + l.position) AS section_position,
+        COUNT(i.manga_id) AS item_count
+      FROM user_lists l
+      LEFT JOIN user_profile_sections s
+        ON s.user_id = l.user_id
+       AND s.section_type = 'custom_list'
+       AND s.reference_id = l.id
+      LEFT JOIN user_list_items i ON i.list_id = l.id
+      WHERE l.user_id = ?
+      GROUP BY l.id
+      ORDER BY section_position ASC, l.position ASC, l.created_at ASC, l.id ASC`)
+      .bind(targetId)
+      .all(),
+    db
+      .prepare(`WITH ranked AS (
+        SELECT
+          i.list_id,
+          i.manga_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY i.list_id
+            ORDER BY i.position ASC, i.added_at ASC, i.manga_id ASC
+          ) AS row_number
+        FROM user_list_items i
+        JOIN user_lists l ON l.id = i.list_id
+        WHERE l.user_id = ?
+      )
+      SELECT list_id, manga_id, row_number
+      FROM ranked
+      WHERE row_number <= ?
+      ORDER BY list_id ASC, row_number ASC`)
+      .bind(targetId, previewLimit)
+      .all(),
+    db
+      .prepare(`SELECT section_type, position
+        FROM user_profile_sections
+        WHERE user_id = ?
+          AND section_type IN ('continue_reading','favorites')
+        ORDER BY position ASC`)
+      .bind(targetId)
+      .all(),
+    db
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility
+        FROM friendships f
+        JOIN users u ON u.id = f.friend_id
+        WHERE f.user_id = ?
+        ORDER BY u.name COLLATE NOCASE ASC, u.id ASC
+        LIMIT ?`)
+      .bind(targetId, previewLimit)
+      .all(),
+    db
+      .prepare(`SELECT
+        (SELECT COUNT(*) FROM user_library WHERE user_id = ?) AS works,
+        (SELECT COUNT(*) FROM user_library WHERE user_id = ? AND status = 'completed') AS completed,
+        (SELECT COUNT(*) FROM user_lists WHERE user_id = ?) AS lists,
+        (SELECT COUNT(*) FROM friendships WHERE user_id = ?) AS friends`)
+      .bind(targetId, targetId, targetId, targetId)
+      .first(),
+  ]);
+
+  const listPreviews = new Map();
+  for (const row of listPreviewResult.results ?? []) {
+    const values = listPreviews.get(row.list_id) ?? [];
+    values.push(row.manga_id);
+    listPreviews.set(row.list_id, values);
+  }
+
+  const lists = (listResult.results ?? []).map((row) => ({
+    ...mapUserList(row),
+    sectionPosition: Number(row.section_position),
+    previewItems: listPreviews.get(row.id) ?? [],
+  }));
+
+  const systemPositions = new Map(
+    (systemSectionResult.results ?? []).map((row) => [
+      row.section_type,
+      Number(row.position),
+    ]),
+  );
+  const sections = [
+    {
+      key: "system:favorites",
+      type: "favorites",
+      referenceId: null,
+      position: systemPositions.get("favorites") ?? 1024,
+    },
+    {
+      key: "system:library",
+      type: "library",
+      referenceId: null,
+      position: systemPositions.get("continue_reading") ?? 2048,
+    },
+    ...lists.map((list) => ({
+      key: `list:${list.id}`,
+      type: "list",
+      referenceId: list.id,
+      position: list.sectionPosition,
+    })),
+  ].sort((a, b) => a.position - b.position || a.key.localeCompare(b.key));
+
+  return {
+    ...profile,
+    library: (libraryResult.results ?? []).map((row) => ({
+      mangaId: row.manga_id,
+      status: row.status,
+      highestReachedChapter:
+        row.highest_reached_chapter == null
+          ? null
+          : Number(row.highest_reached_chapter),
+    })),
+    lists,
+    sections,
+    friends: (friendResult.results ?? []).map(publicUser),
+    stats: {
+      works: Number(stats?.works ?? 0),
+      completed: Number(stats?.completed ?? 0),
+      lists: Number(stats?.lists ?? 0),
+      friends: Number(stats?.friends ?? 0),
+    },
+  };
+}
+
 async function getFriends(db, userId) {
   const result = await db
     .prepare(
-      `SELECT u.id, u.username, u.name
+      `SELECT u.id, u.username, u.name, u.profile_visibility
        FROM friendships f
        JOIN users u ON u.id = f.friend_id
        WHERE f.user_id = ?
-       ORDER BY u.name COLLATE NOCASE ASC`,
+       ORDER BY u.name COLLATE NOCASE ASC, u.id ASC`,
     )
     .bind(userId)
     .all();
   const users = result.results ?? [];
   if (!users.length) return [];
 
-  const ids = users.map((user) => user.id);
+  const ids = users.map((friend) => friend.id);
   const placeholders = ids.map(() => "?").join(",");
-  const [favoritesResult, stateResult, progressResult] = await Promise.all([
-    db
-      .prepare(`SELECT user_id, manga_id FROM favorites WHERE user_id IN (${placeholders}) ORDER BY created_at ASC`)
-      .bind(...ids)
-      .all(),
-    db
-      .prepare(`SELECT user_id, last_manga_id, last_chapter FROM user_state WHERE user_id IN (${placeholders})`)
-      .bind(...ids)
-      .all(),
-    db
-      .prepare(
-        `SELECT user_id, manga_id, chapter, updated_at
-         FROM reading_progress
-         WHERE user_id IN (${placeholders})
-         ORDER BY updated_at DESC`,
-      )
-      .bind(...ids)
-      .all(),
-  ]);
+  const favoritesResult = await db
+    .prepare(`WITH ranked AS (
+      SELECT
+        user_id,
+        manga_id,
+        ROW_NUMBER() OVER (
+          PARTITION BY user_id
+          ORDER BY created_at DESC, manga_id ASC
+        ) AS row_number
+      FROM favorites
+      WHERE user_id IN (${placeholders})
+    )
+    SELECT user_id, manga_id
+    FROM ranked
+    WHERE row_number <= 3
+    ORDER BY user_id ASC, row_number ASC`)
+    .bind(...ids)
+    .all();
 
   const favorites = new Map(ids.map((id) => [id, []]));
   for (const row of favoritesResult.results ?? []) {
     favorites.get(row.user_id)?.push(row.manga_id);
   }
 
+  const publicIds = users
+    .filter((friend) => friend.profile_visibility === "public")
+    .map((friend) => friend.id);
   const reading = new Map();
-  for (const row of stateResult.results ?? []) {
-    if (row.last_manga_id != null && row.last_chapter != null) {
-      reading.set(row.user_id, {
-        mangaId: row.last_manga_id,
-        chapter: Number(row.last_chapter),
-      });
-    }
-  }
-  for (const row of progressResult.results ?? []) {
-    if (!reading.has(row.user_id)) {
+  if (publicIds.length) {
+    const publicPlaceholders = publicIds.map(() => "?").join(",");
+    const readingResult = await db
+      .prepare(`WITH ranked AS (
+        SELECT
+          user_id,
+          manga_id,
+          highest_reached_chapter,
+          ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC, manga_id ASC
+          ) AS row_number
+        FROM user_library
+        WHERE user_id IN (${publicPlaceholders})
+          AND status = 'reading'
+          AND highest_reached_chapter IS NOT NULL
+      )
+      SELECT user_id, manga_id, highest_reached_chapter
+      FROM ranked
+      WHERE row_number = 1`)
+      .bind(...publicIds)
+      .all();
+
+    for (const row of readingResult.results ?? []) {
       reading.set(row.user_id, {
         mangaId: row.manga_id,
-        chapter: Number(row.chapter),
+        chapter: Number(row.highest_reached_chapter),
       });
     }
   }
 
   return users.map((friend) => ({
     user: publicUser(friend),
-    reading: reading.get(friend.id) ?? null,
+    reading:
+      friend.profile_visibility === "public"
+        ? reading.get(friend.id) ?? null
+        : null,
     favorites: favorites.get(friend.id) ?? [],
   }));
 }
@@ -1734,13 +2023,25 @@ function getCookie(request, name) {
 }
 
 function publicUser(row) {
-  return { id: row.id, username: row.username, name: row.name };
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    profileVisibility:
+      row.profile_visibility === "public" || row.profileVisibility === "public"
+        ? "public"
+        : "private",
+  };
 }
 
 function normalizeUsername(value) {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase();
   return /^[a-z0-9_-]{2,32}$/.test(normalized) ? normalized : "";
+}
+
+function profileVisibility(value) {
+  return value === "public" || value === "private" ? value : "";
 }
 
 function libraryStatus(value) {

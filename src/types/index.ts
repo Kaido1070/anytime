@@ -1,7 +1,11 @@
+export type ProfileVisibility = "public" | "private";
+export type ProfileAccess = "owner" | "public" | "private";
+
 export interface User {
   id: string;
   name: string;
   username: string;
+  profileVisibility: ProfileVisibility;
 }
 
 export type SourceName = "mangatime" | "teamx" | "3asq" | "starzmanga" | "xsano" | "mangalik";
@@ -88,6 +92,8 @@ export interface UserListItem {
 
 export interface UserListDetail extends UserListSummary {
   items: UserListItem[];
+  owner?: User;
+  canManage?: boolean;
 }
 
 export type UserProfileSectionType = "continue_reading" | "favorites" | "custom_list";
@@ -128,4 +134,41 @@ export interface Friend {
   user: User;
   reading: { mangaId: string; chapter: number } | null;
   favorites: string[];
+}
+
+export interface ProfileLibraryItem {
+  mangaId: string;
+  status: LibraryStatus;
+  highestReachedChapter: number | null;
+}
+
+export interface ProfileListPreview extends UserListSummary {
+  previewItems: string[];
+  sectionPosition: number;
+}
+
+export interface ProfileSectionView {
+  key: string;
+  type: "favorites" | "library" | "list";
+  referenceId: string | null;
+  position: number;
+}
+
+export interface ProfileStats {
+  works: number;
+  completed: number;
+  lists: number;
+  friends: number;
+}
+
+export interface UserProfileView {
+  user: User;
+  access: ProfileAccess;
+  favorites: string[];
+  favoriteCount: number;
+  library?: ProfileLibraryItem[];
+  lists?: ProfileListPreview[];
+  sections?: ProfileSectionView[];
+  friends?: User[];
+  stats?: ProfileStats;
 }
