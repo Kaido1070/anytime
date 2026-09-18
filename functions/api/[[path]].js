@@ -639,6 +639,106 @@ async function route(request, url, db) {
   }
   const user = session.user;
 
+  if (path === "personalization-state") {
+    if (!isSocialUser(user)) {
+      return json(
+        { error: "ADMIN_NOT_SOCIAL", message: "هذه الصفحة مخصصة لحسابات المستخدمين." },
+        403,
+      );
+    }
+
+    if (request.method === "GET") {
+      const [followedResult, readingResult] = await Promise.all([
+        db
+          .prepare(`SELECT manga_id, MIN(started_at) AS tracking_started_at
+            FROM (
+              SELECT manga_id, added_at AS started_at
+              FROM user_library
+              WHERE user_id = ?
+              UNION ALL
+              SELECT manga_id, created_at AS started_at
+              FROM favorites
+              WHERE user_id = ?
+              UNION ALL
+              SELECT i.manga_id, i.added_at AS started_at
+              FROM user_list_items i
+              JOIN user_lists l ON l.id = i.list_id
+              WHERE l.user_id = ?
+            )
+            GROUP BY manga_id
+            ORDER BY tracking_started_at ASC, manga_id ASC`)
+          .bind(user.id, user.id, user.id)
+          .all(),
+        db
+          .prepare(`SELECT
+              manga_id,
+              COUNT(DISTINCT chapter) AS read_count,
+              MAX(read_at) AS last_read_at,
+              MAX(chapter) AS highest_chapter
+            FROM reading_history
+            WHERE user_id = ?
+            GROUP BY manga_id
+            ORDER BY last_read_at DESC, manga_id ASC`)
+          .bind(user.id)
+          .all(),
+      ]);
+
+      return json({
+        followed: (followedResult.results ?? []).map((row) => ({
+          mangaId: String(row.manga_id),
+          trackingStartedAt: Number(row.tracking_started_at),
+        })),
+        readingWorks: (readingResult.results ?? []).map((row) => ({
+          mangaId: String(row.manga_id),
+          readCount: Number(row.read_count ?? 0),
+          lastReadAt: row.last_read_at == null ? null : Number(row.last_read_at),
+          highestChapter: row.highest_chapter == null ? null : Number(row.highest_chapter),
+        })),
+      });
+    }
+
+    if (request.method === "POST") {
+      const body = await readJson(request);
+      const requested = Array.isArray(body?.chapters) ? body.chapters : [];
+      const chapters = requested
+        .map((item) => ({
+          mangaId: safeId(item?.mangaId),
+          chapter: Number(item?.chapter),
+        }))
+        .filter(
+          (item) =>
+            /^(mt|tx|aq|sz|xs|ml):/.test(item.mangaId) &&
+            Number.isFinite(item.chapter) &&
+            item.chapter >= 0,
+        )
+        .slice(0, 40);
+
+      if (!chapters.length) return json({ read: [] });
+
+      const clauses = chapters
+        .map(() => "(manga_id = ? AND ABS(chapter - ?) < 0.000001)")
+        .join(" OR ");
+      const binds = [user.id];
+      for (const chapter of chapters) binds.push(chapter.mangaId, chapter.chapter);
+
+      const result = await db
+        .prepare(`SELECT DISTINCT manga_id, chapter
+          FROM reading_history
+          WHERE user_id = ? AND (${clauses})`)
+        .bind(...binds)
+        .all();
+
+      return json({
+        read: (result.results ?? []).map((row) => ({
+          mangaId: String(row.manga_id),
+          chapter: Number(row.chapter),
+        })),
+      });
+    }
+
+    return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+  }
+
   if (request.method === "GET" && path === "avatars") {
     const series = await getAvatarLibrary(db);
     return json({ series }, 200, { "Cache-Control": "private, max-age=3600" });

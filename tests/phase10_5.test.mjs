@@ -117,7 +117,7 @@ test("Phase 10.5 navigation exposes exactly the four social destinations and kee
 
 test("New tracking is an active union and exact read state reuses reading_history", async () => {
   const [api, feed, migration] = await Promise.all([
-    readFile(new URL("../functions/api/personalization-state.js", import.meta.url), "utf8"),
+    readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8"),
     readFile(new URL("../src/services/newChapters.ts", import.meta.url), "utf8"),
     readFile(new URL("../migrations/0010_phase10_5.sql", import.meta.url), "utf8"),
   ]);
@@ -128,7 +128,9 @@ test("New tracking is an active union and exact read state reuses reading_histor
   assert.match(api, /MIN\(start.*\) AS tracking_started_at/i);
   assert.match(api, /FROM reading_history/);
   assert.match(api, /ABS\(chapter - \?\) < 0\.000001/);
+  assert.match(api, /path === "personalization-state"/);
   assert.match(api, /ADMIN_NOT_SOCIAL/);
+  assert.match(api, /\.slice\(0, 40\)/);
   assert.match(feed, /chapter\.releaseAt > Number\(group\.trackingStartedAt\)/);
   assert.match(migration, /idx_reading_history_user_chapter/);
 });
