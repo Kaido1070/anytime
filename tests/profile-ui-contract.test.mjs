@@ -5,7 +5,8 @@ import test from "node:test";
 test("Phase 5 keeps the existing friend profile route and adds no duplicate profile route", async () => {
   const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
   assert.match(app, /path="friends\/:id" element={<FriendProfile \/>}/);
-  assert.doesNotMatch(app, /path="(?:profile|users|member)\/:id"/);
+  assert.doesNotMatch(app, /path="(?:profile|member)\/:id"/);
+  assert.match(app, /path="\/admin"[\s\S]*path="users\/:id" element={<AdminUserDetail \/>}/);
 });
 
 test("Phase 5 private profile UI renders favorites without hidden social sections", async () => {
