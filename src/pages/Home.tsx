@@ -454,7 +454,9 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      <footer className="page-footer">مكان هادي وقصة حلوة في أي وقت.</footer>
+      {!embedded && (
+        <footer className="page-footer">مكان هادي وقصة حلوة في أي وقت.</footer>
+      )}
     </>
   );
 }
