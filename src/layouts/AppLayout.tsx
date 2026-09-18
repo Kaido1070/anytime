@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { Icon } from "../components/UI";
-import { loadNewChapterFeed } from "../services/newChapters";
+import { loadUnreadFollowedCount } from "../services/newChapters";
 
 export function AppLayout() {
   const [newCount, setNewCount] = useState(0);
@@ -14,9 +14,9 @@ export function AppLayout() {
 
   useEffect(() => {
     let active = true;
-    void loadNewChapterFeed(1)
-      .then((feed) => {
-        if (active) setNewCount(feed.unreadFollowedCount);
+    void loadUnreadFollowedCount()
+      .then((count) => {
+        if (active) setNewCount(count);
       })
       .catch(() => {
         if (active) setNewCount(0);
