@@ -19,7 +19,6 @@ export async function ensureAdminAccount(db, env) {
     if (existing.id !== ADMIN_ID || existing.role !== "admin") {
       throw new Error("Reserved Admin username is already in use.");
     }
-    await purgeSocialRows(db, existing.id);
     return { configured: true, created: false };
   }
 
