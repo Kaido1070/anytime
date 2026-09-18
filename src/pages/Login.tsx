@@ -23,9 +23,9 @@ export function Login() {
   return (
     <main className="login">
       <div className="login-art">
-        <p className="eyebrow login-welcome">أهلا بك في WANY</p>
         <span className="brand-mark">w</span>
-        <p>تابع قصتك</p>
+        <p className="eyebrow login-welcome">أهلا بك في WANY</p>
+        <p className="login-kicker">تابع قصتك</p>
         <h1>
           في أي وقت<span>.</span>
         </h1>
