@@ -1,5 +1,6 @@
 export type ProfileVisibility = "public" | "private";
 export type ProfileAccess = "owner" | "public" | "private";
+export type FriendRelationship = "none" | "pending_sent" | "pending_received" | "friends";
 
 export interface User {
   id: string;
@@ -136,6 +137,23 @@ export interface Friend {
   favorites: string[];
 }
 
+export interface FriendRequest {
+  user: User;
+  createdAt: number;
+}
+
+export interface FriendRequests {
+  incoming: FriendRequest[];
+  outgoing: FriendRequest[];
+  incomingCount: number;
+  outgoingCount: number;
+}
+
+export interface FriendSearchResult {
+  user: User;
+  relationship: FriendRelationship;
+}
+
 export interface ProfileLibraryItem {
   mangaId: string;
   status: LibraryStatus;
@@ -166,6 +184,7 @@ export interface UserProfileView {
   access: ProfileAccess;
   favorites: string[];
   favoriteCount: number;
+  relationship: FriendRelationship;
   library?: ProfileLibraryItem[];
   lists?: ProfileListPreview[];
   sections?: ProfileSectionView[];
