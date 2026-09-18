@@ -15,7 +15,7 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
 });
 
-const user = { id: "mahdi", username: "has", name: "Has" };
+const user = { id: "has", username: "has", name: "Has" };
 let signedIn = false;
 let nextHistoryId = 1;
 let now = 1000;
