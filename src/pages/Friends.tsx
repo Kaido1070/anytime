@@ -188,7 +188,7 @@ export function FriendProfile() {
 
   return (
     <>
-      <Back to="/friends" />
+      <Back to="/profile#account-friends" />
       <div className="friend-heading">
         <span className="avatar large">{friend.user.name[0]}</span>
         <div>
