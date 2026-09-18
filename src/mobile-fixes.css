@@ -191,3 +191,32 @@
     margin-top: 22px;
   }
 }
+
+
+@media (max-width: 759px) {
+  .login-art > .brand-mark {
+    margin-bottom: 14px;
+  }
+
+  .login-art > .login-welcome {
+    margin: 0 0 26px;
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+    line-height: 1.4;
+  }
+
+  .login-art > .login-kicker {
+    margin: 0 0 7px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.5;
+  }
+
+  .login-art h1 {
+    margin: 0;
+  }
+}
