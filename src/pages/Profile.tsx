@@ -45,6 +45,10 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  const [showReaderProgress, setShowReaderProgress] = useState(() =>
+    typeof window === "undefined" || window.localStorage.getItem(READER_PROGRESS_VISIBILITY_KEY) !== "false",
+  );
+
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
 
@@ -310,6 +314,43 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
               {privacyMessage}
             </p>
           )}
+        </section>
+
+        <section className="settings-card" aria-labelledby="settings-reader-title">
+          <div className="settings-card-header">
+            <div>
+              <p className="eyebrow">القارئ</p>
+              <h3 id="settings-reader-title">مؤشر تقدم القراءة</h3>
+            </div>
+          </div>
+
+          <div className="settings-choice-group" role="group" aria-label="عرض مؤشر تقدم القراءة">
+            <button
+              type="button"
+              className={showReaderProgress ? "active" : ""}
+              aria-pressed={showReaderProgress}
+              onClick={() => {
+                window.localStorage.setItem(READER_PROGRESS_VISIBILITY_KEY, "true");
+                setShowReaderProgress(true);
+              }}
+            >
+              إظهار
+            </button>
+            <button
+              type="button"
+              className={!showReaderProgress ? "active" : ""}
+              aria-pressed={!showReaderProgress}
+              onClick={() => {
+                window.localStorage.setItem(READER_PROGRESS_VISIBILITY_KEY, "false");
+                setShowReaderProgress(false);
+              }}
+            >
+              إخفاء
+            </button>
+          </div>
+          <p className="muted settings-privacy-description">
+            مؤشر صغير وشفاف يظهر أثناء قراءة الفصول. يمكنك إخفاؤه بالكامل.
+          </p>
         </section>
 
         <section className="settings-card" aria-labelledby="settings-security-title">
