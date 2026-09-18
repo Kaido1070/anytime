@@ -145,7 +145,8 @@ test("chapter availability uses published time first and stable first_seen fallb
   assert.match(sourceApi, /first_seen_at/);
   assert.match(sourceApi, /synthetic: true/);
   assert.match(sourceApi, /filter\(\(chapter\) => !chapter\.synthetic\)/);
-  assert.match(sourceApi, /published_at = COALESCE\(excluded\.published_at, source_chapter_seen\.published_at\)/);
+  assert.match(sourceApi, /published_at = COALESCE\(\?, published_at\)/);
+  assert.match(sourceApi, /if \(!numberChanged && !publicationChanged\) continue/);
   assert.match(feed, /parsePublished\(chapter\.publishedAt\)/);
   assert.match(feed, /chapter\.baselineObserved/);
   assert.match(feed, /chapter\.firstSeenAt/);
