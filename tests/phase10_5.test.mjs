@@ -96,6 +96,7 @@ test("relative release time stays Arabic while long dates stay Gregorian", () =>
   assert.equal(formatArabicRelativeTime(now - 60 * 60_000, now), "منذ ساعة");
   assert.equal(formatArabicRelativeTime(now - 2 * 60 * 60_000, now), "منذ ساعتين");
   assert.equal(formatArabicRelativeTime(now - 24 * 60 * 60_000, now), "أمس");
+  assert.equal(formatArabicRelativeTime(now - 14 * 24 * 60 * 60_000, now), "04/09/2026");
   assert.match(formatArabicRelativeTime(now - 20 * 24 * 60 * 60_000, now), /\d{2}\/\d{2}\/\d{4}/);
 });
 

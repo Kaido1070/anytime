@@ -1,4 +1,4 @@
-import { onRequest as handleSourceRequest } from "./[[path]].js";
+import { onRequest as handleSourceRequest, latestLinkedChapter } from "./[[path]].js";
 
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
@@ -38,7 +38,6 @@ async function searchSeries(page) {
   const inputs = [
     { page, limit: 24, sortBy: "recent", sortOrder: "desc" },
     { page, limit: 24, sortBy: "updated", sortOrder: "desc" },
-    { page, limit: 24, sortBy: "popularity", sortOrder: "desc" },
   ];
   let lastStatus = 0;
   for (const input of inputs) {
@@ -69,6 +68,7 @@ async function toMangaTimeItem(row) {
     url: `${MANGATIME_BASE}/${encodeURIComponent(type)}/${encodeURIComponent(slug)}`,
     title: String(row.title || row.slug || "بدون عنوان"),
     cover: absoluteUrl(MANGATIME_BASE, row.coverUrl), description: "", status: "", genres: [],
+    latest: row.latestChapter?.number == null ? null : Number(row.latestChapter.number),
   };
 }
 
@@ -101,7 +101,7 @@ async function teamXLatest(page) {
     seen.add(slug);
     items.push({ key: `tx:${safeSlugKey(slug)}`, source: "teamx", sourceId: slug, slug, type: "series", url: `${TEAMX_BASE}/series/${encodeURIComponent(slug)}`, title, cover: absoluteUrl(TEAMX_BASE, coverRaw), description: "", status: "", genres: [] });
   }
-  return { items, hasMore: /<a[^>]+rel=["']next["']/i.test(html), page };
+  return { items: items.map((item) => ({ ...item, latest: latestLinkedChapter(scoped, item.url) })), hasMore: /<a[^>]+rel=["']next["']/i.test(html), page };
 }
 
 async function ensureSchema(db) {
