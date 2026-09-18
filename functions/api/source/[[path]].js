@@ -302,7 +302,8 @@ async function rememberChapterAvailability(db, item) {
   const chapters = Array.isArray(item?.chapters) ? item.chapters : [];
   if (!item?.key || !chapters.length) return item;
 
-  const recent = [...chapters]
+  const recent = chapters
+    .filter((chapter) => !chapter.synthetic)
     .sort((a, b) => Number(b.number ?? 0) - Number(a.number ?? 0))
     .slice(0, 240);
   const current = await db
@@ -698,6 +699,7 @@ function parseTeamXChapters(html, seriesUrl) {
             number,
             title: `الفصل ${number}`,
             publishedAt: null,
+            synthetic: true,
             url: `${parsedBase.origin}${basePath}/${number}`,
           });
         }
