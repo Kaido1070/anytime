@@ -23,7 +23,7 @@ export function Login() {
   return (
     <main className="login">
       <div className="login-art">
-        <span className="brand-mark">a</span>
+        <span className="brand-mark">w</span>
         <p>تابع قصتك</p>
         <h1>
           في أي وقت<span>.</span>
@@ -35,7 +35,7 @@ export function Login() {
         </div>
       </div>
       <div className="login-form">
-        <p className="eyebrow">أهلا بك في ANYTIME</p>
+        <p className="eyebrow">أهلا بك في WANY</p>
         <h2>مكانك داخل القصة.</h2>
         <p className="muted">سجل دخولك للوصول إلى مكتبتك المتزامنة.</p>
         <form onSubmit={submit}>
