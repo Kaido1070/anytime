@@ -17,6 +17,10 @@ const RECOVERY_ACCOUNT_IDS = {
   has: "has",
 };
 
+const RECOVERY_BY_ID = Object.fromEntries(
+  RECOVERY_SEEDS.map(([userId, salt, hash]) => [userId, { salt, hash }]),
+);
+
 export async function onRequestPost(context) {
   const { request } = context;
   const db = context.env?.DB;
@@ -26,9 +30,9 @@ export async function onRequestPost(context) {
   const origin = request.headers.get("Origin");
   if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
 
+  let stage = "INIT";
   try {
-    await ensureRecoveryCodes(db);
-
+    stage = "BODY";
     const body = await request.json().catch(() => ({}));
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     const accountId = RECOVERY_ACCOUNT_IDS[username] ?? null;
@@ -37,69 +41,52 @@ export async function onRequestPost(context) {
 
     if (!accountId || recoveryCode.length < 20 || recoveryCode.length > 128) {
       await sleep(250);
-      return invalidRecovery();
+      return invalidRecovery("RCV-401-A");
     }
     if (newPassword.length < 4 || newPassword.length > 128) {
-      return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر." }, 400);
+      return json({ error: "WEAK_PASSWORD", reference: "RCV-400-PASS", message: "كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر. [RCV-400-PASS]" }, 400);
     }
 
-    const row = await db.prepare(`
-      SELECT u.id, r.recovery_salt, r.recovery_hash, r.recovery_iterations
-      FROM users u JOIN account_recovery r ON r.user_id = u.id
-      WHERE u.id = ? LIMIT 1
-    `).bind(accountId).first();
+    stage = "USER";
+    const row = await db.prepare("SELECT id FROM users WHERE id = ? LIMIT 1").bind(accountId).first();
+    const recoverySeed = RECOVERY_BY_ID[accountId];
 
-    if (!row || !(await verifyRecoveryCode(recoveryCode, row))) {
+    if (!row || !recoverySeed) {
       await sleep(250);
-      return invalidRecovery();
+      return invalidRecovery("RCV-401-U");
     }
 
+    stage = "VERIFY";
+    const derivedRecoveryHash = await deriveHash(
+      recoveryCode,
+      base64UrlToBytes(recoverySeed.salt),
+      RECOVERY_ITERATIONS,
+    );
+    if (!timingSafeEqual(base64UrlToBytes(derivedRecoveryHash), base64UrlToBytes(recoverySeed.hash))) {
+      await sleep(250);
+      return invalidRecovery("RCV-401-C");
+    }
+
+    stage = "PASSWORD";
     const passwordSaltBytes = crypto.getRandomValues(new Uint8Array(16));
     const passwordSalt = bytesToBase64Url(passwordSaltBytes);
     const passwordHash = await deriveHash(newPassword, passwordSaltBytes, PASSWORD_ITERATIONS);
     const now = Date.now();
 
-    await db.batch([
-      db.prepare("UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ?")
-        .bind(passwordSalt, passwordHash, PASSWORD_ITERATIONS, now, row.id),
-      db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(row.id),
-    ]);
+    stage = "WRITE";
+    await db.prepare("UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ?")
+      .bind(passwordSalt, passwordHash, PASSWORD_ITERATIONS, now, row.id)
+      .run();
 
-    return json({ ok: true });
+    stage = "SESSIONS";
+    await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(row.id).run();
+
+    return json({ ok: true, reference: "RCV-200" });
   } catch (error) {
-    console.error("Wany recovery error", error instanceof Error ? error.message : "unknown");
-    return json({ error: "SERVER_ERROR", message: "تعذر استعادة الحساب الآن." }, 500);
+    const reference = `RCV-500-${stage}`;
+    console.error("Wany recovery error", reference, error instanceof Error ? error.message : "unknown");
+    return json({ error: "SERVER_ERROR", reference, message: `تعذر استعادة الحساب الآن. [${reference}]` }, 500);
   }
-}
-
-async function ensureRecoveryCodes(db) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS account_recovery (
-    user_id TEXT PRIMARY KEY,
-    recovery_salt TEXT NOT NULL,
-    recovery_hash TEXT NOT NULL,
-    recovery_iterations INTEGER NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`).run();
-
-  const now = Date.now();
-  for (const [userId, salt, hash] of RECOVERY_SEEDS) {
-    await db.prepare(`
-      INSERT INTO account_recovery
-        (user_id, recovery_salt, recovery_hash, recovery_iterations, created_at)
-      SELECT id, ?, ?, ?, ? FROM users WHERE id = ? LIMIT 1
-      ON CONFLICT(user_id) DO UPDATE SET
-        recovery_salt = excluded.recovery_salt,
-        recovery_hash = excluded.recovery_hash,
-        recovery_iterations = excluded.recovery_iterations
-    `).bind(salt, hash, RECOVERY_ITERATIONS, now, userId).run();
-  }
-}
-
-async function verifyRecoveryCode(value, row) {
-  const salt = base64UrlToBytes(row.recovery_salt);
-  const derived = await deriveHash(value, salt, Number(row.recovery_iterations));
-  return timingSafeEqual(base64UrlToBytes(derived), base64UrlToBytes(row.recovery_hash));
 }
 
 async function deriveHash(value, salt, iterations) {
@@ -108,8 +95,12 @@ async function deriveHash(value, salt, iterations) {
   return bytesToBase64Url(new Uint8Array(bits));
 }
 
-function invalidRecovery() {
-  return json({ error: "INVALID_RECOVERY", message: "اسم المستخدم أو رمز الاستعادة غير صحيح." }, 401);
+function invalidRecovery(reference = "RCV-401") {
+  return json({
+    error: "INVALID_RECOVERY",
+    reference,
+    message: `اسم المستخدم أو رمز الاستعادة غير صحيح. [${reference}]`,
+  }, 401);
 }
 
 function timingSafeEqual(a, b) {
