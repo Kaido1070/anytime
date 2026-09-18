@@ -1,5 +1,7 @@
 import type {
   ActivityFeed,
+  AdminUserDetail,
+  AdminUserSummary,
   AvatarSeries,
   Friend,
   FriendRelationship,
@@ -48,6 +50,8 @@ export interface UserDataService {
   getFriendsActivity(limit?: number, offset?: number): Promise<ActivityFeed>;
   saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
   getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
+  getAdminUsers(options?: { query?: string; visibility?: string; status?: string; sort?: string; limit?: number; offset?: number }): Promise<{ users: AdminUserSummary[]; total: number; hasMore: boolean }>;
+  getAdminUser(id: string, historyLimit?: number, historyOffset?: number): Promise<AdminUserDetail>;
   getAvatarLibrary(): Promise<AvatarSeries[]>;
   setAvatar(avatarId: string): Promise<User>;
   setDisplayName(name: string): Promise<User>;
@@ -130,6 +134,7 @@ function normalizeUser(user: User): User {
     ...user,
     profileVisibility: user.profileVisibility === "public" ? "public" : "private",
     avatarId: isAvatarId(user.avatarId) ? user.avatarId : null,
+    ...(user.role === "admin" ? { role: "admin" as const } : user.role === "user" ? { role: "user" as const } : {}),
   };
 }
 
@@ -246,13 +251,15 @@ class ApiUserDataService implements UserDataService {
   }
 
   async signIn(username: string, password: string) {
-    const result = await this.request<{ user: User }>("login", {
+    const normalizedUsername = username.trim().toLowerCase();
+    const endpoint = normalizedUsername === "admin" ? "admin-login" : "login";
+    const result = await this.request<{ user: User }>(endpoint, {
       method: "POST",
-      body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
+      body: JSON.stringify({ username: normalizedUsername, password }),
     });
     this.currentUser = normalizeUser(result.user);
     this.cleaned = false;
-    await this.cleanupDemoData();
+    if (this.currentUser.role !== "admin") await this.cleanupDemoData();
     return this.currentUser;
   }
 
@@ -471,6 +478,41 @@ class ApiUserDataService implements UserDataService {
     return normalizeUserProfile(result.profile);
   }
 
+  async getAdminUsers(options: { query?: string; visibility?: string; status?: string; sort?: string; limit?: number; offset?: number } = {}) {
+    const params = new URLSearchParams();
+    const query = options.query?.trim().replace(/\s+/g, " ").slice(0, 64);
+    if (query) params.set("q", query);
+    if (options.visibility === "public" || options.visibility === "private") params.set("visibility", options.visibility);
+    if (options.status === "reading") params.set("status", "reading");
+    if (options.sort === "username" || options.sort === "works") params.set("sort", options.sort);
+    params.set("limit", String(Math.max(1, Math.min(100, Math.trunc(options.limit ?? 50)))));
+    params.set("offset", String(Math.max(0, Math.trunc(options.offset ?? 0))));
+    const result = await this.request<{ users: AdminUserSummary[]; total: number; hasMore: boolean }>(`admin/users?${params.toString()}`);
+    return {
+      users: (result.users ?? []).map((item) => ({ ...item, user: normalizeUser(item.user) })),
+      total: Number(result.total ?? 0),
+      hasMore: Boolean(result.hasMore),
+    };
+  }
+
+  async getAdminUser(id: string, historyLimit = 50, historyOffset = 0) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const limit = Math.max(1, Math.min(100, Math.trunc(historyLimit)));
+    const offset = Math.max(0, Math.trunc(historyOffset));
+    const result = await this.request<{ detail: AdminUserDetail }>(`admin/users/${encodeURIComponent(id)}?historyLimit=${limit}&historyOffset=${offset}`);
+    const detail = result.detail;
+    return {
+      ...detail,
+      user: normalizeUser(detail.user),
+      library: (detail.library ?? []).filter((item) => isLiveKey(item.mangaId)),
+      readingHistory: (detail.readingHistory ?? []).filter((item) => isLiveKey(item.mangaId)),
+      lists: (detail.lists ?? []).map((list) => ({ ...list, items: (list.items ?? []).filter((item) => isLiveKey(item.mangaId)) })),
+      favorites: (detail.favorites ?? []).filter((mangaId) => isLiveKey(mangaId)),
+      friends: (detail.friends ?? []).map(normalizeUser),
+      activity: detail.activity ?? [],
+    };
+  }
+
   async getAvatarLibrary() {
     const result = await this.request<{ series: AvatarSeries[] }>("avatars");
     return normalizeAvatarSeries(result.series);
@@ -651,7 +693,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   private async cleanupDemoData() {
-    if (this.cleaned || !this.currentUser) return;
+    if (this.cleaned || !this.currentUser || this.currentUser.role === "admin") return;
     try {
       await this.request<{ ok: boolean }>("cleanup-demo", { method: "POST" });
       this.cleaned = true;
