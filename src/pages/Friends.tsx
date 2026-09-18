@@ -208,7 +208,7 @@ function ListSection({
 
 function PublicFriendsSection({ friends }: { friends: User[] }) {
   return (
-    <section className="profile-module profile-public-friends">
+    <section className="profile-module profile-public-friends" id="profile-public-friends">
       <div className="profile-module-heading">
         <h2>الأصدقاء</h2>
         <span className="profile-module-count">{friends.length ? "معاينة" : ""}</span>
@@ -646,6 +646,7 @@ export function FriendProfile() {
     removeFriend,
   } = useLibrary();
   const [profile, setProfile] = useState<UserProfileView | null>(null);
+  const [series, setSeries] = useState<Record<string, SourceManga>>({});
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -697,17 +698,44 @@ export function FriendProfile() {
   }, [profile]);
   const sourceItems = useSourceItems(sourceKeys);
 
+  const readingEntries = useMemo(
+    () => (profile?.library ?? []).filter((entry) => entry.status === "reading"),
+    [profile?.library],
+  );
+  const readingSignature = readingEntries.map((entry) => entry.mangaId).join("|");
+
+  useEffect(() => {
+    let active = true;
+    if (!readingEntries.length) {
+      setSeries({});
+      return;
+    }
+    Promise.allSettled(
+      readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
+    ).then((results) => {
+      if (!active) return;
+      setSeries(
+        Object.fromEntries(
+          results.flatMap((result, index) =>
+            result.status === "fulfilled"
+              ? [[readingEntries[index].mangaId, result.value]]
+              : [],
+          ),
+        ),
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, [readingSignature]);
+
   if (id === user?.id) return <Navigate to="/profile" replace />;
 
   if (loading) {
     return (
       <>
-        <Back to="/profile#account-friends" />
-        <div className="profile-view-loading" aria-label="جاري تحميل الحساب">
-          <span />
-          <span />
-          <span />
-        </div>
+        <Back to="/friends" />
+        <ProfileOverviewSkeleton />
       </>
     );
   }
@@ -715,9 +743,10 @@ export function FriendProfile() {
   if (!profile) {
     return (
       <>
-        <Back to="/profile#account-friends" />
-        <h1>الحساب غير موجود</h1>
-        {pageError && <p className="muted">{pageError}</p>}
+        <Back to="/friends" />
+        <div className="profile-section-error" role="alert">
+          <span>{pageError || "الحساب غير موجود."}</span>
+        </div>
       </>
     );
   }
@@ -725,9 +754,10 @@ export function FriendProfile() {
   const profileUserId = profile.user.id;
   const isPrivate = profile.access === "private";
   const relationship = profile.relationship;
-  const listById = new Map((profile.lists ?? []).map((list) => [list.id, list]));
 
-  async function updateRelationship(action: "send" | "accept" | "reject" | "cancel" | "remove") {
+  async function updateRelationship(
+    action: "send" | "accept" | "reject" | "cancel" | "remove",
+  ) {
     setActionBusy(true);
     setActionError("");
     try {
@@ -740,54 +770,40 @@ export function FriendProfile() {
         await removeFriend(profileUserId);
         next = "none";
       }
-      setProfile((current) => (current ? { ...current, relationship: next } : current));
+      setProfile((current) =>
+        current ? { ...current, relationship: next } : current,
+      );
       if (action === "remove") setRemoveConfirm(false);
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "تعذر تحديث حالة الصداقة.");
+      setActionError(
+        cause instanceof Error ? cause.message : "تعذر تحديث حالة الصداقة.",
+      );
     } finally {
       setActionBusy(false);
     }
   }
 
+  const relationshipActions = (
+    <RelationshipActions
+      relationship={relationship}
+      busy={actionBusy}
+      onSend={() => void updateRelationship("send")}
+      onAccept={() => void updateRelationship("accept")}
+      onReject={() => void updateRelationship("reject")}
+      onCancel={() => void updateRelationship("cancel")}
+      onRemove={() => setRemoveConfirm(true)}
+    />
+  );
+
   return (
     <>
-      <Back to="/profile#account-friends" />
+      <Back to="/friends" />
 
-      <header className="profile-view-header">
-        <div className="profile-view-identity">
-          <UserAvatar user={profile.user} className="profile-view-avatar" loading="eager" />
-          <div>
-            <p className="eyebrow">{isPrivate ? "حساب خاص" : "ملف المستخدم"}</p>
-            <h1>{profile.user.name}</h1>
-            <p className="muted">@{profile.user.username}</p>
-          </div>
-        </div>
-
-        <div className="profile-view-side">
-          {isPrivate ? (
-            <span className="profile-private-badge">حساب خاص</span>
-          ) : (
-            profile.stats && (
-              <div className="profile-view-stats" aria-label="إحصائيات الحساب">
-                <span><b>{profile.stats.works}</b><small>عمل</small></span>
-                <span><b>{profile.stats.completed}</b><small>مكتمل</small></span>
-                <span><b>{profile.stats.lists}</b><small>قائمة</small></span>
-                <span><b>{profile.stats.friends}</b><small>صديق</small></span>
-              </div>
-            )
-          )}
-
-          <RelationshipActions
-            relationship={relationship}
-            busy={actionBusy}
-            onSend={() => void updateRelationship("send")}
-            onAccept={() => void updateRelationship("accept")}
-            onReject={() => void updateRelationship("reject")}
-            onCancel={() => void updateRelationship("cancel")}
-            onRemove={() => setRemoveConfirm(true)}
-          />
-        </div>
-      </header>
+      <ProfileIdentityHeader
+        user={profile.user}
+        actions={relationshipActions}
+        privateState={isPrivate}
+      />
 
       {removeConfirm && relationship === "friends" && (
         <div className="friend-remove-confirm" role="alert">
@@ -817,44 +833,41 @@ export function FriendProfile() {
 
       {isPrivate ? (
         <FavoritesSection profile={profile} works={sourceItems} />
-      ) : (
+      ) : profile.stats ? (
         <>
-          <div className="profile-public-modules">
-            {(profile.sections ?? []).map((section) => {
-              if (section.type === "favorites") {
-                return <FavoritesSection key={section.key} profile={profile} works={sourceItems} />;
-              }
-              if (section.type === "library") {
-                return (
-                  <LibrarySection
-                    key={section.key}
-                    entries={profile.library ?? []}
-                    works={sourceItems}
-                  />
-                );
-              }
-              const list = section.referenceId ? listById.get(section.referenceId) : null;
-              return list ? <ListSection key={section.key} list={list} works={sourceItems} /> : null;
-            })}
-          </div>
+          <ProfileSummaryStrip
+            friends={profile.stats.friends}
+            lists={profile.stats.lists}
+            works={profile.stats.works}
+            friendsTo="#profile-public-friends"
+            listsTo="#profile-lists"
+            worksTo="#profile-reading"
+          />
 
-          {!profile.lists?.length && (
-            <section className="profile-module">
-              <SectionTitle title="القوائم" />
-              <p className="profile-module-empty">لا توجد قوائم شخصية حتى الآن.</p>
-            </section>
-          )}
+          <ProfileStatsSection stats={profile.stats} />
 
-          <ActivityFeed
-            title="النشاط الأخير"
+          <ProfileListsSection
+            favorites={profile.favorites}
+            favoriteCount={profile.favoriteCount}
+            lists={profile.lists ?? []}
+            works={sourceItems}
+            viewAllTo=""
+          />
+
+          <ProfileReadingSection
+            entries={readingEntries}
+            series={series}
+            own={false}
+          />
+
+          <ProfileActivitySection
             events={profile.activity ?? []}
             showActor
-            emptyText="لا يوجد نشاط حديث حتى الآن."
           />
 
           <PublicFriendsSection friends={profile.friends ?? []} />
         </>
-      )}
+      ) : null}
     </>
   );
 }
