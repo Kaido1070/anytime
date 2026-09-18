@@ -24,6 +24,6 @@ test("profile keeps a compact main page with dedicated lists and friends hubs", 
   assert.doesNotMatch(account, /<Home embedded \/>/);
   assert.doesNotMatch(account, /<Lists embedded \/>/);
   assert.doesNotMatch(account, /<Friends embedded \/>/);
-  assert.match(account, /settingsOpen \? \(/);
+  assert.match(account, /if \(settingsOpen\)/);
   assert.match(account, /<Profile embedded \/>/);
 });
