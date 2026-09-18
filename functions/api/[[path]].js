@@ -14,23 +14,23 @@ const READING_OPEN_DEDUP_MS = 5 * 60 * 1000;
 
 const SEEDED_USERS = [
   {
-    id: "mahdi",
-    username: "mahdi",
-    name: "Mahdi",
+    id: "has",
+    username: "has",
+    name: "Has",
     salt: "nckWsLoOqPQ2ko0y6KFcdQ",
     hash: "Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE",
   },
   {
-    id: "kaido",
-    username: "kaido",
-    name: "Kaido",
+    id: "yas",
+    username: "yas",
+    name: "Yas",
     salt: "w-fi6L0FIdkx0NNSYyhvdg",
     hash: "g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y",
   },
   {
-    id: "ahmed",
-    username: "ahmed",
-    name: "Ahmed",
+    id: "m",
+    username: "m",
+    name: "M",
     salt: "4ueIIy1PaWKbbDjqIkf39g",
     hash: "Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI",
   },
@@ -522,11 +522,11 @@ const AVATAR_LIBRARY_SEED = [
 ];
 
 const SEEDED_PROGRESS = [
-  ["mahdi", "returner", 141, 100, 1],
-  ["mahdi", "returner", 142, 100, 1],
-  ["mahdi", "returner", 143, 62, 0],
-  ["kaido", "eleceed", 315, 45, 0],
-  ["ahmed", "solo", 197, 55, 0],
+  ["has", "returner", 141, 100, 1],
+  ["has", "returner", 142, 100, 1],
+  ["has", "returner", 143, 62, 0],
+  ["yas", "eleceed", 315, 45, 0],
+  ["m", "solo", 197, 55, 0],
 ];
 
 export async function onRequest(context) {
@@ -1765,13 +1765,14 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version === "13") return;
+      if (version === "14") return;
 
       await ensureDatabase(db);
       await ensureAdminSchema(db);
       await applyRuntimeOptimizationMigration(db);
       await applyUsernameMigration(db);
       await applyUsernameMigrationV13(db);
+      await applyUserIdentityV14(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -1864,6 +1865,83 @@ async function applyUsernameMigrationV13(db) {
     .run();
 }
 
+async function applyUserIdentityV14(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "14") return;
+  if (version?.value !== "13") return;
+
+  const identities = [
+    { usernames: ["has"], id: "has", username: "has", name: "Has" },
+    { usernames: ["yas"], id: "yas", username: "yas", name: "Yas" },
+    { usernames: ["m", "mah"], id: "m", username: "m", name: "M" },
+  ];
+
+  for (const identity of identities) {
+    const placeholders = identity.usernames.map(() => "?").join(",");
+    const source = await db
+      .prepare(`SELECT id, username FROM users
+        WHERE lower(username) IN (${placeholders}) AND role = 'user'
+        LIMIT 1`)
+      .bind(...identity.usernames)
+      .first();
+
+    if (!source) continue;
+
+    if (String(source.id) === identity.id) {
+      await db
+        .prepare("UPDATE users SET username = ?, name = ?, updated_at = ? WHERE id = ?")
+        .bind(identity.username, identity.name, Date.now(), identity.id)
+        .run();
+      continue;
+    }
+
+    const target = await db
+      .prepare("SELECT id FROM users WHERE id = ? LIMIT 1")
+      .bind(identity.id)
+      .first();
+    if (target) {
+      throw new Error(`User identity migration target already exists: ${identity.id}`);
+    }
+
+    const temporaryUsername = `__wany_identity_${source.id}_${Date.now()}`;
+    const statements = [
+      db.prepare("UPDATE users SET username = ?, updated_at = ? WHERE id = ?")
+        .bind(temporaryUsername, Date.now(), source.id),
+      db.prepare(`INSERT INTO users
+        (id, username, name, profile_visibility, password_salt, password_hash, password_iterations,
+         created_at, updated_at, avatar_id, role)
+        SELECT ?, ?, ?, profile_visibility, password_salt, password_hash, password_iterations,
+               created_at, ?, avatar_id, role
+        FROM users WHERE id = ?`)
+        .bind(identity.id, identity.username, identity.name, Date.now(), source.id),
+      db.prepare("UPDATE sessions SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE favorites SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE reading_progress SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE user_state SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE friendships SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE friendships SET friend_id = ? WHERE friend_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE user_library SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE reading_history SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE user_lists SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE user_profile_sections SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE activity_events SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE friend_requests SET pair_low_id = ? WHERE pair_low_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE friend_requests SET pair_high_id = ? WHERE pair_high_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE friend_requests SET requester_id = ? WHERE requester_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE friend_requests SET receiver_id = ? WHERE receiver_id = ?").bind(identity.id, source.id),
+      db.prepare("UPDATE admin_audit_log SET target_user_id = ? WHERE target_user_id = ?").bind(identity.id, source.id),
+      db.prepare("DELETE FROM users WHERE id = ?").bind(source.id),
+    ];
+    await db.batch(statements);
+  }
+
+  await db
+    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '14')")
+    .run();
+}
+
 async function ensureDatabase(db) {
   await db
     .prepare(
@@ -1873,7 +1951,7 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "9" || version?.value === "10" || version?.value === "11" || version?.value === "12") return;
+  if (version?.value === "9" || version?.value === "10" || version?.value === "11" || version?.value === "12" || version?.value === "13" || version?.value === "14") return;
   if (version?.value === "8") {
     await db.batch([
       ...avatarSchemaStatements(db),
@@ -2067,9 +2145,9 @@ async function ensureDatabase(db) {
   }
 
   for (const [userId, mangaId, chapter] of [
-    ["mahdi", "returner", 143],
-    ["kaido", "eleceed", 315],
-    ["ahmed", "solo", 197],
+    ["has", "returner", 143],
+    ["yas", "eleceed", 315],
+    ["m", "solo", 197],
   ]) {
     statements.push(
       db
