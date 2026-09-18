@@ -36,8 +36,8 @@ export function Login() {
       </div>
       <div className="login-form">
         <p className="eyebrow">أهلا بك في WANY</p>
-        <h2>مكانك داخل القصة.</h2>
-        <p className="muted">سجل دخولك للوصول إلى مكتبتك المتزامنة.</p>
+        <h2>ومن أي مكان.</h2>
+        <p className="muted">سجّل دخولك وكمل من حيث توقفت.</p>
         <form onSubmit={submit}>
           <label>
             اسم المستخدم
