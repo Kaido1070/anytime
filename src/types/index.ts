@@ -1,4 +1,5 @@
 export type ProfileVisibility = "public" | "private";
+export type UserRole = "user" | "admin";
 export type ProfileAccess = "owner" | "public" | "private";
 export type FriendRelationship = "none" | "pending_sent" | "pending_received" | "friends";
 
@@ -8,6 +9,7 @@ export interface User {
   username: string;
   profileVisibility: ProfileVisibility;
   avatarId: string | null;
+  role?: UserRole;
 }
 
 export interface Avatar {
@@ -239,4 +241,44 @@ export interface UserProfileView {
   friends?: User[];
   stats?: ProfileStats;
   activity?: ActivityEvent[];
+}
+
+
+export interface AdminLastRead {
+  mangaId: string;
+  lastReadChapter: number | null;
+  highestReachedChapter: number | null;
+  lastReadAt: number | null;
+}
+
+export interface AdminUserSummary {
+  user: User;
+  worksCount: number;
+  listsCount: number;
+  friendsCount: number;
+  lastActivityAt: number | null;
+  lastRead: AdminLastRead | null;
+}
+
+export interface AdminUserList extends UserListSummary {
+  items: UserListItem[];
+}
+
+export interface AdminUserDetail {
+  user: User;
+  createdAt: number;
+  lastActivityAt: number | null;
+  stats: {
+    works: number;
+    lists: number;
+    friends: number;
+  };
+  library: LibraryEntry[];
+  readingHistory: ReadingHistoryEntry[];
+  readingHistoryTotal: number;
+  readingHistoryHasMore: boolean;
+  lists: AdminUserList[];
+  favorites: string[];
+  friends: User[];
+  activity: ActivityEvent[];
 }
