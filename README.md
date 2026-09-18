@@ -29,7 +29,7 @@ pnpm dev
 Production:
 
 ```text
-https://anytimee.pages.dev/
+https://wany.site/
 ```
 
 Local development:
