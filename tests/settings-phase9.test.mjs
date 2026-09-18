@@ -219,5 +219,5 @@ test("login delegates to the shared API handler that preserves avatar data", asy
 
   assert.match(login, /handleApiRequest\(context\)/);
   assert.match(api, /profile_visibility, avatar_id, role, password_salt/);
-  assert.match(admin, /avatarId: row\.avatar_id \?\? null/);
+  assert.match(admin, /avatarId: row\.avatar_id \?\? row\.avatarId \?\? null/);
 });
