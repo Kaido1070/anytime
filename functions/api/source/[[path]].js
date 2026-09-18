@@ -126,7 +126,8 @@ export async function onRequest(context) {
               : item.source === "xsano"
                 ? await xsanoSeries(db, item)
                 : await mangalikSeries(db, item);
-      return json({ item: detail }, 200, shortCache());
+      const observedDetail = await rememberChapterAvailability(db, detail);
+      return json({ item: observedDetail }, 200, shortCache());
     }
 
     if (action === "chapter") {
@@ -202,27 +203,52 @@ function shortCache() {
 
 async function ensureSourceSchema(db) {
   if (!sourceSchemaReady) {
-    sourceSchemaReady = db
-      .prepare(`CREATE TABLE IF NOT EXISTS source_items (
-        source_key TEXT PRIMARY KEY,
-        source TEXT NOT NULL,
-        source_id TEXT NOT NULL,
-        slug TEXT NOT NULL,
-        type TEXT NOT NULL DEFAULT '',
-        url TEXT NOT NULL DEFAULT '',
-        title TEXT NOT NULL,
-        cover_url TEXT NOT NULL DEFAULT '',
-        description TEXT,
-        status TEXT,
-        genres_json TEXT NOT NULL DEFAULT '[]',
-        updated_at INTEGER NOT NULL,
-        UNIQUE(source, source_id)
-      )`)
-      .run()
-      .catch((error) => {
-        sourceSchemaReady = null;
-        throw error;
-      });
+    sourceSchemaReady = (async () => {
+      await db
+        .prepare(`CREATE TABLE IF NOT EXISTS source_items (
+          source_key TEXT PRIMARY KEY,
+          source TEXT NOT NULL,
+          source_id TEXT NOT NULL,
+          slug TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT '',
+          url TEXT NOT NULL DEFAULT '',
+          title TEXT NOT NULL,
+          cover_url TEXT NOT NULL DEFAULT '',
+          description TEXT,
+          status TEXT,
+          genres_json TEXT NOT NULL DEFAULT '[]',
+          updated_at INTEGER NOT NULL,
+          first_seen_at INTEGER,
+          UNIQUE(source, source_id)
+        )`)
+        .run();
+
+      const columns = await db.prepare("PRAGMA table_info(source_items)").all();
+      if (!(columns.results ?? []).some((column) => column.name === "first_seen_at")) {
+        await db.prepare("ALTER TABLE source_items ADD COLUMN first_seen_at INTEGER").run();
+      }
+      await db
+        .prepare("UPDATE source_items SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
+        .run();
+
+      await db
+        .prepare(`CREATE TABLE IF NOT EXISTS source_chapter_seen (
+          source_key TEXT NOT NULL,
+          chapter_identity TEXT NOT NULL,
+          chapter_number REAL,
+          published_at TEXT,
+          first_seen_at INTEGER NOT NULL,
+          PRIMARY KEY (source_key, chapter_identity),
+          FOREIGN KEY (source_key) REFERENCES source_items(source_key) ON DELETE CASCADE
+        )`)
+        .run();
+      await db
+        .prepare("CREATE INDEX IF NOT EXISTS idx_source_chapter_seen_release ON source_chapter_seen(first_seen_at DESC, source_key)")
+        .run();
+    })().catch((error) => {
+      sourceSchemaReady = null;
+      throw error;
+    });
   }
   await sourceSchemaReady;
 }
@@ -233,8 +259,8 @@ async function rememberItems(db, items) {
   const statements = items.slice(0, 80).map((item) =>
     db
       .prepare(`INSERT INTO source_items
-        (source_key, source, source_id, slug, type, url, title, cover_url, description, status, genres_json, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (source_key, source, source_id, slug, type, url, title, cover_url, description, status, genres_json, updated_at, first_seen_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(source_key) DO UPDATE SET
           source_id = excluded.source_id,
           slug = excluded.slug,
@@ -245,7 +271,8 @@ async function rememberItems(db, items) {
           description = COALESCE(excluded.description, source_items.description),
           status = COALESCE(excluded.status, source_items.status),
           genres_json = CASE WHEN excluded.genres_json <> '[]' THEN excluded.genres_json ELSE source_items.genres_json END,
-          updated_at = excluded.updated_at`)
+          updated_at = excluded.updated_at,
+          first_seen_at = COALESCE(source_items.first_seen_at, excluded.first_seen_at)`)
       .bind(
         item.key,
         item.source,
@@ -259,9 +286,85 @@ async function rememberItems(db, items) {
         item.status ?? null,
         JSON.stringify(item.genres ?? []),
         now,
+        now,
       ),
   );
   await db.batch(statements);
+}
+
+function sourceChapterIdentity(chapter) {
+  const number = Number(chapter?.number);
+  if (Number.isFinite(number)) return String(number);
+  return String(chapter?.title ?? "").trim().slice(0, 120);
+}
+
+async function rememberChapterAvailability(db, item) {
+  const chapters = Array.isArray(item?.chapters) ? item.chapters : [];
+  if (!item?.key || !chapters.length) return item;
+
+  const recent = [...chapters]
+    .sort((a, b) => Number(b.number ?? 0) - Number(a.number ?? 0))
+    .slice(0, 240);
+  const current = await db
+    .prepare("SELECT COUNT(*) AS count FROM source_chapter_seen WHERE source_key = ?")
+    .bind(item.key)
+    .first();
+  const sourceItem = await db
+    .prepare("SELECT first_seen_at FROM source_items WHERE source_key = ? LIMIT 1")
+    .bind(item.key)
+    .first();
+  const now = Date.now();
+  const baseline = Number(current?.count ?? 0) === 0
+    ? Number(sourceItem?.first_seen_at ?? now)
+    : now;
+
+  for (let index = 0; index < recent.length; index += 50) {
+    const chunk = recent.slice(index, index + 50);
+    await db.batch(
+      chunk.map((chapter) =>
+        db.prepare(`INSERT INTO source_chapter_seen
+          (source_key, chapter_identity, chapter_number, published_at, first_seen_at)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
+            chapter_number = excluded.chapter_number,
+            published_at = COALESCE(excluded.published_at, source_chapter_seen.published_at)`)
+          .bind(
+            item.key,
+            sourceChapterIdentity(chapter),
+            Number.isFinite(Number(chapter.number)) ? Number(chapter.number) : null,
+            chapter.publishedAt ? String(chapter.publishedAt) : null,
+            baseline,
+          ),
+      ),
+    );
+  }
+
+  const identities = recent.map(sourceChapterIdentity).filter(Boolean);
+  if (!identities.length) return item;
+  const placeholders = identities.map(() => "?").join(",");
+  const seen = await db
+    .prepare(`SELECT chapter_identity, first_seen_at, published_at
+      FROM source_chapter_seen
+      WHERE source_key = ? AND chapter_identity IN (${placeholders})`)
+    .bind(item.key, ...identities)
+    .all();
+  const byIdentity = new Map(
+    (seen.results ?? []).map((row) => [String(row.chapter_identity), row]),
+  );
+
+  return {
+    ...item,
+    chapters: chapters.map((chapter) => {
+      const row = byIdentity.get(sourceChapterIdentity(chapter));
+      return row
+        ? {
+            ...chapter,
+            publishedAt: chapter.publishedAt ?? row.published_at ?? null,
+            firstSeenAt: Number(row.first_seen_at),
+          }
+        : chapter;
+    }),
+  };
 }
 
 async function loadItem(db, key) {
