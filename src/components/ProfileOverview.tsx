@@ -32,13 +32,15 @@ export function ProfileIdentityHeader({
     <header className="profile-overview-header">
       <div className="profile-overview-identity">
         <UserAvatar user={user} className="profile-overview-avatar" loading="eager" />
-        <div className="profile-overview-name">
-          <h1 dir="auto">{user?.name ?? "—"}</h1>
-          <p dir="ltr">@{user?.username ?? "—"}</p>
-          {privateState && <span className="profile-overview-private">حساب خاص</span>}
+        <div className="profile-overview-details">
+          <div className="profile-overview-name">
+            <h1 dir="auto">{user?.name ?? "—"}</h1>
+            <p dir="ltr">@{user?.username ?? "—"}</p>
+            {privateState && <span className="profile-overview-private">حساب خاص</span>}
+          </div>
+          {actions && <div className="profile-overview-actions">{actions}</div>}
         </div>
       </div>
-      {actions && <div className="profile-overview-actions">{actions}</div>}
     </header>
   );
 }
@@ -81,8 +83,8 @@ export function ProfileSummaryStrip({
           onClick={() => navigate(cell.to)}
           key={cell.label}
         >
-          <span>{cell.label}</span>
           <strong>{formatCount(cell.value)}</strong>
+          <span>{cell.label}</span>
           {cell.badge > 0 && (
             <small className="profile-summary-badge" aria-label={`${cell.badge} طلب صداقة جديد`}>
               {cell.badge > 99 ? "99+" : cell.badge}
@@ -105,7 +107,7 @@ export function ProfileStatsSection({ stats }: { stats: ProfileStats }) {
   return (
     <section className="profile-overview-section profile-stats-section" aria-labelledby="profile-stats-title">
       <div className="profile-overview-section-heading">
-        <h2 id="profile-stats-title">الإحصائيات</h2>
+        <h2 id="profile-stats-title">إحصائيات القراءة</h2>
       </div>
       <div className="profile-stats-grid">
         {metrics.map((metric) => (
@@ -151,12 +153,16 @@ export function ProfileListsSection({
   lists,
   works,
   viewAllTo = "/lists",
+  error = "",
+  onRetry,
 }: {
   favorites: string[];
   favoriteCount: number;
   lists: ProfileListPreview[];
   works: Record<string, SourceManga>;
   viewAllTo?: string;
+  error?: string;
+  onRetry?: () => void;
 }) {
   const cards = [
     {
@@ -202,6 +208,16 @@ export function ProfileListsSection({
       ) : (
         <p className="profile-overview-empty">لا توجد قوائم حتى الآن.</p>
       )}
+      {error && (
+        <div className="profile-section-error compact" role="alert">
+          <span>{error}</span>
+          {onRetry && (
+            <button className="secondary" type="button" onClick={onRetry}>
+              إعادة المحاولة
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -233,10 +249,14 @@ function ReadingCard({
       <div className="profile-reading-copy">
         <h3 dir="auto">{title}</h3>
         <p>
-          {highest == null ? "لم يسجل تقدمًا بعد" : `وصل إلى الفصل ${highest}`}
+          {highest == null
+            ? "لم يسجل تقدمًا بعد"
+            : own
+              ? `وصلت إلى الفصل ${highest}`
+              : `وصل إلى الفصل ${highest}`}
         </p>
         {progress?.latestChapter != null && (
-          <p>من أصل {progress.latestChapter} فصلًا متاحًا</p>
+          <p>أحدث فصل متاح: {progress.latestChapter}</p>
         )}
         {progress && (
           <>
@@ -276,12 +296,16 @@ export function ProfileReadingSection({
   own,
   completed = new Set<string>(),
   viewAllTo,
+  error = "",
+  onRetry,
 }: {
   entries: ProfileLibraryItem[];
   series: Record<string, SourceManga>;
   own: boolean;
   completed?: Set<string>;
   viewAllTo?: string;
+  error?: string;
+  onRetry?: () => void;
 }) {
   const available = entries.filter(
     (entry) => entry.status === "reading" && Boolean(series[entry.mangaId]),
@@ -311,10 +335,20 @@ export function ProfileReadingSection({
             );
           })}
         </div>
-      ) : (
+      ) : entries.length && error ? null : (
         <p className="profile-overview-empty">
           {entries.length ? "تعذر تحميل بيانات الفصول لهذه الأعمال." : "لا توجد أعمال تقرؤها حاليًا."}
         </p>
+      )}
+      {error && (
+        <div className="profile-section-error compact" role="alert">
+          <span>{error}</span>
+          {onRetry && (
+            <button className="secondary" type="button" onClick={onRetry}>
+              إعادة المحاولة
+            </button>
+          )}
+        </div>
       )}
     </section>
   );
