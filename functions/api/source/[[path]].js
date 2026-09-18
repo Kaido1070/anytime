@@ -2107,6 +2107,8 @@ export const __test = {
   parseAsqPages,
   parseStarzChapters,
   parseStarzPages,
+  parseMangalikChapters,
+  parseMangalikPages,
   starzPostId,
   parseXsanoPages,
   xsanoChapterFeedUrl,
