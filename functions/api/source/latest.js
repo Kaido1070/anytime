@@ -9,7 +9,7 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") || "mangatime").toLowerCase();
-  if (source === "3asq" || source === "starzmanga" || source === "xsano") return handleSourceRequest(context);
+  if (source === "3asq" || source === "starzmanga" || source === "xsano" || source === "mangalik") return handleSourceRequest(context);
   if (!env.DB) return json({ error: "D1_NOT_CONFIGURED", message: "قاعدة بيانات Anytime غير مربوطة بالموقع." }, 503);
   if (!(await getSession(request, env.DB))) return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
   const page = safePage(url.searchParams.get("page"));
