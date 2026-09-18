@@ -9,11 +9,11 @@
 
 Performed against the running app in Chromium, using a 390 × 844 mobile viewport:
 
-- Mock sign-in, invalid-password feedback, sign-out, and switching from Mahdi to Kaido.
+- Mock sign-in, invalid-password feedback, sign-out, and switching from Has to Yas.
 - Home, Favorites, Friends, friend profile, Profile, manga details, and chapter reader navigation.
 - Favorite removal persisted after a page reload.
-- A friend's Eleceed favorite copied into Mahdi's library; the copy button became disabled and the manga appeared in Favorites.
-- Kaido retained a separate sample library after switching accounts.
+- A friend's Eleceed favorite copied into Has's library; the copy button became disabled and the manga appeared in Favorites.
+- Yas retained a separate sample library after switching accounts.
 - Seeded chapter 143 restored to 62%. Scrolled to approximately 94.63%; leaving/reopening and a full reload both restored the measured 94.63% position.
 - Reaching 100% marked chapter 143 completed. Next chapter 144 opened at 0%; the details page reflected both states.
 - Mobile login overlap was found and corrected.
