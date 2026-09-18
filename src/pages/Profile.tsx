@@ -5,6 +5,7 @@ import { useLibrary } from "../hooks/useLibrary";
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 const PASSWORD_MAX_LENGTH = 128;
+const READER_PROGRESS_VISIBILITY_KEY = "wany:reader-progress-visible";
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 function normalizeDisplayName(value: string) {
