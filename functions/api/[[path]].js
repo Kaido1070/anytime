@@ -2029,6 +2029,7 @@ function librarySchemaStatements(db) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_recent ON user_library(user_id, last_read_at DESC, updated_at DESC)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_status ON user_library(user_id, status, manga_id)"),
     db.prepare(`CREATE TABLE IF NOT EXISTS reading_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -2039,6 +2040,7 @@ function librarySchemaStatements(db) {
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_time ON reading_history(user_id, read_at DESC, id DESC)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_work ON reading_history(user_id, manga_id, read_at DESC)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_chapter ON reading_history(user_id, manga_id, chapter)"),
   ];
 }
 
