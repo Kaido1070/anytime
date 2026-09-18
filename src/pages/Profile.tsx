@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
+import { AvatarPicker } from "../components/AvatarPicker";
+import { UserAvatar } from "../components/UserAvatar";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
 
 export function Profile({ embedded = false }: { embedded?: boolean }) {
-  const { user, data, signOut, setProfileVisibility, changePassword } = useLibrary();
+  const { user, data, signOut, setAvatar, setProfileVisibility, changePassword } = useLibrary();
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
   const [privacyError, setPrivacyError] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
@@ -77,7 +80,7 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
             حسابي<span className="accent">.</span>
           </h1>
           <div className="profile-heading">
-            <span className="avatar profile-avatar">{user?.name[0]}</span>
+            <UserAvatar user={user} className="profile-avatar" loading="eager" />
             <h2>{user?.name}</h2>
             <p className="muted">@{user?.username}</p>
           </div>
@@ -93,6 +96,17 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
           </div>
         </>
       )}
+      <section className="profile-avatar-setting" aria-labelledby="profile-avatar-setting-title">
+        <UserAvatar user={user} className="profile-avatar-settings" loading="eager" />
+        <div className="profile-avatar-setting-copy">
+          <b id="profile-avatar-setting-title">الصورة الشخصية</b>
+          <span className="muted">اختر من مكتبة Wany الجاهزة. لا يوجد رفع صور من الجهاز.</span>
+        </div>
+        <button className="secondary" type="button" onClick={() => setAvatarPickerOpen(true)}>
+          تغيير
+        </button>
+      </section>
+
       <div className="profile-info">
         <p>
           <span>الاسم الظاهر</span>
@@ -183,6 +197,16 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
       <button className="secondary signout" onClick={signOut}>
         تسجيل الخروج <span>↗</span>
       </button>
+
+      {avatarPickerOpen && (
+        <AvatarPicker
+          currentAvatarId={user?.avatarId ?? null}
+          onSave={async (avatarId) => {
+            await setAvatar(avatarId);
+          }}
+          onClose={() => setAvatarPickerOpen(false)}
+        />
+      )}
     </>
   );
 }

@@ -239,6 +239,13 @@ function useLibraryState() {
     setFriends(await service.getFriends());
   };
 
+  const setAvatar = async (avatarId: string) => {
+    setError("");
+    const updatedUser = await service.setAvatar(avatarId);
+    setUser(updatedUser);
+    return updatedUser;
+  };
+
   const setProfileVisibility = async (visibility: ProfileVisibility) => {
     setError("");
     const updatedUser = await service.setProfileVisibility(visibility);
@@ -272,6 +279,7 @@ function useLibraryState() {
     rejectFriendRequest,
     cancelFriendRequest,
     removeFriend,
+    setAvatar,
     setProfileVisibility,
     changePassword,
   };

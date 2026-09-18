@@ -3,6 +3,9 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PASSWORD_ITERATIONS = 210000;
 const MAX_JSON_BYTES = 32 * 1024;
 const PROGRESS_ACTIVITY_AGGREGATION_MS = 30 * 60 * 1000;
+const AVATAR_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const AVATAR_IMAGE_FAILURE_TTL_MS = 5 * 60 * 1000;
+const avatarImageCache = new Map();
 
 const SEEDED_USERS = [
   {
@@ -33,6 +36,485 @@ const SEEDED_FAVORITES = {
   kaido: ["eleceed", "horizon"],
   ahmed: ["solo", "returner"],
 };
+
+const AVATAR_LIBRARY_SEED = [
+  {
+    "id": "one-piece",
+    "name": "ون بيس",
+    "slug": "one-piece",
+    "position": 1,
+    "avatars": [
+      {
+        "id": "one-piece:luffy",
+        "characterName": "لوفي",
+        "imagePath": "anilist:Monkey D. Luffy",
+        "position": 1
+      },
+      {
+        "id": "one-piece:zoro",
+        "characterName": "زورو",
+        "imagePath": "anilist:Roronoa Zoro",
+        "position": 2
+      },
+      {
+        "id": "one-piece:nami",
+        "characterName": "نامي",
+        "imagePath": "anilist:Nami",
+        "position": 3
+      },
+      {
+        "id": "one-piece:sanji",
+        "characterName": "سانجي",
+        "imagePath": "anilist:Sanji",
+        "position": 4
+      },
+      {
+        "id": "one-piece:robin",
+        "characterName": "روبن",
+        "imagePath": "anilist:Nico Robin",
+        "position": 5
+      },
+      {
+        "id": "one-piece:chopper",
+        "characterName": "تشوبر",
+        "imagePath": "anilist:Tony Tony Chopper",
+        "position": 6
+      },
+      {
+        "id": "one-piece:usopp",
+        "characterName": "أوسوب",
+        "imagePath": "anilist:Usopp",
+        "position": 7
+      },
+      {
+        "id": "one-piece:jinbe",
+        "characterName": "جينبي",
+        "imagePath": "anilist:Jinbe",
+        "position": 8
+      }
+    ]
+  },
+  {
+    "id": "naruto",
+    "name": "ناروتو",
+    "slug": "naruto",
+    "position": 2,
+    "avatars": [
+      {
+        "id": "naruto:naruto",
+        "characterName": "ناروتو",
+        "imagePath": "anilist:Naruto Uzumaki",
+        "position": 1
+      },
+      {
+        "id": "naruto:sasuke",
+        "characterName": "ساسكي",
+        "imagePath": "anilist:Sasuke Uchiha",
+        "position": 2
+      },
+      {
+        "id": "naruto:sakura",
+        "characterName": "ساكورا",
+        "imagePath": "anilist:Sakura Haruno",
+        "position": 3
+      },
+      {
+        "id": "naruto:kakashi",
+        "characterName": "كاكاشي",
+        "imagePath": "anilist:Kakashi Hatake",
+        "position": 4
+      },
+      {
+        "id": "naruto:itachi",
+        "characterName": "إيتاتشي",
+        "imagePath": "anilist:Itachi Uchiha",
+        "position": 5
+      },
+      {
+        "id": "naruto:hinata",
+        "characterName": "هيناتا",
+        "imagePath": "anilist:Hinata Hyuga",
+        "position": 6
+      },
+      {
+        "id": "naruto:gaara",
+        "characterName": "غارا",
+        "imagePath": "anilist:Gaara",
+        "position": 7
+      },
+      {
+        "id": "naruto:shikamaru",
+        "characterName": "شيكامارو",
+        "imagePath": "anilist:Shikamaru Nara",
+        "position": 8
+      }
+    ]
+  },
+  {
+    "id": "bleach",
+    "name": "بليتش",
+    "slug": "bleach",
+    "position": 3,
+    "avatars": [
+      {
+        "id": "bleach:ichigo",
+        "characterName": "إيتشيغو",
+        "imagePath": "anilist:Ichigo Kurosaki",
+        "position": 1
+      },
+      {
+        "id": "bleach:rukia",
+        "characterName": "روكيا",
+        "imagePath": "anilist:Rukia Kuchiki",
+        "position": 2
+      },
+      {
+        "id": "bleach:uryu",
+        "characterName": "أوريو",
+        "imagePath": "anilist:Uryu Ishida",
+        "position": 3
+      },
+      {
+        "id": "bleach:urahara",
+        "characterName": "أوراهارا",
+        "imagePath": "anilist:Kisuke Urahara",
+        "position": 4
+      },
+      {
+        "id": "bleach:byakuya",
+        "characterName": "بياكويا",
+        "imagePath": "anilist:Byakuya Kuchiki",
+        "position": 5
+      },
+      {
+        "id": "bleach:renji",
+        "characterName": "رينجي",
+        "imagePath": "anilist:Renji Abarai",
+        "position": 6
+      },
+      {
+        "id": "bleach:aizen",
+        "characterName": "آيزن",
+        "imagePath": "anilist:Sosuke Aizen",
+        "position": 7
+      }
+    ]
+  },
+  {
+    "id": "attack-on-titan",
+    "name": "هجوم العمالقة",
+    "slug": "attack-on-titan",
+    "position": 4,
+    "avatars": [
+      {
+        "id": "attack-on-titan:eren",
+        "characterName": "إيرين",
+        "imagePath": "anilist:Eren Yeager",
+        "position": 1
+      },
+      {
+        "id": "attack-on-titan:mikasa",
+        "characterName": "ميكاسا",
+        "imagePath": "anilist:Mikasa Ackerman",
+        "position": 2
+      },
+      {
+        "id": "attack-on-titan:armin",
+        "characterName": "أرمين",
+        "imagePath": "anilist:Armin Arlert",
+        "position": 3
+      },
+      {
+        "id": "attack-on-titan:levi",
+        "characterName": "ليفاي",
+        "imagePath": "anilist:Levi Ackerman",
+        "position": 4
+      },
+      {
+        "id": "attack-on-titan:hange",
+        "characterName": "هانجي",
+        "imagePath": "anilist:Hange Zoe",
+        "position": 5
+      },
+      {
+        "id": "attack-on-titan:erwin",
+        "characterName": "إروين",
+        "imagePath": "anilist:Erwin Smith",
+        "position": 6
+      },
+      {
+        "id": "attack-on-titan:reiner",
+        "characterName": "راينر",
+        "imagePath": "anilist:Reiner Braun",
+        "position": 7
+      }
+    ]
+  },
+  {
+    "id": "demon-slayer",
+    "name": "قاتل الشياطين",
+    "slug": "demon-slayer",
+    "position": 5,
+    "avatars": [
+      {
+        "id": "demon-slayer:tanjiro",
+        "characterName": "تانجيرو",
+        "imagePath": "anilist:Tanjiro Kamado",
+        "position": 1
+      },
+      {
+        "id": "demon-slayer:nezuko",
+        "characterName": "نيزوكو",
+        "imagePath": "anilist:Nezuko Kamado",
+        "position": 2
+      },
+      {
+        "id": "demon-slayer:zenitsu",
+        "characterName": "زينيتسو",
+        "imagePath": "anilist:Zenitsu Agatsuma",
+        "position": 3
+      },
+      {
+        "id": "demon-slayer:inosuke",
+        "characterName": "إينوسكي",
+        "imagePath": "anilist:Inosuke Hashibira",
+        "position": 4
+      },
+      {
+        "id": "demon-slayer:giyu",
+        "characterName": "غيو",
+        "imagePath": "anilist:Giyu Tomioka",
+        "position": 5
+      },
+      {
+        "id": "demon-slayer:rengoku",
+        "characterName": "رينغوكو",
+        "imagePath": "anilist:Kyojuro Rengoku",
+        "position": 6
+      },
+      {
+        "id": "demon-slayer:shinobu",
+        "characterName": "شينوبو",
+        "imagePath": "anilist:Shinobu Kocho",
+        "position": 7
+      }
+    ]
+  },
+  {
+    "id": "jujutsu-kaisen",
+    "name": "جوجوتسو كايسن",
+    "slug": "jujutsu-kaisen",
+    "position": 6,
+    "avatars": [
+      {
+        "id": "jujutsu-kaisen:yuji",
+        "characterName": "يوجي",
+        "imagePath": "anilist:Yuji Itadori",
+        "position": 1
+      },
+      {
+        "id": "jujutsu-kaisen:megumi",
+        "characterName": "ميغومي",
+        "imagePath": "anilist:Megumi Fushiguro",
+        "position": 2
+      },
+      {
+        "id": "jujutsu-kaisen:nobara",
+        "characterName": "نوبارا",
+        "imagePath": "anilist:Nobara Kugisaki",
+        "position": 3
+      },
+      {
+        "id": "jujutsu-kaisen:gojo",
+        "characterName": "غوجو",
+        "imagePath": "anilist:Satoru Gojo",
+        "position": 4
+      },
+      {
+        "id": "jujutsu-kaisen:maki",
+        "characterName": "ماكي",
+        "imagePath": "anilist:Maki Zenin",
+        "position": 5
+      },
+      {
+        "id": "jujutsu-kaisen:sukuna",
+        "characterName": "سوكونا",
+        "imagePath": "anilist:Ryomen Sukuna",
+        "position": 6
+      }
+    ]
+  },
+  {
+    "id": "solo-leveling",
+    "name": "سولو ليفلينغ",
+    "slug": "solo-leveling",
+    "position": 7,
+    "avatars": [
+      {
+        "id": "solo-leveling:jinwoo",
+        "characterName": "سونغ جين وو",
+        "imagePath": "anilist:Sung Jinwoo",
+        "position": 1
+      },
+      {
+        "id": "solo-leveling:cha-hae-in",
+        "characterName": "تشا هاي إن",
+        "imagePath": "anilist:Cha Hae-In",
+        "position": 2
+      },
+      {
+        "id": "solo-leveling:jinho",
+        "characterName": "يو جين هو",
+        "imagePath": "anilist:Yoo Jinho",
+        "position": 3
+      },
+      {
+        "id": "solo-leveling:igris",
+        "characterName": "إيغريس",
+        "imagePath": "anilist:Igris",
+        "position": 4
+      },
+      {
+        "id": "solo-leveling:beru",
+        "characterName": "بيرو",
+        "imagePath": "anilist:Beru",
+        "position": 5
+      }
+    ]
+  },
+  {
+    "id": "hunter-x-hunter",
+    "name": "هنتر × هنتر",
+    "slug": "hunter-x-hunter",
+    "position": 8,
+    "avatars": [
+      {
+        "id": "hunter-x-hunter:gon",
+        "characterName": "غون",
+        "imagePath": "anilist:Gon Freecss",
+        "position": 1
+      },
+      {
+        "id": "hunter-x-hunter:killua",
+        "characterName": "كيلوا",
+        "imagePath": "anilist:Killua Zoldyck",
+        "position": 2
+      },
+      {
+        "id": "hunter-x-hunter:kurapika",
+        "characterName": "كورابيكا",
+        "imagePath": "anilist:Kurapika",
+        "position": 3
+      },
+      {
+        "id": "hunter-x-hunter:leorio",
+        "characterName": "ليوريو",
+        "imagePath": "anilist:Leorio Paradinight",
+        "position": 4
+      },
+      {
+        "id": "hunter-x-hunter:hisoka",
+        "characterName": "هيسوكا",
+        "imagePath": "anilist:Hisoka Morow",
+        "position": 5
+      },
+      {
+        "id": "hunter-x-hunter:chrollo",
+        "characterName": "كرولو",
+        "imagePath": "anilist:Chrollo Lucilfer",
+        "position": 6
+      }
+    ]
+  },
+  {
+    "id": "my-hero-academia",
+    "name": "أكاديمية بطلي",
+    "slug": "my-hero-academia",
+    "position": 9,
+    "avatars": [
+      {
+        "id": "my-hero-academia:deku",
+        "characterName": "ديكو",
+        "imagePath": "anilist:Izuku Midoriya",
+        "position": 1
+      },
+      {
+        "id": "my-hero-academia:bakugo",
+        "characterName": "باكوغو",
+        "imagePath": "anilist:Katsuki Bakugo",
+        "position": 2
+      },
+      {
+        "id": "my-hero-academia:todoroki",
+        "characterName": "تودوروكي",
+        "imagePath": "anilist:Shoto Todoroki",
+        "position": 3
+      },
+      {
+        "id": "my-hero-academia:uraraka",
+        "characterName": "أوراراكا",
+        "imagePath": "anilist:Ochaco Uraraka",
+        "position": 4
+      },
+      {
+        "id": "my-hero-academia:all-might",
+        "characterName": "أول مايت",
+        "imagePath": "anilist:All Might",
+        "position": 5
+      },
+      {
+        "id": "my-hero-academia:tsuyu",
+        "characterName": "تسويو",
+        "imagePath": "anilist:Tsuyu Asui",
+        "position": 6
+      }
+    ]
+  },
+  {
+    "id": "fullmetal-alchemist",
+    "name": "الخيميائي الفولاذي",
+    "slug": "fullmetal-alchemist",
+    "position": 10,
+    "avatars": [
+      {
+        "id": "fullmetal-alchemist:edward",
+        "characterName": "إدوارد",
+        "imagePath": "anilist:Edward Elric",
+        "position": 1
+      },
+      {
+        "id": "fullmetal-alchemist:alphonse",
+        "characterName": "ألفونس",
+        "imagePath": "anilist:Alphonse Elric",
+        "position": 2
+      },
+      {
+        "id": "fullmetal-alchemist:roy",
+        "characterName": "روي",
+        "imagePath": "anilist:Roy Mustang",
+        "position": 3
+      },
+      {
+        "id": "fullmetal-alchemist:riza",
+        "characterName": "ريزا",
+        "imagePath": "anilist:Riza Hawkeye",
+        "position": 4
+      },
+      {
+        "id": "fullmetal-alchemist:winry",
+        "characterName": "وينري",
+        "imagePath": "anilist:Winry Rockbell",
+        "position": 5
+      },
+      {
+        "id": "fullmetal-alchemist:scar",
+        "characterName": "سكار",
+        "imagePath": "anilist:Scar",
+        "position": 6
+      }
+    ]
+  }
+];
 
 const SEEDED_PROGRESS = [
   ["mahdi", "returner", 141, 100, 1],
@@ -82,7 +564,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 7, database: "ready" });
+    return json({ ok: true, phase: 8, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -95,7 +577,7 @@ async function route(request, url, db) {
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, profile_visibility, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, profile_visibility, avatar_id, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
       )
       .bind(username)
       .first();
@@ -150,6 +632,64 @@ async function route(request, url, db) {
   }
   const user = session.user;
 
+  if (request.method === "GET" && path === "avatars") {
+    const series = await getAvatarLibrary(db);
+    return json({ series }, 200, { "Cache-Control": "private, max-age=3600" });
+  }
+
+  const avatarImageMatch = path.match(/^avatars\/([^/]+)\/image$/);
+  if (request.method === "GET" && avatarImageMatch) {
+    const avatarId = safeId(decodeURIComponent(avatarImageMatch[1]));
+    if (!avatarId) return json({ error: "INVALID_AVATAR" }, 400);
+    const avatar = await db
+      .prepare(`SELECT a.image_path
+        FROM avatars a
+        JOIN avatar_series s ON s.id = a.series_id
+        WHERE a.id = ? AND a.is_active = 1 AND s.is_active = 1
+        LIMIT 1`)
+      .bind(avatarId)
+      .first();
+    if (!avatar) return json({ error: "AVATAR_NOT_FOUND" }, 404);
+    const imageUrl = await resolveAvatarImagePath(avatar.image_path);
+    if (!imageUrl) return json({ error: "AVATAR_IMAGE_UNAVAILABLE" }, 404);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: imageUrl,
+        "Cache-Control": "private, max-age=86400",
+      },
+    });
+  }
+
+  if (request.method === "PUT" && path === "profile/avatar") {
+    const body = await readJson(request);
+    const avatarId = safeId(body?.avatarId);
+    if (!avatarId) {
+      return json({ error: "INVALID_AVATAR", message: "الصورة الشخصية غير صالحة." }, 400);
+    }
+    const avatar = await db
+      .prepare(`SELECT a.id
+        FROM avatars a
+        JOIN avatar_series s ON s.id = a.series_id
+        WHERE a.id = ? AND a.is_active = 1 AND s.is_active = 1
+        LIMIT 1`)
+      .bind(avatarId)
+      .first();
+    if (!avatar) {
+      return json({ error: "INVALID_AVATAR", message: "هذه الصورة غير متاحة في مكتبة Wany." }, 400);
+    }
+    const now = Date.now();
+    await db
+      .prepare("UPDATE users SET avatar_id = ?, updated_at = ? WHERE id = ?")
+      .bind(avatar.id, now, user.id)
+      .run();
+    const updated = await db
+      .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
+      .bind(user.id)
+      .first();
+    return json({ user: publicUser(updated) });
+  }
+
   if (request.method === "PUT" && path === "profile/visibility") {
     const body = await readJson(request);
     const visibility = profileVisibility(body?.visibility);
@@ -165,7 +705,7 @@ async function route(request, url, db) {
       .bind(visibility, now, user.id)
       .run();
     const updated = await db
-      .prepare("SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1")
+      .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
       .bind(user.id)
       .first();
     return json({ user: publicUser(updated) });
@@ -932,8 +1472,8 @@ async function route(request, url, db) {
     const target = await db
       .prepare(
         targetId
-          ? "SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1"
-          : "SELECT id, username, name, profile_visibility FROM users WHERE username = ? LIMIT 1",
+          ? "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1"
+          : "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE username = ? LIMIT 1",
       )
       .bind(targetId || username)
       .first();
@@ -1060,12 +1600,22 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "8") return;
+  if (version?.value === "9") return;
+  if (version?.value === "8") {
+    await db.batch([
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
+    ]);
+    return;
+  }
   if (version?.value === "7") {
     await db.batch([
       ...profileActivitySectionMigrationStatements(db),
       ...activitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
     ]);
     return;
   }
@@ -1074,7 +1624,9 @@ async function ensureDatabase(db) {
       ...friendRequestSchemaStatements(db),
       ...profileActivitySectionMigrationStatements(db),
       ...activitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
     ]);
     return;
   }
@@ -1084,7 +1636,9 @@ async function ensureDatabase(db) {
       ...friendRequestSchemaStatements(db),
       ...profileActivitySectionMigrationStatements(db),
       ...activitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
     ]);
     return;
   }
@@ -1094,7 +1648,9 @@ async function ensureDatabase(db) {
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
       ...activitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
     ]);
     return;
   }
@@ -1105,7 +1661,9 @@ async function ensureDatabase(db) {
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
       ...activitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
     ]);
     return;
   }
@@ -1118,7 +1676,9 @@ async function ensureDatabase(db) {
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
       ...activitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      ...avatarSchemaStatements(db),
+      ...avatarSeedStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
     ]);
     return;
   }
@@ -1186,6 +1746,8 @@ async function ensureDatabase(db) {
     ...listSchemaStatements(db),
     ...profileSectionSchemaStatements(db),
     ...activitySchemaStatements(db),
+    ...avatarSchemaStatements(db),
+    ...avatarSeedStatements(db),
   ];
 
   for (const seeded of SEEDED_USERS) {
@@ -1259,9 +1821,62 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
   );
   await db.batch(statements);
+}
+
+function avatarSchemaStatements(db) {
+  return [
+    db.prepare(`CREATE TABLE IF NOT EXISTS avatar_series (
+      id TEXT PRIMARY KEY,
+      work_id TEXT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      position INTEGER NOT NULL UNIQUE CHECK (position BETWEEN 1 AND 10),
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS avatars (
+      id TEXT PRIMARY KEY,
+      series_id TEXT NOT NULL,
+      character_name TEXT NOT NULL,
+      image_path TEXT NOT NULL UNIQUE,
+      position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 15),
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (series_id) REFERENCES avatar_series(id) ON DELETE CASCADE,
+      UNIQUE (series_id, position),
+      UNIQUE (series_id, character_name COLLATE NOCASE)
+    )`),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_avatars_series_position ON avatars(series_id, position ASC)"),
+    db.prepare("ALTER TABLE users ADD COLUMN avatar_id TEXT REFERENCES avatars(id) ON DELETE SET NULL"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_users_avatar ON users(avatar_id)"),
+  ];
+}
+
+function avatarSeedStatements(db) {
+  const now = Date.now();
+  const statements = [];
+  for (const series of AVATAR_LIBRARY_SEED) {
+    statements.push(
+      db.prepare(`INSERT OR IGNORE INTO avatar_series
+        (id, work_id, name, slug, position, is_active, created_at, updated_at)
+        VALUES (?, NULL, ?, ?, ?, 1, ?, ?)`)
+        .bind(series.id, series.name, series.slug, series.position, now, now),
+    );
+    for (const avatar of series.avatars) {
+      statements.push(
+        db.prepare(`INSERT OR IGNORE INTO avatars
+          (id, series_id, character_name, image_path, position, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 1, ?, ?)`)
+          .bind(avatar.id, series.id, avatar.characterName, avatar.imagePath, avatar.position, now, now),
+      );
+    }
+  }
+  return statements;
 }
 
 function librarySchemaStatements(db) {
@@ -1890,7 +2505,7 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name, u.profile_visibility
+         u.id, u.username, u.name, u.profile_visibility, u.avatar_id
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -1981,7 +2596,7 @@ export function getProfileAccess(viewer, target) {
 
 async function getUserProfileView(db, viewer, targetId, previewLimit) {
   const target = await db
-    .prepare("SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1")
+    .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
     .bind(targetId)
     .first();
   if (!target) return null;
@@ -2091,7 +2706,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       .bind(targetId)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
         FROM friendships f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
@@ -2172,6 +2787,139 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
   };
 }
 
+async function getAvatarLibrary(db) {
+  const result = await db
+    .prepare(`SELECT
+      s.id AS series_id, s.work_id, s.name AS series_name, s.slug, s.position AS series_position,
+      a.id AS avatar_id, a.character_name, a.image_path, a.position AS avatar_position
+      FROM avatar_series s
+      JOIN avatars a ON a.series_id = s.id AND a.is_active = 1
+      WHERE s.is_active = 1
+      ORDER BY s.position ASC, a.position ASC, a.id ASC`)
+    .all();
+  const rows = result.results ?? [];
+  const imageUrls = await resolveAvatarImagePaths(rows);
+  const groups = new Map();
+  for (const row of rows) {
+    if (!groups.has(row.series_id)) {
+      groups.set(row.series_id, {
+        id: row.series_id,
+        workId: row.work_id ?? null,
+        name: row.series_name,
+        slug: row.slug,
+        position: Number(row.series_position),
+        avatars: [],
+      });
+    }
+    groups.get(row.series_id).avatars.push({
+      id: row.avatar_id,
+      seriesId: row.series_id,
+      characterName: row.character_name,
+      imageUrl: imageUrls.get(row.avatar_id) ?? null,
+      position: Number(row.avatar_position),
+    });
+  }
+  return [...groups.values()].slice(0, 10).map((group) => ({
+    ...group,
+    avatars: group.avatars.slice(0, 15),
+  }));
+}
+
+function avatarSearchName(imagePath) {
+  if (typeof imagePath !== "string" || !imagePath.startsWith("anilist:")) return "";
+  return imagePath.slice("anilist:".length).trim().slice(0, 120);
+}
+
+function trustedAvatarImageUrl(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" &&
+      (parsed.hostname === "anilist.co" || parsed.hostname.endsWith(".anilist.co"))
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function warmAvatarImageCache(imagePaths) {
+  const now = Date.now();
+  const misses = [...new Set(imagePaths)].filter((imagePath) => {
+    const name = avatarSearchName(imagePath);
+    if (!name) return false;
+    const cached = avatarImageCache.get(imagePath);
+    return !cached || cached.expiresAt <= now;
+  });
+  if (!misses.length) return;
+
+  const definitions = [];
+  const fields = [];
+  const variables = {};
+  misses.forEach((imagePath, index) => {
+    const key = `q${index}`;
+    definitions.push(`${key}: String`);
+    fields.push(`c${index}: Character(search: ${key}) { image { large medium } }`);
+    variables[key] = avatarSearchName(imagePath);
+  });
+
+  try {
+    const response = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        query: `query AvatarImages(${definitions.join(", ")}) { ${fields.join("\n")} }`,
+        variables,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`AniList avatar image lookup failed: ${response.status}`);
+    }
+    const payload = await response.json();
+    misses.forEach((imagePath, index) => {
+      const image = payload?.data?.[`c${index}`]?.image;
+      const imageUrl =
+        trustedAvatarImageUrl(image?.large) ??
+        trustedAvatarImageUrl(image?.medium);
+      avatarImageCache.set(imagePath, {
+        url: imageUrl,
+        expiresAt:
+          now +
+          (imageUrl
+            ? AVATAR_IMAGE_CACHE_TTL_MS
+            : AVATAR_IMAGE_FAILURE_TTL_MS),
+      });
+    });
+  } catch (error) {
+    console.error("Avatar image resolution failed", error);
+    for (const imagePath of misses) {
+      avatarImageCache.set(imagePath, {
+        url: null,
+        expiresAt: now + AVATAR_IMAGE_FAILURE_TTL_MS,
+      });
+    }
+  }
+}
+
+async function resolveAvatarImagePath(imagePath) {
+  await warmAvatarImageCache([imagePath]);
+  return avatarImageCache.get(imagePath)?.url ?? null;
+}
+
+async function resolveAvatarImagePaths(rows) {
+  await warmAvatarImageCache(rows.map((row) => row.image_path));
+  return new Map(
+    rows.map((row) => [
+      row.avatar_id,
+      avatarImageCache.get(row.image_path)?.url ??
+        `/api/avatars/${encodeURIComponent(row.avatar_id)}/image`,
+    ]),
+  );
+}
+
 async function getFriends(db, userId, limit = 50, offset = 0) {
   const [countRow, result] = await Promise.all([
     db
@@ -2180,7 +2928,7 @@ async function getFriends(db, userId, limit = 50, offset = 0) {
       .first(),
     db
       .prepare(
-        `SELECT u.id, u.username, u.name, u.profile_visibility
+        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
          FROM friendships f
          JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = ?
@@ -2309,7 +3057,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId)
       .first(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.requester_id
         WHERE r.receiver_id = ?
@@ -2318,7 +3066,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId, limit)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.receiver_id
         WHERE r.requester_id = ?
@@ -2513,6 +3261,7 @@ function mapActivityRow(row) {
       username: row.username,
       name: row.name,
       profile_visibility: row.profile_visibility,
+      avatar_id: row.avatar_id,
     }),
     mangaId: row.manga_id ?? null,
     list:
@@ -2535,7 +3284,7 @@ async function getUserActivity(db, userId, limit = 12, offset = 0) {
       .prepare(`SELECT
           e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
           e.created_at, e.updated_at,
-          u.username, u.name, u.profile_visibility,
+          u.username, u.name, u.profile_visibility, u.avatar_id,
           l.name AS list_name
         FROM activity_events e
         JOIN users u ON u.id = e.user_id
@@ -2568,7 +3317,7 @@ async function getFriendsActivity(db, userId, limit = 12, offset = 0) {
       .prepare(`SELECT
           e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
           e.created_at, e.updated_at,
-          u.username, u.name, u.profile_visibility,
+          u.username, u.name, u.profile_visibility, u.avatar_id,
           l.name AS list_name
         FROM activity_events e
         JOIN friendships f ON f.user_id = ? AND f.friend_id = e.user_id
@@ -2744,6 +3493,7 @@ function publicUser(row) {
       row.profile_visibility === "public" || row.profileVisibility === "public"
         ? "public"
         : "private",
+    avatarId: row.avatar_id ?? row.avatarId ?? null,
   };
 }
 

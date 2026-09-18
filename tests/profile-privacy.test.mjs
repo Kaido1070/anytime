@@ -27,7 +27,7 @@ class FakeStatement {
       return { total: 0 };
     }
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "8" };
+      return { value: "9" };
     }
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
@@ -38,7 +38,7 @@ class FakeStatement {
         ...viewer,
       };
     }
-    if (this.query.includes("SELECT id, username, name, profile_visibility FROM users WHERE id = ?")) {
+    if (this.query.includes("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ?")) {
       return this.db.target;
     }
     if (this.query.includes("FROM user_lists l") && this.query.includes("owner_profile_visibility")) {

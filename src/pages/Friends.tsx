@@ -4,6 +4,7 @@ import { ActivityFeed } from "../components/ActivityFeed";
 import { useLibrary } from "../hooks/useLibrary";
 import { Back, SectionTitle } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
+import { UserAvatar } from "../components/UserAvatar";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { userDataService } from "../services/userData";
@@ -207,7 +208,7 @@ function PublicFriendsSection({ friends }: { friends: User[] }) {
         <div className="profile-friends-strip">
           {friends.map((friend, index) => (
             <Link to={`/friends/${friend.id}`} className="profile-friend-card" key={friend.id}>
-              <span className={`avatar tone-${index % 3}`}>{friend.name.slice(0, 1)}</span>
+              <UserAvatar user={friend} className={`tone-${index % 3}`} />
               <span>
                 <b>{friend.name}</b>
                 <small>@{friend.username}</small>
@@ -442,7 +443,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           {searchResults.map((result, index) => (
             <div className="friend-result-card" key={result.user.id}>
               <Link className="friend-result-identity" to={`/friends/${result.user.id}`}>
-                <span className={`avatar tone-${index % 3}`}>{result.user.name.slice(0, 1)}</span>
+                <UserAvatar user={result.user} className={`tone-${index % 3}`} />
                 <span>
                   <b>{result.user.name}</b>
                   <small>@{result.user.username}</small>
@@ -493,9 +494,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           <div className="friends-list">
             {friends.map((friend, index) => (
               <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
-                <span className={`avatar large tone-${index % 3}`}>
-                  {friend.user.name.slice(0, 1)}
-                </span>
+                <UserAvatar user={friend.user} className={`large tone-${index % 3}`} />
                 <div>
                   <h2>{friend.user.name}</h2>
                   <small>@{friend.user.username}</small>
@@ -531,9 +530,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
                 {requests.incoming.map((request, index) => (
                   <div className="friend-request-card" key={request.user.id}>
                     <Link className="friend-result-identity" to={`/friends/${request.user.id}`}>
-                      <span className={`avatar tone-${index % 3}`}>
-                        {request.user.name.slice(0, 1)}
-                      </span>
+                      <UserAvatar user={request.user} className={`tone-${index % 3}`} />
                       <span>
                         <b>{request.user.name}</b>
                         <small>@{request.user.username}</small>
@@ -560,9 +557,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
                 {requests.outgoing.map((request, index) => (
                   <div className="friend-request-card" key={request.user.id}>
                     <Link className="friend-result-identity" to={`/friends/${request.user.id}`}>
-                      <span className={`avatar tone-${(index + 1) % 3}`}>
-                        {request.user.name.slice(0, 1)}
-                      </span>
+                      <UserAvatar user={request.user} className={`tone-${(index + 1) % 3}`} />
                       <span>
                         <b>{request.user.name}</b>
                         <small>@{request.user.username}</small>
@@ -708,7 +703,7 @@ export function FriendProfile() {
 
       <header className="profile-view-header">
         <div className="profile-view-identity">
-          <span className="avatar profile-view-avatar">{profile.user.name.slice(0, 1)}</span>
+          <UserAvatar user={profile.user} className="profile-view-avatar" loading="eager" />
           <div>
             <p className="eyebrow">{isPrivate ? "حساب خاص" : "ملف المستخدم"}</p>
             <h1>{profile.user.name}</h1>

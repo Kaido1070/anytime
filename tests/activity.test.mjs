@@ -126,7 +126,7 @@ class RouteStatement {
   }
 
   async first() {
-    if (this.query.includes("SELECT value FROM schema_meta")) return { value: "8" };
+    if (this.query.includes("SELECT value FROM schema_meta")) return { value: "9" };
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
         token_hash: "token",
