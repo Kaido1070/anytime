@@ -1769,7 +1769,10 @@ async function ensureApiRuntime(db) {
 
       await ensureDatabase(db);
       await ensureAdminSchema(db);
-      await applyRuntimeOptimizationMigration(db);
+
+      // Migrations are strictly versioned. Never rerun an older migration against
+      // a newer schema: some legacy steps write their own schema_version.
+      if (version == null || Number(version) < 11) await applyRuntimeOptimizationMigration(db);
       await applyUsernameMigration(db);
       await applyUsernameMigrationV13(db);
       await applyUserIdentityV14(db);
@@ -1788,7 +1791,7 @@ async function applyRuntimeOptimizationMigration(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "11") return;
+  if (Number(version?.value ?? 0) >= 11) return;
 
   const now = Date.now();
   const statements = [
