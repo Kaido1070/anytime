@@ -4,6 +4,7 @@ const TEAMX_BASE = "https://olympustaff.com";
 const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
 const XSANO_BASE = "https://www.xsano-manga.com";
+const MANGALIK_BASE = "https://mangalik.net";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -17,7 +18,7 @@ export async function onRequest(context) {
 
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") ?? "").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik") {
     return json({ error: "UNKNOWN_SOURCE" }, 400);
   }
 
@@ -29,7 +30,9 @@ export async function onRequest(context) {
         ? STARZ_BASE
         : source === "xsano"
           ? XSANO_BASE
-          : MANGATIME_BASE;
+          : source === "mangalik"
+            ? MANGALIK_BASE
+            : MANGATIME_BASE;
   const raw = String(url.searchParams.get("url") ?? "");
   const target = absoluteUrl(base, raw);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
@@ -47,7 +50,9 @@ export async function onRequest(context) {
         ? safeStarzReferer(url.searchParams.get("referer"))
         : source === "xsano"
           ? safeXsanoReferer(url.searchParams.get("referer"))
-          : `${MANGATIME_BASE}/`;
+          : source === "mangalik"
+            ? safeMangalikReferer(url.searchParams.get("referer"))
+            : `${MANGATIME_BASE}/`;
 
   const response = await fetch(target, {
     headers: {
@@ -126,6 +131,18 @@ function safeXsanoReferer(value) {
     return parsed.toString();
   } catch {
     return `${XSANO_BASE}/`;
+  }
+}
+
+function safeMangalikReferer(value) {
+  if (!value) return `${MANGALIK_BASE}/`;
+  try {
+    const parsed = new URL(String(value), MANGALIK_BASE);
+    if (!/^(?:www\.)?mangalik\.net$/i.test(parsed.hostname)) return `${MANGALIK_BASE}/`;
+    if (!/^\/manga\//i.test(parsed.pathname)) return `${MANGALIK_BASE}/`;
+    return parsed.toString();
+  } catch {
+    return `${MANGALIK_BASE}/`;
   }
 }
 
