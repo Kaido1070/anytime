@@ -20,7 +20,7 @@ export const RECOMMENDATION_WEIGHTS = {
   freshnessTieBreaker: 0.15,
   typeFeatureWeight: 0.45,
   minimumConfidence: 0.14,
-  diversityPenalty: 1.1,
+  diversityPenalty: 0.55,
 } as const;
 
 export const FYP_INITIAL_COUNT = 20;
