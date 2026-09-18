@@ -357,7 +357,8 @@ export function Account() {
   const [series, setSeries] = useState<Record<string, SourceManga>>({});
   const [worksError, setWorksError] = useState("");
   const [readingError, setReadingError] = useState("");
-  const [sectionRetry, setSectionRetry] = useState(0);
+  const [worksRetry, setWorksRetry] = useState(0);
+  const [readingRetry, setReadingRetry] = useState(0);
   const [loading, setLoading] = useState(true);
   const [customizing, setCustomizing] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
@@ -391,7 +392,6 @@ export function Account() {
     return [
       ...profile.favorites,
       ...(profile.lists ?? []).flatMap((list) => list.previewItems),
-      ...(profile.library ?? []).map((entry) => entry.mangaId),
     ];
   }, [profile]);
 
@@ -418,7 +418,7 @@ export function Account() {
     return () => {
       active = false;
     };
-  }, [sourceKeys.join("|"), sectionRetry]);
+  }, [sourceKeys.join("|"), worksRetry]);
 
   const readingEntries = useMemo(
     () => (profile?.library ?? []).filter((entry) => entry.status === "reading"),
@@ -457,7 +457,7 @@ export function Account() {
     return () => {
       active = false;
     };
-  }, [readingSignature, sectionRetry]);
+  }, [readingSignature, readingRetry]);
 
   const saveLayout = async () => {
     if (savingLayout) return;
@@ -598,7 +598,7 @@ export function Account() {
                       lists={profile.lists ?? []}
                       works={works}
                       error={worksError}
-                      onRetry={() => setSectionRetry((value) => value + 1)}
+                      onRetry={() => setWorksRetry((value) => value + 1)}
                     />
                   );
                 }
@@ -612,7 +612,7 @@ export function Account() {
                       completed={completed}
                       viewAllTo="/profile?tab=reading"
                       error={readingError}
-                      onRetry={() => setSectionRetry((value) => value + 1)}
+                      onRetry={() => setReadingRetry((value) => value + 1)}
                     />
                   );
                 }
