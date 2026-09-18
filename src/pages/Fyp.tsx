@@ -329,8 +329,8 @@ async function buildFyp(data: UserData, userId: string) {
     } satisfies RecommendationCandidate;
   });
 
-  const candidates = hydrated.filter(
-    (candidate): candidate is RecommendationCandidate => Boolean(candidate),
+  const candidates: RecommendationCandidate[] = hydrated.filter(
+    (candidate): candidate is NonNullable<typeof candidate> => candidate !== null,
   );
   const recommendations = rankRecommendations(candidates, signals);
   const snapshot: FypSnapshot = {
