@@ -42,7 +42,7 @@ export default function App() {
             <Route path="discover" element={<Discover />} />
             <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
-            <Route path="lists" element={<Navigate to="/profile?tab=lists" replace />} />
+            <Route path="lists" element={<Navigate to="/profile#account-lists" replace />} />
             <Route path="lists/:id" element={<UserList />} />
             <Route path="friends" element={<Friends />} />
             <Route path="friends/:id" element={<FriendProfile />} />
