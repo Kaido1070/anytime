@@ -1,5 +1,6 @@
 import type {
   ActivityFeed,
+  AvatarSeries,
   Friend,
   FriendRelationship,
   FriendRequests,
@@ -47,6 +48,8 @@ export interface UserDataService {
   getFriendsActivity(limit?: number, offset?: number): Promise<ActivityFeed>;
   saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
   getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
+  getAvatarLibrary(): Promise<AvatarSeries[]>;
+  setAvatar(avatarId: string): Promise<User>;
   setProfileVisibility(visibility: ProfileVisibility): Promise<User>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
@@ -86,6 +89,8 @@ class ApiError extends Error {
 const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|ml):/.test(value));
 const isListId = (value?: string | null) =>
   Boolean(value && /^[a-zA-Z0-9_-]{1,128}$/.test(value));
+const isAvatarId = (value?: string | null) =>
+  Boolean(value && /^[a-zA-Z0-9:_-]{1,128}$/.test(value));
 const isProfileSectionType = (value?: string | null) =>
   value === "continue_reading" ||
   value === "favorites" ||
@@ -123,7 +128,22 @@ function normalizeUser(user: User): User {
   return {
     ...user,
     profileVisibility: user.profileVisibility === "public" ? "public" : "private",
+    avatarId: isAvatarId(user.avatarId) ? user.avatarId : null,
   };
+}
+
+function normalizeAvatarSeries(series: AvatarSeries[]): AvatarSeries[] {
+  return (series ?? []).slice(0, 10).map((group) => ({
+    ...group,
+    workId: group.workId ?? null,
+    position: Number(group.position),
+    avatars: (group.avatars ?? []).slice(0, 15).map((avatar) => ({
+      ...avatar,
+      seriesId: group.id,
+      imageUrl: typeof avatar.imageUrl === "string" ? avatar.imageUrl : null,
+      position: Number(avatar.position),
+    })),
+  }));
 }
 
 function normalizeFriends(friends: Friend[]): Friend[] {
@@ -448,6 +468,21 @@ class ApiUserDataService implements UserDataService {
       `profiles/${encodeURIComponent(id)}?limit=${limit}`,
     );
     return normalizeUserProfile(result.profile);
+  }
+
+  async getAvatarLibrary() {
+    const result = await this.request<{ series: AvatarSeries[] }>("avatars");
+    return normalizeAvatarSeries(result.series);
+  }
+
+  async setAvatar(avatarId: string) {
+    if (!isAvatarId(avatarId)) throw new Error("الصورة الشخصية غير صالحة.");
+    const result = await this.request<{ user: User }>("profile/avatar", {
+      method: "PUT",
+      body: JSON.stringify({ avatarId }),
+    });
+    this.currentUser = normalizeUser(result.user);
+    return this.currentUser;
   }
 
   async setProfileVisibility(visibility: ProfileVisibility) {
