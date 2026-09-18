@@ -309,8 +309,7 @@ async function rememberChapterAvailability(db, item) {
 
   const recent = chapters
     .filter((chapter) => !chapter.synthetic)
-    .sort((a, b) => Number(b.number ?? 0) - Number(a.number ?? 0))
-    .slice(0, 240);
+    .sort((a, b) => Number(b.number ?? 0) - Number(a.number ?? 0));
   const current = await db
     .prepare("SELECT COUNT(*) AS count FROM source_chapter_seen WHERE source_key = ?")
     .bind(item.key)
@@ -349,15 +348,21 @@ async function rememberChapterAvailability(db, item) {
 
   const identities = recent.map(sourceChapterIdentity).filter(Boolean);
   if (!identities.length) return item;
-  const placeholders = identities.map(() => "?").join(",");
-  const seen = await db
-    .prepare(`SELECT chapter_identity, first_seen_at, published_at, is_baseline
+  // Observe the whole baseline, including long series; read in bounded chunks.
+  const rows = [];
+  for (let index = 0; index < identities.length; index += 50) {
+    const chunk = identities.slice(index, index + 50);
+    const placeholders = chunk.map(() => "?").join(",");
+    const seen = await db
+      .prepare(`SELECT chapter_identity, first_seen_at, published_at, is_baseline
       FROM source_chapter_seen
       WHERE source_key = ? AND chapter_identity IN (${placeholders})`)
-    .bind(item.key, ...identities)
-    .all();
+      .bind(item.key, ...chunk)
+      .all();
+    rows.push(...(seen.results ?? []));
+  }
   const byIdentity = new Map(
-    (seen.results ?? []).map((row) => [String(row.chapter_identity), row]),
+    rows.map((row) => [String(row.chapter_identity), row]),
   );
 
   return {
@@ -445,6 +450,7 @@ async function mangaTimeList(db, { page, sortBy, query = null }) {
       description: "",
       status: "",
       genres: mangaTimeTypeGenres(row.type),
+      latest: row.latestChapter?.number == null ? null : Number(row.latestChapter.number),
     })),
   );
   await rememberItems(db, items);
@@ -634,7 +640,9 @@ async function teamXItemsFromHtml(html) {
       genres: [],
     });
   }
-  return [...bySlug.values()].slice(0, 80);
+  return [...bySlug.values()].slice(0, 80).map((item) => ({
+    ...item, latest: latestLinkedChapter(html, item.url),
+  }));
 }
 
 async function teamXSeries(db, item) {
@@ -852,7 +860,9 @@ async function asqItemsFromHtml(html) {
     }
   }
 
-  return [...bySlug.values()].slice(0, 80);
+  return [...bySlug.values()].slice(0, 80).map((item) => ({
+    ...item, latest: latestLinkedChapter(html, item.url),
+  }));
 }
 
 async function asqSeries(db, item) {
@@ -955,6 +965,26 @@ function parseAsqChapters(html, seriesUrl) {
   }
 
   return [...found.values()].sort((a, b) => b.number - a.number);
+}
+
+// Only chapter links actually present in a source list may identify its update.
+// Scope by origin AND series path so adjacent cards cannot lend a chapter number.
+export function latestLinkedChapter(html, seriesUrl) {
+  const series = new URL(seriesUrl);
+  const prefix = series.pathname.replace(/\/$/, "") + "/";
+  const numbers = [];
+  for (const anchor of extractAnchors(html)) {
+    let url;
+    try { url = new URL(anchor.href, series); } catch { continue; }
+    if (url.origin !== series.origin || !url.pathname.startsWith(prefix)) continue;
+    const tail = decodeURIComponent(url.pathname.slice(prefix.length)).replace(/\/$/, "");
+    if (!tail || tail.includes("/")) continue;
+    // Do not mistake a work title containing a number for a chapter link.
+    if (!/^(?:chapter[-_]?|ch[-_]?)?\d+(?:[._]\d+)?$/i.test(tail)) continue;
+    const number = asqChapterNumber("", tail);
+    if (Number.isFinite(number)) numbers.push(number);
+  }
+  return numbers.length ? Math.max(...numbers) : null;
 }
 
 function asqChapterNumber(title, chapterId) {
@@ -1168,7 +1198,9 @@ async function starzItemsFromHtml(html) {
     }
   }
 
-  return [...bySlug.values()].slice(0, 80);
+  return [...bySlug.values()].slice(0, 80).map((item) => ({
+    ...item, latest: latestLinkedChapter(html, item.url),
+  }));
 }
 
 async function starzSeries(db, item) {
@@ -1437,7 +1469,9 @@ async function mangalikItemsFromHtml(html) {
     }
   }
 
-  return [...bySlug.values()].slice(0, 80);
+  return [...bySlug.values()].slice(0, 80).map((item) => ({
+    ...item, latest: latestLinkedChapter(html, item.url),
+  }));
 }
 
 async function mangalikSeries(db, item) {
@@ -2212,6 +2246,7 @@ function json(body, status = 200, extraHeaders = {}) {
 }
 
 export const __test = {
+  rememberChapterAvailability,
   extractAnchors,
   extractImages,
   parseTeamXChapters,

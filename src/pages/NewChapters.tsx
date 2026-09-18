@@ -4,39 +4,11 @@ import { SourceCoverImage } from "../components/SourceCoverImage";
 import { formatArabicRelativeTime } from "../services/dateFormat";
 import {
   loadNewChapterFeed,
-  type ChapterFeedGroup,
+  mergeChapterFeedPages,
   type NewChapterFeed,
 } from "../services/newChapters";
 
 type Tab = "followed" | "all";
-
-function mergeGroups(pages: NewChapterFeed[], kind: Tab) {
-  const map = new Map<string, ChapterFeedGroup>();
-  for (const page of pages) {
-    const groups = kind === "followed" ? page.followed : page.all;
-    for (const group of groups) {
-      const existing = map.get(group.id);
-      if (!existing) {
-        map.set(group.id, { ...group, chapters: [...group.chapters] });
-        continue;
-      }
-      const chapters = new Map(existing.chapters.map((chapter) => [chapter.identity, chapter]));
-      for (const chapter of group.chapters) {
-        const previous = chapters.get(chapter.identity);
-        if (!previous || chapter.releaseAt > previous.releaseAt) {
-          chapters.set(chapter.identity, chapter);
-        }
-      }
-      existing.chapters = [...chapters.values()].sort(
-        (a, b) => b.releaseAt - a.releaseAt || b.number - a.number,
-      );
-      existing.newestAt = existing.chapters[0]?.releaseAt ?? existing.newestAt;
-    }
-  }
-  return [...map.values()].sort(
-    (a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id),
-  );
-}
 
 function FeedSkeleton() {
   return (
@@ -62,8 +34,8 @@ export function NewChapters() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
-  const followed = useMemo(() => mergeGroups(pages, "followed"), [pages]);
-  const all = useMemo(() => mergeGroups(pages, "all"), [pages]);
+  const followed = useMemo(() => mergeChapterFeedPages(pages, "followed"), [pages]);
+  const all = useMemo(() => mergeChapterFeedPages(pages, "all"), [pages]);
   const groups = tab === "followed" ? followed : all;
   const hasMore = pages.at(-1)?.hasMore ?? false;
   const nextPage = (pages.at(-1)?.page ?? 0) + 1;

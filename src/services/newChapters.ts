@@ -45,6 +45,37 @@ export interface NewChapterFeed {
   page: number;
 }
 
+export function mergeChapterFeedPages(pages: NewChapterFeed[], kind: "followed" | "all") {
+  // Followed is a complete snapshot on every load; only the all feed is paged.
+  const incoming = (kind === "followed" ? pages.slice(-1) : pages).flatMap((page) => page[kind]);
+  const canonical = mergeSourceItems(incoming.map((group) => group.item));
+  const idByKey = new Map(canonical.flatMap((group) => group.items.map((item) => [item.key, group.id])));
+  const merged = new Map<string, ChapterFeedGroup>();
+  for (const group of incoming) {
+    const id = idByKey.get(group.item.key)!;
+    const previous = merged.get(id);
+    if (!previous) {
+      merged.set(id, { ...group, id, chapters: [...group.chapters] });
+      continue;
+    }
+    const chapters = new Map(previous.chapters.map((chapter) => [chapter.identity, chapter]));
+    for (const chapter of group.chapters) {
+      const existing = chapters.get(chapter.identity);
+      if (!existing) chapters.set(chapter.identity, chapter);
+      else {
+        const preferred = existing.releaseKind !== chapter.releaseKind
+          ? (chapter.releaseKind === "published" ? chapter : existing)
+          : (chapter.releaseAt < existing.releaseAt ? chapter : existing);
+        chapters.set(chapter.identity, { ...preferred, read: existing.read || chapter.read });
+      }
+    }
+    previous.sourceKeys = [...new Set([...previous.sourceKeys, ...group.sourceKeys])];
+    previous.chapters = [...chapters.values()].sort((a, b) => b.releaseAt - a.releaseAt || b.number - a.number);
+    previous.newestAt = previous.chapters[0].releaseAt;
+  }
+  return [...merged.values()].sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
+}
+
 function parsePublished(value?: string | null) {
   if (!value) return null;
   const timestamp = Date.parse(value);
@@ -110,10 +141,11 @@ async function hydrateGroup(group: SourceGroup) {
     }
   });
   const readable = details.filter((item) => (item.chapters?.length ?? 0) > 0);
-  const items = readable.length ? readable : details;
+  // Keep unresolved variants: their keys still carry follow and read state.
+  const items = details;
   return {
     ...group,
-    primary: items.find((item) => item.key === group.primary.key) ?? items[0] ?? group.primary,
+    primary: readable.find((item) => item.key === group.primary.key) ?? readable[0] ?? group.primary,
     items,
   };
 }
@@ -158,6 +190,8 @@ function groupChapters(
   for (const [identity, versions] of byIdentity) {
     const realPublished = versions.filter((version) => version.kind === "published");
     const timingPool = realPublished.length ? realPublished : versions;
+    // Earliest genuine publication is the canonical release. A later mirror's
+    // upload/detection must not turn an already released chapter into a new one.
     const releaseAt = Math.min(...timingPool.map((version) => version.timestamp));
     const routeVersion = [...versions].sort((a, b) => {
       if (a.item.key === group.primary.key) return -1;
@@ -165,7 +199,7 @@ function groupChapters(
       return a.item.key.localeCompare(b.item.key);
     })[0];
     const number = Number(routeVersion.chapter.number);
-    const isRead = versions.some((version) => read.has(readKey(version.item.key, number)));
+    const isRead = group.items.some((item) => read.has(readKey(item.key, number)));
 
     chapters.push({
       identity,
@@ -196,10 +230,11 @@ function collectReadChecks(groups: SourceGroup[]) {
   const pairs: ReadChapterPair[] = [];
   const seen = new Set<string>();
   for (const group of groups) {
+    const numbers = new Set(group.items.flatMap((item) =>
+      (item.chapters ?? []).map((chapter) => Number(chapter.number)).filter(Number.isFinite),
+    ));
     for (const item of group.items) {
-      for (const chapter of item.chapters ?? []) {
-        const number = Number(chapter.number);
-        if (!Number.isFinite(number)) continue;
+      for (const number of numbers) {
         const key = readKey(item.key, number);
         if (seen.has(key)) continue;
         seen.add(key);
@@ -210,7 +245,32 @@ function collectReadChecks(groups: SourceGroup[]) {
   return pairs;
 }
 
-export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
+function latestIdentities(group: SourceGroup, latestBySourceKey: Map<string, number | null>, now: number) {
+  const identities = new Set<string>();
+  for (const item of group.items) {
+    if (!latestBySourceKey.has(item.key)) continue;
+    const latest = latestBySourceKey.get(item.key);
+    const chapters = (item.chapters ?? []).filter((chapter) =>
+      !chapter.synthetic && Number.isFinite(Number(chapter.number)),
+    );
+    // The list snapshot, never the hydrated series.latest, defines the update.
+    // Without it, only the highest real chapter can qualify, and only if dated.
+    const candidate = latest != null
+      ? chapters.find((chapter) => Number(chapter.number) === latest)
+      : [...chapters].sort((a, b) => b.number - a.number)[0];
+    if (!candidate) continue;
+    const release = releaseFor(candidate);
+    if (release && release.timestamp <= now) identities.add(exactChapterIdentity(candidate));
+  }
+  return identities;
+}
+
+function selectChapters(group: ChapterFeedGroup, predicate: (chapter: FeedChapter) => boolean) {
+  const chapters = group.chapters.filter(predicate);
+  return chapters.length ? { ...group, chapters, newestAt: chapters[0].releaseAt } : null;
+}
+
+async function loadFeed(page: number, followedOnly = false): Promise<NewChapterFeed> {
   const safePage = Math.max(1, Math.min(20, Math.trunc(page)));
   const [state, latestSettled] = await Promise.all([
     userDataService.getPersonalizationState(),
@@ -225,11 +285,17 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   );
   const followedItems = await resolveInChunks(state.followed.map((entry) => entry.mangaId));
   const allMerged = mergeSourceItems([...latestItems, ...followedItems]);
-  const latestKeys = new Set(latestItems.map((item) => item.key));
-  const relevant = allMerged.filter((group) =>
-    group.items.some((item) => latestKeys.has(item.key)),
-  );
+  const latestBySourceKey = new Map(latestItems.map((item) => [
+    item.key,
+    item.latest != null && Number.isFinite(Number(item.latest)) ? Number(item.latest) : null,
+  ]));
 
+  const followedKeys = new Set(state.followed.map((entry) => entry.mangaId));
+  // Badge requests need the same canonical variants but need not hydrate
+  // unrelated latest works (or initialize their chapter baselines).
+  const relevant = followedOnly
+    ? allMerged.filter((group) => group.items.some((item) => followedKeys.has(item.key)))
+    : allMerged;
   const hydrated = await mapWithConcurrency(relevant, 6, hydrateGroup);
   const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(hydrated));
   const read = new Set(readPairs.map((entry) => readKey(entry.mangaId, entry.chapter)));
@@ -240,20 +306,20 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
     .filter((group): group is ChapterFeedGroup => Boolean(group))
     .sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
 
-  const all = groups.map((group) => ({
-    ...group,
-    chapters: group.chapters.slice(0, 8),
-  }));
+  const latestByGroup = new Map(hydrated.map((group) =>
+    [group.id, latestIdentities(group, latestBySourceKey, now)],
+  ));
+  const all = groups
+    .map((group) => selectChapters(group, (chapter) => latestByGroup.get(group.id)!.has(chapter.identity)))
+    .filter((group): group is ChapterFeedGroup => group != null)
+    .sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
 
   const followed = groups
     .filter((group) => group.trackingStartedAt != null)
-    .map((group) => ({
-      ...group,
-      chapters: group.chapters.filter(
-        (chapter) => chapter.releaseAt > Number(group.trackingStartedAt),
-      ),
-    }))
-    .filter((group) => group.chapters.length > 0)
+    .map((group) => selectChapters(group,
+      (chapter) => chapter.releaseAt > Number(group.trackingStartedAt),
+    ))
+    .filter((group): group is ChapterFeedGroup => group != null)
     .sort((a, b) => b.chapters[0].releaseAt - a.chapters[0].releaseAt || a.id.localeCompare(b.id));
 
   return {
@@ -269,24 +335,11 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
 }
 
 
+export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
+  return loadFeed(page);
+}
+
 export async function loadUnreadFollowedCount() {
-  const state = await userDataService.getPersonalizationState();
-  if (!state.followed.length) return 0;
-
-  const followedItems = await resolveInChunks(state.followed.map((entry) => entry.mangaId));
-  const merged = mergeSourceItems(followedItems);
-  const hydrated = await mapWithConcurrency(merged, 6, hydrateGroup);
-  const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(hydrated));
-  const read = new Set(readPairs.map((entry) => readKey(entry.mangaId, entry.chapter)));
-  const now = Date.now();
-
-  return hydrated.reduce((total, group) => {
-    const feed = groupChapters(group, state, read, now);
-    if (!feed || feed.trackingStartedAt == null) return total;
-    return total + feed.chapters.filter(
-      (chapter) =>
-        chapter.releaseAt > Number(feed.trackingStartedAt) &&
-        !chapter.read,
-    ).length;
-  }, 0);
+  // Share the same source variants, release precedence and exact read checks.
+  return (await loadFeed(1, true)).unreadFollowedCount;
 }
