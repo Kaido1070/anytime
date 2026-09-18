@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ActivityFeed } from "./ActivityFeed";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
@@ -60,6 +60,7 @@ export function ProfileSummaryStrip({
   listsTo?: string;
   worksTo?: string;
 }) {
+  const navigate = useNavigate();
   const cells = [
     {
       label: "الأصدقاء",
@@ -74,7 +75,12 @@ export function ProfileSummaryStrip({
   return (
     <nav className="profile-summary-strip" aria-label="ملخص الحساب">
       {cells.map((cell) => (
-        <Link className="profile-summary-cell" to={cell.to} key={cell.label}>
+        <button
+          className="profile-summary-cell"
+          type="button"
+          onClick={() => navigate(cell.to)}
+          key={cell.label}
+        >
           <span>{cell.label}</span>
           <strong>{formatCount(cell.value)}</strong>
           {cell.badge > 0 && (
@@ -82,7 +88,7 @@ export function ProfileSummaryStrip({
               {cell.badge > 99 ? "99+" : cell.badge}
             </small>
           )}
-        </Link>
+        </button>
       ))}
     </nav>
   );
