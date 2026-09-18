@@ -90,29 +90,71 @@ function stripHtml(value) {
 }
 
 async function trpc(endpoint, input, meta) {
-  const url = new URL(`${BASE}/api/trpc/${endpoint}`);
-  url.searchParams.set("batch", "1");
-  url.searchParams.set("input", JSON.stringify({
-    "0": {
-      json: input,
-      ...(meta ? { meta } : {}),
+  const headers = {
+    Accept: "application/json,text/plain,*/*",
+    "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
+    Referer: `${BASE}/`,
+    "User-Agent": UA,
+    "X-MT-Platform": "web",
+    "X-MT-UIMode": "standard",
+  };
+  const attempts = [
+    {
+      batched: false,
+      input: { json: input, ...(meta ? { meta } : {}) },
     },
-  }));
-  const response = await fetchWithTimeout(url, {
-    headers: {
-      Accept: "application/json,text/plain,*/*",
-      "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
-      Referer: `${BASE}/`,
-      "User-Agent": UA,
-      "X-MT-Platform": "web",
-      "X-MT-UIMode": "standard",
+    {
+      batched: true,
+      input: { "0": { json: input, ...(meta ? { meta } : {}) } },
     },
-  }, 20000);
-  if (!response.ok) throw new Error(`${endpoint} HTTP ${response.status}`);
-  const payload = await response.json();
-  const first = Array.isArray(payload) ? payload[0] : null;
-  if (first?.error) throw new Error(first.error?.json?.message || first.error?.message || `${endpoint} API error`);
-  return first?.result?.data?.json;
+  ];
+
+  let lastError = `${endpoint} API error`;
+  for (const attempt of attempts) {
+    const url = new URL(`${BASE}/api/trpc/${endpoint}`);
+    if (attempt.batched) url.searchParams.set("batch", "1");
+    url.searchParams.set("input", JSON.stringify(attempt.input));
+
+    let response;
+    try {
+      response = await fetchWithTimeout(url, { headers, redirect: "follow" }, 20000);
+    } catch (error) {
+      lastError = `${endpoint} network error: ${error instanceof Error ? error.message : String(error)}`;
+      continue;
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      lastError = `${endpoint} HTTP ${response.status}: ${body.slice(0, 240)}`;
+      continue;
+    }
+
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      lastError = `${endpoint} returned invalid JSON`;
+      continue;
+    }
+
+    const envelope = attempt.batched
+      ? (Array.isArray(payload) ? payload[0] : null)
+      : (Array.isArray(payload) ? payload[0] : payload);
+
+    if (envelope?.error) {
+      lastError =
+        envelope.error?.json?.message ||
+        envelope.error?.message ||
+        `${endpoint} API error`;
+      continue;
+    }
+
+    const data = envelope?.result?.data?.json;
+    if (data !== undefined) return data;
+    lastError = `${endpoint} returned an empty response`;
+  }
+
+  throw new Error(lastError);
 }
 
 const undefinedMeta = {
