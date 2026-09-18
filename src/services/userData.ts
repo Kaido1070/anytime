@@ -8,7 +8,9 @@ import type {
   FriendRequests,
   FriendSearchResult,
   LibraryStatus,
+  PersonalizationState,
   ProfileVisibility,
+  ReadChapterPair,
   ReadingHistoryEntry,
   ReadingProgress,
   User,
@@ -59,6 +61,8 @@ export interface UserDataService {
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
+  getPersonalizationState(): Promise<PersonalizationState>;
+  getReadChapterPairs(chapters: ReadChapterPair[]): Promise<ReadChapterPair[]>;
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
   saveReadingProgress(progress: ReadingProgress): Promise<void>;
   getFriends(): Promise<Friend[]>;
@@ -578,6 +582,28 @@ class ApiUserDataService implements UserDataService {
       `reading/history?limit=${normalizedLimit}`,
     );
     return result.history.filter((item) => isLiveKey(item.mangaId));
+  }
+
+  async getPersonalizationState() {
+    const result = await this.request<PersonalizationState>("personalization-state");
+    return {
+      followed: (result.followed ?? []).filter((item) => isLiveKey(item.mangaId)),
+      readingWorks: (result.readingWorks ?? []).filter((item) => isLiveKey(item.mangaId)),
+    };
+  }
+
+  async getReadChapterPairs(chapters: ReadChapterPair[]) {
+    const normalized = chapters
+      .filter((item) => isLiveKey(item.mangaId) && Number.isFinite(item.chapter) && item.chapter >= 0)
+      .slice(0, 320);
+    if (!normalized.length) return [];
+    const result = await this.request<{ read: ReadChapterPair[] }>("personalization-state", {
+      method: "POST",
+      body: JSON.stringify({ chapters: normalized }),
+    });
+    return (result.read ?? []).filter(
+      (item) => isLiveKey(item.mangaId) && Number.isFinite(item.chapter),
+    );
   }
 
   async getReadingProgress() {
