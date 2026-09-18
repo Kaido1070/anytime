@@ -30,7 +30,7 @@ function useFriendSourceItems(keys: string[]) {
   return items;
 }
 
-export function Friends() {
+export function Friends({ embedded = false }: { embedded?: boolean }) {
   const { friends, addFriend } = useLibrary();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -67,11 +67,23 @@ export function Friends() {
 
   return (
     <>
-      <p className="eyebrow">القراءة أحلى مع الأصدقاء</p>
-      <h1>
-        الأصدقاء<span className="accent">.</span>
-      </h1>
-      <p className="muted page-intro">شوف وش يقرؤون وخذ من مفضلتهم.</p>
+      {embedded ? (
+        <header className="account-friends-header">
+          <div>
+            <p className="eyebrow">داخل حسابك</p>
+            <h2>الأصدقاء</h2>
+            <p className="muted page-intro">شوف وش يقرؤون وخذ من مفضلتهم.</p>
+          </div>
+        </header>
+      ) : (
+        <>
+          <p className="eyebrow">القراءة أحلى مع الأصدقاء</p>
+          <h1>
+            الأصدقاء<span className="accent">.</span>
+          </h1>
+          <p className="muted page-intro">شوف وش يقرؤون وخذ من مفضلتهم.</p>
+        </>
+      )}
 
       <div className="login-form" style={{ maxWidth: 460, marginBottom: 28 }}>
         <form onSubmit={submit} style={{ marginTop: 0 }}>
@@ -150,7 +162,7 @@ export function FriendProfile() {
   if (!friend)
     return (
       <>
-        <Back to="/friends" />
+        <Back to="/profile#account-friends" />
         <h1>الصديق غير موجود</h1>
       </>
     );
@@ -167,7 +179,7 @@ export function FriendProfile() {
     setRemoveError("");
     try {
       await removeFriend(friendId);
-      navigate("/friends", { replace: true });
+      navigate("/profile#account-friends", { replace: true });
     } catch (cause) {
       setRemoveError(cause instanceof Error ? cause.message : "تعذر حذف الصديق.");
       setRemoving(false);
@@ -176,7 +188,7 @@ export function FriendProfile() {
 
   return (
     <>
-      <Back to="/friends" />
+      <Back to="/profile#account-friends" />
       <div className="friend-heading">
         <span className="avatar large">{friend.user.name[0]}</span>
         <div>

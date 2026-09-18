@@ -4,7 +4,6 @@ import { Icon } from "../components/UI";
 export function AppLayout() {
   const navItems = [
     { label: "استكشف", path: "/discover", icon: "search" },
-    { label: "الأصدقاء", path: "/friends", icon: "friends" },
     { label: "حسابي", path: "/profile", icon: "profile" },
   ];
 

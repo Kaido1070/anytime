@@ -1,13 +1,24 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 import { Home } from "./Home";
 import { Lists } from "./Lists";
+import { Friends } from "./Friends";
 import { Profile } from "./Profile";
 
 export function Account() {
   const { user } = useLibrary();
   const [searchParams] = useSearchParams();
+  const { hash } = useLocation();
   const settingsOpen = searchParams.get("tab") === "settings";
+
+  useEffect(() => {
+    if (settingsOpen || !hash) return;
+    const id = hash.slice(1);
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ block: "start" });
+    });
+  }, [hash, settingsOpen]);
 
   return (
     <>
@@ -42,6 +53,9 @@ export function Account() {
             <Home embedded />
             <section id="account-lists" className="account-lists-section">
               <Lists embedded />
+            </section>
+            <section id="account-friends" className="account-friends-section">
+              <Friends embedded />
             </section>
           </>
         )}

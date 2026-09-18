@@ -4,7 +4,7 @@ import { useLibrary } from "./hooks/useLibrary";
 import { AppLayout } from "./layouts/AppLayout";
 import { Login } from "./pages/Login";
 import { Favorites } from "./pages/Favorites";
-import { Friends, FriendProfile } from "./pages/Friends";
+import { FriendProfile } from "./pages/Friends";
 import { Account } from "./pages/Account";
 import { UserList } from "./pages/UserList";
 import { Discover } from "./pages/Discover";
@@ -44,7 +44,7 @@ export default function App() {
             <Route path="favorites" element={<Favorites />} />
             <Route path="lists" element={<Navigate to="/profile#account-lists" replace />} />
             <Route path="lists/:id" element={<UserList />} />
-            <Route path="friends" element={<Friends />} />
+            <Route path="friends" element={<Navigate to="/profile#account-friends" replace />} />
             <Route path="friends/:id" element={<FriendProfile />} />
             <Route path="profile" element={<Account />} />
             <Route
