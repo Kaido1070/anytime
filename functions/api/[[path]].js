@@ -749,7 +749,7 @@ async function route(request, url, db) {
     const username = normalizeUsername(body.username);
     if (!username) return json({ error: "INVALID_USERNAME" }, 400);
     const friend = await db
-      .prepare("SELECT id, username, name FROM users WHERE username = ? LIMIT 1")
+      .prepare("SELECT id, username, name, profile_visibility FROM users WHERE username = ? LIMIT 1")
       .bind(username)
       .first();
     if (!friend || friend.id === user.id) {
@@ -2027,7 +2027,10 @@ function publicUser(row) {
     id: row.id,
     username: row.username,
     name: row.name,
-    profileVisibility: row.profile_visibility === "public" ? "public" : "private",
+    profileVisibility:
+      row.profile_visibility === "public" || row.profileVisibility === "public"
+        ? "public"
+        : "private",
   };
 }
 
