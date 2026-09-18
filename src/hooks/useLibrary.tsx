@@ -38,7 +38,7 @@ function useLibraryState() {
       .getUser()
       .then(async (currentUser) => {
         setUser(currentUser);
-        if (currentUser) await refresh();
+        if (currentUser && currentUser.role !== "admin") await refresh();
       })
       .catch((cause) =>
         setError(
@@ -51,7 +51,7 @@ function useLibraryState() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role === "admin") return;
     const sync = () => {
       if (document.visibilityState === "visible") {
         void refresh().catch(() => undefined);
@@ -70,7 +70,12 @@ function useLibraryState() {
     setError("");
     const nextUser = await service.signIn(username, password);
     setUser(nextUser);
-    await refresh();
+    if (nextUser.role === "admin") {
+      setData(null);
+      setFriends([]);
+    } else {
+      await refresh();
+    }
   };
 
   const signOut = async () => {
