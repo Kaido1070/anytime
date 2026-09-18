@@ -1765,7 +1765,7 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version === "15") return;
+      if (version === "16") return;
 
       await ensureDatabase(db);
       await ensureAdminSchema(db);
@@ -1774,6 +1774,7 @@ async function ensureApiRuntime(db) {
       await applyUsernameMigrationV13(db);
       await applyUserIdentityV14(db);
       await applyYUsernameV15(db);
+      await applyHUsernameV16(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -1864,6 +1865,25 @@ async function applyUsernameMigrationV13(db) {
   await db
     .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '13')")
     .run();
+}
+
+async function applyHUsernameV16(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "16") return;
+  if (version?.value !== "15") return;
+
+  const existingH = await db
+    .prepare("SELECT id FROM users WHERE username = 'H' COLLATE NOCASE AND id <> 'has' LIMIT 1")
+    .first();
+  if (existingH) throw new Error("Username H is already in use.");
+
+  await db.batch([
+    db.prepare("UPDATE users SET username = 'H', name = 'H', updated_at = ? WHERE id = 'has'")
+      .bind(Date.now()),
+    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '16')"),
+  ]);
 }
 
 async function applyYUsernameV15(db) {
