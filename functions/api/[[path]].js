@@ -1776,7 +1776,7 @@ async function applyRuntimeOptimizationMigration(db) {
   if (version?.value === "11") return;
 
   const now = Date.now();
-  await db.batch([
+  const statements = [
     db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_status ON user_library(user_id, status, manga_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_chapter ON reading_history(user_id, manga_id, chapter)"),
     db.prepare(`INSERT OR IGNORE INTO user_profile_sections
@@ -1801,7 +1801,8 @@ async function applyRuntimeOptimizationMigration(db) {
       FROM user_lists l
       JOIN users u ON u.id = l.user_id AND u.role = 'user'`).bind(now, now),
     db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '11')"),
-  ]);
+  ];
+  for (const statement of statements) await statement.run();
 }
 
 async function ensureDatabase(db) {
