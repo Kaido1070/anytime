@@ -1,4 +1,5 @@
 import type {
+  ActivityFeed,
   Friend,
   FriendRelationship,
   FriendRequests,
@@ -42,6 +43,8 @@ export interface UserDataService {
     afterId?: string | null,
   ): Promise<void>;
   getProfileSections(previewLimit?: number): Promise<UserProfileSection[]>;
+  getMyActivity(limit?: number, offset?: number): Promise<ActivityFeed>;
+  getFriendsActivity(limit?: number, offset?: number): Promise<ActivityFeed>;
   saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
   getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
   setProfileVisibility(visibility: ProfileVisibility): Promise<User>;
@@ -84,7 +87,11 @@ const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|
 const isListId = (value?: string | null) =>
   Boolean(value && /^[a-zA-Z0-9_-]{1,128}$/.test(value));
 const isProfileSectionType = (value?: string | null) =>
-  value === "continue_reading" || value === "favorites" || value === "custom_list";
+  value === "continue_reading" ||
+  value === "favorites" ||
+  value === "my_activity" ||
+  value === "friends_activity" ||
+  value === "custom_list";
 
 function normalizeProfileSections(sections: UserProfileSection[]): UserProfileSection[] {
   return (sections ?? []).flatMap((section) => {
@@ -162,6 +169,15 @@ function normalizeUserProfile(profile: UserProfileView): UserProfileView {
       previewItems: (list.previewItems ?? []).filter((id) => isLiveKey(id)),
     })),
     friends: profile.friends?.map(normalizeUser),
+    activity: profile.activity?.map((event) => ({
+      ...event,
+      user: normalizeUser(event.user),
+      mangaId: event.mangaId && isLiveKey(event.mangaId) ? event.mangaId : null,
+      list: event.list ?? null,
+      chapterNumber: event.chapterNumber == null ? null : Number(event.chapterNumber),
+      createdAt: Number(event.createdAt),
+      updatedAt: Number(event.updatedAt),
+    })),
     relationship: normalizeRelationship(profile.relationship),
   };
 }
@@ -382,6 +398,22 @@ class ApiUserDataService implements UserDataService {
       `profile/sections?limit=${limit}`,
     );
     return normalizeProfileSections(result.sections);
+  }
+
+  async getMyActivity(limit = 12, offset = 0) {
+    const safeLimit = Math.max(1, Math.min(20, Math.trunc(limit)));
+    const safeOffset = Math.max(0, Math.trunc(offset));
+    return await this.request<ActivityFeed>(
+      `activity/me?limit=${safeLimit}&offset=${safeOffset}`,
+    );
+  }
+
+  async getFriendsActivity(limit = 12, offset = 0) {
+    const safeLimit = Math.max(1, Math.min(20, Math.trunc(limit)));
+    const safeOffset = Math.max(0, Math.trunc(offset));
+    return await this.request<ActivityFeed>(
+      `activity/friends?limit=${safeLimit}&offset=${safeOffset}`,
+    );
   }
 
   async saveProfileSections(sections: UserProfileSectionInput[]) {
