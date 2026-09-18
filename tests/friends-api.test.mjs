@@ -25,7 +25,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "8" };
+      return { value: "9" };
     }
 
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
@@ -40,11 +40,11 @@ class FakeStatement {
       };
     }
 
-    if (this.query.includes("SELECT id, username, name, profile_visibility FROM users WHERE id = ?")) {
+    if (this.query.includes("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ?")) {
       return this.db.users[this.args[0]] ?? null;
     }
 
-    if (this.query.includes("SELECT id, username, name, profile_visibility FROM users WHERE username = ?")) {
+    if (this.query.includes("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE username = ?")) {
       return (
         Object.values(this.db.users).find((user) => user.username === this.args[0]) ?? null
       );
