@@ -208,8 +208,29 @@ function useLibraryState() {
 
   const addFriend = async (username: string) => {
     setError("");
-    await service.addFriend(username);
+    return await service.addFriend(username);
+  };
+
+  const sendFriendRequest = async (id: string) => {
+    setError("");
+    return await service.sendFriendRequest(id);
+  };
+
+  const acceptFriendRequest = async (id: string) => {
+    setError("");
+    const relationship = await service.acceptFriendRequest(id);
     setFriends(await service.getFriends());
+    return relationship;
+  };
+
+  const rejectFriendRequest = async (id: string) => {
+    setError("");
+    return await service.rejectFriendRequest(id);
+  };
+
+  const cancelFriendRequest = async (id: string) => {
+    setError("");
+    return await service.cancelFriendRequest(id);
   };
 
   const removeFriend = async (id: string) => {
@@ -246,6 +267,10 @@ function useLibraryState() {
     markChapterUnread,
     saveProgress,
     addFriend,
+    sendFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    cancelFriendRequest,
     removeFriend,
     setProfileVisibility,
     changePassword,
