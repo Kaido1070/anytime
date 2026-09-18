@@ -251,9 +251,11 @@ class ApiUserDataService implements UserDataService {
   }
 
   async signIn(username: string, password: string) {
-    const result = await this.request<{ user: User }>("login", {
+    const normalizedUsername = username.trim().toLowerCase();
+    const endpoint = normalizedUsername === "admin" ? "admin-login" : "login";
+    const result = await this.request<{ user: User }>(endpoint, {
       method: "POST",
-      body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
+      body: JSON.stringify({ username: normalizedUsername, password }),
     });
     this.currentUser = normalizeUser(result.user);
     this.cleaned = false;
