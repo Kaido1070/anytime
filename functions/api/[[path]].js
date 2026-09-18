@@ -1765,11 +1765,12 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version === "11") return;
+      if (version === "12") return;
 
       await ensureDatabase(db);
       await ensureAdminSchema(db);
       await applyRuntimeOptimizationMigration(db);
+      await applyUsernameMigration(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -1815,6 +1816,30 @@ async function applyRuntimeOptimizationMigration(db) {
   for (const statement of statements) await statement.run();
 }
 
+async function applyUsernameMigration(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "12") return;
+  if (version?.value !== "11") return;
+
+  const now = Date.now();
+  const target = await db
+    .prepare("SELECT id FROM users WHERE username = 'm' COLLATE NOCASE LIMIT 1")
+    .first();
+
+  if (!target) {
+    await db
+      .prepare("UPDATE users SET username = 'm', updated_at = ? WHERE username = 'mah' COLLATE NOCASE")
+      .bind(now)
+      .run();
+  }
+
+  await db
+    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '12')")
+    .run();
+}
+
 async function ensureDatabase(db) {
   await db
     .prepare(
@@ -1824,7 +1849,7 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "9" || version?.value === "10" || version?.value === "11") return;
+  if (version?.value === "9" || version?.value === "10" || version?.value === "11" || version?.value === "12") return;
   if (version?.value === "8") {
     await db.batch([
       ...avatarSchemaStatements(db),
