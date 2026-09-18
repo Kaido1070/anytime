@@ -1,3 +1,7 @@
+import { ensureAdminSchema, isAdminUser, isSocialUser, sessionUser } from "../_admin.js";
+import { ensureAdminAccount } from "../_admin_provision.js";
+export { isAdminUser, isSocialUser };
+
 const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PASSWORD_ITERATIONS = 210000;
@@ -547,6 +551,9 @@ export async function onRequest(context) {
 
   try {
     await ensureDatabase(db);
+    await ensureAdminSchema(db);
+    await db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '10')").run();
+    await ensureAdminAccount(db, context.env);
     return await route(request, url, db);
   } catch (error) {
     console.error("Anytime API error", error);
@@ -564,7 +571,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 9, database: "ready" });
+    return json({ ok: true, phase: 10, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -577,7 +584,7 @@ async function route(request, url, db) {
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, profile_visibility, avatar_id, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, profile_visibility, avatar_id, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
       )
       .bind(username)
       .first();
@@ -602,7 +609,7 @@ async function route(request, url, db) {
     ]);
 
     return json(
-      { user: publicUser(user) },
+      { user: sessionUser(user) },
       200,
       { "Set-Cookie": sessionCookie(token, SESSION_TTL_MS) },
     );
@@ -623,7 +630,7 @@ async function route(request, url, db) {
 
   if (request.method === "GET" && path === "session") {
     const session = await getSession(request, db);
-    return json({ user: session ? publicUser(session.user) : null });
+    return json({ user: session ? sessionUser(session.user) : null });
   }
 
   const session = await getSession(request, db);
@@ -659,6 +666,13 @@ async function route(request, url, db) {
         "Cache-Control": "private, max-age=86400",
       },
     });
+  }
+
+  if (isAdminUser(user)) {
+    return json(
+      { error: "ADMIN_SOCIAL_DISABLED", message: "حساب الإدارة مخصص للوحة الإدارة فقط." },
+      403,
+    );
   }
 
   if (request.method === "PUT" && path === "profile/avatar") {
@@ -1374,7 +1388,7 @@ async function route(request, url, db) {
       return json({ error: "INVALID_FRIEND" }, 400);
     }
     const target = await db
-      .prepare("SELECT id FROM users WHERE id = ? LIMIT 1")
+      .prepare("SELECT id FROM users WHERE id = ? AND role = 'user' LIMIT 1")
       .bind(targetId)
       .first();
     if (!target) return json({ error: "FRIEND_NOT_FOUND" }, 404);
@@ -1493,8 +1507,8 @@ async function route(request, url, db) {
     const target = await db
       .prepare(
         targetId
-          ? "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1"
-          : "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE username = ? LIMIT 1",
+          ? "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? AND role = 'user' LIMIT 1"
+          : "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE username = ? AND role = 'user' LIMIT 1",
       )
       .bind(targetId || username)
       .first();
@@ -1621,7 +1635,7 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "9") return;
+  if (version?.value === "9" || version?.value === "10") return;
   if (version?.value === "8") {
     await db.batch([
       ...avatarSchemaStatements(db),
@@ -2526,7 +2540,7 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name, u.profile_visibility, u.avatar_id
+         u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.role
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -2543,7 +2557,7 @@ async function getSession(request, db) {
   }
   return {
     tokenHash,
-    user: publicUser(row),
+    user: sessionUser(row),
   };
 }
 
@@ -2617,7 +2631,7 @@ export function getProfileAccess(viewer, target) {
 
 async function getUserProfileView(db, viewer, targetId, previewLimit) {
   const target = await db
-    .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
+    .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? AND role = 'user' LIMIT 1")
     .bind(targetId)
     .first();
   if (!target) return null;
@@ -2731,6 +2745,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
         FROM friendships f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
+          AND u.role = 'user'
         ORDER BY u.name COLLATE NOCASE ASC, u.id ASC
         LIMIT ?`)
       .bind(targetId, previewLimit)
@@ -2740,7 +2755,9 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
         (SELECT COUNT(*) FROM user_library WHERE user_id = ?) AS works,
         (SELECT COUNT(*) FROM user_library WHERE user_id = ? AND status = 'completed') AS completed,
         (SELECT COUNT(*) FROM user_lists WHERE user_id = ?) AS lists,
-        (SELECT COUNT(*) FROM friendships WHERE user_id = ?) AS friends`)
+        (SELECT COUNT(*) FROM friendships f
+          JOIN users friend_user ON friend_user.id = f.friend_id AND friend_user.role = 'user'
+          WHERE f.user_id = ?) AS friends`)
       .bind(targetId, targetId, targetId, targetId)
       .first(),
   ]);
@@ -2944,7 +2961,10 @@ async function resolveAvatarImagePaths(rows) {
 async function getFriends(db, userId, limit = 50, offset = 0) {
   const [countRow, result] = await Promise.all([
     db
-      .prepare("SELECT COUNT(*) AS total FROM friendships WHERE user_id = ?")
+      .prepare(`SELECT COUNT(*) AS total
+        FROM friendships f
+        JOIN users u ON u.id = f.friend_id
+        WHERE f.user_id = ? AND u.role = 'user'`)
       .bind(userId)
       .first(),
     db
@@ -2953,6 +2973,7 @@ async function getFriends(db, userId, limit = 50, offset = 0) {
          FROM friendships f
          JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = ?
+           AND u.role = 'user'
          ORDER BY u.name COLLATE NOCASE ASC, u.id ASC
          LIMIT ? OFFSET ?`,
       )
@@ -3070,11 +3091,17 @@ async function getFriendRelationship(db, currentUserId, targetUserId) {
 async function getFriendRequests(db, userId, limit = 50) {
   const [incomingCountRow, outgoingCountRow, incomingResult, outgoingResult] = await Promise.all([
     db
-      .prepare("SELECT COUNT(*) AS total FROM friend_requests WHERE receiver_id = ?")
+      .prepare(`SELECT COUNT(*) AS total
+        FROM friend_requests r
+        JOIN users u ON u.id = r.requester_id
+        WHERE r.receiver_id = ? AND u.role = 'user'`)
       .bind(userId)
       .first(),
     db
-      .prepare("SELECT COUNT(*) AS total FROM friend_requests WHERE requester_id = ?")
+      .prepare(`SELECT COUNT(*) AS total
+        FROM friend_requests r
+        JOIN users u ON u.id = r.receiver_id
+        WHERE r.requester_id = ? AND u.role = 'user'`)
       .bind(userId)
       .first(),
     db
@@ -3082,6 +3109,7 @@ async function getFriendRequests(db, userId, limit = 50) {
         FROM friend_requests r
         JOIN users u ON u.id = r.requester_id
         WHERE r.receiver_id = ?
+          AND u.role = 'user'
         ORDER BY r.created_at DESC, u.id ASC
         LIMIT ?`)
       .bind(userId, limit)
@@ -3091,6 +3119,7 @@ async function getFriendRequests(db, userId, limit = 50) {
         FROM friend_requests r
         JOIN users u ON u.id = r.receiver_id
         WHERE r.requester_id = ?
+          AND u.role = 'user'
         ORDER BY r.created_at DESC, u.id ASC
         LIMIT ?`)
       .bind(userId, limit)
@@ -3119,6 +3148,7 @@ async function searchUsersForFriends(db, userId, query, limit = 20) {
     .prepare(`SELECT id, username, name, profile_visibility
       FROM users
       WHERE id <> ?
+        AND role = 'user'
         AND (
           username LIKE ? ESCAPE '\\' COLLATE NOCASE
           OR name LIKE ? ESCAPE '\\' COLLATE NOCASE
@@ -3331,6 +3361,7 @@ async function getFriendsActivity(db, userId, limit = 12, offset = 0) {
         JOIN users u ON u.id = e.user_id
         LEFT JOIN user_lists l ON l.id = e.list_id
         WHERE u.profile_visibility = 'public'
+          AND u.role = 'user'
           AND (e.list_id IS NULL OR l.id IS NOT NULL)`)
       .bind(userId)
       .first(),
