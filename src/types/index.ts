@@ -51,6 +51,25 @@ export interface SourceChapterPayload {
   next: number | null;
 }
 
+export type LibraryStatus = "reading" | "completed" | "paused" | "planned";
+
+export interface LibraryEntry {
+  mangaId: string;
+  status: LibraryStatus;
+  addedAt: number;
+  updatedAt: number;
+  lastReadAt: number | null;
+  lastReadChapter: number | null;
+  highestReachedChapter: number | null;
+}
+
+export interface ReadingHistoryEntry {
+  id: number;
+  mangaId: string;
+  chapter: number;
+  readAt: number;
+}
+
 export interface ReadingProgress {
   mangaId: string;
   chapter: number;
@@ -59,8 +78,9 @@ export interface ReadingProgress {
 }
 
 export interface UserData {
-  version: 2;
+  version: 3;
   favorites: string[];
+  library: LibraryEntry[];
   progress: Record<string, ReadingProgress>;
   completed: string[];
   lastOpened: { mangaId: string; chapter: number } | null;

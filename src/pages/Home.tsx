@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
-import { SectionTitle, Progress, Icon } from "../components/UI";
+import { SectionTitle, Icon } from "../components/UI";
 import { SourceCard } from "../components/SourceCard";
 import { SourceCoverImage } from "../components/SourceCoverImage";
+import { getContinueChapter } from "../services/reading";
 import { mergeSourceItems, type SourceGroup } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
@@ -11,21 +12,39 @@ import type { SourceManga } from "../types";
 export function Home() {
   const { user, data, friends } = useLibrary();
   const [sourceItems, setSourceItems] = useState<Record<string, SourceManga>>({});
+  const [continueSeries, setContinueSeries] = useState<Record<string, SourceManga>>({});
   const [latest, setLatest] = useState<SourceGroup[]>([]);
+
+  const continueEntries = useMemo(
+    () =>
+      [...(data?.library ?? [])]
+        .filter(
+          (entry) =>
+            entry.status === "reading" &&
+            entry.lastReadAt != null &&
+            entry.highestReachedChapter != null &&
+            sourceService.isSourceKey(entry.mangaId),
+        )
+        .sort((a, b) => (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0))
+        .slice(0, 4),
+    [data?.library],
+  );
+
+  const continueKeys = continueEntries.map((entry) => entry.mangaId);
 
   const sourceKeys = useMemo(() => {
     const keys = new Set<string>();
     const add = (key?: string | null) => {
       if (sourceService.isSourceKey(key)) keys.add(key!);
     };
-    add(data?.lastOpened?.mangaId);
     data?.favorites.forEach(add);
+    data?.library.forEach((entry) => add(entry.mangaId));
     friends.forEach((friend) => {
       add(friend.reading?.mangaId);
       friend.favorites.forEach(add);
     });
     return [...keys];
-  }, [data?.lastOpened?.mangaId, data?.favorites, friends]);
+  }, [data?.favorites, data?.library, friends]);
 
   useEffect(() => {
     let active = true;
@@ -43,6 +62,24 @@ export function Home() {
       active = false;
     };
   }, [sourceKeys.join("|")]);
+
+  useEffect(() => {
+    let active = true;
+    if (!continueKeys.length) {
+      setContinueSeries({});
+      return;
+    }
+    Promise.allSettled(continueKeys.map((key) => sourceService.getSeries(key))).then((results) => {
+      if (!active) return;
+      const entries = results.flatMap((result, index) =>
+        result.status === "fulfilled" ? [[continueKeys[index], result.value] as const] : [],
+      );
+      setContinueSeries(Object.fromEntries(entries));
+    });
+    return () => {
+      active = false;
+    };
+  }, [continueKeys.join("|")]);
 
   useEffect(() => {
     let active = true;
@@ -78,10 +115,19 @@ export function Home() {
     };
   }, []);
 
-  const last = data?.lastOpened;
-  const current = last && sourceService.isSourceKey(last.mangaId) ? sourceItems[last.mangaId] : null;
-  const chapter = current && last ? last.chapter : 0;
-  const percent = current ? data?.progress[`${current.key}:${chapter}`]?.percent ?? 0 : 0;
+  const continueCards = continueEntries.flatMap((entry) => {
+    const item = continueSeries[entry.mangaId] ?? sourceItems[entry.mangaId];
+    const highest = entry.highestReachedChapter;
+    if (!item || highest == null) return [];
+    const completed = data?.completed.includes(`${entry.mangaId}:${highest}`) ?? false;
+    const resumeChapter = getContinueChapter(
+      continueSeries[entry.mangaId]?.chapters,
+      highest,
+      completed,
+    );
+    return [{ entry, item, highest, resumeChapter }];
+  });
+
   const favoriteItems = (data?.favorites ?? [])
     .filter((id) => sourceService.isSourceKey(id))
     .map((id) => sourceItems[id])
@@ -99,38 +145,46 @@ export function Home() {
         <p className="muted">فصلك الجاي ينتظرك.</p>
       </div>
 
-      <SectionTitle title="كمل القراءة" />
-      {current ? (
-        <section className="continue-card">
-          <Link className="continue-cover" to={`/source/${encodeURIComponent(current.key)}`}>
-            {current.cover ? (
-              <SourceCoverImage
-                item={current}
-                alt={`غلاف ${current.title}`}
-              />
-            ) : (
-              <div className="source-cover-placeholder">{current.title.slice(0, 1)}</div>
-            )}
-          </Link>
-          <div className="continue-copy">
-            <p className="eyebrow">{sourceService.sourceLabel(current.source)}</p>
-            <Link to={`/source/${encodeURIComponent(current.key)}`}>
-              <h2 dir="auto">{current.title}</h2>
-            </Link>
-            <p className="muted">الفصل {chapter}</p>
-            <div className="progress-meta">
-              <span>تقدمك</span>
-              <b>{Math.round(percent)}%</b>
-            </div>
-            <Progress value={percent} />
-            <Link className="primary" to={`/read-source/${encodeURIComponent(current.key)}/${chapter}`}>
-              متابعة القراءة <Icon name="arrow" />
-            </Link>
-          </div>
+      <SectionTitle title="أكمل القراءة" />
+      {continueCards.length ? (
+        <section className="continue-reading-grid" aria-label="أكمل القراءة">
+          {continueCards.map(({ entry, item, highest, resumeChapter }) => (
+            <article className="continue-reading-card" key={entry.mangaId}>
+              <Link
+                className="continue-reading-cover"
+                to={`/source/${encodeURIComponent(item.key)}`}
+                aria-label={`فتح ${item.title}`}
+              >
+                {item.cover ? (
+                  <SourceCoverImage item={item} alt={`غلاف ${item.title}`} />
+                ) : (
+                  <div className="source-cover-placeholder">{item.title.slice(0, 1)}</div>
+                )}
+              </Link>
+              <div className="continue-reading-copy">
+                <p className="eyebrow">{sourceService.sourceLabel(item.source)}</p>
+                <Link to={`/source/${encodeURIComponent(item.key)}`}>
+                  <h2 dir="auto">{item.title}</h2>
+                </Link>
+                <p className="continue-reading-meta">
+                  أبعد وصول: الفصل {highest}
+                  {entry.lastReadChapter != null && entry.lastReadChapter !== highest
+                    ? ` · آخر فتح: ${entry.lastReadChapter}`
+                    : ""}
+                </p>
+                <Link
+                  className="primary"
+                  to={`/read-source/${encodeURIComponent(item.key)}/${resumeChapter}`}
+                >
+                  متابعة من الفصل {resumeChapter} <Icon name="arrow" />
+                </Link>
+              </div>
+            </article>
+          ))}
         </section>
       ) : (
         <div className="empty">
-          <p>ابدأ قراءة عمل من المصادر وراح يظهر تقدمك هنا.</p>
+          <p>ابدأ قراءة عمل من المصادر وراح يظهر هنا بدون ما يرجع تقدمك للخلف.</p>
           <Link className="primary" to="/discover">استكشف الأعمال ←</Link>
         </div>
       )}
@@ -170,10 +224,10 @@ export function Home() {
         <SectionTitle title="نشاط الأصدقاء" to="/friends" label="الأصدقاء" />
         <div className="activity">
           {friends.map((friend, i) => {
-            const reading = friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
+            const friendReading = friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
               ? friend.reading
               : null;
-            const readingTitle = reading ? sourceItems[reading.mangaId]?.title : null;
+            const readingTitle = friendReading ? sourceItems[friendReading.mangaId]?.title : null;
             const favoriteCount = friend.favorites.filter((id) => sourceService.isSourceKey(id)).length;
             return (
               <Link to={`/friends/${friend.user.id}`} key={friend.user.id}>
@@ -181,14 +235,14 @@ export function Home() {
                 <div>
                   <p>
                     <b>{friend.user.name}</b>{" "}
-                    {reading && readingTitle
+                    {friendReading && readingTitle
                       ? `يقرأ ${readingTitle}`
                       : favoriteCount
                         ? "حدّث مكتبته"
                         : "ما بدأ قراءة بعد"}
                   </p>
                   <small>
-                    {reading ? `الفصل ${reading.chapter}` : `${favoriteCount} في المفضلة`}
+                    {friendReading ? `الفصل ${friendReading.chapter}` : `${favoriteCount} في المفضلة`}
                   </small>
                 </div>
                 <span aria-hidden="true">↗</span>

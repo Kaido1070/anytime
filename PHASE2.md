@@ -9,6 +9,9 @@ Phase 2 moves account state from browser-only storage to Cloudflare Pages Functi
 - Passwords are stored only as PBKDF2-SHA256 hashes with per-user salts and 210,000 iterations.
 - Favorites sync across devices.
 - Reading progress, completed chapters, and last-opened chapter sync across devices.
+- User library state is stored per work with status, timestamps, last-read chapter, and a non-regressing highest-reached chapter.
+- Every chapter open creates an independent reading-history event. Reading an older chapter updates history/last-read without reducing highest-reached progress.
+- “أكمل القراءة” is driven by the user library and advances to the next available chapter only when the highest reached chapter is completed.
 - Friends and their favorites/current reading state come from D1.
 - Existing Phase 1 local data is imported once after the first successful Phase 2 login.
 - Profile password changes invalidate the user's other active sessions.
@@ -42,6 +45,12 @@ The private accounts remain `mahdi`, `kaido`, and `ahmed`. Their original Phase 
 - `POST /api/favorites`
 - `DELETE /api/favorites/:mangaId`
 - `PUT /api/progress`
+- `GET /api/library`
+- `POST /api/library`
+- `PUT /api/library`
+- `DELETE /api/library/:mangaId`
+- `POST /api/reading/open`
+- `GET /api/reading/history?limit=100`
 - `GET /api/friends`
 - `POST /api/friends`
 - `DELETE /api/friends/:userId`
