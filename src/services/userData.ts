@@ -617,8 +617,8 @@ class ApiUserDataService implements UserDataService {
     if (!normalized.length) return [];
 
     const chunks: ReadChapterPair[][] = [];
-    for (let index = 0; index < normalized.length; index += 200) {
-      chunks.push(normalized.slice(index, index + 200));
+    for (let index = 0; index < normalized.length; index += 40) {
+      chunks.push(normalized.slice(index, index + 40));
     }
     const results = await Promise.all(
       chunks.map((chunk) =>
