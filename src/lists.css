@@ -439,6 +439,31 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
+.list-sortable-row.drop-target::before,
+.list-sortable-row.drop-target::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.list-sortable-row.drop-before::before {
+  top: -6px;
+}
+
+.list-sortable-row.drop-after::after {
+  bottom: -6px;
+}
+
+.list-sortable-row.drop-before::after,
+.list-sortable-row.drop-after::before {
+  display: none;
+}
+
 .list-sortable-row.dragging {
   z-index: 2;
   border-color: #5d584d;
