@@ -8,10 +8,11 @@ test("general API bootstraps D1 once per binding instead of on every request", a
     api.indexOf("export async function onRequest"),
     api.indexOf("async function route"),
   );
-  assert.match(requestHandler, /await ensureApiRuntime\(db, context\.env\)/);
+  assert.match(requestHandler, /await ensureApiRuntime\\(db\\)/);
   assert.doesNotMatch(requestHandler, /ensureDatabase\(db\)/);
   assert.doesNotMatch(requestHandler, /INSERT OR REPLACE INTO schema_meta/);
   assert.match(api, /const apiRuntimeReady = new WeakMap\(\)/);
+  assert.match(api, /if \(version === "11"\) return/);
   assert.match(api, /schema_version', '11'/);
 });
 
