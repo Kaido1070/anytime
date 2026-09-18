@@ -205,6 +205,16 @@ async function ensureSourceSchema(db) {
   let pending = sourceSchemaReady.get(db);
   if (!pending) {
     pending = (async () => {
+      try {
+        await Promise.all([
+          db.prepare("SELECT first_seen_at FROM source_items LIMIT 1").first(),
+          db.prepare("SELECT is_baseline FROM source_chapter_seen LIMIT 1").first(),
+        ]);
+        return;
+      } catch {
+        // Missing tables/columns are repaired below once per binding.
+      }
+
       await db
         .prepare(`CREATE TABLE IF NOT EXISTS source_items (
           source_key TEXT PRIMARY KEY,
