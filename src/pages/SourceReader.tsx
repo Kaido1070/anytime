@@ -338,13 +338,6 @@ function ReaderChapter({
           )}
         </div>
       </footer>
-
-      {showProgress && (
-        <div className="reader-progress" aria-label={`تقدم القراءة ${Math.round(percent)}%`}>
-          <Progress value={percent} />
-          <span>{Math.round(percent)}%</span>
-        </div>
-      )}
     </main>
   );
 }
