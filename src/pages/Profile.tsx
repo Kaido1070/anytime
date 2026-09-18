@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
 
-export function Profile() {
+export function Profile({ embedded = false }: { embedded?: boolean }) {
   const { user, data, signOut, changePassword } = useLibrary();
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -48,25 +48,34 @@ export function Profile() {
 
   return (
     <>
-      <p className="eyebrow">حسابك في ANYTIME</p>
-      <h1>
-        حسابي<span className="accent">.</span>
-      </h1>
-      <div className="profile-heading">
-        <span className="avatar profile-avatar">{user?.name[0]}</span>
-        <h2>{user?.name}</h2>
-        <p className="muted">@{user?.username}</p>
-      </div>
-      <div className="stats">
-        <div>
-          <strong>{favorites}</strong>
-          <span>المفضلة</span>
+      {embedded ? (
+        <div className="account-settings-intro">
+          <p className="eyebrow">الحساب والأمان</p>
+          <h2>الإعدادات</h2>
         </div>
-        <div>
-          <strong>{reading}</strong>
-          <span>قيد القراءة</span>
-        </div>
-      </div>
+      ) : (
+        <>
+          <p className="eyebrow">حسابك في ANYTIME</p>
+          <h1>
+            حسابي<span className="accent">.</span>
+          </h1>
+          <div className="profile-heading">
+            <span className="avatar profile-avatar">{user?.name[0]}</span>
+            <h2>{user?.name}</h2>
+            <p className="muted">@{user?.username}</p>
+          </div>
+          <div className="stats">
+            <div>
+              <strong>{favorites}</strong>
+              <span>المفضلة</span>
+            </div>
+            <div>
+              <strong>{reading}</strong>
+              <span>قيد القراءة</span>
+            </div>
+          </div>
+        </>
+      )}
       <div className="profile-info">
         <p>
           <span>الاسم الظاهر</span>
