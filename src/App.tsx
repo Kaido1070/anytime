@@ -14,6 +14,7 @@ import { SourceMangaDetails } from "./pages/SourceMangaDetails";
 import { SourceReader } from "./pages/SourceReader";
 import "./phase3.css";
 import "./lists.css";
+import "./phase4.css";
 
 export default function App() {
   const { user, loading, error } = useLibrary();
