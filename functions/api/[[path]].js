@@ -1,5 +1,4 @@
 import { ensureAdminSchema, isAdminUser, isSocialUser, sessionUser } from "../_admin.js";
-import { ensureAdminAccount } from "../_admin_provision.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -552,7 +551,7 @@ export async function onRequest(context) {
   }
 
   try {
-    await ensureApiRuntime(db, context.env);
+    await ensureApiRuntime(db);
     return await route(request, url, db);
   } catch (error) {
     console.error("Anytime API error", error);
@@ -1752,14 +1751,25 @@ async function route(request, url, db) {
   return json({ error: "NOT_FOUND" }, 404);
 }
 
-async function ensureApiRuntime(db, env) {
+async function ensureApiRuntime(db) {
   let pending = apiRuntimeReady.get(db);
   if (!pending) {
     pending = (async () => {
+      let version = null;
+      try {
+        const row = await db
+          .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+          .first();
+        version = row?.value ?? null;
+      } catch {
+        // Fresh databases do not have schema_meta yet; bootstrap below.
+      }
+
+      if (version === "11") return;
+
       await ensureDatabase(db);
       await ensureAdminSchema(db);
       await applyRuntimeOptimizationMigration(db);
-      await ensureAdminAccount(db, env);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
