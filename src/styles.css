@@ -1272,3 +1272,27 @@ small {
     text-align: end;
   }
 }
+
+.login-recovery-link {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+}
+.login-recovery-link:hover { color: var(--accent); }
+.login-success {
+  margin: 18px 0 0;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.6;
+}

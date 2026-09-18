@@ -26,6 +26,7 @@ export interface UserDataService {
   getUser(): Promise<User | null>;
   signIn(username: string, password: string): Promise<User>;
   signOut(): Promise<void>;
+  recoverPassword(username: string, recoveryCode: string, newPassword: string): Promise<void>;
   getData(): Promise<UserData>;
   getFavorites(): Promise<string[]>;
   addFavorite(id: string): Promise<void>;
@@ -282,6 +283,14 @@ class ApiUserDataService implements UserDataService {
       this.currentUser = null;
       this.cleaned = false;
     }
+  }
+
+  async recoverPassword(username: string, recoveryCode: string, newPassword: string) {
+    const normalizedUsername = username.trim().toLowerCase();
+    await this.request<{ ok: boolean }>("recover-password", {
+      method: "POST",
+      body: JSON.stringify({ username: normalizedUsername, recoveryCode: recoveryCode.trim(), newPassword }),
+    });
   }
 
   async getData(): Promise<UserData> {
