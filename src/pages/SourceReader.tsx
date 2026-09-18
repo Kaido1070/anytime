@@ -12,6 +12,12 @@ const READER_PRELOAD_MARGIN = "1400px 0px";
 const PROGRESS_SAVE_DELAY_MS = 60 * 1000;
 const PROGRESS_MIN_DELTA = 3;
 const PROGRESS_NOOP_DELTA = 0.25;
+const READER_PROGRESS_VISIBILITY_KEY = "wany:reader-progress-visible";
+
+function readerProgressVisible() {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(READER_PROGRESS_VISIBILITY_KEY) !== "false";
+}
 
 type NavigatorWithConnection = Navigator & {
   connection?: {
@@ -96,6 +102,7 @@ function ReaderChapter({
   const chapter = payload.number;
   const saved = data?.progress[`${sourceKey}:${chapter}`]?.percent ?? 0;
   const [percent, setPercent] = useState(saved);
+  const [showProgress] = useState(readerProgressVisible);
   const saveRef = useRef(saveProgress);
   const restoredRef = useRef(false);
   const initialPageCount = Math.min(INITIAL_READER_PAGES, payload.pages.length);
@@ -286,7 +293,7 @@ function ReaderChapter({
         >
           {markingUnread ? "جاري…" : "غير مقروء"}
         </button>
-        <span>{Math.round(percent)}%</span>
+        {showProgress && <span>{Math.round(percent)}%</span>}
       </header>
 
       <div className="reader-panels source-pages">
@@ -332,10 +339,12 @@ function ReaderChapter({
         </div>
       </footer>
 
-      <div className="reader-progress">
-        <Progress value={percent} />
-        <span>تقدم القراءة: {Math.round(percent)}%</span>
-      </div>
+      {showProgress && (
+        <div className="reader-progress" aria-label={`تقدم القراءة ${Math.round(percent)}%`}>
+          <Progress value={percent} />
+          <span>{Math.round(percent)}%</span>
+        </div>
+      )}
     </main>
   );
 }
