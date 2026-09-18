@@ -612,42 +612,84 @@ async function mangaTimeChapter(context, db, item, number) {
 async function mangaTimeTrpc(endpoint, input) {
   const headers = sourceHeaders(MANGATIME_BASE, "application/json,text/plain,*/*");
   const cache = { cacheTtl: endpoint.startsWith("search.") ? 45 : 20, cacheEverything: true };
+  const attempts = [
+    {
+      batched: false,
+      url: (() => {
+        const value = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
+        value.searchParams.set("input", JSON.stringify({ json: input }));
+        return value;
+      })(),
+    },
+    {
+      batched: true,
+      url: (() => {
+        const value = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
+        value.searchParams.set("batch", "1");
+        value.searchParams.set("input", JSON.stringify({ "0": { json: input } }));
+        return value;
+      })(),
+    },
+  ];
 
-  // tRPC supports a normal single-procedure request. Prefer it because MangaTime
-  // no longer consistently accepts the legacy batched GET shape from Workers.
-  let url = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
-  url.searchParams.set("input", JSON.stringify({ json: input }));
-  let response = await fetch(url, { headers, cf: cache });
+  let lastStatus = 502;
+  let lastMessage = "";
 
-  // Keep the old batch transport as a compatibility fallback for procedures
-  // that may still be deployed with the previous MangaTime router.
-  let batched = false;
-  if (!response.ok) {
-    url = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
-    url.searchParams.set("batch", "1");
-    url.searchParams.set("input", JSON.stringify({ "0": { json: input } }));
-    response = await fetch(url, { headers, cf: cache });
-    batched = true;
+  for (const attempt of attempts) {
+    let response;
+    try {
+      response = await fetch(attempt.url, {
+        headers,
+        redirect: "follow",
+        cf: cache,
+      });
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : String(error);
+      continue;
+    }
+
+    lastStatus = response.status;
+    if (!response.ok) {
+      lastMessage = `HTTP ${response.status}`;
+      continue;
+    }
+
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      lastMessage = "MangaTime رجع استجابة غير صالحة.";
+      continue;
+    }
+
+    const envelope = attempt.batched
+      ? (Array.isArray(payload) ? payload[0] : null)
+      : (Array.isArray(payload) ? payload[0] : payload);
+    if (envelope?.error) {
+      lastMessage =
+        envelope.error?.json?.message ||
+        envelope.error?.message ||
+        "MangaTime API error";
+      continue;
+    }
+
+    const data = envelope?.result?.data?.json;
+    if (data !== undefined) return data;
+    lastMessage = "MangaTime API رجع استجابة فارغة.";
   }
 
-  if (!response.ok) {
-    throw new SourceError("MANGATIME_UPSTREAM", `MangaTime رجع HTTP ${response.status}.`, 502);
-  }
-
-  const payload = await response.json();
-  const envelope = batched
-    ? (Array.isArray(payload) ? payload[0] : null)
-    : (Array.isArray(payload) ? payload[0] : payload);
-
-  if (envelope?.error) {
-    const message = envelope.error?.json?.message || envelope.error?.message || "MangaTime API error";
-    throw new SourceError("MANGATIME_API", String(message), 502);
-  }
-  return envelope?.result?.data?.json;
+  const detail = lastMessage ? ` (${lastMessage})` : "";
+  throw new SourceError(
+    "MANGATIME_UPSTREAM",
+    `تعذر الوصول إلى MangaTime الآن${detail}`,
+    lastStatus >= 400 && lastStatus < 600 ? 502 : 502,
+  );
 }
 
 async function mangaTimeTrackView(seriesId, chapterId) {
-  await fetch(`${MANGATIME_BASE}/api/trpc/content.trackView`, {
+  const url = new URL(`${MANGATIME_BASE}/api/trpc/content.trackView`);
+  url.searchParams.set("batch", "1");
+  await fetch(url, {
     method: "POST",
     headers: {
       ...sourceHeaders(MANGATIME_BASE, "application/json,text/plain,*/*"),
@@ -2124,6 +2166,12 @@ function sourceHeaders(base, accept) {
     "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
     Referer: `${base}/`,
     "User-Agent": SOURCE_UA,
+    ...(base === MANGATIME_BASE
+      ? {
+          "X-MT-Platform": "web",
+          "X-MT-UIMode": "standard",
+        }
+      : {}),
   };
 }
 
@@ -2318,6 +2366,8 @@ export const __test = {
   normalizeAsqType,
   mangaTimeTypeGenres,
   mangaTimeSeriesGenres,
+  mangaTimeTrpc,
+  sourceHeaders,
   isNovelLabel,
   normalizeStatus,
 };
