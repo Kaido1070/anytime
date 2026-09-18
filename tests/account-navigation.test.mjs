@@ -8,8 +8,8 @@ test("profile keeps a compact main page with dedicated lists and friends hubs", 
   const account = await readFile(new URL("../src/pages/Account.tsx", import.meta.url), "utf8");
 
   assert.match(app, /path="profile" element={<Account \/>}/);
-  assert.match(app, /path="lists" element={<Navigate to="\/profile#account-lists" replace \/>}/);
-  assert.match(app, /path="friends" element={<Navigate to="\/profile#account-friends" replace \/>}/);
+  assert.match(app, /path="lists" element={<Lists \/>}/);
+  assert.match(app, /path="friends" element={<Friends \/>}/);
   assert.match(app, /path="friends\/:id" element={<FriendProfile \/>}/);
   assert.doesNotMatch(layout, /label: "الرئيسية"/);
   assert.doesNotMatch(layout, /label: "القوائم"/);
