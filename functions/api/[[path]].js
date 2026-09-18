@@ -3763,7 +3763,7 @@ function publicUser(row) {
 function normalizeUsername(value) {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase();
-  return /^[a-z0-9_-]{2,32}$/.test(normalized) ? normalized : "";
+  return /^[a-z0-9_-]{1,32}$/.test(normalized) ? normalized : "";
 }
 
 function normalizeDisplayName(value) {
