@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS source_chapter_seen (
   chapter_number REAL,
   published_at TEXT,
   first_seen_at INTEGER NOT NULL,
+  is_baseline INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (source_key, chapter_identity),
   FOREIGN KEY (source_key) REFERENCES source_items(source_key) ON DELETE CASCADE
 );
