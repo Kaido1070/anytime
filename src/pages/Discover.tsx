@@ -501,11 +501,11 @@ export function Discover() {
 
   return (
     <>
-      <p className="eyebrow">مصادر حقيقية</p>
+      <p className="eyebrow">كل المصادر، مكان واحد</p>
       <h1>
         استكشف<span className="accent">.</span>
       </h1>
-      <p className="muted page-intro">ابحث في كل المصادر واقرأ الفصول داخل Anytime.</p>
+      <p className="muted page-intro">ابحث عن قصتك التالية واقرأ فصولها مباشرة داخل Wany.</p>
 
       <form className="source-search" onSubmit={submit}>
         <input
