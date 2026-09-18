@@ -19,6 +19,7 @@ export interface UserDataService {
   setLibraryStatus(id: string, status: LibraryStatus): Promise<void>;
   removeFromLibrary(id: string): Promise<void>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
+  markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
   saveReadingProgress(progress: ReadingProgress): Promise<void>;
@@ -195,6 +196,16 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId, chapter }),
       keepalive: true,
+    });
+  }
+
+  async markChapterUnread(mangaId: string, chapter: number) {
+    if (!isLiveKey(mangaId) || !Number.isFinite(chapter) || chapter < 0) {
+      throw new Error("بيانات الفصل غير صالحة.");
+    }
+    await this.request<{ ok: boolean }>("reading/unread", {
+      method: "POST",
+      body: JSON.stringify({ mangaId, chapter }),
     });
   }
 

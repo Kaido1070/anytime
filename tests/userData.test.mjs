@@ -140,6 +140,41 @@ Object.defineProperty(globalThis, "fetch", {
       });
       return response({ ok: true, readAt });
     }
+    if (path === "reading/unread" && method === "POST") {
+      const body = JSON.parse(String(init.body));
+      history = history.filter(
+        (entry) => !(entry.mangaId === body.mangaId && entry.chapter === body.chapter),
+      );
+      const workHistory = history.filter((entry) => entry.mangaId === body.mangaId);
+      const current = serverData.library.find((item) => item.mangaId === body.mangaId);
+      const latest = workHistory[0];
+      const highest = workHistory.length
+        ? Math.max(...workHistory.map((entry) => entry.chapter))
+        : null;
+      serverData = {
+        ...serverData,
+        library: serverData.library.map((item) =>
+          item.mangaId === body.mangaId
+            ? {
+                ...item,
+                lastReadAt: latest?.readAt ?? null,
+                lastReadChapter: latest?.chapter ?? null,
+                highestReachedChapter: highest,
+              }
+            : item,
+        ),
+        progress: Object.fromEntries(
+          Object.entries(serverData.progress).filter(
+            ([, progress]) =>
+              !(progress.mangaId === body.mangaId && progress.chapter === body.chapter),
+          ),
+        ),
+        completed: serverData.completed.filter(
+          (key) => key !== `${body.mangaId}:${body.chapter}`,
+        ),
+      };
+      return response({ ok: true });
+    }
     if (path.startsWith("reading/history?") && method === "GET")
       return response({ history });
     if (path === "progress" && method === "PUT") {
@@ -203,6 +238,23 @@ test("API service supports library, reading history, and non-regressing highest 
     readingHistory.slice(0, 3).map((entry) => entry.chapter),
     [5, 11, 10],
   );
+
+  await service.markChapterUnread(mangaId, 5);
+  const afterUnread = await service.getData();
+  const afterUnreadItem = afterUnread.library.find((entry) => entry.mangaId === mangaId);
+  assert.equal(afterUnreadItem.lastReadChapter, 11);
+  assert.equal(afterUnreadItem.highestReachedChapter, 11);
+  assert.deepEqual(
+    (await service.getReadingHistory()).slice(0, 2).map((entry) => entry.chapter),
+    [11, 10],
+  );
+
+  await service.markChapterUnread(mangaId, 11);
+  const afterHighestUnread = await service.getData();
+  const afterHighestUnreadItem = afterHighestUnread.library.find((entry) => entry.mangaId === mangaId);
+  assert.equal(afterHighestUnreadItem.highestReachedChapter, 10);
+  assert.equal(afterHighestUnread.progress[`${mangaId}:11`], undefined);
+  assert.equal(afterHighestUnread.completed.includes(`${mangaId}:11`), false);
 
   await service.setLibraryStatus(mangaId, "paused");
   assert.equal((await service.getData()).library[0].status, "paused");
