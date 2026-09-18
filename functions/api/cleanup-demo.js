@@ -21,6 +21,34 @@ export async function onRequestPost(context) {
   if (!session) return json({ error: "UNAUTHORIZED" }, 401);
 
   const placeholders = DEMO_IDS.map(() => "?").join(",");
+  const hasDemo = await db
+    .prepare(`SELECT 1 AS present
+      WHERE EXISTS (
+        SELECT 1 FROM favorites WHERE user_id = ? AND manga_id IN (${placeholders})
+      )
+      OR EXISTS (
+        SELECT 1 FROM reading_progress WHERE user_id = ? AND manga_id IN (${placeholders})
+      )
+      OR EXISTS (
+        SELECT 1 FROM user_library WHERE user_id = ? AND manga_id IN (${placeholders})
+      )
+      OR EXISTS (
+        SELECT 1 FROM reading_history WHERE user_id = ? AND manga_id IN (${placeholders})
+      )
+      OR EXISTS (
+        SELECT 1 FROM user_state WHERE user_id = ? AND last_manga_id IN (${placeholders})
+      )
+      LIMIT 1`)
+    .bind(
+      session.user_id, ...DEMO_IDS,
+      session.user_id, ...DEMO_IDS,
+      session.user_id, ...DEMO_IDS,
+      session.user_id, ...DEMO_IDS,
+      session.user_id, ...DEMO_IDS,
+    )
+    .first();
+  if (!hasDemo) return json({ ok: true, changed: false });
+
   await db.batch([
     db.prepare(`DELETE FROM favorites WHERE user_id = ? AND manga_id IN (${placeholders})`)
       .bind(session.user_id, ...DEMO_IDS),
@@ -37,7 +65,7 @@ export async function onRequestPost(context) {
       .bind(Date.now(), session.user_id, ...DEMO_IDS),
   ]);
 
-  return json({ ok: true });
+  return json({ ok: true, changed: true });
 }
 
 function getCookie(request, name) {
