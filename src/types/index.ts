@@ -233,6 +233,8 @@ export interface ProfileLibraryItem {
   mangaId: string;
   status: LibraryStatus;
   highestReachedChapter: number | null;
+  lastReadChapter?: number | null;
+  lastReadAt?: number | null;
 }
 
 export interface ProfileListPreview extends UserListSummary {
@@ -249,7 +251,9 @@ export interface ProfileSectionView {
 
 export interface ProfileStats {
   works: number;
+  chaptersRead: number;
   completed: number;
+  reading: number;
   lists: number;
   friends: number;
 }
@@ -265,6 +269,7 @@ export interface UserProfileView {
   sections?: ProfileSectionView[];
   friends?: User[];
   stats?: ProfileStats;
+  pendingFriendRequests?: number;
   activity?: ActivityEvent[];
 }
 
