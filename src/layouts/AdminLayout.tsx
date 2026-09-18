@@ -9,8 +9,8 @@ export function AdminLayout() {
     <div className="app-shell admin-shell">
       <header className="app-header admin-header" style={{ direction: "ltr" }}>
         <Link to="/admin" className="wordmark" dir="ltr">
-          <span className="brand-mark">a</span>
-          Anytime
+          <span className="brand-mark">w</span>
+          Wany
         </Link>
         <span className="admin-role-badge">ADMIN</span>
         <button className="secondary admin-signout" type="button" onClick={() => void signOut()}>
