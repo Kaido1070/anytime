@@ -141,11 +141,13 @@ export function ActivityFeed({
   events,
   showActor = false,
   emptyText,
+  to,
 }: {
   title: string;
   events: ActivityEvent[];
   showActor?: boolean;
   emptyText: string;
+  to?: string;
 }) {
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
   const keys = useMemo(
@@ -180,7 +182,11 @@ export function ActivityFeed({
     <section className="profile-module activity-module">
       <div className="profile-module-heading">
         <h2>{title}</h2>
-        {events.length > 0 && <span className="profile-module-count">آخر {events.length}</span>}
+        {to ? (
+          <Link to={to}>عرض الكل <span aria-hidden="true">↗</span></Link>
+        ) : (
+          events.length > 0 && <span className="profile-module-count">آخر {events.length}</span>
+        )}
       </div>
       {events.length ? (
         <div className="activity-feed">

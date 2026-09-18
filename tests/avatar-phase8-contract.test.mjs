@@ -22,6 +22,10 @@ const account = await readFile(
   new URL("../src/pages/Account.tsx", import.meta.url),
   "utf8",
 );
+const profileOverview = await readFile(
+  new URL("../src/components/ProfileOverview.tsx", import.meta.url),
+  "utf8",
+);
 const friends = await readFile(
   new URL("../src/pages/Friends.tsx", import.meta.url),
   "utf8",
@@ -97,7 +101,8 @@ test("picker is local-search, horizontal-scroll and explicit-save without upload
 });
 
 test("shared avatar is integrated into account, friends and activity", () => {
-  assert.match(account, /UserAvatar/);
+  assert.match(account, /ProfileIdentityHeader/);
+  assert.match(profileOverview, /UserAvatar/);
   assert.match(friends, /UserAvatar/);
   assert.match(activity, /UserAvatar/);
 });

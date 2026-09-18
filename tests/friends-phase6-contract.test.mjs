@@ -42,15 +42,16 @@ test("friend search prioritizes exact and prefix matches before contains matches
   assert.match(api, /LIMIT \?/);
 });
 
-test("friends UI stays inside account section and has local friends/requests tabs", async () => {
+test("friends UI uses a dedicated hub with friends, requests and search tabs", async () => {
   const source = await readFile(new URL("../src/pages/Friends.tsx", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
-  assert.match(app, /path="friends" element={<Navigate to="\/profile#account-friends" replace \/>}/);
+  assert.match(app, /path="friends" element={<Friends \/>}/);
   assert.match(app, /path="friends\/:id" element={<FriendProfile \/>}/);
   assert.match(app, /import "\.\/phase6\.css"/);
-  assert.match(source, /"friends" \| "requests"/);
+  assert.match(source, /"friends" \| "requests" \| "search"/);
   assert.match(source, /friend-request-badge/);
+  assert.match(source, /tab === "search"/);
   assert.match(source, /البحث عن مستخدم/);
   assert.match(source, /لم نجد مستخدمًا بهذا الاسم/);
 });

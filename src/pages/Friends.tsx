@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { ActivityFeed } from "../components/ActivityFeed";
+import {
+  ProfileActivitySection,
+  ProfileIdentityHeader,
+  ProfileListsSection,
+  ProfileOverviewSkeleton,
+  ProfileReadingSection,
+  ProfileStatsSection,
+  ProfileSummaryStrip,
+} from "../components/ProfileOverview";
 import { useLibrary } from "../hooks/useLibrary";
 import { Back, SectionTitle } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
@@ -20,7 +29,7 @@ import type {
   UserProfileView,
 } from "../types";
 
-const PROFILE_PREVIEW_LIMIT = 8;
+const PROFILE_PREVIEW_LIMIT = 4;
 
 const libraryStatusLabels: Record<LibraryStatus, string> = {
   reading: "يقرأ حاليًا",
@@ -199,7 +208,7 @@ function ListSection({
 
 function PublicFriendsSection({ friends }: { friends: User[] }) {
   return (
-    <section className="profile-module profile-public-friends">
+    <section className="profile-module profile-public-friends" id="profile-public-friends">
       <div className="profile-module-heading">
         <h2>الأصدقاء</h2>
         <span className="profile-module-count">{friends.length ? "معاينة" : ""}</span>
@@ -287,15 +296,17 @@ function RelationshipActions({
 export function Friends({ embedded = false }: { embedded?: boolean }) {
   const {
     friends,
+    refreshFriends,
     sendFriendRequest,
     acceptFriendRequest,
     rejectFriendRequest,
     cancelFriendRequest,
   } = useLibrary();
-  const [tab, setTab] = useState<"friends" | "requests">("friends");
+  const [tab, setTab] = useState<"friends" | "requests" | "search">("friends");
   const [requests, setRequests] = useState<FriendRequests>(emptyRequests);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState("");
+  const [friendsError, setFriendsError] = useState("");
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<FriendSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -316,8 +327,17 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
   }
 
   useEffect(() => {
+    let active = true;
+    refreshFriends().catch((cause) => {
+      if (active) {
+        setFriendsError(cause instanceof Error ? cause.message : "تعذر تحميل الأصدقاء.");
+      }
+    });
     void loadRequests();
-  }, [friends.length]);
+    return () => {
+      active = false;
+    };
+  }, [refreshFriends]);
 
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -375,9 +395,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
       let relationship: FriendRelationship;
       if (action === "send") {
         relationship = await sendFriendRequest(userId);
-        if (relationship === "pending_sent") {
-          void loadRequests();
-        }
+        if (relationship === "pending_sent") void loadRequests();
       } else if (action === "accept") {
         relationship = await acceptFriendRequest(userId);
         removeRequestLocally(userId, "incoming");
@@ -406,66 +424,17 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           <div>
             <p className="eyebrow">داخل حسابك</p>
             <h2>الأصدقاء</h2>
-            <p className="muted page-intro">أرسل الطلبات وتابع قائمة أصدقائك من مكان واحد.</p>
           </div>
         </header>
       ) : (
         <>
-          <p className="eyebrow">القراءة أحلى مع الأصدقاء</p>
-          <h1>
-            الأصدقاء<span className="accent">.</span>
-          </h1>
-          <p className="muted page-intro">أرسل الطلبات وتابع قائمة أصدقائك من مكان واحد.</p>
+          <p className="eyebrow">مجتمعك في Wany</p>
+          <h1>الأصدقاء<span className="accent">.</span></h1>
+          <p className="muted page-intro">أصدقاؤك وطلبات الصداقة والبحث في مكان واحد.</p>
         </>
       )}
 
-      <form className="friend-search" onSubmit={submitSearch}>
-        <label htmlFor="friend-search-input">البحث عن مستخدم</label>
-        <div className="friend-search-controls">
-          <input
-            id="friend-search-input"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            autoCapitalize="none"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="اسم المستخدم أو اسم العرض"
-          />
-          <button className="secondary" disabled={searching}>
-            {searching ? "جاري البحث…" : "بحث"}
-          </button>
-        </div>
-        {searchError && <p className="error">{searchError}</p>}
-      </form>
-
-      {searchDone && (
-        <div className="friend-search-results" aria-live="polite">
-          {searchResults.map((result, index) => (
-            <div className="friend-result-card" key={result.user.id}>
-              <Link className="friend-result-identity" to={`/friends/${result.user.id}`}>
-                <UserAvatar user={result.user} className={`tone-${index % 3}`} />
-                <span>
-                  <b>{result.user.name}</b>
-                  <small>@{result.user.username}</small>
-                </span>
-              </Link>
-              <RelationshipActions
-                relationship={result.relationship}
-                busy={busyUserId === result.user.id}
-                onSend={() => void runAction(result.user.id, "send")}
-                onAccept={() => void runAction(result.user.id, "accept")}
-                onReject={() => void runAction(result.user.id, "reject")}
-                onCancel={() => void runAction(result.user.id, "cancel")}
-              />
-            </div>
-          ))}
-          {!searching && !searchResults.length && (
-            <p className="friend-empty">لم نجد مستخدمًا بهذا الاسم.</p>
-          )}
-        </div>
-      )}
-
-      <div className="friend-tabs" role="tablist" aria-label="قسم الأصدقاء">
+      <div className="friend-tabs friend-hub-tabs" role="tablist" aria-label="قسم الأصدقاء">
         <button
           type="button"
           role="tab"
@@ -473,7 +442,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           className={tab === "friends" ? "active" : ""}
           onClick={() => setTab("friends")}
         >
-          الأصدقاء <span>{friends.length}</span>
+          أصدقائي <span>{friends.length}</span>
         </button>
         <button
           type="button"
@@ -487,10 +456,38 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
             <span className="friend-request-badge">{requests.incomingCount}</span>
           )}
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "search"}
+          className={tab === "search" ? "active" : ""}
+          onClick={() => setTab("search")}
+        >
+          البحث
+        </button>
       </div>
 
-      {tab === "friends" ? (
+      {tab === "friends" && (
         <>
+          {friendsError && (
+            <div className="profile-section-error compact">
+              <span>{friendsError}</span>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => {
+                  setFriendsError("");
+                  void refreshFriends().catch((cause) =>
+                    setFriendsError(
+                      cause instanceof Error ? cause.message : "تعذر تحميل الأصدقاء.",
+                    ),
+                  );
+                }}
+              >
+                إعادة المحاولة
+              </button>
+            </div>
+          )}
           <div className="friends-list">
             {friends.map((friend, index) => (
               <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
@@ -503,20 +500,18 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
               </Link>
             ))}
           </div>
-          {!friends.length && (
+          {!friends.length && !friendsError && (
             <div className="friend-empty-state">
               <p>ما عندك أصدقاء حتى الآن.</p>
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => document.getElementById("friend-search-input")?.focus()}
-              >
-                إضافة صديق
+              <button className="secondary" type="button" onClick={() => setTab("search")}>
+                البحث عن مستخدم
               </button>
             </div>
           )}
         </>
-      ) : (
+      )}
+
+      {tab === "requests" && (
         <div className="friend-requests-panel">
           {requestsLoading ? (
             <p className="friend-empty">جاري تحميل الطلبات…</p>
@@ -576,8 +571,65 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
               </section>
             </>
           )}
-          {requestsError && <p className="error">{requestsError}</p>}
+          {requestsError && (
+            <div className="profile-section-error compact">
+              <span>{requestsError}</span>
+              <button className="secondary" type="button" onClick={() => void loadRequests()}>
+                إعادة المحاولة
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {tab === "search" && (
+        <section className="friend-search-hub" aria-label="البحث عن مستخدم">
+          <form className="friend-search" onSubmit={submitSearch}>
+            <label htmlFor="friend-search-input">البحث عن مستخدم</label>
+            <div className="friend-search-controls">
+              <input
+                id="friend-search-input"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                autoCapitalize="none"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="اسم المستخدم أو اسم العرض"
+              />
+              <button className="secondary" disabled={searching}>
+                {searching ? "جاري البحث…" : "بحث"}
+              </button>
+            </div>
+            {searchError && <p className="error">{searchError}</p>}
+          </form>
+
+          {searchDone && (
+            <div className="friend-search-results" aria-live="polite">
+              {searchResults.map((result, index) => (
+                <div className="friend-result-card" key={result.user.id}>
+                  <Link className="friend-result-identity" to={`/friends/${result.user.id}`}>
+                    <UserAvatar user={result.user} className={`tone-${index % 3}`} />
+                    <span>
+                      <b>{result.user.name}</b>
+                      <small>@{result.user.username}</small>
+                    </span>
+                  </Link>
+                  <RelationshipActions
+                    relationship={result.relationship}
+                    busy={busyUserId === result.user.id}
+                    onSend={() => void runAction(result.user.id, "send")}
+                    onAccept={() => void runAction(result.user.id, "accept")}
+                    onReject={() => void runAction(result.user.id, "reject")}
+                    onCancel={() => void runAction(result.user.id, "cancel")}
+                  />
+                </div>
+              ))}
+              {!searching && !searchResults.length && (
+                <p className="friend-empty">لم نجد مستخدمًا بهذا الاسم.</p>
+              )}
+            </div>
+          )}
+        </section>
       )}
     </>
   );
@@ -594,6 +646,7 @@ export function FriendProfile() {
     removeFriend,
   } = useLibrary();
   const [profile, setProfile] = useState<UserProfileView | null>(null);
+  const [series, setSeries] = useState<Record<string, SourceManga>>({});
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -645,17 +698,44 @@ export function FriendProfile() {
   }, [profile]);
   const sourceItems = useSourceItems(sourceKeys);
 
+  const readingEntries = useMemo(
+    () => (profile?.library ?? []).filter((entry) => entry.status === "reading"),
+    [profile?.library],
+  );
+  const readingSignature = readingEntries.map((entry) => entry.mangaId).join("|");
+
+  useEffect(() => {
+    let active = true;
+    if (!readingEntries.length) {
+      setSeries({});
+      return;
+    }
+    Promise.allSettled(
+      readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
+    ).then((results) => {
+      if (!active) return;
+      setSeries(
+        Object.fromEntries(
+          results.flatMap((result, index) =>
+            result.status === "fulfilled"
+              ? [[readingEntries[index].mangaId, result.value]]
+              : [],
+          ),
+        ),
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, [readingSignature]);
+
   if (id === user?.id) return <Navigate to="/profile" replace />;
 
   if (loading) {
     return (
       <>
-        <Back to="/profile#account-friends" />
-        <div className="profile-view-loading" aria-label="جاري تحميل الحساب">
-          <span />
-          <span />
-          <span />
-        </div>
+        <Back to="/friends" />
+        <ProfileOverviewSkeleton />
       </>
     );
   }
@@ -663,9 +743,10 @@ export function FriendProfile() {
   if (!profile) {
     return (
       <>
-        <Back to="/profile#account-friends" />
-        <h1>الحساب غير موجود</h1>
-        {pageError && <p className="muted">{pageError}</p>}
+        <Back to="/friends" />
+        <div className="profile-section-error" role="alert">
+          <span>{pageError || "الحساب غير موجود."}</span>
+        </div>
       </>
     );
   }
@@ -673,9 +754,10 @@ export function FriendProfile() {
   const profileUserId = profile.user.id;
   const isPrivate = profile.access === "private";
   const relationship = profile.relationship;
-  const listById = new Map((profile.lists ?? []).map((list) => [list.id, list]));
 
-  async function updateRelationship(action: "send" | "accept" | "reject" | "cancel" | "remove") {
+  async function updateRelationship(
+    action: "send" | "accept" | "reject" | "cancel" | "remove",
+  ) {
     setActionBusy(true);
     setActionError("");
     try {
@@ -688,54 +770,40 @@ export function FriendProfile() {
         await removeFriend(profileUserId);
         next = "none";
       }
-      setProfile((current) => (current ? { ...current, relationship: next } : current));
+      setProfile((current) =>
+        current ? { ...current, relationship: next } : current,
+      );
       if (action === "remove") setRemoveConfirm(false);
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : "تعذر تحديث حالة الصداقة.");
+      setActionError(
+        cause instanceof Error ? cause.message : "تعذر تحديث حالة الصداقة.",
+      );
     } finally {
       setActionBusy(false);
     }
   }
 
+  const relationshipActions = (
+    <RelationshipActions
+      relationship={relationship}
+      busy={actionBusy}
+      onSend={() => void updateRelationship("send")}
+      onAccept={() => void updateRelationship("accept")}
+      onReject={() => void updateRelationship("reject")}
+      onCancel={() => void updateRelationship("cancel")}
+      onRemove={() => setRemoveConfirm(true)}
+    />
+  );
+
   return (
     <>
-      <Back to="/profile#account-friends" />
+      <Back to="/friends" />
 
-      <header className="profile-view-header">
-        <div className="profile-view-identity">
-          <UserAvatar user={profile.user} className="profile-view-avatar" loading="eager" />
-          <div>
-            <p className="eyebrow">{isPrivate ? "حساب خاص" : "ملف المستخدم"}</p>
-            <h1>{profile.user.name}</h1>
-            <p className="muted">@{profile.user.username}</p>
-          </div>
-        </div>
-
-        <div className="profile-view-side">
-          {isPrivate ? (
-            <span className="profile-private-badge">حساب خاص</span>
-          ) : (
-            profile.stats && (
-              <div className="profile-view-stats" aria-label="إحصائيات الحساب">
-                <span><b>{profile.stats.works}</b><small>عمل</small></span>
-                <span><b>{profile.stats.completed}</b><small>مكتمل</small></span>
-                <span><b>{profile.stats.lists}</b><small>قائمة</small></span>
-                <span><b>{profile.stats.friends}</b><small>صديق</small></span>
-              </div>
-            )
-          )}
-
-          <RelationshipActions
-            relationship={relationship}
-            busy={actionBusy}
-            onSend={() => void updateRelationship("send")}
-            onAccept={() => void updateRelationship("accept")}
-            onReject={() => void updateRelationship("reject")}
-            onCancel={() => void updateRelationship("cancel")}
-            onRemove={() => setRemoveConfirm(true)}
-          />
-        </div>
-      </header>
+      <ProfileIdentityHeader
+        user={profile.user}
+        actions={relationshipActions}
+        privateState={isPrivate}
+      />
 
       {removeConfirm && relationship === "friends" && (
         <div className="friend-remove-confirm" role="alert">
@@ -765,44 +833,41 @@ export function FriendProfile() {
 
       {isPrivate ? (
         <FavoritesSection profile={profile} works={sourceItems} />
-      ) : (
+      ) : profile.stats ? (
         <>
-          <div className="profile-public-modules">
-            {(profile.sections ?? []).map((section) => {
-              if (section.type === "favorites") {
-                return <FavoritesSection key={section.key} profile={profile} works={sourceItems} />;
-              }
-              if (section.type === "library") {
-                return (
-                  <LibrarySection
-                    key={section.key}
-                    entries={profile.library ?? []}
-                    works={sourceItems}
-                  />
-                );
-              }
-              const list = section.referenceId ? listById.get(section.referenceId) : null;
-              return list ? <ListSection key={section.key} list={list} works={sourceItems} /> : null;
-            })}
-          </div>
+          <ProfileSummaryStrip
+            friends={profile.stats.friends}
+            lists={profile.stats.lists}
+            works={profile.stats.works}
+            friendsTo="#profile-public-friends"
+            listsTo="#profile-lists"
+            worksTo="#profile-reading"
+          />
 
-          {!profile.lists?.length && (
-            <section className="profile-module">
-              <SectionTitle title="القوائم" />
-              <p className="profile-module-empty">لا توجد قوائم شخصية حتى الآن.</p>
-            </section>
-          )}
+          <ProfileStatsSection stats={profile.stats} />
 
-          <ActivityFeed
-            title="النشاط الأخير"
+          <ProfileListsSection
+            favorites={profile.favorites}
+            favoriteCount={profile.favoriteCount}
+            lists={profile.lists ?? []}
+            works={sourceItems}
+            viewAllTo=""
+          />
+
+          <ProfileReadingSection
+            entries={readingEntries}
+            series={series}
+            own={false}
+          />
+
+          <ProfileActivitySection
             events={profile.activity ?? []}
             showActor
-            emptyText="لا يوجد نشاط حديث حتى الآن."
           />
 
           <PublicFriendsSection friends={profile.friends ?? []} />
         </>
-      )}
+      ) : null}
     </>
   );
 }

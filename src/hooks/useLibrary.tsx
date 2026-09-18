@@ -25,12 +25,13 @@ function useLibraryState() {
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
-    const [nextData, nextFriends] = await Promise.all([
-      service.getData(),
-      service.getFriends(),
-    ]);
-    setData(nextData);
+    setData(await service.getData());
+  }, []);
+
+  const refreshFriends = useCallback(async () => {
+    const nextFriends = await service.getFriends();
     setFriends(nextFriends);
+    return nextFriends;
   }, []);
 
   useEffect(() => {
@@ -224,7 +225,7 @@ function useLibraryState() {
   const acceptFriendRequest = async (id: string) => {
     setError("");
     const relationship = await service.acceptFriendRequest(id);
-    setFriends(await service.getFriends());
+    await refreshFriends();
     return relationship;
   };
 
@@ -241,7 +242,7 @@ function useLibraryState() {
   const removeFriend = async (id: string) => {
     setError("");
     await service.removeFriend(id);
-    setFriends(await service.getFriends());
+    await refreshFriends();
   };
 
   const setAvatar = async (avatarId: string) => {
@@ -276,6 +277,7 @@ function useLibraryState() {
     loading,
     error,
     refresh,
+    refreshFriends,
     signIn,
     signOut,
     favorite,

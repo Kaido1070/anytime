@@ -44,8 +44,15 @@ class FakeStatement {
     if (this.query.includes("FROM user_lists l") && this.query.includes("owner_profile_visibility")) {
       return this.db.listRow;
     }
-    if (this.query.includes("(SELECT COUNT(*) FROM user_library")) {
-      return { works: 4, completed: 1, lists: 1, friends: 1 };
+    if (this.query.includes("AS chapters_read")) {
+      return {
+        works: 4,
+        chapters_read: 12,
+        completed: 1,
+        reading: 2,
+        lists: 1,
+        friends: 1,
+      };
     }
     return null;
   }
@@ -60,7 +67,7 @@ class FakeStatement {
         results: [{ manga_id: "mt:manhwa:nano-machine", total_count: 1 }],
       };
     }
-    if (this.query.includes("FROM user_library") && this.query.includes("PARTITION BY status")) {
+    if (this.query.includes("FROM user_library") && this.query.includes("status = 'reading'")) {
       this.db.sensitiveQueries.push("library");
       return {
         results: [
@@ -68,7 +75,8 @@ class FakeStatement {
             manga_id: "mt:manhwa:nano-machine",
             status: "reading",
             highest_reached_chapter: 100,
-            row_number: 1,
+            last_read_chapter: 99,
+            last_read_at: 1234,
           },
         ],
       };
@@ -216,10 +224,18 @@ test("public profile exposes bounded social data and uses highest reached chapte
 
   assert.equal(profile.access, "public");
   assert.equal(profile.library[0].highestReachedChapter, 100);
-  assert.equal("lastReadChapter" in profile.library[0], false);
+  assert.equal(profile.library[0].lastReadChapter, 99);
+  assert.equal(profile.library[0].lastReadAt, 1234);
   assert.equal(profile.lists[0].name, "موريم");
   assert.equal(profile.friends[0].id, "friend-1");
-  assert.deepEqual(profile.stats, { works: 4, completed: 1, lists: 1, friends: 1 });
+  assert.deepEqual(profile.stats, {
+    works: 4,
+    chaptersRead: 12,
+    completed: 1,
+    reading: 2,
+    lists: 1,
+    friends: 1,
+  });
   assert.ok(db.sensitiveQueries.includes("library"));
   assert.ok(db.sensitiveQueries.includes("lists"));
   assert.ok(db.sensitiveQueries.includes("friends"));

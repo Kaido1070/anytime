@@ -5,10 +5,11 @@ import { AppLayout } from "./layouts/AppLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { Login } from "./pages/Login";
 import { Favorites } from "./pages/Favorites";
-import { FriendProfile } from "./pages/Friends";
+import { FriendProfile, Friends } from "./pages/Friends";
 import { Account } from "./pages/Account";
 import { AdminDashboard, AdminUserDetail } from "./pages/Admin";
 import { UserList } from "./pages/UserList";
+import { Lists } from "./pages/Lists";
 import { Discover } from "./pages/Discover";
 import { Fyp } from "./pages/Fyp";
 import { NewChapters } from "./pages/NewChapters";
@@ -25,6 +26,7 @@ import "./phase8.css";
 import "./phase9.css";
 import "./phase10.css";
 import "./phase10_5.css";
+import "./profileOverview.css";
 
 export default function App() {
   const { user, loading, error } = useLibrary();
@@ -61,9 +63,9 @@ export default function App() {
             <Route path="new" element={<NewChapters />} />
             <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
-            <Route path="lists" element={<Navigate to="/profile#account-lists" replace />} />
+            <Route path="lists" element={<Lists />} />
             <Route path="lists/:id" element={<UserList />} />
-            <Route path="friends" element={<Navigate to="/profile#account-friends" replace />} />
+            <Route path="friends" element={<Friends />} />
             <Route path="friends/:id" element={<FriendProfile />} />
             <Route path="profile" element={<Account />} />
             <Route

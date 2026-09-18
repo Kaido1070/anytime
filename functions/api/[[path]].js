@@ -2029,6 +2029,7 @@ function librarySchemaStatements(db) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_recent ON user_library(user_id, last_read_at DESC, updated_at DESC)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_status ON user_library(user_id, status, manga_id)"),
     db.prepare(`CREATE TABLE IF NOT EXISTS reading_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
@@ -2039,6 +2040,7 @@ function librarySchemaStatements(db) {
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_time ON reading_history(user_id, read_at DESC, id DESC)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_work ON reading_history(user_id, manga_id, read_at DESC)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_chapter ON reading_history(user_id, manga_id, chapter)"),
   ];
 }
 
@@ -2747,7 +2749,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       WHERE user_id = ?
       ORDER BY created_at ASC, manga_id ASC
       LIMIT ?`)
-    .bind(targetId, previewLimit)
+    .bind(targetId, Math.min(previewLimit, 4))
     .all();
   const favoriteRows = favoriteResult.results ?? [];
   const profile = {
@@ -2761,40 +2763,23 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
   // Private profiles stop here: hidden data is never queried or serialized.
   if (access === "private") return profile;
 
-  const activity = (await getUserActivity(db, targetId, Math.min(previewLimit, 10), 0)).events;
-
+  const activityPromise = getUserActivity(db, targetId, 3, 0);
   const [
     libraryResult,
     listResult,
-    listPreviewResult,
     systemSectionResult,
     friendResult,
     stats,
+    pendingRequests,
+    activityFeed,
   ] = await Promise.all([
     db
-      .prepare(`WITH ranked AS (
-        SELECT
-          manga_id,
-          status,
-          highest_reached_chapter,
-          ROW_NUMBER() OVER (
-            PARTITION BY status
-            ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC, manga_id ASC
-          ) AS row_number
+      .prepare(`SELECT
+          manga_id, status, highest_reached_chapter, last_read_chapter, last_read_at
         FROM user_library
-        WHERE user_id = ?
-      )
-      SELECT manga_id, status, highest_reached_chapter, row_number
-      FROM ranked
-      WHERE row_number <= ?
-      ORDER BY
-        CASE status
-          WHEN 'reading' THEN 1
-          WHEN 'completed' THEN 2
-          WHEN 'paused' THEN 3
-          ELSE 4
-        END,
-        row_number ASC`)
+        WHERE user_id = ? AND status = 'reading'
+        ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC, manga_id ASC
+        LIMIT ?`)
       .bind(targetId, previewLimit)
       .all(),
     db
@@ -2810,33 +2795,15 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       LEFT JOIN user_list_items i ON i.list_id = l.id
       WHERE l.user_id = ?
       GROUP BY l.id
-      ORDER BY section_position ASC, l.position ASC, l.created_at ASC, l.id ASC`)
-      .bind(targetId)
-      .all(),
-    db
-      .prepare(`WITH ranked AS (
-        SELECT
-          i.list_id,
-          i.manga_id,
-          ROW_NUMBER() OVER (
-            PARTITION BY i.list_id
-            ORDER BY i.position ASC, i.added_at ASC, i.manga_id ASC
-          ) AS row_number
-        FROM user_list_items i
-        JOIN user_lists l ON l.id = i.list_id
-        WHERE l.user_id = ?
-      )
-      SELECT list_id, manga_id, row_number
-      FROM ranked
-      WHERE row_number <= ?
-      ORDER BY list_id ASC, row_number ASC`)
+      ORDER BY section_position ASC, l.position ASC, l.created_at ASC, l.id ASC
+      LIMIT ?`)
       .bind(targetId, previewLimit)
       .all(),
     db
-      .prepare(`SELECT section_type, position
+      .prepare(`SELECT section_type, position, is_visible
         FROM user_profile_sections
         WHERE user_id = ?
-          AND section_type IN ('continue_reading','favorites')
+          AND section_type IN ('continue_reading','favorites','my_activity')
         ORDER BY position ASC`)
       .bind(targetId)
       .all(),
@@ -2852,24 +2819,73 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       .all(),
     db
       .prepare(`SELECT
-        (SELECT COUNT(*) FROM user_library WHERE user_id = ?) AS works,
+        (SELECT COUNT(*) FROM (
+          SELECT manga_id FROM user_library WHERE user_id = ?
+          UNION
+          SELECT manga_id FROM favorites WHERE user_id = ?
+          UNION
+          SELECT i.manga_id
+          FROM user_list_items i
+          JOIN user_lists l ON l.id = i.list_id
+          WHERE l.user_id = ?
+        )) AS works,
+        (SELECT COUNT(*) FROM (
+          SELECT manga_id, chapter
+          FROM reading_history
+          WHERE user_id = ?
+          GROUP BY manga_id, chapter
+        )) AS chapters_read,
         (SELECT COUNT(*) FROM user_library WHERE user_id = ? AND status = 'completed') AS completed,
+        (SELECT COUNT(*) FROM user_library WHERE user_id = ? AND status = 'reading') AS reading,
         (SELECT COUNT(*) FROM user_lists WHERE user_id = ?) AS lists,
         (SELECT COUNT(*) FROM friendships f
           JOIN users friend_user ON friend_user.id = f.friend_id AND friend_user.role = 'user'
           WHERE f.user_id = ?) AS friends`)
-      .bind(targetId, targetId, targetId, targetId)
+      .bind(targetId, targetId, targetId, targetId, targetId, targetId, targetId, targetId)
       .first(),
+    access === "owner"
+      ? db
+          .prepare("SELECT COUNT(*) AS total FROM friend_requests WHERE receiver_id = ?")
+          .bind(targetId)
+          .first()
+      : Promise.resolve({ total: 0 }),
+    activityPromise,
   ]);
 
+  const listRows = listResult.results ?? [];
+  const listIds = listRows.map((row) => row.id);
+  let listPreviewRows = [];
+  if (listIds.length) {
+    const placeholders = listIds.map(() => "?").join(",");
+    const previewResult = await db
+      .prepare(`WITH ranked AS (
+        SELECT
+          i.list_id,
+          i.manga_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY i.list_id
+            ORDER BY i.position ASC, i.added_at ASC, i.manga_id ASC
+          ) AS row_number
+        FROM user_list_items i
+        WHERE i.list_id IN (${placeholders})
+      )
+      SELECT list_id, manga_id, row_number
+      FROM ranked
+      WHERE row_number <= 4
+      ORDER BY list_id ASC, row_number ASC`)
+      .bind(...listIds)
+      .all();
+    listPreviewRows = previewResult.results ?? [];
+  }
+
   const listPreviews = new Map();
-  for (const row of listPreviewResult.results ?? []) {
+  for (const row of listPreviewRows) {
     const values = listPreviews.get(row.list_id) ?? [];
     values.push(row.manga_id);
     listPreviews.set(row.list_id, values);
   }
 
-  const lists = (listResult.results ?? []).map((row) => ({
+  const lists = listRows.map((row) => ({
     ...mapUserList(row),
     sectionPosition: Number(row.section_position),
     previewItems: listPreviews.get(row.id) ?? [],
@@ -2904,7 +2920,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
 
   return {
     ...profile,
-    activity,
+    activity: activityFeed.events,
     library: (libraryResult.results ?? []).map((row) => ({
       mangaId: row.manga_id,
       status: row.status,
@@ -2912,13 +2928,20 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
         row.highest_reached_chapter == null
           ? null
           : Number(row.highest_reached_chapter),
+      lastReadChapter:
+        row.last_read_chapter == null ? null : Number(row.last_read_chapter),
+      lastReadAt: row.last_read_at == null ? null : Number(row.last_read_at),
     })),
     lists,
     sections,
     friends: (friendResult.results ?? []).map(publicUser),
+    pendingFriendRequests:
+      access === "owner" ? Number(pendingRequests?.total ?? 0) : undefined,
     stats: {
       works: Number(stats?.works ?? 0),
+      chaptersRead: Number(stats?.chapters_read ?? 0),
       completed: Number(stats?.completed ?? 0),
+      reading: Number(stats?.reading ?? 0),
       lists: Number(stats?.lists ?? 0),
       friends: Number(stats?.friends ?? 0),
     },
