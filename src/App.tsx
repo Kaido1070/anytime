@@ -7,10 +7,13 @@ import { Home } from "./pages/Home";
 import { Favorites } from "./pages/Favorites";
 import { Friends, FriendProfile } from "./pages/Friends";
 import { Profile } from "./pages/Profile";
+import { Lists } from "./pages/Lists";
+import { UserList } from "./pages/UserList";
 import { Discover } from "./pages/Discover";
 import { SourceMangaDetails } from "./pages/SourceMangaDetails";
 import { SourceReader } from "./pages/SourceReader";
 import "./phase3.css";
+import "./lists.css";
 
 export default function App() {
   const { user, loading, error } = useLibrary();
@@ -39,6 +42,8 @@ export default function App() {
             <Route path="discover" element={<Discover />} />
             <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
+            <Route path="lists" element={<Lists />} />
+            <Route path="lists/:id" element={<UserList />} />
             <Route path="friends" element={<Friends />} />
             <Route path="friends/:id" element={<FriendProfile />} />
             <Route path="profile" element={<Profile />} />
