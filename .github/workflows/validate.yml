@@ -20,16 +20,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.18.0
+          cache: pnpm
       - name: Enable pnpm
         run: |
           corepack enable
           corepack prepare pnpm@10.15.1 --activate
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Tests
-        run: pnpm test
-      - name: Build
-        run: pnpm build
-      - name: Check Pages Function syntax
+      - name: Parallel checks
+        shell: bash
         run: |
-          find functions -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          set -uo pipefail
+
+          pnpm test > /tmp/tests.log 2>&1 &
+          tests_pid=$!
+
+          pnpm build > /tmp/build.log 2>&1 &
+          build_pid=$!
+
+          (
+            find functions -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          ) > /tmp/functions.log 2>&1 &
+          functions_pid=$!
+
+          status=0
+          wait "$tests_pid" || status=1
+          wait "$build_pid" || status=1
+          wait "$functions_pid" || status=1
+
+          echo "::group::Tests"
+          cat /tmp/tests.log
+          echo "::endgroup::"
+          echo "::group::Build"
+          cat /tmp/build.log
+          echo "::endgroup::"
+          echo "::group::Pages Function syntax"
+          cat /tmp/functions.log
+          echo "::endgroup::"
+
+          exit "$status"
