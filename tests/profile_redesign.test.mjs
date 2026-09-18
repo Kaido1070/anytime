@@ -156,7 +156,8 @@ test("profile source failures stay inside their own preview sections", async () 
   ]);
   assert.match(account, /worksError/);
   assert.match(account, /readingError/);
-  assert.match(account, /setSectionRetry/);
+  assert.match(account, /setWorksRetry/);
+  assert.match(account, /setReadingRetry/);
   assert.match(overview, /onRetry\?: \(\) => void/);
   assert.match(overview, /profile-section-error compact/);
 });
