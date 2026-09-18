@@ -312,7 +312,6 @@ function ReaderChapter({
 
       <footer className="reader-end">
         <p className="eyebrow">نهاية الفصل {chapter}</p>
-        <h2>جاهز تكمل؟</h2>
         <div className="reader-links">
           {payload.previous != null ? (
             <Link
