@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
+import { ActivityFeed } from "../components/ActivityFeed";
 import { useLibrary } from "../hooks/useLibrary";
 import { Back, SectionTitle } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
@@ -796,6 +797,13 @@ export function FriendProfile() {
               <p className="profile-module-empty">لا توجد قوائم شخصية حتى الآن.</p>
             </section>
           )}
+
+          <ActivityFeed
+            title="النشاط الأخير"
+            events={profile.activity ?? []}
+            showActor
+            emptyText="لا يوجد نشاط حديث حتى الآن."
+          />
 
           <PublicFriendsSection friends={profile.friends ?? []} />
         </>
