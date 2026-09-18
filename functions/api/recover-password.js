@@ -7,8 +7,8 @@ const RECOVERY_ITERATIONS = 210000;
 const RECOVERY_SEEDS = [
   ["admin", "iXMrYFxlRGeNeXtahvJrxg", "qB91GPghZPSkaJ4EkLZlQ4O33bYMktRSEWQ8TzHiJ08"],
   ["m", "DQKmZM9LWDe-yvsralJ3NA", "gk2_0df_3o7dJprXj1IzLcRnJUUmiGF1YgfjXKhe0T8"],
-  ["yas", "yzbZYsIxWd_q11a259Vekg", "JkkmyqM-AxXhtFvjyuGw2_tgIOix_C1O0Zww0gEowC0"],
-  ["has", "kfncionM84kNNDTiZGagDQ", "hYOzUUBxo4VWBLVZHUpPbWyufAcPqN11e6GckRtyO_c"],
+  ["Y", "yzbZYsIxWd_q11a259Vekg", "JkkmyqM-AxXhtFvjyuGw2_tgIOix_C1O0Zww0gEowC0"],
+  ["H", "kfncionM84kNNDTiZGagDQ", "hYOzUUBxo4VWBLVZHUpPbWyufAcPqN11e6GckRtyO_c"],
 ];
 
 export async function onRequestPost(context) {
@@ -80,9 +80,13 @@ async function ensureRecoveryCodes(db) {
   const now = Date.now();
   for (const [username, salt, hash] of RECOVERY_SEEDS) {
     await db.prepare(`
-      INSERT OR IGNORE INTO account_recovery
+      INSERT INTO account_recovery
         (user_id, recovery_salt, recovery_hash, recovery_iterations, created_at)
       SELECT id, ?, ?, ?, ? FROM users WHERE username = ? COLLATE NOCASE LIMIT 1
+      ON CONFLICT(user_id) DO UPDATE SET
+        recovery_salt = excluded.recovery_salt,
+        recovery_hash = excluded.recovery_hash,
+        recovery_iterations = excluded.recovery_iterations
     `).bind(salt, hash, RECOVERY_ITERATIONS, now, username).run();
   }
 }
