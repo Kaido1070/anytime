@@ -10,6 +10,8 @@ import { Account } from "./pages/Account";
 import { AdminDashboard, AdminUserDetail } from "./pages/Admin";
 import { UserList } from "./pages/UserList";
 import { Discover } from "./pages/Discover";
+import { Fyp } from "./pages/Fyp";
+import { NewChapters } from "./pages/NewChapters";
 import { SourceMangaDetails } from "./pages/SourceMangaDetails";
 import { SourceReader } from "./pages/SourceReader";
 import "./phase3.css";
@@ -22,6 +24,7 @@ import "./phase7.css";
 import "./phase8.css";
 import "./phase9.css";
 import "./phase10.css";
+import "./phase10_5.css";
 
 export default function App() {
   const { user, loading, error } = useLibrary();
@@ -54,6 +57,8 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Navigate to="/profile" replace />} />
             <Route path="discover" element={<Discover />} />
+            <Route path="fyp" element={<Fyp />} />
+            <Route path="new" element={<NewChapters />} />
             <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
             <Route path="lists" element={<Navigate to="/profile#account-lists" replace />} />
