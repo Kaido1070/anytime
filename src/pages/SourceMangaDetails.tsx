@@ -44,7 +44,7 @@ export function SourceMangaDetails() {
     setError("");
     sourceService.getSeries(sourceKey)
       .then((next) => active && setItem(next))
-      .catch((cause) => active && setError(cause instanceof Error ? cause.message : "تعذر تحميل العمل."))
+      .catch((cause) => active && setError(cause instanceof Error ? cause.message : "تعذر تحميل القصة."))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [sourceKey]);
@@ -67,8 +67,8 @@ export function SourceMangaDetails() {
     [data?.library, sourceKey],
   );
 
-  if (loading) return <><Back to="/discover" /><p className="empty">جاري تحميل العمل والفصول من المصدر…</p></>;
-  if (!item || error) return <><Back to="/discover" /><h1>تعذر فتح العمل</h1><p className="error source-error">{error || "العمل غير موجود في المصدر."}</p></>;
+  if (loading) return <><Back to="/discover" /><p className="empty">جاري تحميل القصة والفصول من المصدر…</p></>;
+  if (!item || error) return <><Back to="/discover" /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
 
   const optionMap = new Map(sourceOptions.map((entry) => [entry.key, entry]));
   optionMap.set(item.key, item);
@@ -111,7 +111,7 @@ export function SourceMangaDetails() {
           <p className="eyebrow">{sourceService.sourceLabel(item.source)} · {statusLabel(item.status)}</p>
           <h1 dir="auto">{displayTitle}</h1>
           {sourceChoices.length > 1 && (
-            <div className="source-switcher" aria-label="اختيار مصدر العمل">
+            <div className="source-switcher" aria-label="اختيار مصدر القصة">
               <span className="source-switcher-label">اختر المصدر</span>
               <div className="source-switcher-options">
                 {sourceChoices.map((option) => (
@@ -144,7 +144,7 @@ export function SourceMangaDetails() {
             {libraryEntry && (
               <select
                 className="library-status-select"
-                aria-label="حالة العمل في المكتبة"
+                aria-label="حالة القصة في المكتبة"
                 value={libraryEntry.status}
                 onChange={(event) =>
                   void setLibraryStatus(sourceKey, event.target.value as LibraryStatus)
@@ -193,7 +193,7 @@ export function SourceMangaDetails() {
           </Link>;
         })}
       </div>
-      {!chapters.length && <p className="empty">المصدر ما رجع فصول لهذا العمل.</p>}
+      {!chapters.length && <p className="empty">المصدر ما رجع فصول لهذه القصة.</p>}
     </>
   );
 }
