@@ -23,7 +23,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "7" };
+      return { value: "8" };
     }
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
