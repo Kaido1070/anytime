@@ -18,6 +18,8 @@ const SOURCES: SourceName[] = [
   "mangalik",
 ];
 
+export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
+
 export interface FeedChapter {
   identity: string;
   number: number;
@@ -240,10 +242,18 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
     .filter((group): group is ChapterFeedGroup => Boolean(group))
     .sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
 
-  const all = groups.map((group) => ({
-    ...group,
-    chapters: group.chapters.slice(0, 8),
-  }));
+  const cutoff = now - NEW_CHAPTER_WINDOW_MS;
+  const all = groups
+    .map((group) => ({
+      ...group,
+      chapters: group.chapters.filter((chapter) => chapter.releaseAt >= cutoff),
+    }))
+    .filter((group) => group.chapters.length > 0)
+    .map((group) => ({
+      ...group,
+      newestAt: group.chapters[0].releaseAt,
+    }))
+    .sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
 
   const followed = groups
     .filter((group) => group.trackingStartedAt != null)
