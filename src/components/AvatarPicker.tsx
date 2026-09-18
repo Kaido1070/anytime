@@ -160,7 +160,7 @@ export function AvatarPicker({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="ابحث عن عمل أو شخصية..."
+            placeholder="ابحث عن قصة أو شخصية..."
             autoFocus
           />
         </label>
@@ -228,7 +228,7 @@ export function AvatarPicker({
           ) : (
             <div className="avatar-picker-empty">
               <b>لا توجد نتيجة</b>
-              <span className="muted">جرّب اسم عمل أو شخصية أخرى.</span>
+              <span className="muted">جرّب اسم قصة أو شخصية أخرى.</span>
             </div>
           )}
         </div>

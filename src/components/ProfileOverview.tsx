@@ -99,9 +99,9 @@ export function ProfileSummaryStrip({
 export function ProfileStatsSection({ stats }: { stats: ProfileStats }) {
   const metrics = [
     { value: stats.chaptersRead, label: "فصل مقروء" },
-    { value: stats.completed, label: "عمل مكتمل" },
+    { value: stats.completed, label: "قصة مكتملة" },
     { value: stats.reading, label: "أقرأ الآن" },
-    { value: stats.works, label: "إجمالي الأعمال" },
+    { value: stats.works, label: "إجمالي القصص" },
   ];
 
   return (
@@ -200,7 +200,7 @@ export function ProfileListsSection({
               <Collage keys={card.keys} works={works} />
               <span className="profile-list-preview-copy">
                 <b dir="auto">{card.name}</b>
-                <small>{formatCount(card.count)} عمل</small>
+                <small>{formatCount(card.count)} قصص</small>
               </span>
             </Link>
           ))}
@@ -282,7 +282,7 @@ function ReadingCard({
           </Link>
         ) : (
           <Link className="secondary profile-reading-continue" to={`/source/${encodeURIComponent(item.key)}`}>
-            فتح العمل
+            فتح القصة
           </Link>
         )}
       </div>
@@ -337,7 +337,7 @@ export function ProfileReadingSection({
         </div>
       ) : entries.length && error ? null : (
         <p className="profile-overview-empty">
-          {entries.length ? "تعذر تحميل بيانات الفصول لهذه الأعمال." : "لا توجد أعمال تقرؤها حاليًا."}
+          {entries.length ? "تعذر تحميل بيانات الفصول لهذه القصص." : "لا توجد قصص تقرؤها حاليًا."}
         </p>
       )}
       {error && (

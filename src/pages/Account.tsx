@@ -448,7 +448,7 @@ export function Account() {
           ),
         );
         if (results.some((result) => result.status === "rejected")) {
-          setReadingError("تعذر تحميل تقدم بعض الأعمال. يمكنك المحاولة مرة أخرى.");
+          setReadingError("تعذر تحميل تقدم بعض القصص. يمكنك المحاولة مرة أخرى.");
         }
       })
       .catch(() => {

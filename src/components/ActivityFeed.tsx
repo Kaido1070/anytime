@@ -37,7 +37,7 @@ function EventWork({
 }) {
   if (!mangaId) return null;
   const item = works[mangaId];
-  if (!item) return <span className="activity-work-name">العمل</span>;
+  if (!item) return <span className="activity-work-name">القصة</span>;
   const title = sourceDisplayTitle(item);
   return (
     <Link className="activity-work-name" to={`/source/${encodeURIComponent(item.key)}`}>

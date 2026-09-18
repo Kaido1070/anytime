@@ -106,10 +106,10 @@ export function ListManager({ mangaId }: { mangaId: string }) {
             if (event.target === event.currentTarget && !busyListId && !creating) setOpen(false);
           }}
         >
-          <section className="list-manager-sheet" role="dialog" aria-modal="true" aria-label="إضافة العمل إلى قائمة">
+          <section className="list-manager-sheet" role="dialog" aria-modal="true" aria-label="إضافة القصة إلى قائمة">
             <div className="list-dialog-header">
               <div>
-                <p className="eyebrow">تنظيم العمل</p>
+                <p className="eyebrow">تنظيم القصة</p>
                 <h2>إضافة إلى قائمة</h2>
               </div>
               <button className="list-dialog-close" type="button" onClick={() => setOpen(false)} aria-label="إغلاق">×</button>
@@ -149,7 +149,7 @@ export function ListManager({ mangaId }: { mangaId: string }) {
                       <span className="list-check">{selected ? "✓" : ""}</span>
                       <span>
                         <b>{list.name}</b>
-                        <small>{list.itemCount} عمل{list.description ? ` · ${list.description}` : ""}</small>
+                        <small>{list.itemCount} قصص{list.description ? ` · ${list.description}` : ""}</small>
                       </span>
                     </button>
                   );
@@ -165,7 +165,7 @@ export function ListManager({ mangaId }: { mangaId: string }) {
               <div className="list-inline-create">
                 <label>
                   اسم القائمة
-                  <input maxLength={80} value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="مثال: أفضل الأعمال" />
+                  <input maxLength={80} value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="مثال: أفضل القصص" />
                 </label>
                 <label>
                   الوصف <small>اختياري</small>

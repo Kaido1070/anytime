@@ -192,7 +192,7 @@ export function ProfileSectionEditor({
               <b>{sectionLabel(section)}</b>
               <small>
                 {section.sectionType === "custom_list"
-                  ? `${section.list?.itemCount ?? 0} عمل`
+                  ? `${section.list?.itemCount ?? 0} قصص`
                   : "قسم تلقائي"}
               </small>
             </div>

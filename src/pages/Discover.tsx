@@ -531,12 +531,12 @@ export function Discover() {
       </form>
 
       <div className="section-title">
-        <h2>{mode === "search" ? `نتائج ${query}` : "أحدث الأعمال"}</h2>
+        <h2>{mode === "search" ? `نتائج ${query}` : "أحدث القصص"}</h2>
         <span className="muted">{filterLabel(sourceFilter, genreFilters, typeFilter, statusFilter)}</span>
       </div>
 
       {error && <p className="error source-error">{error}</p>}
-      {(loading || filterLoading) && !visibleGroups.length && <p className="empty">جاري جلب الأعمال من المصادر…</p>}
+      {(loading || filterLoading) && !visibleGroups.length && <p className="empty">جاري جلب القصص من المصادر…</p>}
 
       <div className="cover-grid source-grid">
         {visibleGroups.map((group) => (
@@ -545,7 +545,7 @@ export function Discover() {
       </div>
 
       {!loading && !filterLoading && !visibleGroups.length && !error && (
-        <p className="empty">ما لقينا أعمال تطابق الفلاتر المحددة.</p>
+        <p className="empty">ما لقينا قصص تطابق الفلاتر المحددة.</p>
       )}
 
       {hasMore && (
@@ -556,7 +556,7 @@ export function Discover() {
 
       {filtersOpen && (
         <div className="filter-backdrop" onMouseDown={() => !filterLoading && setFiltersOpen(false)}>
-          <section className="filter-sheet" role="dialog" aria-modal="true" aria-label="فلترة الأعمال" onMouseDown={(event) => event.stopPropagation()}>
+          <section className="filter-sheet" role="dialog" aria-modal="true" aria-label="فلترة القصص" onMouseDown={(event) => event.stopPropagation()}>
             <div className="filter-sheet-header">
               <div>
                 <p className="eyebrow">تخصيص النتائج</p>
@@ -583,7 +583,7 @@ export function Discover() {
             </div>
 
             <div className="filter-group">
-              <h3>نوع العمل</h3>
+              <h3>نوع القصة</h3>
               <div className="filter-choice-grid source-choice-grid">
                 <button type="button" className={draftType === "all" ? "selected" : ""} onClick={() => setDraftType("all")}>كل الأنواع</button>
                 {WORK_TYPES.map((entry) => (

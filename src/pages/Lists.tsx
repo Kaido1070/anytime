@@ -50,7 +50,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
     <>
       <header className={`lists-page-header ${embedded ? "account-lists-header" : ""}`}>
         <div>
-          <p className="eyebrow">{embedded ? "داخل حسابك" : "رتب أعمالك بطريقتك"}</p>
+          <p className="eyebrow">{embedded ? "داخل حسابك" : "رتب قصصك بطريقتك"}</p>
           {embedded ? (
             <h2>قوائمي</h2>
           ) : (
@@ -58,7 +58,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
               القوائم<span className="accent">.</span>
             </h1>
           )}
-          <p className="muted">العمل الواحد يقدر يكون في أكثر من قائمة في نفس الوقت.</p>
+          <p className="muted">القصة الواحدة تقدر تكون في أكثر من قائمة في نفس الوقت.</p>
         </div>
         <button className="primary" type="button" onClick={() => setShowCreate(true)}>
           <span aria-hidden="true">+</span>
@@ -73,7 +73,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
           <Link className="user-list-card system-list-card" to="/favorites">
             <div className="list-card-top">
               <span className="list-card-icon"><Icon name="favorites" /></span>
-              <span className="list-count">{favoritesCount} عمل</span>
+              <span className="list-count">{favoritesCount} قصص</span>
             </div>
             <div>
               <h2>المفضلة</h2>
@@ -93,7 +93,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
                 <Link className="user-list-card" to={`/lists/${encodeURIComponent(list.id)}`} key={list.id}>
                   <div className="list-card-top">
                     <span className="list-card-icon"><Icon name="lists" /></span>
-                    <span className="list-count">{list.itemCount} عمل</span>
+                    <span className="list-count">{list.itemCount} قصص</span>
                   </div>
                   <div>
                     <h2>{list.name}</h2>
@@ -107,7 +107,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
           <div className="lists-empty-state">
             <span className="list-card-icon"><Icon name="lists" /></span>
             <h2>ما عندك قوائم حتى الآن</h2>
-            <p>أنشئ قائمتك الأولى ورتب أعمالك بالطريقة اللي تناسبك.</p>
+            <p>أنشئ قائمتك الأولى ورتب قصصك بالطريقة اللي تناسبك.</p>
             <button className="primary" type="button" onClick={() => setShowCreate(true)}>
               + إنشاء قائمة
             </button>

@@ -462,7 +462,7 @@ export function Fyp() {
                     className="secondary fyp-open"
                     to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)}
                   >
-                    فتح العمل
+                    فتح القصة
                   </Link>
                 </div>
               </article>

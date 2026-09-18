@@ -404,7 +404,7 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
           title="المفضلة"
           items={favoriteItems}
           to="/favorites"
-          emptyText="ما أضفت أعمالًا إلى المفضلة حتى الآن."
+          emptyText="ما أضفت قصصًا إلى المفضلة حتى الآن."
         />
       );
     }
@@ -443,7 +443,7 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
         title={list.name}
         items={items}
         to={`/lists/${encodeURIComponent(list.id)}`}
-        emptyText="لا توجد أعمال في هذه القائمة حتى الآن."
+        emptyText="لا توجد قصص في هذه القائمة حتى الآن."
       />
     );
   };

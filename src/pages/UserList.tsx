@@ -197,7 +197,7 @@ export function UserList() {
     } catch (cause) {
       updateItems(snapshot);
       setList((current) => current ? { ...current, itemCount: snapshot.length } : current);
-      setError(cause instanceof Error ? cause.message : "تعذر إزالة العمل من القائمة.");
+      setError(cause instanceof Error ? cause.message : "تعذر إزالة القصة من القائمة.");
     }
   };
 
@@ -258,7 +258,7 @@ export function UserList() {
       <Back to={backTo} />
       <header className="list-detail-header">
         <div>
-          <p className="eyebrow">{list.itemCount} عمل</p>
+          <p className="eyebrow">{list.itemCount} قصص</p>
           <h1>{list.name}<span className="accent">.</span></h1>
           {list.description && <p className="muted">{list.description}</p>}
         </div>
@@ -281,11 +281,11 @@ export function UserList() {
         <div className="lists-empty-state list-detail-empty">
           <span className="list-card-icon"><Icon name="lists" /></span>
           <h2>هذه القائمة فارغة</h2>
-          <p>{canManage ? "أضف أعمالًا إليها من صفحات الأعمال." : "لا توجد أعمال في هذه القائمة حتى الآن."}</p>
-          {canManage && <Link className="primary" to="/discover">استكشف الأعمال</Link>}
+          <p>{canManage ? "أضف قصصًا إليها من صفحات القصص." : "لا توجد قصص في هذه القائمة حتى الآن."}</p>
+          {canManage && <Link className="primary" to="/discover">استكشف القصص</Link>}
         </div>
       ) : (
-        <section className="list-sortable" aria-label={`أعمال قائمة ${list.name}`}>
+        <section className="list-sortable" aria-label={`قصص قائمة ${list.name}`}>
           {items.map((entry, index) => {
             const work = works[entry.mangaId];
             if (!work) {
@@ -312,7 +312,7 @@ export function UserList() {
                   </button>}
                   <div className="list-work-copy">
                     <b>{entry.mangaId}</b>
-                    <small>تعذر تحميل بيانات العمل من المصدر حاليًا.</small>
+                    <small>تعذر تحميل بيانات القصة من المصدر حاليًا.</small>
                   </div>
                   {canManage && (
                     <button className="list-remove" type="button" onClick={() => void removeItem(entry.mangaId)}>
@@ -408,7 +408,7 @@ export function UserList() {
           <section className="list-delete-dialog" role="alertdialog" aria-modal="true" aria-label="تأكيد حذف القائمة">
             <p className="eyebrow">تأكيد الحذف</p>
             <h2>هل تريد حذف قائمة “{list.name}”؟</h2>
-            <p>سيتم حذف القائمة فقط. لن يتم حذف الأعمال من مكتبتك، ولن يتأثر تقدم القراءة أو سجل القراءة.</p>
+            <p>سيتم حذف القائمة فقط. لن يتم حذف القصص من مكتبتك، ولن يتأثر تقدم القراءة أو سجل القراءة.</p>
             <div className="list-dialog-actions">
               <button className="secondary" type="button" onClick={() => setShowDelete(false)} disabled={busyDelete}>
                 إلغاء

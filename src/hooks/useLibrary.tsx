@@ -108,7 +108,7 @@ function useLibraryState() {
       setData(await service.getData());
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "تعذر إضافة العمل إلى المكتبة.",
+        cause instanceof Error ? cause.message : "تعذر إضافة القصة إلى المكتبة.",
       );
     }
   };
@@ -120,7 +120,7 @@ function useLibraryState() {
       setData(await service.getData());
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "تعذر تحديث حالة العمل.",
+        cause instanceof Error ? cause.message : "تعذر تحديث حالة القصة.",
       );
     }
   };
@@ -132,7 +132,7 @@ function useLibraryState() {
       setData(await service.getData());
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "تعذر حذف العمل من المكتبة.",
+        cause instanceof Error ? cause.message : "تعذر حذف القصة من المكتبة.",
       );
     }
   };
