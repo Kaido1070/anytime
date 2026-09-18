@@ -128,7 +128,10 @@ test("profile summary uses real buttons and the mobile layout keeps three cells 
 
 test("profile redesign uses an identity card and 2x2 mobile reading stats", async () => {
   const css = await readFile(new URL("../src/profileOverview.css", import.meta.url), "utf8");
-  assert.match(css, /\.profile-overview-avatar \{[\s\S]*?width: 88px;[\s\S]*?height: 88px;/);
+  assert.match(
+    css,
+    /\.profile-overview-header \.user-avatar\.profile-overview-avatar \{[\s\S]*?width: 88px;[\s\S]*?height: 88px;[\s\S]*?aspect-ratio: 1 \/ 1;[\s\S]*?flex: 0 0 88px;/,
+  );
   assert.match(css, /\.profile-overview-header \+ \.profile-summary-strip/);
   assert.match(
     css,

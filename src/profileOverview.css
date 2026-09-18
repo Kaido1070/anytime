@@ -813,10 +813,17 @@ button.profile-icon-action {
   gap: 20px;
 }
 
-.profile-overview-avatar {
+.profile-overview-header .user-avatar.profile-overview-avatar {
   width: 88px;
   height: 88px;
-  flex-basis: 88px;
+  min-width: 88px;
+  min-height: 88px;
+  max-width: 88px;
+  max-height: 88px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 88px;
+  align-self: center;
+  border-radius: 50%;
   font-size: 30px;
   border-width: 1px;
 }
@@ -855,6 +862,10 @@ button.profile-icon-action {
 .profile-icon-action {
   width: 40px;
   height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto;
   border-radius: 9px;
   background: #252729;
 }
@@ -1083,9 +1094,13 @@ button.profile-icon-action {
     gap: 12px;
   }
 
-  .profile-overview-avatar {
+  .profile-overview-header .user-avatar.profile-overview-avatar {
     width: 64px;
     height: 64px;
+    min-width: 64px;
+    min-height: 64px;
+    max-width: 64px;
+    max-height: 64px;
     flex-basis: 64px;
     font-size: 22px;
   }
@@ -1120,6 +1135,8 @@ button.profile-icon-action {
   .profile-icon-action {
     width: 37px;
     height: 37px;
+    min-width: 37px;
+    min-height: 37px;
     border-radius: 8px;
   }
 
@@ -1222,9 +1239,13 @@ button.profile-icon-action {
     padding: 12px;
   }
 
-  .profile-overview-avatar {
+  .profile-overview-header .user-avatar.profile-overview-avatar {
     width: 56px;
     height: 56px;
+    min-width: 56px;
+    min-height: 56px;
+    max-width: 56px;
+    max-height: 56px;
     flex-basis: 56px;
   }
 
@@ -1244,6 +1265,8 @@ button.profile-icon-action {
   .profile-icon-action {
     width: 34px;
     height: 34px;
+    min-width: 34px;
+    min-height: 34px;
   }
 
   .profile-summary-cell {
