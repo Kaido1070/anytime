@@ -5,6 +5,8 @@ import type {
   ReadingProgress,
   User,
   UserData,
+  UserListDetail,
+  UserListSummary,
 } from "../types";
 
 export interface UserDataService {
@@ -18,6 +20,20 @@ export interface UserDataService {
   addToLibrary(id: string, status?: LibraryStatus): Promise<void>;
   setLibraryStatus(id: string, status: LibraryStatus): Promise<void>;
   removeFromLibrary(id: string): Promise<void>;
+  getLists(): Promise<UserListSummary[]>;
+  getList(id: string): Promise<UserListDetail>;
+  getListMembership(mangaId: string): Promise<string[]>;
+  createList(name: string, description?: string): Promise<UserListSummary>;
+  updateList(id: string, name: string, description?: string): Promise<UserListSummary>;
+  deleteList(id: string): Promise<void>;
+  addWorkToList(listId: string, mangaId: string): Promise<void>;
+  removeWorkFromList(listId: string, mangaId: string): Promise<void>;
+  reorderListItem(
+    listId: string,
+    mangaId: string,
+    beforeId?: string | null,
+    afterId?: string | null,
+  ): Promise<void>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
@@ -47,6 +63,8 @@ class ApiError extends Error {
 }
 
 const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|ml):/.test(value));
+const isListId = (value?: string | null) =>
+  Boolean(value && /^[a-zA-Z0-9_-]{1,128}$/.test(value));
 
 function normalizeData(data: UserData): UserData {
   const favorites = (data.favorites ?? []).filter((id) => isLiveKey(id));
@@ -185,6 +203,98 @@ class ApiUserDataService implements UserDataService {
   async removeFromLibrary(id: string) {
     await this.request<{ ok: boolean }>(`library/${encodeURIComponent(id)}`, {
       method: "DELETE",
+    });
+  }
+
+  async getLists() {
+    const result = await this.request<{ lists: UserListSummary[] }>("lists");
+    return result.lists ?? [];
+  }
+
+  async getList(id: string) {
+    if (!isListId(id)) throw new Error("معرّف القائمة غير صالح.");
+    const result = await this.request<{
+      list: UserListSummary;
+      items: UserListDetail["items"];
+    }>(`lists/${encodeURIComponent(id)}`);
+    return {
+      ...result.list,
+      items: (result.items ?? []).filter((item) => isLiveKey(item.mangaId)),
+    };
+  }
+
+  async getListMembership(mangaId: string) {
+    if (!isLiveKey(mangaId)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    const result = await this.request<{ listIds: string[] }>(
+      `lists/membership/${encodeURIComponent(mangaId)}`,
+    );
+    return (result.listIds ?? []).filter((id) => isListId(id));
+  }
+
+  async createList(name: string, description = "") {
+    const result = await this.request<{ list: UserListSummary }>("lists", {
+      method: "POST",
+      body: JSON.stringify({ name, description }),
+    });
+    return result.list;
+  }
+
+  async updateList(id: string, name: string, description = "") {
+    if (!isListId(id)) throw new Error("معرّف القائمة غير صالح.");
+    const result = await this.request<{ list: UserListSummary }>(
+      `lists/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ name, description }),
+      },
+    );
+    return result.list;
+  }
+
+  async deleteList(id: string) {
+    if (!isListId(id)) throw new Error("معرّف القائمة غير صالح.");
+    await this.request<{ ok: boolean }>(`lists/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  }
+
+  async addWorkToList(listId: string, mangaId: string) {
+    if (!isListId(listId) || !isLiveKey(mangaId)) {
+      throw new Error("بيانات القائمة غير صالحة.");
+    }
+    await this.request<{ ok: boolean }>(`lists/${encodeURIComponent(listId)}/items`, {
+      method: "POST",
+      body: JSON.stringify({ mangaId }),
+    });
+  }
+
+  async removeWorkFromList(listId: string, mangaId: string) {
+    if (!isListId(listId) || !isLiveKey(mangaId)) {
+      throw new Error("بيانات القائمة غير صالحة.");
+    }
+    await this.request<{ ok: boolean }>(
+      `lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(mangaId)}`,
+      { method: "DELETE" },
+    );
+  }
+
+  async reorderListItem(
+    listId: string,
+    mangaId: string,
+    beforeId: string | null = null,
+    afterId: string | null = null,
+  ) {
+    if (
+      !isListId(listId) ||
+      !isLiveKey(mangaId) ||
+      (beforeId != null && !isLiveKey(beforeId)) ||
+      (afterId != null && !isLiveKey(afterId))
+    ) {
+      throw new Error("بيانات الترتيب غير صالحة.");
+    }
+    await this.request<{ ok: boolean }>(`lists/${encodeURIComponent(listId)}/reorder`, {
+      method: "PUT",
+      body: JSON.stringify({ mangaId, beforeId, afterId }),
     });
   }
 
