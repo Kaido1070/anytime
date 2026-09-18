@@ -1092,11 +1092,15 @@ button.profile-icon-action {
 
   .profile-overview-details {
     gap: 8px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
 
   .profile-overview-name {
-    flex: 1 1 auto;
+    flex: 1 1 110px;
+  }
+
+  .profile-overview-actions {
+    max-width: 100%;
   }
 
   .profile-overview-name h1 {
