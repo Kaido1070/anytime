@@ -13,36 +13,105 @@
 
 @media (max-width: 759px) {
 
-  /* Keep the mobile details hero inside the viewport in RTL.
-     The base rule expands the synopsis/actions with a negative left margin,
-     which is the wrong physical side when the grid is RTL and pushes content
-     off-screen. Expand toward the cover column on the right instead. */
+  /* Mobile story details: keep every block in its own grid area.
+     The old negative-margin expansion became fragile after library/list actions
+     were added and could squeeze labels into narrow vertical strips. */
   .details-hero {
-    grid-template-columns: 110px minmax(0, 1fr);
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 14px 18px;
+    margin-bottom: 30px;
+    align-items: start;
   }
 
+  /* Let the existing detail children participate directly in the mobile grid
+     without changing the desktop markup/layout. */
   .details-hero > div {
+    display: contents;
+  }
+
+  .details-hero .detail-cover {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 100%;
     min-width: 0;
+    align-self: start;
+  }
+
+  .details-hero .eyebrow {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    margin: 0;
+    align-self: end;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .details-hero h1 {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    font-size: clamp(22px, 6.2vw, 26px);
+    line-height: 1.18;
     overflow-wrap: anywhere;
   }
 
+  .details-hero .source-switcher {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .details-hero .genres,
   .details-hero .description,
   .details-hero .detail-actions {
+    grid-column: 1 / -1;
+    min-width: 0;
     margin-left: 0;
-    margin-right: -129px;
+    margin-right: 0;
+  }
+
+  .details-hero .genres {
+    gap: 6px;
+    margin-top: 4px;
+    margin-bottom: 0;
   }
 
   .details-hero .description {
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 1.75;
     overflow-wrap: anywhere;
+  }
+
+  /* Reading stays the primary full-width action. The remaining controls use
+     a stable 2-column grid so Arabic labels never collapse letter-by-letter. */
+  .details-hero .detail-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .details-hero .detail-actions > .primary {
+    grid-column: 1 / -1;
+  }
+
+  .details-hero .detail-actions > .primary,
+  .details-hero .detail-actions > .secondary,
+  .details-hero .detail-actions > .library-status-select {
+    width: 100%;
+    min-width: 0;
+    min-height: 48px;
+    margin: 0;
+    padding: 10px 12px;
+    line-height: 1.35;
   }
 
   .details-hero .detail-actions > .primary,
   .details-hero .detail-actions > .secondary {
-    flex: 1 1 0;
-    min-width: 0;
+    gap: 7px;
+    white-space: normal;
+    text-align: center;
   }
 
   .login-art {
