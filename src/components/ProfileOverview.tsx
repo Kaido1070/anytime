@@ -1,15 +1,16 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ActivityFeed } from "./ActivityFeed";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
 import { getContinueChapter } from "../services/reading";
+import { availableChapterProgress } from "../services/profileProgress";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import type {
   ActivityEvent,
   ProfileLibraryItem,
   ProfileListPreview,
   ProfileStats,
-  SourceChapter,
   SourceManga,
   User,
 } from "../types";
@@ -24,7 +25,7 @@ export function ProfileIdentityHeader({
   privateState = false,
 }: {
   user: User | null;
-  actions?: React.ReactNode;
+  actions?: ReactNode;
   privateState?: boolean;
 }) {
   return (
@@ -119,7 +120,10 @@ function Collage({
   keys: string[];
   works: Record<string, SourceManga>;
 }) {
-  const items = keys.slice(0, 4).map((key) => works[key]).filter(Boolean);
+  const items = keys
+    .slice(0, 4)
+    .map((key) => works[key])
+    .filter((item): item is SourceManga => Boolean(item));
   return (
     <span className={"profile-list-collage count-" + Math.max(1, items.length)} aria-hidden="true">
       {items.length ? (
@@ -171,7 +175,7 @@ export function ProfileListsSection({
     <section className="profile-overview-section" id="profile-lists" aria-labelledby="profile-lists-title">
       <div className="profile-overview-section-heading">
         <h2 id="profile-lists-title">القوائم</h2>
-        <Link to={viewAllTo}>عرض الكل</Link>
+        {viewAllTo && <Link to={viewAllTo}>عرض الكل</Link>}
       </div>
       {cards.length ? (
         <div className="profile-list-preview-strip">
@@ -196,32 +200,6 @@ export function ProfileListsSection({
   );
 }
 
-function orderedChapters(chapters?: SourceChapter[]) {
-  const map = new Map<number, SourceChapter>();
-  for (const chapter of chapters ?? []) {
-    const number = Number(chapter.number);
-    if (!Number.isFinite(number)) continue;
-    if (!map.has(number)) map.set(number, chapter);
-  }
-  return [...map.values()].sort((a, b) => Number(a.number) - Number(b.number));
-}
-
-function positionProgress(chapters: SourceChapter[] | undefined, highest: number | null) {
-  if (highest == null) return null;
-  const ordered = orderedChapters(chapters);
-  if (!ordered.length) return null;
-  const index = ordered.findIndex(
-    (chapter) => Math.abs(Number(chapter.number) - Number(highest)) < 0.000001,
-  );
-  if (index < 0) return null;
-  const latest = ordered.at(-1);
-  const percent = Math.max(0, Math.min(100, ((index + 1) / ordered.length) * 100));
-  return {
-    percent,
-    latestChapter: latest ? Number(latest.number) : null,
-  };
-}
-
 function ReadingCard({
   entry,
   item,
@@ -235,7 +213,7 @@ function ReadingCard({
 }) {
   const title = sourceDisplayTitle(item);
   const highest = entry.highestReachedChapter;
-  const progress = positionProgress(item.chapters, highest);
+  const progress = availableChapterProgress(item.chapters, highest);
   const resumeChapter =
     own && highest != null
       ? getContinueChapter(item.chapters, highest, highestCompleted)
