@@ -321,11 +321,11 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
           <div className="settings-card-header">
             <div>
               <p className="eyebrow">القارئ</p>
-              <h3 id="settings-reader-title">مؤشر تقدم القراءة</h3>
+              <h3 id="settings-reader-title">نسبة تقدم القراءة</h3>
             </div>
           </div>
 
-          <div className="settings-choice-group" role="group" aria-label="عرض مؤشر تقدم القراءة">
+          <div className="settings-choice-group" role="group" aria-label="عرض نسبة تقدم القراءة">
             <button
               type="button"
               className={showReaderProgress ? "active" : ""}
@@ -350,7 +350,7 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
             </button>
           </div>
           <p className="muted settings-privacy-description">
-            مؤشر صغير وشفاف يظهر أثناء قراءة الفصول. يمكنك إخفاؤه بالكامل.
+            إظهار أو إخفاء نسبة تقدم القراءة الموجودة أعلى القارئ.
           </p>
         </section>
 
