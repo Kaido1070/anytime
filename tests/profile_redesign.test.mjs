@@ -46,7 +46,7 @@ test("profile progress deduplicates repeated chapter numbers before calculating 
 test("account profile has fixed hierarchy and modular content groups", async () => {
   const account = await readFile(new URL("../src/pages/Account.tsx", import.meta.url), "utf8");
   assert.match(account, /ProfileIdentityHeader/);
-  assert.match(account, /ProfileSummaryStrip/);
+  assert.doesNotMatch(account, /ProfileSummaryStrip/);
   assert.match(account, /ProfileStatsSection/);
   assert.match(account, /id: "lists"/);
   assert.match(account, /id: "reading"/);
@@ -115,41 +115,45 @@ test("private profile shell never renders public summary, stats or progress bran
   assert.match(view, /: profile\.stats \? \(/);
 });
 
-test("profile summary uses real buttons and the mobile layout keeps three cells in one row", async () => {
+test("profile header keeps friends and settings in the identity row without a summary strip", async () => {
+  const [overview, account] = await Promise.all([
+    readFile(new URL("../src/components/ProfileOverview.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/pages/Account.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(overview, /className="profile-header-friends"/);
+  assert.match(overview, />الأصدقاء</);
+  assert.doesNotMatch(overview, /ProfileSummaryStrip/);
+  assert.doesNotMatch(account, /Icon name="more"/);
+  assert.match(account, /Icon name="settings"/);
+});
+
+test("profile reading stats stay in one compact three-column row on mobile", async () => {
   const [overview, css] = await Promise.all([
     readFile(new URL("../src/components/ProfileOverview.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/profileOverview.css", import.meta.url), "utf8"),
   ]);
-  assert.match(overview, /className="profile-summary-cell"\s+type="button"/);
-  assert.match(css, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(css, /@media \(max-width: 359px\)/);
-});
-
-
-test("profile redesign uses an identity card and 2x2 mobile reading stats", async () => {
-  const css = await readFile(new URL("../src/profileOverview.css", import.meta.url), "utf8");
+  assert.match(overview, /"فصول مقروءة"/);
+  assert.match(overview, /"قصص مكتملة"/);
+  assert.match(overview, /"أقرأ الآن"/);
+  assert.doesNotMatch(overview, /"إجمالي القصص"/);
+  const compact = css.slice(css.indexOf("Compact profile shell: one-row identity and stats"));
+  assert.match(compact, /\.profile-stats-grid \{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(
-    css,
-    /\.profile-overview-header \.user-avatar\.profile-overview-avatar \{[\s\S]*?width: 88px;[\s\S]*?height: 88px;[\s\S]*?aspect-ratio: 1 \/ 1;[\s\S]*?flex: 0 0 88px;/,
-  );
-  assert.match(css, /\.profile-overview-header \+ \.profile-summary-strip/);
-  assert.match(
-    css,
-    /@media \(max-width: 759px\)[\s\S]*?\.profile-stats-grid \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+    compact,
+    /@media \(max-width: 759px\)[\s\S]*?\.profile-stats-grid \{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/,
   );
 });
 
-test("profile summary emphasizes the number before its label", async () => {
-  const overview = await readFile(
-    new URL("../src/components/ProfileOverview.tsx", import.meta.url),
-    "utf8",
-  );
-  const cell = overview.slice(
-    overview.indexOf('className="profile-summary-cell"'),
-    overview.indexOf("{cell.badge > 0"),
-  );
-  assert.ok(cell.indexOf("<strong>") < cell.indexOf("<span>"));
-  assert.match(overview, /إحصائيات القراءة/);
+test("profile customization moves from the header menu to a pencil by lists", async () => {
+  const [account, overview, ui] = await Promise.all([
+    readFile(new URL("../src/pages/Account.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/ProfileOverview.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/UI.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(account, /onCustomize=\{\(\) => setCustomizing\(true\)\}/);
+  assert.match(overview, /className="profile-section-edit"/);
+  assert.match(overview, /Icon name="edit"/);
+  assert.match(ui, /edit:/);
 });
 
 test("profile source failures stay inside their own preview sections", async () => {

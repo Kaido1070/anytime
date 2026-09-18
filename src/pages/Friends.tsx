@@ -8,7 +8,6 @@ import {
   ProfileOverviewSkeleton,
   ProfileReadingSection,
   ProfileStatsSection,
-  ProfileSummaryStrip,
 } from "../components/ProfileOverview";
 import { useLibrary } from "../hooks/useLibrary";
 import { Back, SectionTitle } from "../components/UI";
@@ -803,6 +802,8 @@ export function FriendProfile() {
         user={profile.user}
         actions={relationshipActions}
         privateState={isPrivate}
+        friends={profile.stats?.friends}
+        friendsTo="#profile-public-friends"
       />
 
       {removeConfirm && relationship === "friends" && (
@@ -835,15 +836,6 @@ export function FriendProfile() {
         <FavoritesSection profile={profile} works={sourceItems} />
       ) : profile.stats ? (
         <>
-          <ProfileSummaryStrip
-            friends={profile.stats.friends}
-            lists={profile.stats.lists}
-            works={profile.stats.works}
-            friendsTo="#profile-public-friends"
-            listsTo="#profile-lists"
-            worksTo="#profile-reading"
-          />
-
           <ProfileStatsSection stats={profile.stats} />
 
           <ProfileListsSection

@@ -8,7 +8,6 @@ import {
   ProfileOverviewSkeleton,
   ProfileReadingSection,
   ProfileStatsSection,
-  ProfileSummaryStrip,
 } from "../components/ProfileOverview";
 import { Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
@@ -168,7 +167,7 @@ function ProfileContentEditor({
         </div>
       </div>
       <p className="muted profile-content-editor-hint">
-        الهوية والملخص والإحصائيات ثابتة. يمكنك ترتيب أقسام المحتوى أو إخفاءها فقط.
+        الهوية والإحصائيات ثابتة. يمكنك ترتيب أقسام المحتوى أو إخفاءها فقط.
       </p>
       <div className="profile-content-editor-list">
         {groups.map((group, index) => (
@@ -529,27 +528,17 @@ export function Account() {
     <>
       <ProfileIdentityHeader
         user={user}
+        friends={profile?.stats?.friends}
+        pendingFriendRequests={profile?.pendingFriendRequests ?? 0}
         actions={
-          <>
-            <Link
-              className="profile-icon-action"
-              to="/profile?tab=settings"
-              aria-label="إعدادات الحساب"
-              title="الإعدادات"
-            >
-              <Icon name="settings" />
-            </Link>
-            <button
-              className="profile-icon-action"
-              type="button"
-              aria-label="تخصيص صفحة الحساب"
-              title="تخصيص الصفحة"
-              onClick={() => setCustomizing(true)}
-              disabled={loading}
-            >
-              <Icon name="more" />
-            </button>
-          </>
+          <Link
+            className="profile-icon-action"
+            to="/profile?tab=settings"
+            aria-label="إعدادات الحساب"
+            title="الإعدادات"
+          >
+            <Icon name="settings" />
+          </Link>
         }
       />
 
@@ -564,13 +553,6 @@ export function Account() {
         </div>
       ) : profile && stats ? (
         <>
-          <ProfileSummaryStrip
-            friends={stats.friends}
-            lists={stats.lists}
-            works={stats.works}
-            pendingFriendRequests={profile.pendingFriendRequests ?? 0}
-          />
-
           <ProfileStatsSection stats={stats} />
 
           {customizing ? (
@@ -599,6 +581,7 @@ export function Account() {
                       works={works}
                       error={worksError}
                       onRetry={() => setWorksRetry((value) => value + 1)}
+                      onCustomize={() => setCustomizing(true)}
                     />
                   );
                 }
