@@ -56,6 +56,7 @@ function releaseFor(chapter: SourceChapter) {
   if (published != null) {
     return { timestamp: published, kind: "published" as const };
   }
+  if (chapter.baselineObserved) return null;
   const firstSeen = Number(chapter.firstSeenAt);
   if (Number.isFinite(firstSeen) && firstSeen > 0) {
     return { timestamp: firstSeen, kind: "first_seen" as const };
