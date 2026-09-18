@@ -97,7 +97,12 @@ export interface UserListDetail extends UserListSummary {
   canManage?: boolean;
 }
 
-export type UserProfileSectionType = "continue_reading" | "favorites" | "custom_list";
+export type UserProfileSectionType =
+  | "continue_reading"
+  | "favorites"
+  | "my_activity"
+  | "friends_activity"
+  | "custom_list";
 
 export interface UserProfileSection {
   key: string;
@@ -154,6 +159,31 @@ export interface FriendSearchResult {
   relationship: FriendRelationship;
 }
 
+export type ActivityEventType =
+  | "started_work"
+  | "progress_reached"
+  | "completed_work"
+  | "favorited_work"
+  | "added_to_list"
+  | "created_list";
+
+export interface ActivityEvent {
+  id: number;
+  type: ActivityEventType;
+  user: User;
+  mangaId: string | null;
+  list: { id: string; name: string } | null;
+  chapterNumber: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ActivityFeed {
+  events: ActivityEvent[];
+  total: number;
+  hasMore: boolean;
+}
+
 export interface ProfileLibraryItem {
   mangaId: string;
   status: LibraryStatus;
@@ -190,4 +220,5 @@ export interface UserProfileView {
   sections?: ProfileSectionView[];
   friends?: User[];
   stats?: ProfileStats;
+  activity?: ActivityEvent[];
 }
