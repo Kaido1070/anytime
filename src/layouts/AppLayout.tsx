@@ -39,8 +39,8 @@ export function AppLayout() {
         style={{ direction: "ltr", justifyContent: "flex-start" }}
       >
         <Link to="/profile" className="wordmark" dir="ltr">
-          <span className="brand-mark">a</span>
-          Anytime
+          <span className="brand-mark">w</span>
+          Wany
         </Link>
       </header>
 
