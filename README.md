@@ -24,7 +24,15 @@ pnpm install
 pnpm dev
 ```
 
-The Vite development server runs on:
+## Deployment
+
+Production:
+
+```text
+https://anytimee.pages.dev/
+```
+
+Local development:
 
 ```text
 http://localhost:5173
