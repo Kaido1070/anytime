@@ -1263,3 +1263,32 @@ small {
     font-size: 11px;
   }
 }
+
+.reader-unread {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #414345;
+  border-radius: 7px;
+  background: #252729;
+  color: #c8cbc8;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.reader-unread:hover:not(:disabled) {
+  background: #343638;
+  color: #f0f0e9;
+}
+.reader-unread:disabled {
+  opacity: 0.55;
+}
+@media (max-width: 759px) {
+  .reader-unread {
+    min-height: 32px;
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+  .reader-header > span {
+    min-width: 32px;
+    text-align: end;
+  }
+}

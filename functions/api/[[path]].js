@@ -238,6 +238,65 @@ async function route(request, url, db) {
     return json({ ok: true, readAt: now });
   }
 
+  if (request.method === "POST" && path === "reading/unread") {
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    const chapter = Number(body.chapter);
+    if (!mangaId || !Number.isFinite(chapter) || chapter < 0) {
+      return json({ error: "INVALID_READING_EVENT" }, 400);
+    }
+
+    await db.batch([
+      db.prepare("DELETE FROM reading_history WHERE user_id = ? AND manga_id = ? AND chapter = ?")
+        .bind(user.id, mangaId, chapter),
+      db.prepare("DELETE FROM reading_progress WHERE user_id = ? AND manga_id = ? AND chapter = ?")
+        .bind(user.id, mangaId, chapter),
+    ]);
+
+    const [latestForWork, highestForWork, latestOverall] = await Promise.all([
+      db.prepare(`SELECT chapter, read_at FROM reading_history
+        WHERE user_id = ? AND manga_id = ?
+        ORDER BY read_at DESC, id DESC LIMIT 1`).bind(user.id, mangaId).first(),
+      db.prepare(`SELECT MAX(chapter) AS chapter FROM reading_history
+        WHERE user_id = ? AND manga_id = ?`).bind(user.id, mangaId).first(),
+      db.prepare(`SELECT manga_id, chapter, read_at FROM reading_history
+        WHERE user_id = ?
+        ORDER BY read_at DESC, id DESC LIMIT 1`).bind(user.id).first(),
+    ]);
+
+    const now = Date.now();
+    await db.batch([
+      db.prepare(`UPDATE user_library
+        SET updated_at = ?,
+            last_read_at = ?,
+            last_read_chapter = ?,
+            highest_reached_chapter = ?
+        WHERE user_id = ? AND manga_id = ?`)
+        .bind(
+          now,
+          latestForWork?.read_at ?? null,
+          latestForWork?.chapter ?? null,
+          highestForWork?.chapter ?? null,
+          user.id,
+          mangaId,
+        ),
+      db.prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          last_manga_id = excluded.last_manga_id,
+          last_chapter = excluded.last_chapter,
+          updated_at = excluded.updated_at`)
+        .bind(user.id, latestOverall?.manga_id ?? null, latestOverall?.chapter ?? null, now),
+    ]);
+
+    return json({
+      ok: true,
+      lastReadChapter: latestForWork?.chapter == null ? null : Number(latestForWork.chapter),
+      highestReachedChapter:
+        highestForWork?.chapter == null ? null : Number(highestForWork.chapter),
+    });
+  }
+
   if (request.method === "GET" && path === "reading/history") {
     const requestedLimit = Number(url.searchParams.get("limit") ?? 100);
     const limit = Number.isFinite(requestedLimit)

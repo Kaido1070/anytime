@@ -151,6 +151,19 @@ function useLibraryState() {
     }
   }, []);
 
+  const markChapterUnread = useCallback(async (mangaId: string, chapter: number) => {
+    try {
+      setError("");
+      await service.markChapterUnread(mangaId, chapter);
+      setData(await service.getData());
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "تعذر تعليم الفصل كغير مقروء.",
+      );
+      throw cause;
+    }
+  }, []);
+
   const saveProgress = async (progress: ReadingProgress) => {
     const key = `${progress.mangaId}:${progress.chapter}`;
     setData((current) => {
@@ -223,6 +236,7 @@ function useLibraryState() {
     setLibraryStatus,
     removeFromLibrary,
     recordChapterOpen,
+    markChapterUnread,
     saveProgress,
     addFriend,
     removeFriend,
