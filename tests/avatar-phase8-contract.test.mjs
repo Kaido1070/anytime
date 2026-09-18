@@ -88,7 +88,7 @@ test("avatar selection is validated by active avatar and active series", () => {
 });
 
 test("picker is local-search, horizontal-scroll and explicit-save without upload", () => {
-  assert.match(picker, /ابحث عن عمل أو شخصية/);
+  assert.match(picker, /ابحث عن قصة أو شخصية/);
   assert.match(picker, /filterAvatarSeries/);
   assert.match(picker, /aria-pressed/);
   assert.match(picker, /جاري الحفظ/);
