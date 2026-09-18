@@ -1,0 +1,44 @@
+name: Probe MangaTime
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-mangatime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe current MangaTime endpoints
+        shell: bash
+        run: |
+          set -u
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0 Safari/537.36'
+          BASE='https://mangatime.org'
+          echo '=== HOME ==='
+          curl -sS -L -D /tmp/home-headers -o /tmp/home.html -A "$UA" "$BASE/" || true
+          head -n 30 /tmp/home-headers || true
+          echo "home bytes: $(wc -c < /tmp/home.html 2>/dev/null || echo 0)"
+          grep -oE '<script[^>]+src="[^"]+"' /tmp/home.html | head -n 30 || true
+
+          SINGLE='{"json":{"page":1,"limit":1,"sortBy":"recent","sortOrder":"desc","query":null}}'
+          BATCH='{"0":{"json":{"page":1,"limit":1,"sortBy":"recent","sortOrder":"desc","query":null}}}'
+
+          echo '=== TRPC SINGLE ==='
+          curl -sS -L -D /tmp/single-headers -o /tmp/single.json -G             -A "$UA"             -H 'Accept: application/json,text/plain,*/*'             -H 'Accept-Language: ar,en-US;q=0.9,en;q=0.8'             -H "Referer: $BASE/"             -H 'X-MT-Platform: web'             -H 'X-MT-UIMode: standard'             --data-urlencode "input=$SINGLE"             "$BASE/api/trpc/search.searchSeries" || true
+          head -n 40 /tmp/single-headers || true
+          head -c 1200 /tmp/single.json || true
+          echo
+
+          echo '=== TRPC BATCH ==='
+          curl -sS -L -D /tmp/batch-headers -o /tmp/batch.json -G             -A "$UA"             -H 'Accept: application/json,text/plain,*/*'             -H 'Accept-Language: ar,en-US;q=0.9,en;q=0.8'             -H "Referer: $BASE/"             -H 'X-MT-Platform: web'             -H 'X-MT-UIMode: standard'             --data-urlencode 'batch=1'             --data-urlencode "input=$BATCH"             "$BASE/api/trpc/search.searchSeries" || true
+          head -n 40 /tmp/batch-headers || true
+          head -c 1200 /tmp/batch.json || true
+          echo
+
+          echo '=== API references in homepage/chunks ==='
+          grep -oE '/api/[A-Za-z0-9_./?-]+' /tmp/home.html | sort -u | head -n 100 || true
