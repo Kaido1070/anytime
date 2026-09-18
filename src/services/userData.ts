@@ -286,7 +286,11 @@ class ApiUserDataService implements UserDataService {
   }
 
   async recoverPassword(username: string, recoveryCode: string, newPassword: string) {
-    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedUsername = username
+      .normalize("NFKC")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
     await this.request<{ ok: boolean }>("recover-password", {
       method: "POST",
       body: JSON.stringify({ username: normalizedUsername, recoveryCode: recoveryCode.trim(), newPassword }),
