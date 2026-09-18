@@ -76,6 +76,16 @@ function uniqueCovers(values: Array<string | undefined>) {
   return values.filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index);
 }
 
+function coverFallbackCandidates(item: SourceManga) {
+  if (item.source === "3asq" || item.source === "starzmanga" || item.source === "mangalik") {
+    return uniqueCovers([wordpressOriginalCover(item.cover), item.cover]);
+  }
+  if (item.source === "xsano") {
+    return uniqueCovers([bloggerOriginalCover(item.cover), item.cover]);
+  }
+  return uniqueCovers([item.cover]);
+}
+
 export const sourceService = {
   async latest(source: SourceName, page = 1) {
     return api<SourceListResponse>(
@@ -131,12 +141,12 @@ export const sourceService = {
     return payload.items;
   },
 
+  coverFallbackCandidates(item: SourceManga) {
+    return coverFallbackCandidates(item);
+  },
+
   async coverCandidates(item: SourceManga) {
-    const fallback = item.source === "3asq" || item.source === "starzmanga" || item.source === "mangalik"
-      ? uniqueCovers([wordpressOriginalCover(item.cover), item.cover])
-      : item.source === "xsano"
-        ? uniqueCovers([bloggerOriginalCover(item.cover), item.cover])
-        : uniqueCovers([item.cover]);
+    const fallback = coverFallbackCandidates(item);
     if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga" && item.source !== "xsano" && item.source !== "mangalik") return fallback;
 
     const cached = coverRequests.get(item.key);
