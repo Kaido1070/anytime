@@ -593,17 +593,31 @@ class ApiUserDataService implements UserDataService {
   }
 
   async getReadChapterPairs(chapters: ReadChapterPair[]) {
-    const normalized = chapters
-      .filter((item) => isLiveKey(item.mangaId) && Number.isFinite(item.chapter) && item.chapter >= 0)
-      .slice(0, 320);
-    if (!normalized.length) return [];
-    const result = await this.request<{ read: ReadChapterPair[] }>("personalization-state", {
-      method: "POST",
-      body: JSON.stringify({ chapters: normalized }),
-    });
-    return (result.read ?? []).filter(
-      (item) => isLiveKey(item.mangaId) && Number.isFinite(item.chapter),
+    const normalized = chapters.filter(
+      (item) => isLiveKey(item.mangaId) && Number.isFinite(item.chapter) && item.chapter >= 0,
     );
+    if (!normalized.length) return [];
+
+    const chunks: ReadChapterPair[][] = [];
+    for (let index = 0; index < normalized.length; index += 200) {
+      chunks.push(normalized.slice(index, index + 200));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        this.request<{ read: ReadChapterPair[] }>("personalization-state", {
+          method: "POST",
+          body: JSON.stringify({ chapters: chunk }),
+        }),
+      ),
+    );
+    const unique = new Map<string, ReadChapterPair>();
+    for (const result of results) {
+      for (const item of result.read ?? []) {
+        if (!isLiveKey(item.mangaId) || !Number.isFinite(item.chapter)) continue;
+        unique.set(`${item.mangaId}:${item.chapter}`, item);
+      }
+    }
+    return [...unique.values()];
   }
 
   async getReadingProgress() {
