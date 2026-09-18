@@ -3,9 +3,7 @@ import { Icon } from "../components/UI";
 
 export function AppLayout() {
   const navItems = [
-    { label: "الرئيسية", path: "/", icon: "home" },
     { label: "استكشف", path: "/discover", icon: "search" },
-    { label: "القوائم", path: "/lists", icon: "lists" },
     { label: "الأصدقاء", path: "/friends", icon: "friends" },
     { label: "حسابي", path: "/profile", icon: "profile" },
   ];
@@ -16,7 +14,7 @@ export function AppLayout() {
         className="app-header"
         style={{ direction: "ltr", justifyContent: "flex-start" }}
       >
-        <Link to="/" className="wordmark" dir="ltr">
+        <Link to="/profile" className="wordmark" dir="ltr">
           <span className="brand-mark">a</span>
           Anytime
         </Link>
@@ -28,7 +26,7 @@ export function AppLayout() {
 
       <nav className="bottom-nav" aria-label="التنقل الرئيسي">
         {navItems.map((item) => (
-          <NavLink key={item.path} to={item.path} end={item.path === "/"}>
+          <NavLink key={item.path} to={item.path} end={item.path === "/profile"}>
             <Icon name={item.icon} />
             <span>{item.label}</span>
           </NavLink>
