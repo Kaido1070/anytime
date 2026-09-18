@@ -149,6 +149,42 @@ async function route(request, url, db) {
   }
   const user = session.user;
 
+  if (request.method === "PUT" && path === "profile/visibility") {
+    const body = await readJson(request);
+    const visibility = profileVisibility(body?.visibility);
+    if (!visibility) {
+      return json(
+        { error: "INVALID_PROFILE_VISIBILITY", message: "إعداد الخصوصية غير صالح." },
+        400,
+      );
+    }
+    const now = Date.now();
+    await db
+      .prepare("UPDATE users SET profile_visibility = ?, updated_at = ? WHERE id = ?")
+      .bind(visibility, now, user.id)
+      .run();
+    const updated = await db
+      .prepare("SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1")
+      .bind(user.id)
+      .first();
+    return json({ user: publicUser(updated) });
+  }
+
+  const profileMatch = path.match(/^profiles\/([^/]+)$/);
+  if (request.method === "GET" && profileMatch) {
+    const targetId = safeId(decodeURIComponent(profileMatch[1]));
+    if (!targetId) return json({ error: "INVALID_USER" }, 400);
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 8);
+    const previewLimit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(10, Math.trunc(requestedLimit)))
+      : 8;
+    const profile = await getUserProfileView(db, user, targetId, previewLimit);
+    if (!profile) {
+      return json({ error: "USER_NOT_FOUND", message: "الحساب غير موجود." }, 404);
+    }
+    return json({ profile });
+  }
+
   if (request.method === "GET" && path === "data") {
     return json({ data: await getUserData(db, user.id) });
   }
@@ -1541,6 +1577,196 @@ async function getUserData(db, userId) {
   };
 }
 
+export function getProfileAccess(viewer, target) {
+  if (viewer?.id && target?.id && viewer.id === target.id) return "owner";
+  return target?.profile_visibility === "public" ? "public" : "private";
+}
+
+async function getUserProfileView(db, viewer, targetId, previewLimit) {
+  const target = await db
+    .prepare("SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1")
+    .bind(targetId)
+    .first();
+  if (!target) return null;
+
+  const access = getProfileAccess(viewer, target);
+  const favoriteResult = await db
+    .prepare(`SELECT manga_id, COUNT(*) OVER() AS total_count
+      FROM favorites
+      WHERE user_id = ?
+      ORDER BY created_at ASC, manga_id ASC
+      LIMIT ?`)
+    .bind(targetId, previewLimit)
+    .all();
+  const favoriteRows = favoriteResult.results ?? [];
+  const profile = {
+    user: publicUser(target),
+    access,
+    favorites: favoriteRows.map((row) => row.manga_id),
+    favoriteCount: Number(favoriteRows[0]?.total_count ?? 0),
+  };
+
+  // Private profiles stop here: hidden data is never queried or serialized.
+  if (access === "private") return profile;
+
+  const [
+    libraryResult,
+    listResult,
+    listPreviewResult,
+    systemSectionResult,
+    friendResult,
+    stats,
+  ] = await Promise.all([
+    db
+      .prepare(`WITH ranked AS (
+        SELECT
+          manga_id,
+          status,
+          highest_reached_chapter,
+          ROW_NUMBER() OVER (
+            PARTITION BY status
+            ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC, manga_id ASC
+          ) AS row_number
+        FROM user_library
+        WHERE user_id = ?
+      )
+      SELECT manga_id, status, highest_reached_chapter, row_number
+      FROM ranked
+      WHERE row_number <= ?
+      ORDER BY
+        CASE status
+          WHEN 'reading' THEN 1
+          WHEN 'completed' THEN 2
+          WHEN 'paused' THEN 3
+          ELSE 4
+        END,
+        row_number ASC`)
+      .bind(targetId, previewLimit)
+      .all(),
+    db
+      .prepare(`SELECT
+        l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+        COALESCE(s.position, 3072 + l.position) AS section_position,
+        COUNT(i.manga_id) AS item_count
+      FROM user_lists l
+      LEFT JOIN user_profile_sections s
+        ON s.user_id = l.user_id
+       AND s.section_type = 'custom_list'
+       AND s.reference_id = l.id
+      LEFT JOIN user_list_items i ON i.list_id = l.id
+      WHERE l.user_id = ?
+      GROUP BY l.id
+      ORDER BY section_position ASC, l.position ASC, l.created_at ASC, l.id ASC`)
+      .bind(targetId)
+      .all(),
+    db
+      .prepare(`WITH ranked AS (
+        SELECT
+          i.list_id,
+          i.manga_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY i.list_id
+            ORDER BY i.position ASC, i.added_at ASC, i.manga_id ASC
+          ) AS row_number
+        FROM user_list_items i
+        JOIN user_lists l ON l.id = i.list_id
+        WHERE l.user_id = ?
+      )
+      SELECT list_id, manga_id, row_number
+      FROM ranked
+      WHERE row_number <= ?
+      ORDER BY list_id ASC, row_number ASC`)
+      .bind(targetId, previewLimit)
+      .all(),
+    db
+      .prepare(`SELECT section_type, position
+        FROM user_profile_sections
+        WHERE user_id = ?
+          AND section_type IN ('continue_reading','favorites')
+        ORDER BY position ASC`)
+      .bind(targetId)
+      .all(),
+    db
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility
+        FROM friendships f
+        JOIN users u ON u.id = f.friend_id
+        WHERE f.user_id = ?
+        ORDER BY u.name COLLATE NOCASE ASC, u.id ASC
+        LIMIT ?`)
+      .bind(targetId, previewLimit)
+      .all(),
+    db
+      .prepare(`SELECT
+        (SELECT COUNT(*) FROM user_library WHERE user_id = ?) AS works,
+        (SELECT COUNT(*) FROM user_library WHERE user_id = ? AND status = 'completed') AS completed,
+        (SELECT COUNT(*) FROM user_lists WHERE user_id = ?) AS lists,
+        (SELECT COUNT(*) FROM friendships WHERE user_id = ?) AS friends`)
+      .bind(targetId, targetId, targetId, targetId)
+      .first(),
+  ]);
+
+  const listPreviews = new Map();
+  for (const row of listPreviewResult.results ?? []) {
+    const values = listPreviews.get(row.list_id) ?? [];
+    values.push(row.manga_id);
+    listPreviews.set(row.list_id, values);
+  }
+
+  const lists = (listResult.results ?? []).map((row) => ({
+    ...mapUserList(row),
+    sectionPosition: Number(row.section_position),
+    previewItems: listPreviews.get(row.id) ?? [],
+  }));
+
+  const systemPositions = new Map(
+    (systemSectionResult.results ?? []).map((row) => [
+      row.section_type,
+      Number(row.position),
+    ]),
+  );
+  const sections = [
+    {
+      key: "system:favorites",
+      type: "favorites",
+      referenceId: null,
+      position: systemPositions.get("favorites") ?? 1024,
+    },
+    {
+      key: "system:library",
+      type: "library",
+      referenceId: null,
+      position: systemPositions.get("continue_reading") ?? 2048,
+    },
+    ...lists.map((list) => ({
+      key: `list:${list.id}`,
+      type: "list",
+      referenceId: list.id,
+      position: list.sectionPosition,
+    })),
+  ].sort((a, b) => a.position - b.position || a.key.localeCompare(b.key));
+
+  return {
+    ...profile,
+    library: (libraryResult.results ?? []).map((row) => ({
+      mangaId: row.manga_id,
+      status: row.status,
+      highestReachedChapter:
+        row.highest_reached_chapter == null
+          ? null
+          : Number(row.highest_reached_chapter),
+    })),
+    lists,
+    sections,
+    friends: (friendResult.results ?? []).map(publicUser),
+    stats: {
+      works: Number(stats?.works ?? 0),
+      completed: Number(stats?.completed ?? 0),
+      lists: Number(stats?.lists ?? 0),
+      friends: Number(stats?.friends ?? 0),
+    },
+  };
+}
+
 async function getFriends(db, userId) {
   const result = await db
     .prepare(
@@ -1769,6 +1995,10 @@ function normalizeUsername(value) {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase();
   return /^[a-z0-9_-]{2,32}$/.test(normalized) ? normalized : "";
+}
+
+function profileVisibility(value) {
+  return value === "public" || value === "private" ? value : "";
 }
 
 function libraryStatus(value) {
