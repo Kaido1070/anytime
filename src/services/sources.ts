@@ -155,7 +155,7 @@ export const sourceService = {
     const request = api<{ covers?: string[] }>(
       `/api/source/cover?${params({ key: item.key })}`,
     )
-      .then((payload) => uniqueCovers([...(payload.covers ?? []), item.cover]))
+      .then((payload) => uniqueCovers([...(payload.covers ?? []), ...fallback]))
       .catch(() => fallback);
 
     coverRequests.set(item.key, request);
