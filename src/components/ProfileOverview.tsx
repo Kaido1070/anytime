@@ -71,7 +71,7 @@ export function ProfileSummaryStrip({
       badge: pendingFriendRequests,
     },
     { label: "القوائم", value: lists, to: listsTo, badge: 0 },
-    { label: "الأعمال", value: works, to: worksTo, badge: 0 },
+    { label: "العناوين", value: works, to: worksTo, badge: 0 },
   ];
 
   return (
