@@ -43,6 +43,7 @@ export function UserList() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [draggingId, setDraggingId] = useState("");
   const [dropTargetId, setDropTargetId] = useState("");
+  const [dropPlacement, setDropPlacement] = useState<"before" | "after" | "">("");
   const dragRef = useRef<DragState | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -121,6 +122,7 @@ export function UserList() {
     dragRef.current = null;
     setDraggingId("");
     setDropTargetId("");
+    setDropPlacement("");
     if (cancelled) {
       updateItems(drag.snapshot);
       return;
@@ -152,9 +154,16 @@ export function UserList() {
       .find((element) => element?.dataset.listWorkId && element.dataset.listWorkId !== drag.mangaId);
     const targetId = target?.dataset.listWorkId;
     if (!target || !targetId) return;
+    const edge = Math.min(96, window.innerHeight * 0.18);
+    if (event.clientY < edge) window.scrollBy({ top: -18, behavior: "auto" });
+    else if (event.clientY > window.innerHeight - edge) {
+      window.scrollBy({ top: 18, behavior: "auto" });
+    }
+
     const rect = target.getBoundingClientRect();
     const after = event.clientY > rect.top + rect.height / 2;
     setDropTargetId(targetId);
+    setDropPlacement(after ? "after" : "before");
     const next = moveItem(itemsRef.current, drag.mangaId, targetId, after);
     if (next !== itemsRef.current) updateItems(next);
   };
@@ -306,7 +315,7 @@ export function UserList() {
                 className={[
                   "list-sortable-row",
                   draggingId === entry.mangaId ? "dragging" : "",
-                  dropTargetId === entry.mangaId ? "drop-target" : "",
+                  dropTargetId === entry.mangaId ? `drop-target drop-${dropPlacement}` : "",
                 ].filter(Boolean).join(" ")}
                 data-list-work-id={entry.mangaId}
                 key={entry.mangaId}
