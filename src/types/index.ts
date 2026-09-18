@@ -70,6 +70,26 @@ export interface ReadingHistoryEntry {
   readAt: number;
 }
 
+export interface UserListSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  position: number;
+  itemCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UserListItem {
+  mangaId: string;
+  position: number;
+  addedAt: number;
+}
+
+export interface UserListDetail extends UserListSummary {
+  items: UserListItem[];
+}
+
 export interface ReadingProgress {
   mangaId: string;
   chapter: number;
