@@ -1,6 +1,3 @@
-import { ensureAdminSchema } from "../_admin.js";
-import { ensureAdminAccount } from "../_admin_provision.js";
-
 const PASSWORD_ITERATIONS = 25000;
 const RECOVERY_ITERATIONS = 210000;
 
@@ -30,8 +27,6 @@ export async function onRequestPost(context) {
   if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
 
   try {
-    await ensureAdminSchema(db);
-    await ensureAdminAccount(db, context.env);
     await ensureRecoveryCodes(db);
 
     const body = await request.json().catch(() => ({}));
