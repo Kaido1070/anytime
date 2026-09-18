@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ProfileSectionEditor } from "../components/ProfileSectionEditor";
 import { SourceCoverImage } from "../components/SourceCoverImage";
+import { UserAvatar } from "../components/UserAvatar";
 import { useLibrary } from "../hooks/useLibrary";
 import { getContinueChapter } from "../services/reading";
 import { sourceDisplayTitle } from "../services/sourceTitles";
@@ -466,9 +467,7 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
       ) : (
         <section className="profile-dashboard-header">
           <div className="profile-dashboard-identity">
-            <span className="avatar profile-dashboard-avatar">
-              {user?.name?.slice(0, 1)}
-            </span>
+            <UserAvatar user={user} className="profile-dashboard-avatar" loading="eager" />
             <div>
               <p className="eyebrow">مساحتك الشخصية</p>
               <h1>
