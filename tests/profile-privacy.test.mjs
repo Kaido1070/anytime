@@ -23,7 +23,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "6" };
+      return { value: "7" };
     }
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
@@ -185,9 +185,11 @@ test("private profile returns only identity and favorites without querying hidde
     "access",
     "favoriteCount",
     "favorites",
+    "relationship",
     "user",
   ]);
   assert.equal(profile.access, "private");
+  assert.equal(profile.relationship, "none");
   assert.deepEqual(profile.favorites, ["mt:manhwa:nano-machine"]);
   assert.deepEqual(db.sensitiveQueries, []);
 });
