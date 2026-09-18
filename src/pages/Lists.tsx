@@ -6,7 +6,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { userDataService } from "../services/userData";
 import type { UserListSummary } from "../types";
 
-export function Lists() {
+export function Lists({ embedded = false }: { embedded?: boolean }) {
   const { data } = useLibrary();
   const [lists, setLists] = useState<UserListSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,12 +48,16 @@ export function Lists() {
 
   return (
     <>
-      <header className="lists-page-header">
+      <header className={`lists-page-header ${embedded ? "account-lists-header" : ""}`}>
         <div>
-          <p className="eyebrow">رتب أعمالك بطريقتك</p>
-          <h1>
-            القوائم<span className="accent">.</span>
-          </h1>
+          <p className="eyebrow">{embedded ? "داخل حسابك" : "رتب أعمالك بطريقتك"}</p>
+          {embedded ? (
+            <h2>قوائمي</h2>
+          ) : (
+            <h1>
+              القوائم<span className="accent">.</span>
+            </h1>
+          )}
           <p className="muted">العمل الواحد يقدر يكون في أكثر من قائمة في نفس الوقت.</p>
         </div>
         <button className="primary" type="button" onClick={() => setShowCreate(true)}>
