@@ -47,15 +47,25 @@
   padding: 18px 0 4px;
 }
 
-.account-lists-section {
+.account-lists-section,
+.account-friends-section {
   margin-top: 34px;
   padding-top: 30px;
   border-top: 1px solid var(--line);
   scroll-margin-top: 24px;
 }
 
-.account-lists-header {
+.account-lists-header,
+.account-friends-header {
   margin-top: 0;
+}
+
+.account-friends-header {
+  margin-bottom: 22px;
+}
+
+.account-friends-header .page-intro {
+  margin-top: 8px;
 }
 
 .account-settings-intro {
@@ -89,7 +99,8 @@
     width: 100%;
   }
 
-  .account-lists-section {
+  .account-lists-section,
+  .account-friends-section {
     margin-top: 28px;
     padding-top: 24px;
   }
