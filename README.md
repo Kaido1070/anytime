@@ -1,57 +1,199 @@
 # Anytime
 
-A mobile-first, private reading-room prototype built with React, TypeScript, Vite, and plain CSS. All manga metadata, covers, chapter panels, and friend activity are local mock content. No external content sources or backend are connected.
+Anytime is a private, mobile-first Arabic manga/manhwa reading web app. The current project is no longer a local mock-only prototype: it uses React on the frontend, Cloudflare Pages Functions for the API, and Cloudflare D1 for persistent user data.
+
+The application is designed around reading first: source discovery, work details, chapter reading, per-user libraries and reading progress, personal lists, profiles, friends/activity, avatar selection, and administration.
+
+## Current stack
+
+- React 19 + TypeScript
+- React Router 7
+- Vite 6
+- Plain CSS with a mobile-first dark UI
+- Cloudflare Pages
+- Cloudflare Pages Functions
+- Cloudflare D1
+- PWA/service worker support
+- pnpm
+- Node.js 22.18+ (Node 24 recommended)
 
 ## Run locally
-
-Use Node.js 22.18+ (Node 24 recommended) and pnpm.
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173. Sign in as **Mahdi**, **Kaido**, or **Ahmed**, with password **anytime**. Usernames are case-insensitive. Passwords are neither stored nor sent anywhere.
+The Vite development server runs on:
 
-```sh
-pnpm test     # Native Node service tests; no test-framework dependency
-pnpm build   # Strict TypeScript check, Vite bundle, PWA asset precache
-pnpm preview # Production app on http://localhost:4173
+```text
+http://localhost:5173
 ```
 
-## Files and architecture
+Validation commands:
 
-- `src/App.tsx`, `src/main.tsx`: routing, session gate, React entry, production service-worker registration.
-- `src/pages/`: Login, Home, MangaDetails, Reader, Favorites, Friends / FriendProfile, Profile.
-- `src/layouts/AppLayout.tsx`: app header and mobile bottom navigation; the reader has its own full-width layout.
-- `src/components/UI.tsx`: shared cover cards, progress bar, navigation icons, section titles.
-- `src/types/index.ts`: user, manga, friend, and versioned library contracts.
-- `src/data/mock.ts`: local catalog, sample chapters, three mock accounts, and friend activity.
-- `src/services/userData.ts`: asynchronous `UserDataService` contract and localStorage implementation. UI components never access storage directly.
-- `src/hooks/useLibrary.tsx`: shared session/library state, service calls, and persistence error feedback.
-- `src/styles.css`: mobile-first dark appearance, safe-area insets, touch-sized controls, reduced-motion support, and desktop layout.
-- `public/covers/`, `public/panels/`, `public/icons/`: original local SVG placeholders and temporary PNG app icons.
-- `public/manifest.webmanifest`, `public/sw.js`, `scripts/build-sw.mjs`: standalone PWA and content-versioned local-asset precache.
-- `public/_redirects`: SPA route fallback for Cloudflare Pages.
-- `tests/userData.test.mjs`: credentials, favorites, deduplication, user isolation, progress, completion, sign-out, and corrupted-storage recovery.
-- Vite / TypeScript configuration, package manifest, and pnpm lockfile.
+```sh
+pnpm test
+pnpm build
+pnpm preview
+```
 
-## Persistence
+`pnpm build` runs the strict TypeScript build, creates the Vite production bundle, and generates the versioned service-worker precache.
 
-`anytime:session` stores the mock user ID. `anytime:v1:user:<id>` stores that user's favorites, per-chapter percentage and timestamp, completed chapters, and last opened manga/chapter. Sign-out keeps each user's library. Progress writes are debounced during scrolling and flushed when leaving a chapter or hiding the page. Chapters are completed at 98%; rereading does not erase completion. Restoration uses the scrollable document percentage and fixed image aspect ratios to avoid layout shifts while panels load.
+There is currently no separate lint script in `package.json`.
 
-## Cloudflare and Phase 2
+## Application routes
 
-The build emits a static `dist/` directory suitable for [Cloudflare Pages](https://developers.cloudflare.com/pages/framework-guides/deploy-a-vite3-project/): build command `pnpm build`, output directory `dist`. Nothing has been deployed.
+Authenticated user routes currently include:
 
-Phase 2 can implement the same asynchronous service contract using authenticated Worker API calls and D1 storage, retaining the route components and library hook. Add server-side authorization and session handling before using real private content. The mock sign-in is only a UI simulation and does not protect static assets. Catalog data and friend activity are separate mock fixtures ready for a later data provider.
+- `/profile` — account/profile overview.
+- `/discover` — source discovery and search.
+- `/fyp` — personalized/discovery feed.
+- `/new` — new chapters.
+- `/source/:key` — source work details.
+- `/read-source/:key/:chapter` — full-width source reader.
+- `/favorites` — favorites.
+- `/lists` and `/lists/:id` — personal lists.
+- `/friends` and `/friends/:id` — friends and profiles.
+- `/admin` and `/admin/users/:id` — admin area for admin accounts.
 
-## PWA and known limitations
+Authentication is mandatory; unauthenticated users are shown the login screen.
 
-- Production builds precache the app and local placeholders; development mode does not register a service worker. Updates activate after old app tabs close.
-- On an iPhone, use HTTPS hosting and Safari's Share → Add to Home Screen. A LAN HTTP development URL can preview layout but cannot provide a full secure-context PWA experience.
-- Device-sized Chromium testing is recorded in `QA.md`; physical iPhone Safari installation and WebKit behavior still need device verification.
-- Offline reload did not succeed in the in-app browser during verification. The PWA scaffolding is included, but offline support must be verified before relying on it.
-- Data stays in this browser and is not synchronized or backed up. Clearing site storage removes it. Concurrent edits from multiple tabs are not coordinated in Phase 1.
-- All users start with the same small sample library; friend profiles are fixed mock examples. The same six local panels are reused for each sample chapter.
-- Icons and artwork are placeholders. No scraping, external manga images, real authentication, D1, messaging, analytics, ads, or payments are implemented.
+## User data and reading system
+
+User state is persisted server-side in D1. The reading model separates:
+
+- the last chapter the user opened/read;
+- the highest chapter the user has reached;
+- per-chapter progress;
+- completed chapters;
+- independent reading-history events.
+
+This distinction is intentional. If a user reaches chapter 150 and later rereads chapter 80, the reread is recorded and the last-read state may change, but the highest-reached chapter does not regress.
+
+The user library supports work statuses and timestamps and drives the continue-reading experience. Reading progress is synchronized through authenticated API calls rather than being browser-only state.
+
+## Personal lists
+
+Personal lists are stored separately from Favorites.
+
+A work can belong to multiple personal lists at the same time. List membership uses a many-to-many relation, and item ordering is persisted. Reordering is implemented without an external drag-and-drop dependency and supports pointer/touch interaction plus keyboard movement.
+
+Favorites remain their own authoritative data set and are not duplicated into personal-list rows.
+
+## Profiles, social features, and avatars
+
+The repository contains the later user-system phases as well:
+
+- modular/profile-section persistence;
+- profile visibility support;
+- friend requests and friendships;
+- activity data;
+- avatar-library data;
+- account settings;
+- admin/user-management support.
+
+The UI remains reading-oriented rather than becoming a general-purpose social feed.
+
+## Source content
+
+The current application includes source-backed discovery, source work pages, new chapters, and a dedicated source reader. Source chapter images are treated as the primary reading asset; changes to the reader should preserve image quality and avoid unnecessary transformations or compression.
+
+Source-related API handlers live under `functions/api/source/`, while the frontend source pages live primarily in:
+
+- `src/pages/Discover.tsx`
+- `src/pages/Fyp.tsx`
+- `src/pages/NewChapters.tsx`
+- `src/pages/SourceMangaDetails.tsx`
+- `src/pages/SourceReader.tsx`
+
+## Repository structure
+
+```text
+.
+├── functions/              Cloudflare Pages Functions and API
+│   └── api/
+├── migrations/             D1 schema migrations
+├── public/                 Static/PWA assets
+├── scripts/                Build helpers, including SW generation
+├── src/
+│   ├── components/         Shared UI
+│   ├── data/               Frontend data/helpers
+│   ├── hooks/              Shared React state/hooks
+│   ├── layouts/            User/admin layouts
+│   ├── pages/              Route pages
+│   ├── services/           API/data services
+│   ├── types/              TypeScript contracts
+│   ├── App.tsx             Routing and auth/admin gates
+│   └── main.tsx            React entry + service-worker registration
+├── tests/                  Native Node tests
+├── PHASE2.md               Phase 2 implementation notes
+├── PHASE3.md               Personal-list implementation notes
+├── QA.md                   Verification notes
+└── package.json
+```
+
+## D1 migrations
+
+The repository currently contains migrations through `0011_d1_runtime_optimization.sql`.
+
+Major schema milestones include:
+
+1. Phase 2 server-side user/session data.
+2. User library and reading history.
+3. Personal lists.
+4. User profile sections.
+5. Profile visibility.
+6. Friend requests.
+7. Activity.
+8. Avatar library.
+9. Admin support.
+10. Phase 10.5 additions.
+11. D1 runtime optimization.
+
+The application expects a Cloudflare D1 binding named exactly `DB`.
+
+## Authentication and security
+
+The server-side authentication implementation uses secure session cookies and D1-backed sessions. Session tokens are stored as hashes rather than plaintext tokens, and user passwords are stored as PBKDF2-SHA256 hashes with per-user salts.
+
+API responses containing private application state should remain non-cacheable. The service worker must not cache `/api/*`.
+
+Authorization rules belong in the backend. Frontend visibility alone must never be treated as access control, especially for private profile data and administrative capabilities.
+
+## PWA
+
+Production builds register `/sw.js` and use versioned local-asset precaching. The service worker is updated with `updateViaCache: "none"`, and the app reloads when an already-controlled page receives a new worker controller.
+
+PWA/offline behavior should still be verified on the actual target browsers/devices before being treated as guaranteed offline support.
+
+## UI principles
+
+Anytime is mobile-first and uses its existing dark visual language. When extending the application:
+
+- preserve the current design system and responsive behavior;
+- prioritize phone layouts;
+- keep reader controls unobtrusive;
+- preserve source cover and chapter-image quality;
+- avoid breaking existing reading/navigation behavior;
+- reuse existing API, authentication, and schema conventions instead of creating parallel systems.
+
+## Development rules
+
+Before implementing a feature:
+
+1. Inspect the existing route/component/service and relevant D1 schema.
+2. Reuse existing functionality instead of creating duplicate tables or state.
+3. Keep authorization checks server-side.
+4. Preserve image quality.
+5. Validate both mobile and desktop behavior.
+6. Run `pnpm test` and `pnpm build` after code changes when applicable.
+7. Keep migrations auditable and avoid destructive changes to existing user reading data.
+
+## Additional documentation
+
+- `PHASE2.md` documents the move to Pages Functions + D1 and the reading/library system.
+- `PHASE3.md` documents personal lists and ordering.
+- `QA.md` contains earlier browser/build verification notes.
+
+These files contain historical phase-specific details. This README is the high-level description of the repository's current architecture and feature set.
