@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { filterAvatarSeries } from "../services/avatars";
 import { userDataService } from "../services/userData";
 import type { Avatar, AvatarSeries } from "../types";
-
-function normalizedSearch(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("ar");
-}
 
 function AvatarChoiceImage({ avatar }: { avatar: Avatar }) {
   const [failed, setFailed] = useState(false);
@@ -30,23 +27,6 @@ function AvatarChoiceImage({ avatar }: { avatar: Avatar }) {
       )}
     </span>
   );
-}
-
-export function filterAvatarSeries(series: AvatarSeries[], query: string) {
-  const needle = normalizedSearch(query);
-  if (!needle) return series;
-
-  return series.flatMap((group) => {
-    const seriesMatches =
-      normalizedSearch(group.name).includes(needle) ||
-      normalizedSearch(group.slug).includes(needle);
-    const avatars = seriesMatches
-      ? group.avatars
-      : group.avatars.filter((avatar) =>
-          normalizedSearch(avatar.characterName).includes(needle),
-        );
-    return avatars.length ? [{ ...group, avatars }] : [];
-  });
 }
 
 export function AvatarPicker({
