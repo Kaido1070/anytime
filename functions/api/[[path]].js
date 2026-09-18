@@ -377,14 +377,33 @@ async function route(request, url, db) {
     if (request.method === "GET") {
       const listRow = await db
         .prepare(
-          `SELECT id, name, description, position, created_at, updated_at
-           FROM user_lists
-           WHERE id = ? AND user_id = ?
+          `SELECT
+             l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+             u.id AS owner_id, u.username AS owner_username, u.name AS owner_name,
+             u.profile_visibility AS owner_profile_visibility
+           FROM user_lists l
+           JOIN users u ON u.id = l.user_id
+           WHERE l.id = ?
            LIMIT 1`,
         )
-        .bind(listId, user.id)
+        .bind(listId)
         .first();
       if (!listRow) return json({ error: "LIST_NOT_FOUND" }, 404);
+
+      const owner = publicUser({
+        id: listRow.owner_id,
+        username: listRow.owner_username,
+        name: listRow.owner_name,
+        profile_visibility: listRow.owner_profile_visibility,
+      });
+      const access = getProfileAccess(user, {
+        id: owner.id,
+        profile_visibility: owner.profileVisibility,
+      });
+      if (access === "private") {
+        return json({ error: "LIST_NOT_FOUND" }, 404);
+      }
+
       const itemResult = await db
         .prepare(
           `SELECT manga_id, position, added_at
@@ -403,6 +422,8 @@ async function route(request, url, db) {
         list: {
           ...mapUserList(listRow),
           itemCount: items.length,
+          owner,
+          canManage: access === "owner",
         },
         items,
       });
