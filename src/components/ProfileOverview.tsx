@@ -335,7 +335,7 @@ export function ProfileReadingSection({
             );
           })}
         </div>
-      ) : (
+      ) : entries.length && error ? null : (
         <p className="profile-overview-empty">
           {entries.length ? "تعذر تحميل بيانات الفصول لهذه الأعمال." : "لا توجد أعمال تقرؤها حاليًا."}
         </p>
