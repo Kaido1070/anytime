@@ -8,7 +8,7 @@ const MANGALIK_BASE = "https://mangalik.net";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
-let sourceSchemaReady;
+const sourceSchemaReady = new WeakMap();
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -202,8 +202,19 @@ function shortCache() {
 }
 
 async function ensureSourceSchema(db) {
-  if (!sourceSchemaReady) {
-    sourceSchemaReady = (async () => {
+  let pending = sourceSchemaReady.get(db);
+  if (!pending) {
+    pending = (async () => {
+      try {
+        await Promise.all([
+          db.prepare("SELECT first_seen_at FROM source_items LIMIT 1").first(),
+          db.prepare("SELECT is_baseline FROM source_chapter_seen LIMIT 1").first(),
+        ]);
+        return;
+      } catch {
+        // Missing tables/columns are repaired below once per binding.
+      }
+
       await db
         .prepare(`CREATE TABLE IF NOT EXISTS source_items (
           source_key TEXT PRIMARY KEY,
@@ -227,9 +238,15 @@ async function ensureSourceSchema(db) {
       if (!(columns.results ?? []).some((column) => column.name === "first_seen_at")) {
         await db.prepare("ALTER TABLE source_items ADD COLUMN first_seen_at INTEGER").run();
       }
-      await db
-        .prepare("UPDATE source_items SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
-        .run();
+
+      const missingFirstSeen = await db
+        .prepare("SELECT 1 AS present FROM source_items WHERE first_seen_at IS NULL LIMIT 1")
+        .first();
+      if (missingFirstSeen) {
+        await db
+          .prepare("UPDATE source_items SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
+          .run();
+      }
 
       await db
         .prepare(`CREATE TABLE IF NOT EXISTS source_chapter_seen (
@@ -251,11 +268,12 @@ async function ensureSourceSchema(db) {
         .prepare("CREATE INDEX IF NOT EXISTS idx_source_chapter_seen_release ON source_chapter_seen(first_seen_at DESC, source_key)")
         .run();
     })().catch((error) => {
-      sourceSchemaReady = null;
+      sourceSchemaReady.delete(db);
       throw error;
     });
+    sourceSchemaReady.set(db, pending);
   }
-  await sourceSchemaReady;
+  await pending;
 }
 
 async function rememberItems(db, items) {
@@ -277,7 +295,16 @@ async function rememberItems(db, items) {
           status = COALESCE(excluded.status, source_items.status),
           genres_json = CASE WHEN excluded.genres_json <> '[]' THEN excluded.genres_json ELSE source_items.genres_json END,
           updated_at = excluded.updated_at,
-          first_seen_at = COALESCE(source_items.first_seen_at, excluded.first_seen_at)`)
+          first_seen_at = COALESCE(source_items.first_seen_at, excluded.first_seen_at)
+        WHERE source_items.source_id IS NOT excluded.source_id
+           OR source_items.slug IS NOT excluded.slug
+           OR source_items.type IS NOT excluded.type
+           OR source_items.url IS NOT excluded.url
+           OR source_items.title IS NOT excluded.title
+           OR (excluded.cover_url <> '' AND source_items.cover_url IS NOT excluded.cover_url)
+           OR (excluded.description IS NOT NULL AND source_items.description IS NOT excluded.description)
+           OR (excluded.status IS NOT NULL AND source_items.status IS NOT excluded.status)
+           OR (excluded.genres_json <> '[]' AND source_items.genres_json IS NOT excluded.genres_json)`)
       .bind(
         item.key,
         item.source,
@@ -311,54 +338,97 @@ async function rememberChapterAvailability(db, item) {
     .filter((chapter) => !chapter.synthetic)
     .sort((a, b) => Number(b.number ?? 0) - Number(a.number ?? 0))
     .slice(0, 240);
-  const current = await db
-    .prepare("SELECT COUNT(*) AS count FROM source_chapter_seen WHERE source_key = ?")
-    .bind(item.key)
-    .first();
-  const sourceItem = await db
-    .prepare("SELECT first_seen_at FROM source_items WHERE source_key = ? LIMIT 1")
-    .bind(item.key)
-    .first();
-  const now = Date.now();
-  const isBaseline = Number(current?.count ?? 0) === 0;
-  const baseline = isBaseline
-    ? Number(sourceItem?.first_seen_at ?? now)
-    : now;
+  if (!recent.length) return item;
 
-  for (let index = 0; index < recent.length; index += 50) {
-    const chunk = recent.slice(index, index + 50);
-    await db.batch(
-      chunk.map((chapter) =>
-        db.prepare(`INSERT INTO source_chapter_seen
-          (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
-            chapter_number = excluded.chapter_number,
-            published_at = COALESCE(excluded.published_at, source_chapter_seen.published_at)`)
-          .bind(
-            item.key,
-            sourceChapterIdentity(chapter),
-            Number.isFinite(Number(chapter.number)) ? Number(chapter.number) : null,
-            chapter.publishedAt ? String(chapter.publishedAt) : null,
-            baseline,
-            isBaseline ? 1 : 0,
-          ),
-      ),
-    );
+  const anySeen = await db
+    .prepare("SELECT 1 AS present FROM source_chapter_seen WHERE source_key = ? LIMIT 1")
+    .bind(item.key)
+    .first();
+  const isBaseline = !anySeen;
+  const now = Date.now();
+  let firstSeenAt = now;
+  if (isBaseline) {
+    const sourceItem = await db
+      .prepare("SELECT first_seen_at FROM source_items WHERE source_key = ? LIMIT 1")
+      .bind(item.key)
+      .first();
+    firstSeenAt = Number(sourceItem?.first_seen_at ?? now);
   }
 
   const identities = recent.map(sourceChapterIdentity).filter(Boolean);
-  if (!identities.length) return item;
-  const placeholders = identities.map(() => "?").join(",");
-  const seen = await db
-    .prepare(`SELECT chapter_identity, first_seen_at, published_at, is_baseline
-      FROM source_chapter_seen
-      WHERE source_key = ? AND chapter_identity IN (${placeholders})`)
-    .bind(item.key, ...identities)
-    .all();
-  const byIdentity = new Map(
-    (seen.results ?? []).map((row) => [String(row.chapter_identity), row]),
-  );
+  const byIdentity = new Map();
+  for (let index = 0; index < identities.length; index += 40) {
+    const chunk = identities.slice(index, index + 40);
+    const placeholders = chunk.map(() => "?").join(",");
+    const result = await db
+      .prepare(`SELECT chapter_identity, chapter_number, first_seen_at, published_at, is_baseline
+        FROM source_chapter_seen
+        WHERE source_key = ? AND chapter_identity IN (${placeholders})`)
+      .bind(item.key, ...chunk)
+      .all();
+    for (const row of result.results ?? []) {
+      byIdentity.set(String(row.chapter_identity), row);
+    }
+  }
+
+  const writes = [];
+  for (const chapter of recent) {
+    const identity = sourceChapterIdentity(chapter);
+    if (!identity) continue;
+    const chapterNumber = Number.isFinite(Number(chapter.number))
+      ? Number(chapter.number)
+      : null;
+    const publishedAt = chapter.publishedAt ? String(chapter.publishedAt) : null;
+    const existing = byIdentity.get(identity);
+
+    if (!existing) {
+      writes.push(
+        db.prepare(`INSERT INTO source_chapter_seen
+          (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
+          VALUES (?, ?, ?, ?, ?, ?)`)
+          .bind(
+            item.key,
+            identity,
+            chapterNumber,
+            publishedAt,
+            firstSeenAt,
+            isBaseline ? 1 : 0,
+          ),
+      );
+      byIdentity.set(identity, {
+        chapter_identity: identity,
+        chapter_number: chapterNumber,
+        published_at: publishedAt,
+        first_seen_at: firstSeenAt,
+        is_baseline: isBaseline ? 1 : 0,
+      });
+      continue;
+    }
+
+    const storedNumber =
+      existing.chapter_number == null ? null : Number(existing.chapter_number);
+    const numberChanged = storedNumber !== chapterNumber;
+    const publicationChanged =
+      publishedAt != null && String(existing.published_at ?? "") !== publishedAt;
+    if (!numberChanged && !publicationChanged) continue;
+
+    writes.push(
+      db.prepare(`UPDATE source_chapter_seen
+        SET chapter_number = ?,
+            published_at = COALESCE(?, published_at)
+        WHERE source_key = ? AND chapter_identity = ?`)
+        .bind(chapterNumber, publishedAt, item.key, identity),
+    );
+    byIdentity.set(identity, {
+      ...existing,
+      chapter_number: chapterNumber,
+      published_at: publishedAt ?? existing.published_at ?? null,
+    });
+  }
+
+  for (let index = 0; index < writes.length; index += 50) {
+    await db.batch(writes.slice(index, index + 50));
+  }
 
   return {
     ...item,

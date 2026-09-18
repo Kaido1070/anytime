@@ -1,5 +1,4 @@
 import { ensureAdminSchema, isAdminUser, isSocialUser, sessionUser } from "../_admin.js";
-import { ensureAdminAccount } from "../_admin_provision.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -10,6 +9,8 @@ const PROGRESS_ACTIVITY_AGGREGATION_MS = 30 * 60 * 1000;
 const AVATAR_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AVATAR_IMAGE_FAILURE_TTL_MS = 5 * 60 * 1000;
 const avatarImageCache = new Map();
+const apiRuntimeReady = new WeakMap();
+const READING_OPEN_DEDUP_MS = 5 * 60 * 1000;
 
 const SEEDED_USERS = [
   {
@@ -550,10 +551,7 @@ export async function onRequest(context) {
   }
 
   try {
-    await ensureDatabase(db);
-    await ensureAdminSchema(db);
-    await db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '10')").run();
-    await ensureAdminAccount(db, context.env);
+    await ensureApiRuntime(db);
     return await route(request, url, db);
   } catch (error) {
     console.error("Anytime API error", error);
@@ -1239,12 +1237,22 @@ async function route(request, url, db) {
     if (!mangaId || !Number.isFinite(chapter) || chapter < 0) {
       return json({ error: "INVALID_READING_EVENT" }, 400);
     }
+
     const previous = await getLibraryActivityState(db, user.id, mangaId);
     const now = Date.now();
+    const cutoff = now - READING_OPEN_DEDUP_MS;
+
     await db.batch([
       db
-        .prepare("INSERT INTO reading_history (user_id, manga_id, chapter, read_at) VALUES (?, ?, ?, ?)")
-        .bind(user.id, mangaId, chapter, now),
+        .prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
+          SELECT ?, ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM reading_history
+            WHERE user_id = ? AND manga_id = ?
+              AND ABS(chapter - ?) < 0.000001
+              AND read_at >= ?
+          )`)
+        .bind(user.id, mangaId, chapter, now, user.id, mangaId, chapter, cutoff),
       db
         .prepare(`INSERT INTO user_library
           (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
@@ -1257,17 +1265,26 @@ async function route(request, url, db) {
             highest_reached_chapter = CASE
               WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
               ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
-            END`)
-        .bind(user.id, mangaId, now, now, now, chapter, chapter),
+            END
+          WHERE user_library.status = 'planned'
+             OR user_library.last_read_chapter IS NOT excluded.last_read_chapter
+             OR user_library.last_read_at IS NULL
+             OR user_library.last_read_at < ?
+             OR user_library.highest_reached_chapter IS NULL
+             OR user_library.highest_reached_chapter < excluded.highest_reached_chapter`)
+        .bind(user.id, mangaId, now, now, now, chapter, chapter, cutoff),
       db
         .prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
           VALUES (?, ?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET
             last_manga_id = excluded.last_manga_id,
             last_chapter = excluded.last_chapter,
-            updated_at = excluded.updated_at`)
+            updated_at = excluded.updated_at
+          WHERE user_state.last_manga_id IS NOT excluded.last_manga_id
+             OR user_state.last_chapter IS NOT excluded.last_chapter`)
         .bind(user.id, mangaId, chapter, now),
     ]);
+
     await recordReadingActivity(db, user.id, mangaId, chapter, previous, now);
     return json({ ok: true, readAt: now });
   }
@@ -1409,49 +1426,57 @@ async function route(request, url, db) {
 
     await db.batch([
       db
-        .prepare(
-          `INSERT INTO reading_progress
-            (user_id, manga_id, chapter, percent, completed, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-           ON CONFLICT(user_id, manga_id, chapter) DO UPDATE SET
-             percent = excluded.percent,
-             completed = CASE WHEN reading_progress.completed = 1 OR excluded.completed = 1 THEN 1 ELSE 0 END,
-             updated_at = excluded.updated_at
-           WHERE excluded.updated_at >= reading_progress.updated_at`,
-        )
+        .prepare(`INSERT INTO reading_progress
+          (user_id, manga_id, chapter, percent, completed, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, manga_id, chapter) DO UPDATE SET
+            percent = excluded.percent,
+            completed = CASE WHEN reading_progress.completed = 1 OR excluded.completed = 1 THEN 1 ELSE 0 END,
+            updated_at = excluded.updated_at
+          WHERE excluded.updated_at >= reading_progress.updated_at
+            AND (
+              ABS(reading_progress.percent - excluded.percent) >= 0.25
+              OR (reading_progress.completed = 0 AND excluded.completed = 1)
+            )`)
         .bind(user.id, mangaId, chapter, normalizedPercent, completed, updatedAt),
       db
-        .prepare(
-          `INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
-           VALUES (?, ?, ?, ?)
-           ON CONFLICT(user_id) DO UPDATE SET
-             last_manga_id = excluded.last_manga_id,
-             last_chapter = excluded.last_chapter,
-             updated_at = excluded.updated_at
-           WHERE excluded.updated_at >= user_state.updated_at`,
-        )
+        .prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            last_manga_id = excluded.last_manga_id,
+            last_chapter = excluded.last_chapter,
+            updated_at = excluded.updated_at
+          WHERE excluded.updated_at >= user_state.updated_at
+            AND (
+              user_state.last_manga_id IS NOT excluded.last_manga_id
+              OR user_state.last_chapter IS NOT excluded.last_chapter
+            )`)
         .bind(user.id, mangaId, chapter, updatedAt),
       db
         .prepare(`INSERT INTO user_library
           (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
-         VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
-         ON CONFLICT(user_id, manga_id) DO UPDATE SET
-           status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
-           updated_at = MAX(user_library.updated_at, excluded.updated_at),
-           last_read_at = CASE
-             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
-               THEN excluded.last_read_at
-             ELSE user_library.last_read_at
-           END,
-           last_read_chapter = CASE
-             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
-               THEN excluded.last_read_chapter
-             ELSE user_library.last_read_chapter
-           END,
-           highest_reached_chapter = CASE
-             WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
-             ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
-           END`)
+          VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, manga_id) DO UPDATE SET
+            status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
+            updated_at = MAX(user_library.updated_at, excluded.updated_at),
+            last_read_at = CASE
+              WHEN user_library.last_read_chapter IS NOT excluded.last_read_chapter
+                THEN excluded.last_read_at
+              ELSE user_library.last_read_at
+            END,
+            last_read_chapter = CASE
+              WHEN user_library.last_read_chapter IS NOT excluded.last_read_chapter
+                THEN excluded.last_read_chapter
+              ELSE user_library.last_read_chapter
+            END,
+            highest_reached_chapter = CASE
+              WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+              ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
+            END
+          WHERE user_library.status = 'planned'
+             OR user_library.last_read_chapter IS NOT excluded.last_read_chapter
+             OR user_library.highest_reached_chapter IS NULL
+             OR user_library.highest_reached_chapter < excluded.highest_reached_chapter`)
         .bind(user.id, mangaId, updatedAt, updatedAt, updatedAt, chapter, chapter),
     ]);
 
@@ -1726,6 +1751,70 @@ async function route(request, url, db) {
   return json({ error: "NOT_FOUND" }, 404);
 }
 
+async function ensureApiRuntime(db) {
+  let pending = apiRuntimeReady.get(db);
+  if (!pending) {
+    pending = (async () => {
+      let version = null;
+      try {
+        const row = await db
+          .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+          .first();
+        version = row?.value ?? null;
+      } catch {
+        // Fresh databases do not have schema_meta yet; bootstrap below.
+      }
+
+      if (version === "11") return;
+
+      await ensureDatabase(db);
+      await ensureAdminSchema(db);
+      await applyRuntimeOptimizationMigration(db);
+    })().catch((error) => {
+      apiRuntimeReady.delete(db);
+      throw error;
+    });
+    apiRuntimeReady.set(db, pending);
+  }
+  await pending;
+}
+
+async function applyRuntimeOptimizationMigration(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "11") return;
+
+  const now = Date.now();
+  const statements = [
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_status ON user_library(user_id, status, manga_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_chapter ON reading_history(user_id, manga_id, chapter)"),
+    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
+      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+      SELECT id, 'continue_reading', '', 1024, 1, ?, ?
+      FROM users WHERE role = 'user'`).bind(now, now),
+    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
+      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+      SELECT id, 'favorites', '', 2048, 1, ?, ?
+      FROM users WHERE role = 'user'`).bind(now, now),
+    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
+      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+      SELECT id, 'my_activity', '', 3072, 1, ?, ?
+      FROM users WHERE role = 'user'`).bind(now, now),
+    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
+      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+      SELECT id, 'friends_activity', '', 4096, 1, ?, ?
+      FROM users WHERE role = 'user'`).bind(now, now),
+    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
+      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+      SELECT l.user_id, 'custom_list', l.id, 5120 + l.position, 1, ?, ?
+      FROM user_lists l
+      JOIN users u ON u.id = l.user_id AND u.role = 'user'`).bind(now, now),
+    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '11')"),
+  ];
+  for (const statement of statements) await statement.run();
+}
+
 async function ensureDatabase(db) {
   await db
     .prepare(
@@ -1735,7 +1824,7 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "9" || version?.value === "10") return;
+  if (version?.value === "9" || version?.value === "10" || version?.value === "11") return;
   if (version?.value === "8") {
     await db.batch([
       ...avatarSchemaStatements(db),
@@ -2364,7 +2453,6 @@ async function syncUserProfileSections(db, userId) {
 }
 
 async function getUserProfileSections(db, userId, previewLimit = 8) {
-  await syncUserProfileSections(db, userId);
   const sectionResult = await db
     .prepare(
       `SELECT
