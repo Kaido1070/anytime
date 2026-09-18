@@ -227,13 +227,10 @@ function ReaderChapter({
       if (document.visibilityState === "hidden") persist(true);
     };
 
-    window.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("pagehide", () => persist(true));
-    document.addEventListener("visibilitychange", hidden);
-
     const pageHide = () => persist(true);
-    window.removeEventListener("pagehide", pageHide);
+    window.addEventListener("scroll", scroll, { passive: true });
     window.addEventListener("pagehide", pageHide);
+    document.addEventListener("visibilitychange", hidden);
 
     return () => {
       clearTimeout(timer);
