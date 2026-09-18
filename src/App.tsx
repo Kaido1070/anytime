@@ -16,6 +16,7 @@ import "./phase4.css";
 import "./account.css";
 import "./phase5.css";
 import "./phase6.css";
+import "./phase7.css";
 
 export default function App() {
   const { user, loading, error } = useLibrary();

@@ -2,6 +2,7 @@ const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PASSWORD_ITERATIONS = 210000;
 const MAX_JSON_BYTES = 32 * 1024;
+const PROGRESS_ACTIVITY_AGGREGATION_MS = 30 * 60 * 1000;
 
 const SEEDED_USERS = [
   {
@@ -81,7 +82,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 6, database: "ready" });
+    return json({ ok: true, phase: 7, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -189,6 +190,16 @@ async function route(request, url, db) {
     return json({ data: await getUserData(db, user.id) });
   }
 
+  if (request.method === "GET" && path === "activity/me") {
+    const { limit, offset } = activityPage(url, 12, 20);
+    return json(await getUserActivity(db, user.id, limit, offset));
+  }
+
+  if (request.method === "GET" && path === "activity/friends") {
+    const { limit, offset } = activityPage(url, 12, 20);
+    return json(await getFriendsActivity(db, user.id, limit, offset));
+  }
+
   if (request.method === "GET" && path === "profile/sections") {
     const requestedLimit = Number(url.searchParams.get("limit") ?? 8);
     const previewLimit = Number.isFinite(requestedLimit)
@@ -280,6 +291,12 @@ async function route(request, url, db) {
           now,
         ),
     ]);
+    await recordActivitySafely(db, {
+      userId: user.id,
+      type: "created_list",
+      listId: list.id,
+      now,
+    });
     return json({ list }, 201);
   }
 
@@ -341,7 +358,7 @@ async function route(request, url, db) {
         .bind(listId)
         .first();
       const now = Date.now();
-      await db.batch([
+      const [insertResult] = await db.batch([
         db
           .prepare(
             `INSERT OR IGNORE INTO user_list_items
@@ -352,6 +369,15 @@ async function route(request, url, db) {
         db.prepare("UPDATE user_lists SET updated_at = ? WHERE id = ? AND user_id = ?")
           .bind(now, listId, user.id),
       ]);
+      if (insertResult?.meta?.changes) {
+        await recordActivitySafely(db, {
+          userId: user.id,
+          type: "added_to_list",
+          mangaId,
+          listId,
+          now,
+        });
+      }
       return json({ ok: true }, 201);
     }
 
@@ -489,6 +515,7 @@ async function route(request, url, db) {
     const mangaId = safeId(body.mangaId);
     const status = libraryStatus(body.status) || "planned";
     if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+    const previous = await getLibraryActivityState(db, user.id, mangaId);
     const now = Date.now();
     await db
       .prepare(`INSERT INTO user_library
@@ -499,6 +526,7 @@ async function route(request, url, db) {
           updated_at = excluded.updated_at`)
       .bind(user.id, mangaId, status, now, now)
       .run();
+    await recordLibraryStatusActivity(db, user.id, mangaId, previous?.status ?? null, status, now);
     return json({ ok: true }, 201);
   }
 
@@ -507,11 +535,14 @@ async function route(request, url, db) {
     const mangaId = safeId(body.mangaId);
     const status = libraryStatus(body.status);
     if (!mangaId || !status) return json({ error: "INVALID_LIBRARY_ITEM" }, 400);
+    const previous = await getLibraryActivityState(db, user.id, mangaId);
+    const now = Date.now();
     const result = await db
       .prepare("UPDATE user_library SET status = ?, updated_at = ? WHERE user_id = ? AND manga_id = ?")
-      .bind(status, Date.now(), user.id, mangaId)
+      .bind(status, now, user.id, mangaId)
       .run();
     if (!result.meta?.changes) return json({ error: "LIBRARY_ITEM_NOT_FOUND" }, 404);
+    await recordLibraryStatusActivity(db, user.id, mangaId, previous?.status ?? null, status, now);
     return json({ ok: true });
   }
 
@@ -533,6 +564,7 @@ async function route(request, url, db) {
     if (!mangaId || !Number.isFinite(chapter) || chapter < 0) {
       return json({ error: "INVALID_READING_EVENT" }, 400);
     }
+    const previous = await getLibraryActivityState(db, user.id, mangaId);
     const now = Date.now();
     await db.batch([
       db
@@ -561,6 +593,7 @@ async function route(request, url, db) {
             updated_at = excluded.updated_at`)
         .bind(user.id, mangaId, chapter, now),
     ]);
+    await recordReadingActivity(db, user.id, mangaId, chapter, previous, now);
     return json({ ok: true, readAt: now });
   }
 
@@ -615,11 +648,16 @@ async function route(request, url, db) {
         .bind(user.id, latestOverall?.manga_id ?? null, latestOverall?.chapter ?? null, now),
     ]);
 
+    const correctedHighest = highestForWork?.chapter == null ? null : Number(highestForWork.chapter);
+    try {
+      await reconcileProgressActivity(db, user.id, mangaId, correctedHighest);
+    } catch (error) {
+      console.error("Progress activity reconciliation failed", { userId: user.id, mangaId, error });
+    }
     return json({
       ok: true,
       lastReadChapter: latestForWork?.chapter == null ? null : Number(latestForWork.chapter),
-      highestReachedChapter:
-        highestForWork?.chapter == null ? null : Number(highestForWork.chapter),
+      highestReachedChapter: correctedHighest,
     });
   }
 
@@ -650,10 +688,14 @@ async function route(request, url, db) {
     const body = await readJson(request);
     const mangaId = safeId(body.mangaId);
     if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
-    await db
+    const now = Date.now();
+    const result = await db
       .prepare("INSERT OR IGNORE INTO favorites (user_id, manga_id, created_at) VALUES (?, ?, ?)")
-      .bind(user.id, mangaId, Date.now())
+      .bind(user.id, mangaId, now)
       .run();
+    if (result.meta?.changes) {
+      await recordActivitySafely(db, { userId: user.id, type: "favorited_work", mangaId, now });
+    }
     return json({ ok: true });
   }
 
@@ -683,6 +725,7 @@ async function route(request, url, db) {
       return json({ error: "INVALID_PROGRESS" }, 400);
     }
 
+    const previous = await getLibraryActivityState(db, user.id, mangaId);
     const normalizedPercent = Math.max(0, Math.min(100, percent));
     const updatedAt = Number.isFinite(clientUpdatedAt)
       ? Math.min(Math.max(0, clientUpdatedAt), Date.now() + 5 * 60 * 1000)
@@ -737,6 +780,7 @@ async function route(request, url, db) {
         .bind(user.id, mangaId, updatedAt, updatedAt, updatedAt, chapter, chapter),
     ]);
 
+    await recordReadingActivity(db, user.id, mangaId, chapter, previous, Date.now());
     return json({ ok: true });
   }
 
@@ -1016,11 +1060,21 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "7") return;
+  if (version?.value === "8") return;
+  if (version?.value === "7") {
+    await db.batch([
+      ...profileActivitySectionMigrationStatements(db),
+      ...activitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
+    ]);
+    return;
+  }
   if (version?.value === "6") {
     await db.batch([
       ...friendRequestSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+      ...profileActivitySectionMigrationStatements(db),
+      ...activitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
     ]);
     return;
   }
@@ -1028,7 +1082,9 @@ async function ensureDatabase(db) {
     await db.batch([
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+      ...profileActivitySectionMigrationStatements(db),
+      ...activitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
     ]);
     return;
   }
@@ -1037,7 +1093,8 @@ async function ensureDatabase(db) {
       ...profileSectionSchemaStatements(db),
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+      ...activitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
     ]);
     return;
   }
@@ -1047,7 +1104,8 @@ async function ensureDatabase(db) {
       ...profileSectionSchemaStatements(db),
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+      ...activitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
     ]);
     return;
   }
@@ -1059,7 +1117,8 @@ async function ensureDatabase(db) {
       ...profileSectionSchemaStatements(db),
       ...profileVisibilitySchemaStatements(db),
       ...friendRequestSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+      ...activitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
     ]);
     return;
   }
@@ -1126,6 +1185,7 @@ async function ensureDatabase(db) {
     ...librarySchemaStatements(db),
     ...listSchemaStatements(db),
     ...profileSectionSchemaStatements(db),
+    ...activitySchemaStatements(db),
   ];
 
   for (const seeded of SEEDED_USERS) {
@@ -1199,7 +1259,7 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '8')"),
   );
   await db.batch(statements);
 }
@@ -1346,7 +1406,7 @@ function profileSectionSchemaStatements(db) {
   return [
     db.prepare(`CREATE TABLE IF NOT EXISTS user_profile_sections (
       user_id TEXT NOT NULL,
-      section_type TEXT NOT NULL CHECK (section_type IN ('continue_reading','favorites','custom_list')),
+      section_type TEXT NOT NULL CHECK (section_type IN ('continue_reading','favorites','custom_list','my_activity','friends_activity')),
       reference_id TEXT NOT NULL DEFAULT '',
       position REAL NOT NULL DEFAULT 0,
       is_visible INTEGER NOT NULL DEFAULT 1 CHECK (is_visible IN (0,1)),
@@ -1357,6 +1417,64 @@ function profileSectionSchemaStatements(db) {
     )`),
     db.prepare(
       "CREATE INDEX IF NOT EXISTS idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
+    ),
+  ];
+}
+
+function profileActivitySectionMigrationStatements(db) {
+  return [
+    db.prepare("DROP INDEX IF EXISTS idx_user_profile_sections_user_position"),
+    db.prepare(`CREATE TABLE user_profile_sections_v8 (
+      user_id TEXT NOT NULL,
+      section_type TEXT NOT NULL CHECK (section_type IN ('continue_reading','favorites','custom_list','my_activity','friends_activity')),
+      reference_id TEXT NOT NULL DEFAULT '',
+      position REAL NOT NULL DEFAULT 0,
+      is_visible INTEGER NOT NULL DEFAULT 1 CHECK (is_visible IN (0,1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, section_type, reference_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`INSERT INTO user_profile_sections_v8
+      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+      SELECT user_id, section_type, reference_id, position, is_visible, created_at, updated_at
+      FROM user_profile_sections`),
+    db.prepare("DROP TABLE user_profile_sections"),
+    db.prepare("ALTER TABLE user_profile_sections_v8 RENAME TO user_profile_sections"),
+    db.prepare(
+      "CREATE INDEX idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
+    ),
+  ];
+}
+
+function activitySchemaStatements(db) {
+  return [
+    db.prepare(`CREATE TABLE IF NOT EXISTS activity_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('started_work','progress_reached','completed_work','favorited_work','added_to_list','created_list')),
+      manga_id TEXT,
+      list_id TEXT,
+      chapter_number REAL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (list_id) REFERENCES user_lists(id) ON DELETE CASCADE,
+      CHECK (
+        (type IN ('started_work','completed_work','favorited_work') AND manga_id IS NOT NULL)
+        OR (type = 'progress_reached' AND manga_id IS NOT NULL AND chapter_number IS NOT NULL)
+        OR (type = 'added_to_list' AND manga_id IS NOT NULL AND list_id IS NOT NULL)
+        OR (type = 'created_list' AND list_id IS NOT NULL)
+      )
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_activity_user_created ON activity_events(user_id, created_at DESC, id DESC)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_activity_user_type_work_updated ON activity_events(user_id, type, manga_id, updated_at DESC, id DESC)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_activity_list ON activity_events(list_id, created_at DESC, id DESC)",
     ),
   ];
 }
@@ -1448,23 +1566,49 @@ async function syncUserProfileSections(db, userId) {
     .bind(userId)
     .all();
 
-  if (!(missing.results ?? []).length) return;
+  if ((missing.results ?? []).length) {
+    const last = await db
+      .prepare("SELECT MAX(position) AS position FROM user_profile_sections WHERE user_id = ?")
+      .bind(userId)
+      .first();
+    let position = Number(last?.position ?? 2048);
+    const statements = (missing.results ?? []).map((row) => {
+      position += 1024;
+      return db
+        .prepare(
+          `INSERT OR IGNORE INTO user_profile_sections
+            (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+           VALUES (?, 'custom_list', ?, ?, 1, ?, ?)`,
+        )
+        .bind(userId, row.id, position, now, now);
+    });
+    if (statements.length) await db.batch(statements);
+  }
+
+  const existingActivity = await db
+    .prepare(`SELECT section_type
+      FROM user_profile_sections
+      WHERE user_id = ? AND section_type IN ('my_activity','friends_activity')`)
+    .bind(userId)
+    .all();
+  const present = new Set((existingActivity.results ?? []).map((row) => row.section_type));
+  const missingActivity = ["my_activity", "friends_activity"].filter((type) => !present.has(type));
+  if (!missingActivity.length) return;
+
   const last = await db
     .prepare("SELECT MAX(position) AS position FROM user_profile_sections WHERE user_id = ?")
     .bind(userId)
     .first();
   let position = Number(last?.position ?? 2048);
-  const statements = (missing.results ?? []).map((row) => {
+  const statements = missingActivity.map((type) => {
     position += 1024;
     return db
-      .prepare(
-        `INSERT OR IGNORE INTO user_profile_sections
-          (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-         VALUES (?, 'custom_list', ?, ?, 1, ?, ?)`,
-      )
-      .bind(userId, row.id, position, now, now);
+      .prepare(`INSERT OR IGNORE INTO user_profile_sections
+        (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
+        VALUES (?, ?, '', ?, 1, ?, ?)`)
+      .bind(userId, type, position, now, now);
   });
-  if (statements.length) await db.batch(statements);
+  await db.batch(statements);
 }
 
 async function getUserProfileSections(db, userId, previewLimit = 8) {
@@ -1554,6 +1698,8 @@ function normalizeProfileSectionInput(value) {
     const sectionType =
       section?.sectionType === "continue_reading" ||
       section?.sectionType === "favorites" ||
+      section?.sectionType === "my_activity" ||
+      section?.sectionType === "friends_activity" ||
       section?.sectionType === "custom_list"
         ? section.sectionType
         : "";
@@ -1865,6 +2011,8 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
   // Private profiles stop here: hidden data is never queried or serialized.
   if (access === "private") return profile;
 
+  const activity = (await getUserActivity(db, targetId, Math.min(previewLimit, 10), 0)).events;
+
   const [
     libraryResult,
     listResult,
@@ -2003,6 +2151,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
 
   return {
     ...profile,
+    activity,
     library: (libraryResult.results ?? []).map((row) => ({
       mangaId: row.manga_id,
       status: row.status,
@@ -2236,6 +2385,205 @@ function normalizeFriendSearch(value) {
 
 function escapeSqlLike(value) {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
+function activityPage(url, defaultLimit = 12, maxLimit = 20) {
+  const requestedLimit = Number(url.searchParams.get("limit") ?? defaultLimit);
+  const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+  return {
+    limit: Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(maxLimit, Math.trunc(requestedLimit)))
+      : defaultLimit,
+    offset: Number.isFinite(requestedOffset)
+      ? Math.max(0, Math.trunc(requestedOffset))
+      : 0,
+  };
+}
+
+async function getLibraryActivityState(db, userId, mangaId) {
+  return await db
+    .prepare(`SELECT status, highest_reached_chapter
+      FROM user_library
+      WHERE user_id = ? AND manga_id = ?
+      LIMIT 1`)
+    .bind(userId, mangaId)
+    .first();
+}
+
+async function recordLibraryStatusActivity(db, userId, mangaId, previousStatus, nextStatus, now) {
+  if (previousStatus === nextStatus) return;
+  if (nextStatus === "reading") {
+    await recordActivitySafely(db, { userId, type: "started_work", mangaId, now });
+  } else if (nextStatus === "completed") {
+    await recordActivitySafely(db, { userId, type: "completed_work", mangaId, now });
+  }
+}
+
+async function recordReadingActivity(db, userId, mangaId, chapter, previous, now) {
+  if (!previous || previous.status === "planned") {
+    await recordActivitySafely(db, { userId, type: "started_work", mangaId, now });
+  }
+  const previousHighest =
+    previous?.highest_reached_chapter == null
+      ? null
+      : Number(previous.highest_reached_chapter);
+  if (previousHighest == null || chapter > previousHighest) {
+    try {
+      await recordProgressActivity(db, userId, mangaId, chapter, now);
+    } catch (error) {
+      console.error("Progress activity write failed", { userId, mangaId, chapter, error });
+    }
+  }
+}
+
+export function shouldAggregateProgressActivity(previousUpdatedAt, now) {
+  return (
+    Number.isFinite(Number(previousUpdatedAt)) &&
+    Number.isFinite(Number(now)) &&
+    Number(now) >= Number(previousUpdatedAt) &&
+    Number(now) - Number(previousUpdatedAt) <= PROGRESS_ACTIVITY_AGGREGATION_MS
+  );
+}
+
+export async function recordProgressActivity(db, userId, mangaId, chapter, now = Date.now()) {
+  const latest = await db
+    .prepare(`SELECT id, chapter_number, updated_at
+      FROM activity_events
+      WHERE user_id = ? AND type = 'progress_reached' AND manga_id = ?
+      ORDER BY updated_at DESC, id DESC
+      LIMIT 1`)
+    .bind(userId, mangaId)
+    .first();
+
+  if (latest?.chapter_number != null && chapter <= Number(latest.chapter_number)) return;
+
+  if (latest && shouldAggregateProgressActivity(Number(latest.updated_at), now)) {
+    await db
+      .prepare(`UPDATE activity_events
+        SET chapter_number = ?, created_at = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND type = 'progress_reached'`)
+      .bind(chapter, now, now, latest.id, userId)
+      .run();
+    return;
+  }
+
+  await db
+    .prepare(`INSERT INTO activity_events
+      (user_id, type, manga_id, list_id, chapter_number, created_at, updated_at)
+      VALUES (?, 'progress_reached', ?, NULL, ?, ?, ?)`)
+    .bind(userId, mangaId, chapter, now, now)
+    .run();
+}
+
+async function reconcileProgressActivity(db, userId, mangaId, correctedHighest) {
+  if (correctedHighest == null) {
+    await db
+      .prepare("DELETE FROM activity_events WHERE user_id = ? AND type = 'progress_reached' AND manga_id = ?")
+      .bind(userId, mangaId)
+      .run();
+    return;
+  }
+  await db
+    .prepare(`DELETE FROM activity_events
+      WHERE user_id = ? AND type = 'progress_reached' AND manga_id = ?
+        AND chapter_number > ?`)
+    .bind(userId, mangaId, correctedHighest)
+    .run();
+}
+
+async function recordActivitySafely(db, { userId, type, mangaId = null, listId = null, now = Date.now() }) {
+  try {
+    await db
+      .prepare(`INSERT INTO activity_events
+        (user_id, type, manga_id, list_id, chapter_number, created_at, updated_at)
+        VALUES (?, ?, ?, ?, NULL, ?, ?)`)
+      .bind(userId, type, mangaId, listId, now, now)
+      .run();
+  } catch (error) {
+    console.error("Activity write failed", { type, userId, error });
+  }
+}
+
+function mapActivityRow(row) {
+  return {
+    id: Number(row.id),
+    type: row.type,
+    user: publicUser({
+      id: row.user_id,
+      username: row.username,
+      name: row.name,
+      profile_visibility: row.profile_visibility,
+    }),
+    mangaId: row.manga_id ?? null,
+    list:
+      row.list_id && row.list_name
+        ? { id: row.list_id, name: row.list_name }
+        : null,
+    chapterNumber: row.chapter_number == null ? null : Number(row.chapter_number),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+
+async function getUserActivity(db, userId, limit = 12, offset = 0) {
+  const [countRow, result] = await Promise.all([
+    db
+      .prepare("SELECT COUNT(*) AS total FROM activity_events WHERE user_id = ?")
+      .bind(userId)
+      .first(),
+    db
+      .prepare(`SELECT
+          e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
+          e.created_at, e.updated_at,
+          u.username, u.name, u.profile_visibility,
+          l.name AS list_name
+        FROM activity_events e
+        JOIN users u ON u.id = e.user_id
+        LEFT JOIN user_lists l ON l.id = e.list_id
+        WHERE e.user_id = ?
+          AND (e.list_id IS NULL OR l.id IS NOT NULL)
+        ORDER BY e.created_at DESC, e.id DESC
+        LIMIT ? OFFSET ?`)
+      .bind(userId, limit, offset)
+      .all(),
+  ]);
+  const events = (result.results ?? []).map(mapActivityRow);
+  const total = Number(countRow?.total ?? 0);
+  return { events, total, hasMore: offset + events.length < total };
+}
+
+async function getFriendsActivity(db, userId, limit = 12, offset = 0) {
+  const [countRow, result] = await Promise.all([
+    db
+      .prepare(`SELECT COUNT(*) AS total
+        FROM activity_events e
+        JOIN friendships f ON f.user_id = ? AND f.friend_id = e.user_id
+        JOIN users u ON u.id = e.user_id
+        LEFT JOIN user_lists l ON l.id = e.list_id
+        WHERE u.profile_visibility = 'public'
+          AND (e.list_id IS NULL OR l.id IS NOT NULL)`)
+      .bind(userId)
+      .first(),
+    db
+      .prepare(`SELECT
+          e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
+          e.created_at, e.updated_at,
+          u.username, u.name, u.profile_visibility,
+          l.name AS list_name
+        FROM activity_events e
+        JOIN friendships f ON f.user_id = ? AND f.friend_id = e.user_id
+        JOIN users u ON u.id = e.user_id
+        LEFT JOIN user_lists l ON l.id = e.list_id
+        WHERE u.profile_visibility = 'public'
+          AND (e.list_id IS NULL OR l.id IS NOT NULL)
+        ORDER BY e.created_at DESC, e.id DESC
+        LIMIT ? OFFSET ?`)
+      .bind(userId, limit, offset)
+      .all(),
+  ]);
+  const events = (result.results ?? []).map(mapActivityRow);
+  const total = Number(countRow?.total ?? 0);
+  return { events, total, hasMore: offset + events.length < total };
 }
 
 async function importLegacyData(db, userId, data) {
