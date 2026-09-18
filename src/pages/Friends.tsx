@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { ActivityFeed } from "../components/ActivityFeed";
+import {
+  ProfileActivitySection,
+  ProfileIdentityHeader,
+  ProfileListsSection,
+  ProfileOverviewSkeleton,
+  ProfileReadingSection,
+  ProfileStatsSection,
+  ProfileSummaryStrip,
+} from "../components/ProfileOverview";
 import { useLibrary } from "../hooks/useLibrary";
 import { Back, SectionTitle } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
@@ -20,7 +29,7 @@ import type {
   UserProfileView,
 } from "../types";
 
-const PROFILE_PREVIEW_LIMIT = 8;
+const PROFILE_PREVIEW_LIMIT = 4;
 
 const libraryStatusLabels: Record<LibraryStatus, string> = {
   reading: "يقرأ حاليًا",
