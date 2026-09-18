@@ -42,7 +42,7 @@ test("friend search prioritizes exact and prefix matches before contains matches
   assert.match(api, /LIMIT \?/);
 });
 
-test("friends UI stays inside account section and has local friends/requests tabs", async () => {
+test("friends UI uses a dedicated hub with friends, requests and search tabs", async () => {
   const source = await readFile(new URL("../src/pages/Friends.tsx", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
