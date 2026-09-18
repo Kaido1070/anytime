@@ -124,12 +124,12 @@ function FavoritesSection({
     <section className="profile-module">
       <div className="profile-module-heading">
         <h2>المفضلة</h2>
-        <span className="profile-module-count">{profile.favoriteCount} عمل</span>
+        <span className="profile-module-count">{profile.favoriteCount} قصص</span>
       </div>
       <ProfileWorkStrip
         keys={profile.favorites}
         works={works}
-        emptyText="لا توجد أعمال في المفضلة."
+        emptyText="لا توجد قصص في المفضلة."
       />
     </section>
   );
@@ -145,10 +145,10 @@ function LibrarySection({
   return (
     <section className="profile-module">
       <div className="profile-module-heading">
-        <h2>الأعمال التي يتابعها</h2>
+        <h2>القصص التي يتابعها</h2>
       </div>
       {!entries.length ? (
-        <p className="profile-module-empty">لا توجد أعمال في المكتبة حتى الآن.</p>
+        <p className="profile-module-empty">لا توجد قصص في المكتبة حتى الآن.</p>
       ) : (
         <div className="profile-library-groups">
           {(["reading", "completed", "paused", "planned"] as LibraryStatus[]).map((status) => {
@@ -200,7 +200,7 @@ function ListSection({
       <ProfileWorkStrip
         keys={list.previewItems}
         works={works}
-        emptyText="لا توجد أعمال في هذه القائمة حتى الآن."
+        emptyText="لا توجد قصص في هذه القائمة حتى الآن."
       />
     </section>
   );
