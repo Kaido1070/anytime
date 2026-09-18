@@ -141,40 +141,7 @@
   }
 
   .login-covers {
-    position: static;
-    width: 100%;
-    height: 145px;
-    margin: 24px 0 0;
-    padding: 0;
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    direction: ltr;
-    overflow: visible;
-  }
-
-  .login-covers img {
-    display: block;
-    width: 82px;
-    height: 115px;
-    flex: 0 0 82px;
-    object-fit: cover;
-    border-radius: 7px;
-    box-shadow: 0 14px 24px #0006;
-  }
-
-  .login-covers img:first-child {
     display: none;
-  }
-
-  .login-covers img:nth-child(2) {
-    transform: rotate(-6deg);
-    z-index: 2;
-  }
-
-  .login-covers img:last-child {
-    transform: rotate(6deg) translateX(-14px);
-    z-index: 1;
   }
 
   .login-form {
