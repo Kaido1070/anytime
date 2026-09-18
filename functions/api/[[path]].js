@@ -1927,10 +1927,19 @@ async function applyUserIdentityV14(db) {
       db.prepare("UPDATE user_lists SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
       db.prepare("UPDATE user_profile_sections SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
       db.prepare("UPDATE activity_events SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE friend_requests SET pair_low_id = ? WHERE pair_low_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE friend_requests SET pair_high_id = ? WHERE pair_high_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE friend_requests SET requester_id = ? WHERE requester_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE friend_requests SET receiver_id = ? WHERE receiver_id = ?").bind(identity.id, source.id),
+      db.prepare(`UPDATE friend_requests
+        SET pair_low_id = CASE WHEN pair_low_id = ? THEN ? ELSE pair_low_id END,
+            pair_high_id = CASE WHEN pair_high_id = ? THEN ? ELSE pair_high_id END,
+            requester_id = CASE WHEN requester_id = ? THEN ? ELSE requester_id END,
+            receiver_id = CASE WHEN receiver_id = ? THEN ? ELSE receiver_id END
+        WHERE pair_low_id = ? OR pair_high_id = ? OR requester_id = ? OR receiver_id = ?`)
+        .bind(
+          source.id, identity.id,
+          source.id, identity.id,
+          source.id, identity.id,
+          source.id, identity.id,
+          source.id, source.id, source.id, source.id,
+        ),
       db.prepare("UPDATE admin_audit_log SET target_user_id = ? WHERE target_user_id = ?").bind(identity.id, source.id),
       db.prepare("DELETE FROM users WHERE id = ?").bind(source.id),
     ];
