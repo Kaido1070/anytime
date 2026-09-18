@@ -41,7 +41,7 @@ export function Account() {
             className="secondary account-settings-link"
             to={settingsOpen ? "/profile" : "/profile?tab=settings"}
           >
-            {settingsOpen ? "العودة للحساب" : "الإعدادات"}
+            {settingsOpen ? "العودة للحساب" : "⚙ الإعدادات"}
           </Link>
         </div>
       </header>

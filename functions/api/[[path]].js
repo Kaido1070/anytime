@@ -564,7 +564,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 8, database: "ready" });
+    return json({ ok: true, phase: 9, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -682,6 +682,27 @@ async function route(request, url, db) {
     await db
       .prepare("UPDATE users SET avatar_id = ?, updated_at = ? WHERE id = ?")
       .bind(avatar.id, now, user.id)
+      .run();
+    const updated = await db
+      .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
+      .bind(user.id)
+      .first();
+    return json({ user: publicUser(updated) });
+  }
+
+  if (request.method === "PUT" && path === "profile/name") {
+    const body = await readJson(request);
+    const name = normalizeDisplayName(body?.name);
+    if (!name) {
+      return json(
+        { error: "INVALID_DISPLAY_NAME", message: "اسم العرض مطلوب ويجب ألا يتجاوز 50 حرفًا." },
+        400,
+      );
+    }
+    const now = Date.now();
+    await db
+      .prepare("UPDATE users SET name = ?, updated_at = ? WHERE id = ?")
+      .bind(name, now, user.id)
       .run();
     const updated = await db
       .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
@@ -3501,6 +3522,15 @@ function normalizeUsername(value) {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase();
   return /^[a-z0-9_-]{2,32}$/.test(normalized) ? normalized : "";
+}
+
+function normalizeDisplayName(value) {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 50 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+    return "";
+  }
+  return normalized;
 }
 
 function profileVisibility(value) {

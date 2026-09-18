@@ -1,32 +1,104 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AvatarPicker } from "../components/AvatarPicker";
 import { UserAvatar } from "../components/UserAvatar";
 import { useLibrary } from "../hooks/useLibrary";
-import { sourceService } from "../services/sources";
+
+const DISPLAY_NAME_MAX_LENGTH = 50;
+const PASSWORD_MAX_LENGTH = 128;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+
+function normalizeDisplayName(value: string) {
+  const trimmed = value.trim();
+  if (
+    !trimmed ||
+    trimmed.length > DISPLAY_NAME_MAX_LENGTH ||
+    CONTROL_CHARACTERS.test(trimmed)
+  ) {
+    return null;
+  }
+  return trimmed;
+}
 
 export function Profile({ embedded = false }: { embedded?: boolean }) {
-  const { user, data, signOut, setAvatar, setProfileVisibility, changePassword } = useLibrary();
+  const {
+    user,
+    signOut,
+    setAvatar,
+    setDisplayName,
+    setProfileVisibility,
+    changePassword,
+  } = useLibrary();
+
+  const [displayName, setDisplayNameValue] = useState(user?.name ?? "");
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameMessage, setNameMessage] = useState("");
+  const [nameError, setNameError] = useState("");
+
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState("");
+
   const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState("");
   const [privacyError, setPrivacyError] = useState("");
+
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const favorites = (data?.favorites ?? []).filter((id) => sourceService.isSourceKey(id)).length;
-  const reading = new Set(
-    Object.values(data?.progress ?? {})
-      .filter((p) => sourceService.isSourceKey(p.mangaId))
-      .filter((p) => !data?.completed.includes(`${p.mangaId}:${p.chapter}`))
-      .map((p) => p.mangaId),
-  ).size;
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+
+  useEffect(() => {
+    setDisplayNameValue(user?.name ?? "");
+  }, [user?.name]);
+
+  async function submitDisplayName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (nameBusy) return;
+
+    setNameMessage("");
+    setNameError("");
+
+    const normalized = normalizeDisplayName(displayName);
+    if (!normalized) {
+      setNameError("اسم العرض مطلوب ويجب ألا يتجاوز 50 حرفًا.");
+      return;
+    }
+
+    if (normalized === user?.name) {
+      setDisplayNameValue(normalized);
+      setNameMessage("لا توجد تغييرات للحفظ.");
+      return;
+    }
+
+    setNameBusy(true);
+    try {
+      const updatedUser = await setDisplayName(normalized);
+      setDisplayNameValue(updatedUser.name);
+      setNameMessage("تم حفظ اسم العرض.");
+    } catch (cause) {
+      setNameError(
+        cause instanceof Error ? cause.message : "تعذر حفظ اسم العرض.",
+      );
+    } finally {
+      setNameBusy(false);
+    }
+  }
 
   async function changeVisibility(visibility: "public" | "private") {
     if (privacyBusy || user?.profileVisibility === visibility) return;
+
     setPrivacyBusy(true);
+    setPrivacyMessage("");
     setPrivacyError("");
+
     try {
       await setProfileVisibility(visibility);
+      setPrivacyMessage(
+        visibility === "public"
+          ? "أصبح حسابك عامًا."
+          : "أصبح حسابك خاصًا.",
+      );
     } catch (cause) {
       setPrivacyError(
         cause instanceof Error ? cause.message : "تعذر تحديث خصوصية الحساب.",
@@ -38,9 +110,11 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
 
   async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
+    if (passwordBusy) return;
+
     setPasswordMessage("");
     setPasswordError("");
+
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const currentPassword = String(form.get("currentPassword") ?? "");
@@ -48,161 +122,300 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
     const confirmPassword = String(form.get("confirmPassword") ?? "");
 
     if (newPassword !== confirmPassword) {
-      setPasswordError("تأكيد كلمة المرور غير مطابق.");
-      setBusy(false);
+      setPasswordError("كلمتا المرور الجديدتان غير متطابقتين.");
       return;
     }
 
+    if (newPassword.length < 4 || newPassword.length > PASSWORD_MAX_LENGTH) {
+      setPasswordError("كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر.");
+      return;
+    }
+
+    setPasswordBusy(true);
     try {
       await changePassword(currentPassword, newPassword);
       formElement.reset();
-      setPasswordMessage("تم تغيير كلمة المرور.");
+      setPasswordMessage("تم تحديث كلمة المرور.");
     } catch (cause) {
       setPasswordError(
         cause instanceof Error ? cause.message : "تعذر تغيير كلمة المرور.",
       );
     } finally {
-      setBusy(false);
+      setPasswordBusy(false);
     }
   }
 
+  async function handleSignOut() {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    setLogoutError("");
+    try {
+      await signOut();
+    } catch (cause) {
+      setLogoutError(
+        cause instanceof Error ? cause.message : "تعذر تسجيل الخروج الآن.",
+      );
+      setLogoutBusy(false);
+    }
+  }
+
+  const privacyDescription =
+    user?.profileVisibility === "public"
+      ? "يمكن للمستخدمين الآخرين رؤية ملفك العام، مكتبتك، قوائمك، أصدقائك وتقدم القراءة المسموح بعرضه."
+      : "سيظهر للآخرين اسمك وصورتك واسم المستخدم وحالة الحساب والمفضلة فقط.";
+
   return (
     <>
-      {embedded ? (
-        <div className="account-settings-intro">
+      <div className={"settings-page" + (embedded ? " embedded" : "")}>
+        <header className="settings-heading">
           <p className="eyebrow">الحساب والأمان</p>
           <h2>الإعدادات</h2>
-        </div>
-      ) : (
-        <>
-          <p className="eyebrow">حسابك في ANYTIME</p>
-          <h1>
-            حسابي<span className="accent">.</span>
-          </h1>
-          <div className="profile-heading">
-            <UserAvatar user={user} className="profile-avatar" loading="eager" />
-            <h2>{user?.name}</h2>
-            <p className="muted">@{user?.username}</p>
-          </div>
-          <div className="stats">
-            <div>
-              <strong>{favorites}</strong>
-              <span>المفضلة</span>
-            </div>
-            <div>
-              <strong>{reading}</strong>
-              <span>قيد القراءة</span>
-            </div>
-          </div>
-        </>
-      )}
-      <section className="profile-avatar-setting" aria-labelledby="profile-avatar-setting-title">
-        <UserAvatar user={user} className="profile-avatar-settings" loading="eager" />
-        <div className="profile-avatar-setting-copy">
-          <b id="profile-avatar-setting-title">الصورة الشخصية</b>
-          <span className="muted">اختر من مكتبة Wany الجاهزة. لا يوجد رفع صور من الجهاز.</span>
-        </div>
-        <button className="secondary" type="button" onClick={() => setAvatarPickerOpen(true)}>
-          تغيير
-        </button>
-      </section>
-
-      <div className="profile-info">
-        <p>
-          <span>الاسم الظاهر</span>
-          <b>{user?.name}</b>
-        </p>
-        <p>
-          <span>اسم المستخدم</span>
-          <b>@{user?.username}</b>
-        </p>
-        <p>
-          <span>المزامنة</span>
-          <b>محفوظة في حسابك</b>
-        </p>
-      </div>
-
-      <section className="profile-privacy-card" aria-labelledby="profile-privacy-title">
-        <div>
-          <p className="eyebrow">الخصوصية</p>
-          <h2 id="profile-privacy-title">ظهور الحساب</h2>
           <p className="muted">
-            العام يعرض مكتبتك وقوائمك وتقدمك الاجتماعي. الخاص يعرض هويتك ومفضلتك فقط.
+            إدارة بيانات حسابك وخصوصيته وأمانه من مكان واحد.
           </p>
-        </div>
-        <div className="profile-privacy-options" role="group" aria-label="خصوصية الحساب">
-          <button
-            type="button"
-            className={user?.profileVisibility === "public" ? "active" : ""}
-            aria-pressed={user?.profileVisibility === "public"}
-            disabled={privacyBusy}
-            onClick={() => void changeVisibility("public")}
-          >
-            عام
-          </button>
-          <button
-            type="button"
-            className={user?.profileVisibility !== "public" ? "active" : ""}
-            aria-pressed={user?.profileVisibility !== "public"}
-            disabled={privacyBusy}
-            onClick={() => void changeVisibility("private")}
-          >
-            خاص
-          </button>
-        </div>
-        {privacyError && <p className="error">{privacyError}</p>}
-      </section>
+        </header>
 
-      <div className="login-form" style={{ maxWidth: 460, margin: "34px auto 0" }}>
-        <p className="eyebrow">الأمان</p>
-        <h2>تغيير كلمة المرور</h2>
-        <form onSubmit={submitPassword}>
-          <label>
-            كلمة المرور الحالية
-            <input
-              name="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              required
+        <section className="settings-card" aria-labelledby="settings-account-title">
+          <div className="settings-card-header">
+            <div>
+              <p className="eyebrow">الحساب</p>
+              <h3 id="settings-account-title">بيانات الحساب</h3>
+            </div>
+          </div>
+
+          <form className="settings-form" onSubmit={submitDisplayName}>
+            <label className="settings-field">
+              <span>اسم العرض</span>
+              <input
+                name="displayName"
+                type="text"
+                value={displayName}
+                maxLength={DISPLAY_NAME_MAX_LENGTH}
+                autoComplete="name"
+                disabled={nameBusy}
+                onChange={(event) => setDisplayNameValue(event.target.value)}
+                required
+              />
+              <small>يظهر هذا الاسم في حسابك ولدى أصدقائك.</small>
+            </label>
+
+            <div className="settings-readonly" aria-label="اسم المستخدم">
+              <span>اسم المستخدم</span>
+              <b dir="ltr">@{user?.username ?? "—"}</b>
+              <small>غير قابل للتعديل حاليًا.</small>
+            </div>
+
+            {nameError && (
+              <p className="settings-feedback error" role="alert">
+                {nameError}
+              </p>
+            )}
+            {nameMessage && (
+              <p className="settings-feedback" role="status" aria-live="polite">
+                {nameMessage}
+              </p>
+            )}
+
+            <div className="settings-actions">
+              <button className="primary" type="submit" disabled={nameBusy}>
+                {nameBusy ? "جارٍ الحفظ…" : "حفظ اسم العرض"}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="settings-card" aria-labelledby="settings-avatar-title">
+          <div className="settings-card-header">
+            <div>
+              <p className="eyebrow">الصورة الشخصية</p>
+              <h3 id="settings-avatar-title">Avatar</h3>
+            </div>
+          </div>
+
+          <div className="settings-avatar-row">
+            <UserAvatar
+              user={user}
+              className="settings-avatar-preview"
+              loading="eager"
             />
-          </label>
-          <label>
-            كلمة المرور الجديدة
-            <input
-              name="newPassword"
-              type="password"
-              autoComplete="new-password"
-              minLength={4}
-              required
-            />
-          </label>
-          <label>
-            تأكيد كلمة المرور
-            <input
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              minLength={4}
-              required
-            />
-          </label>
-          {passwordError && <p className="error">{passwordError}</p>}
-          {passwordMessage && <p className="muted">{passwordMessage}</p>}
-          <button className="primary" disabled={busy}>
-            {busy ? "جاري الحفظ…" : "حفظ كلمة المرور"}
+            <div className="settings-avatar-copy">
+              <b>الصورة الحالية</b>
+              <span className="muted">
+                الاختيار فقط من مكتبة Wany. لا يوجد رفع صور من الجهاز.
+              </span>
+            </div>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => {
+                setAvatarMessage("");
+                setAvatarPickerOpen(true);
+              }}
+            >
+              تغيير الصورة
+            </button>
+          </div>
+
+          {avatarMessage && (
+            <p className="settings-feedback" role="status" aria-live="polite">
+              {avatarMessage}
+            </p>
+          )}
+        </section>
+
+        <section className="settings-card" aria-labelledby="settings-privacy-title">
+          <div className="settings-card-header">
+            <div>
+              <p className="eyebrow">الخصوصية</p>
+              <h3 id="settings-privacy-title">خصوصية الحساب</h3>
+            </div>
+          </div>
+
+          <div
+            className="settings-choice-group"
+            role="group"
+            aria-label="خصوصية الحساب"
+          >
+            <button
+              type="button"
+              className={user?.profileVisibility === "public" ? "active" : ""}
+              aria-pressed={user?.profileVisibility === "public"}
+              disabled={privacyBusy}
+              onClick={() => void changeVisibility("public")}
+            >
+              عام
+            </button>
+            <button
+              type="button"
+              className={user?.profileVisibility !== "public" ? "active" : ""}
+              aria-pressed={user?.profileVisibility !== "public"}
+              disabled={privacyBusy}
+              onClick={() => void changeVisibility("private")}
+            >
+              خاص
+            </button>
+          </div>
+
+          <p className="settings-privacy-description muted">
+            {privacyBusy ? "جارٍ تحديث الخصوصية…" : privacyDescription}
+          </p>
+
+          {privacyError && (
+            <p className="settings-feedback error" role="alert">
+              {privacyError}
+            </p>
+          )}
+          {privacyMessage && (
+            <p className="settings-feedback" role="status" aria-live="polite">
+              {privacyMessage}
+            </p>
+          )}
+        </section>
+
+        <section className="settings-card" aria-labelledby="settings-security-title">
+          <div className="settings-card-header">
+            <div>
+              <p className="eyebrow">الأمان</p>
+              <h3 id="settings-security-title">تغيير كلمة المرور</h3>
+            </div>
+          </div>
+
+          <form className="settings-form" onSubmit={submitPassword}>
+            <label className="settings-field">
+              <span>كلمة المرور الحالية</span>
+              <input
+                name="currentPassword"
+                type="password"
+                autoComplete="current-password"
+                maxLength={PASSWORD_MAX_LENGTH}
+                disabled={passwordBusy}
+                required
+              />
+            </label>
+
+            <label className="settings-field">
+              <span>كلمة المرور الجديدة</span>
+              <input
+                name="newPassword"
+                type="password"
+                autoComplete="new-password"
+                minLength={4}
+                maxLength={PASSWORD_MAX_LENGTH}
+                disabled={passwordBusy}
+                required
+              />
+            </label>
+
+            <label className="settings-field">
+              <span>تأكيد كلمة المرور الجديدة</span>
+              <input
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                minLength={4}
+                maxLength={PASSWORD_MAX_LENGTH}
+                disabled={passwordBusy}
+                required
+              />
+            </label>
+
+            {passwordError && (
+              <p className="settings-feedback error" role="alert">
+                {passwordError}
+              </p>
+            )}
+            {passwordMessage && (
+              <p className="settings-feedback" role="status" aria-live="polite">
+                {passwordMessage}
+              </p>
+            )}
+
+            <div className="settings-actions">
+              <button className="primary" type="submit" disabled={passwordBusy}>
+                {passwordBusy ? "جارٍ التحديث…" : "تحديث كلمة المرور"}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section
+          className="settings-card settings-session-card"
+          aria-labelledby="settings-session-title"
+        >
+          <div className="settings-card-header">
+            <div>
+              <p className="eyebrow">الجلسة</p>
+              <h3 id="settings-session-title">تسجيل الخروج</h3>
+            </div>
+          </div>
+
+          <p className="muted">
+            ينهي هذا الإجراء الجلسة الحالية ويعيدك إلى شاشة تسجيل الدخول.
+          </p>
+
+          {logoutError && (
+            <p className="settings-feedback error" role="alert">
+              {logoutError}
+            </p>
+          )}
+
+          <button
+            className="secondary settings-logout"
+            type="button"
+            disabled={logoutBusy}
+            onClick={() => void handleSignOut()}
+          >
+            {logoutBusy ? "جارٍ تسجيل الخروج…" : "تسجيل الخروج"}
           </button>
-        </form>
+        </section>
       </div>
-
-      <button className="secondary signout" onClick={signOut}>
-        تسجيل الخروج <span>↗</span>
-      </button>
 
       {avatarPickerOpen && (
         <AvatarPicker
           currentAvatarId={user?.avatarId ?? null}
           onSave={async (avatarId) => {
             await setAvatar(avatarId);
+            setAvatarMessage("تم تحديث الصورة الشخصية.");
           }}
           onClose={() => setAvatarPickerOpen(false)}
         />

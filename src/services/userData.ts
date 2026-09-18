@@ -50,6 +50,7 @@ export interface UserDataService {
   getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
   getAvatarLibrary(): Promise<AvatarSeries[]>;
   setAvatar(avatarId: string): Promise<User>;
+  setDisplayName(name: string): Promise<User>;
   setProfileVisibility(visibility: ProfileVisibility): Promise<User>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
@@ -480,6 +481,19 @@ class ApiUserDataService implements UserDataService {
     const result = await this.request<{ user: User }>("profile/avatar", {
       method: "PUT",
       body: JSON.stringify({ avatarId }),
+    });
+    this.currentUser = normalizeUser(result.user);
+    return this.currentUser;
+  }
+
+  async setDisplayName(name: string) {
+    const normalized = name.trim();
+    if (!normalized || normalized.length > 50 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+      throw new Error("اسم العرض مطلوب ويجب ألا يتجاوز 50 حرفًا.");
+    }
+    const result = await this.request<{ user: User }>("profile/name", {
+      method: "PUT",
+      body: JSON.stringify({ name: normalized }),
     });
     this.currentUser = normalizeUser(result.user);
     return this.currentUser;

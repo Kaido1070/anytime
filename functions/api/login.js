@@ -55,7 +55,7 @@ export async function onRequestPost(context) {
 
     let user = await db
       .prepare(
-        "SELECT id, username, name, profile_visibility, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, profile_visibility, avatar_id, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
       )
       .bind(username)
       .first();
@@ -229,6 +229,7 @@ function publicUser(row) {
     username: row.username,
     name: row.name,
     profileVisibility: row.profile_visibility === "public" ? "public" : "private",
+    avatarId: row.avatar_id ?? null,
   };
 }
 

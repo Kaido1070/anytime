@@ -1,0 +1,253 @@
+.settings-page {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 26px 0 36px;
+  display: grid;
+  gap: 16px;
+}
+
+.settings-heading {
+  padding-bottom: 4px;
+}
+
+.settings-heading .eyebrow {
+  margin-bottom: 7px;
+}
+
+.settings-heading h2 {
+  font-size: 25px;
+}
+
+.settings-heading .muted {
+  max-width: 560px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.settings-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-card-header .eyebrow {
+  margin-bottom: 5px;
+}
+
+.settings-card-header h3 {
+  font-size: 16px;
+}
+
+.settings-form {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+  color: #deded9;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.settings-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 12px;
+  border: 1px solid #3a3d3f;
+  border-radius: 10px;
+  background: #1b1d1f;
+  color: #eeeee9;
+}
+
+.settings-field input:disabled {
+  opacity: 0.68;
+}
+
+.settings-field small,
+.settings-readonly small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.settings-readonly {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 14px;
+  padding: 12px;
+  border: 1px solid #343638;
+  border-radius: 10px;
+  background: #1f2123;
+}
+
+.settings-readonly > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-readonly > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #d9dad6;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.settings-readonly > small {
+  grid-column: 1 / -1;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.settings-actions .primary {
+  min-width: 150px;
+}
+
+.settings-avatar-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-avatar-preview {
+  width: 64px;
+  height: 64px;
+  font-size: 21px;
+}
+
+.settings-avatar-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.settings-avatar-copy b {
+  font-size: 12px;
+}
+
+.settings-avatar-copy .muted {
+  font-size: 10px;
+}
+
+.settings-choice-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #3a3d3f;
+  border-radius: 10px;
+  background: #202224;
+}
+
+.settings-choice-group button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+}
+
+.settings-choice-group button.active {
+  background: #303332;
+  color: var(--accent);
+}
+
+.settings-privacy-description {
+  min-height: 38px;
+  font-size: 11px;
+}
+
+.settings-feedback {
+  margin: -2px 0 0;
+  color: #c8d6c7;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.settings-feedback.error {
+  color: #e4aaaa;
+}
+
+.settings-session-card {
+  margin-top: 4px;
+}
+
+.settings-session-card > .muted {
+  font-size: 11px;
+}
+
+.settings-logout {
+  justify-self: start;
+  min-width: 150px;
+}
+
+@media (max-width: 759px) {
+  .settings-page {
+    padding-top: 20px;
+    padding-bottom: max(34px, env(safe-area-inset-bottom));
+    gap: 13px;
+  }
+
+  .settings-heading h2 {
+    font-size: 23px;
+  }
+
+  .settings-card {
+    padding: 15px;
+    gap: 14px;
+  }
+
+  .settings-avatar-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .settings-avatar-preview {
+    width: 56px;
+    height: 56px;
+    font-size: 18px;
+  }
+
+  .settings-avatar-row > .secondary {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .settings-actions .primary,
+  .settings-logout {
+    width: 100%;
+  }
+
+  .settings-readonly {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-readonly > b {
+    direction: ltr;
+    text-align: right;
+  }
+
+  .settings-readonly > small {
+    grid-column: auto;
+  }
+}
