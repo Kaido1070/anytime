@@ -81,7 +81,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 4, database: "ready" });
+    return json({ ok: true, phase: 5, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -94,7 +94,7 @@ async function route(request, url, db) {
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, profile_visibility, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
       )
       .bind(username)
       .first();
@@ -774,11 +774,19 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "5") return;
+  if (version?.value === "6") return;
+  if (version?.value === "5") {
+    await db.batch([
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+    ]);
+    return;
+  }
   if (version?.value === "4") {
     await db.batch([
       ...profileSectionSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
     ]);
     return;
   }
@@ -786,7 +794,8 @@ async function ensureDatabase(db) {
     await db.batch([
       ...listSchemaStatements(db),
       ...profileSectionSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
     ]);
     return;
   }
@@ -796,7 +805,8 @@ async function ensureDatabase(db) {
       ...libraryBackfillStatements(db),
       ...listSchemaStatements(db),
       ...profileSectionSchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      ...profileVisibilitySchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
     ]);
     return;
   }
@@ -807,6 +817,8 @@ async function ensureDatabase(db) {
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE COLLATE NOCASE,
       name TEXT NOT NULL,
+      profile_visibility TEXT NOT NULL DEFAULT 'private'
+        CHECK (profile_visibility IN ('public','private')),
       password_salt TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_iterations INTEGER NOT NULL DEFAULT 210000,
@@ -933,7 +945,7 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '5')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
   );
   await db.batch(statements);
 }
@@ -1091,6 +1103,17 @@ function profileSectionSchemaStatements(db) {
     )`),
     db.prepare(
       "CREATE INDEX IF NOT EXISTS idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
+    ),
+  ];
+}
+
+function profileVisibilitySchemaStatements(db) {
+  return [
+    db.prepare(`ALTER TABLE users
+      ADD COLUMN profile_visibility TEXT NOT NULL DEFAULT 'private'
+      CHECK (profile_visibility IN ('public','private'))`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_users_profile_visibility ON users(profile_visibility, id)",
     ),
   ];
 }
@@ -1434,7 +1457,7 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name
+         u.id, u.username, u.name, u.profile_visibility
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -1451,7 +1474,7 @@ async function getSession(request, db) {
   }
   return {
     tokenHash,
-    user: { id: row.id, username: row.username, name: row.name },
+    user: publicUser(row),
   };
 }
 
@@ -1734,7 +1757,12 @@ function getCookie(request, name) {
 }
 
 function publicUser(row) {
-  return { id: row.id, username: row.username, name: row.name };
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    profileVisibility: row.profile_visibility === "public" ? "public" : "private",
+  };
 }
 
 function normalizeUsername(value) {
