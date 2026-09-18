@@ -780,7 +780,7 @@ async function route(request, url, db) {
         .bind(user.id, mangaId, updatedAt, updatedAt, updatedAt, chapter, chapter),
     ]);
 
-    await recordReadingActivity(db, user.id, mangaId, chapter, previous, updatedAt);
+    await recordReadingActivity(db, user.id, mangaId, chapter, previous, Date.now());
     return json({ ok: true });
   }
 
