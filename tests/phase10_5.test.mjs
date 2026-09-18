@@ -172,3 +172,19 @@ test("FYP implementation centralizes weights, excludes known works, caches by al
   assert.match(page, /tasteSignature/);
   assert.match(page, /algorithmVersion/);
 });
+
+
+test("New page is a flat 24-hour chapter timeline", async () => {
+  const [page, feed] = await Promise.all([
+    readFile(new URL("../src/pages/NewChapters.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/services/newChapters.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(feed, /NEW_CHAPTER_WINDOW_MS = 24 \* 60 \* 60_000/);
+  assert.match(feed, /chapter\.releaseAt >= cutoff/);
+  assert.match(page, /page\.all/);
+  assert.match(page, /b\.chapter\.releaseAt - a\.chapter\.releaseAt/);
+  assert.match(page, /آخر 24 ساعة/);
+  assert.doesNotMatch(page, /متابعتي/);
+  assert.doesNotMatch(page, /new-work-group/);
+});
