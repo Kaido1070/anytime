@@ -3,7 +3,9 @@ import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
 
 export function Profile({ embedded = false }: { embedded?: boolean }) {
-  const { user, data, signOut, changePassword } = useLibrary();
+  const { user, data, signOut, setProfileVisibility, changePassword } = useLibrary();
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [privacyError, setPrivacyError] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,6 +17,21 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
       .filter((p) => !data?.completed.includes(`${p.mangaId}:${p.chapter}`))
       .map((p) => p.mangaId),
   ).size;
+
+  async function changeVisibility(visibility: "public" | "private") {
+    if (privacyBusy || user?.profileVisibility === visibility) return;
+    setPrivacyBusy(true);
+    setPrivacyError("");
+    try {
+      await setProfileVisibility(visibility);
+    } catch (cause) {
+      setPrivacyError(
+        cause instanceof Error ? cause.message : "تعذر تحديث خصوصية الحساب.",
+      );
+    } finally {
+      setPrivacyBusy(false);
+    }
+  }
 
   async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,6 +107,37 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
           <b>محفوظة في حسابك</b>
         </p>
       </div>
+
+      <section className="profile-privacy-card" aria-labelledby="profile-privacy-title">
+        <div>
+          <p className="eyebrow">الخصوصية</p>
+          <h2 id="profile-privacy-title">ظهور الحساب</h2>
+          <p className="muted">
+            العام يعرض مكتبتك وقوائمك وتقدمك الاجتماعي. الخاص يعرض هويتك ومفضلتك فقط.
+          </p>
+        </div>
+        <div className="profile-privacy-options" role="group" aria-label="خصوصية الحساب">
+          <button
+            type="button"
+            className={user?.profileVisibility === "public" ? "active" : ""}
+            aria-pressed={user?.profileVisibility === "public"}
+            disabled={privacyBusy}
+            onClick={() => void changeVisibility("public")}
+          >
+            عام
+          </button>
+          <button
+            type="button"
+            className={user?.profileVisibility !== "public" ? "active" : ""}
+            aria-pressed={user?.profileVisibility !== "public"}
+            disabled={privacyBusy}
+            onClick={() => void changeVisibility("private")}
+          >
+            خاص
+          </button>
+        </div>
+        {privacyError && <p className="error">{privacyError}</p>}
+      </section>
 
       <div className="login-form" style={{ maxWidth: 460, margin: "34px auto 0" }}>
         <p className="eyebrow">الأمان</p>
