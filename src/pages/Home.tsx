@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router-dom";
+import { ActivityFeed } from "../components/ActivityFeed";
 import { ProfileSectionEditor } from "../components/ProfileSectionEditor";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { useLibrary } from "../hooks/useLibrary";
@@ -13,6 +14,7 @@ import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { userDataService } from "../services/userData";
 import type {
+  ActivityEvent,
   LibraryEntry,
   SourceManga,
   UserProfileSection,
@@ -20,6 +22,7 @@ import type {
 } from "../types";
 
 const PREVIEW_LIMIT = 6;
+const ACTIVITY_PREVIEW_LIMIT = 12;
 
 type ContinueCard = {
   entry: LibraryEntry;
@@ -150,6 +153,8 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
   const [persistedSections, setPersistedSections] = useState<UserProfileSection[]>([]);
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
   const [continueSeries, setContinueSeries] = useState<Record<string, SourceManga>>({});
+  const [myActivity, setMyActivity] = useState<ActivityEvent[]>([]);
+  const [friendsActivity, setFriendsActivity] = useState<ActivityEvent[]>([]);
   const [loadingSections, setLoadingSections] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [savingSections, setSavingSections] = useState(false);
@@ -201,6 +206,56 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
   const favoritesVisible = visibleSections.some(
     (section) => section.sectionType === "favorites",
   );
+  const myActivityVisible = visibleSections.some(
+    (section) => section.sectionType === "my_activity",
+  );
+  const friendsActivityVisible = visibleSections.some(
+    (section) => section.sectionType === "friends_activity",
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (!myActivityVisible) {
+      setMyActivity([]);
+      return;
+    }
+    userDataService
+      .getMyActivity(ACTIVITY_PREVIEW_LIMIT)
+      .then((feed) => {
+        if (active) setMyActivity(feed.events);
+      })
+      .catch((cause) => {
+        if (active) {
+          setMyActivity([]);
+          setPageError(cause instanceof Error ? cause.message : "تعذر تحميل نشاطك.");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [myActivityVisible]);
+
+  useEffect(() => {
+    let active = true;
+    if (!friendsActivityVisible) {
+      setFriendsActivity([]);
+      return;
+    }
+    userDataService
+      .getFriendsActivity(ACTIVITY_PREVIEW_LIMIT)
+      .then((feed) => {
+        if (active) setFriendsActivity(feed.events);
+      })
+      .catch((cause) => {
+        if (active) {
+          setFriendsActivity([]);
+          setPageError(cause instanceof Error ? cause.message : "تعذر تحميل نشاط الأصدقاء.");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [friendsActivityVisible]);
 
   const workKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -349,6 +404,29 @@ export function Home({ embedded = false }: { embedded?: boolean }) {
           items={favoriteItems}
           to="/favorites"
           emptyText="ما أضفت أعمالًا إلى المفضلة حتى الآن."
+        />
+      );
+    }
+
+    if (section.sectionType === "my_activity") {
+      return (
+        <ActivityFeed
+          key={section.key}
+          title="نشاطي"
+          events={myActivity}
+          emptyText="ما عندك نشاط حتى الآن. ابدأ القراءة وسيظهر نشاطك هنا."
+        />
+      );
+    }
+
+    if (section.sectionType === "friends_activity") {
+      return (
+        <ActivityFeed
+          key={section.key}
+          title="نشاط الأصدقاء"
+          events={friendsActivity}
+          showActor
+          emptyText="لا يوجد نشاط جديد من أصدقائك."
         />
       );
     }
