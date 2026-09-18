@@ -3,11 +3,9 @@ import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { useLibrary } from "./hooks/useLibrary";
 import { AppLayout } from "./layouts/AppLayout";
 import { Login } from "./pages/Login";
-import { Home } from "./pages/Home";
 import { Favorites } from "./pages/Favorites";
 import { Friends, FriendProfile } from "./pages/Friends";
-import { Profile } from "./pages/Profile";
-import { Lists } from "./pages/Lists";
+import { Account } from "./pages/Account";
 import { UserList } from "./pages/UserList";
 import { Discover } from "./pages/Discover";
 import { SourceMangaDetails } from "./pages/SourceMangaDetails";
@@ -15,6 +13,7 @@ import { SourceReader } from "./pages/SourceReader";
 import "./phase3.css";
 import "./lists.css";
 import "./phase4.css";
+import "./account.css";
 
 export default function App() {
   const { user, loading, error } = useLibrary();
@@ -37,23 +36,23 @@ export default function App() {
         <Login />
       ) : (
         <Routes>
-          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<Navigate to="/profile" replace />} />
           <Route element={<AppLayout />}>
-            <Route index element={<Home />} />
+            <Route index element={<Navigate to="/profile" replace />} />
             <Route path="discover" element={<Discover />} />
             <Route path="source/:key" element={<SourceMangaDetails />} />
             <Route path="favorites" element={<Favorites />} />
-            <Route path="lists" element={<Lists />} />
+            <Route path="lists" element={<Navigate to="/profile?tab=lists" replace />} />
             <Route path="lists/:id" element={<UserList />} />
             <Route path="friends" element={<Friends />} />
             <Route path="friends/:id" element={<FriendProfile />} />
-            <Route path="profile" element={<Profile />} />
+            <Route path="profile" element={<Account />} />
             <Route
               path="*"
               element={
                 <>
                   <h1>الصفحة غير موجودة</h1>
-                  <Link to="/">العودة للرئيسية</Link>
+                  <Link to="/profile">العودة لحسابي</Link>
                 </>
               }
             />
