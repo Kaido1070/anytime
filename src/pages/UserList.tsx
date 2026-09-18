@@ -12,7 +12,7 @@ import { Back, Icon } from "../components/UI";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { userDataService } from "../services/userData";
-import type { SourceManga, UserListItem, UserListSummary } from "../types";
+import type { SourceManga, UserListDetail, UserListItem } from "../types";
 
 type DragState = {
   mangaId: string;
@@ -35,7 +35,7 @@ export function UserList() {
   const { id = "" } = useParams();
   const listId = decodeURIComponent(id);
   const navigate = useNavigate();
-  const [list, setList] = useState<UserListSummary | null>(null);
+  const [list, setList] = useState<Omit<UserListDetail, "items"> | null>(null);
   const [items, setItems] = useState<UserListItem[]>([]);
   const itemsRef = useRef<UserListItem[]>([]);
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
@@ -50,6 +50,11 @@ export function UserList() {
   const [busyEdit, setBusyEdit] = useState(false);
   const [busyDelete, setBusyDelete] = useState(false);
   const [error, setError] = useState("");
+  const canManage = list?.canManage !== false;
+  const backTo =
+    list?.owner && list.canManage === false
+      ? `/friends/${list.owner.id}`
+      : "/lists";
 
   const updateItems = useCallback((next: UserListItem[]) => {
     itemsRef.current = next;
@@ -136,7 +141,7 @@ export function UserList() {
     event: ReactPointerEvent<HTMLButtonElement>,
     mangaId: string,
   ) => {
-    if (savingOrder || event.button !== 0) return;
+    if (!canManage || savingOrder || event.button !== 0) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const snapshot = [...itemsRef.current];
@@ -169,7 +174,7 @@ export function UserList() {
   };
 
   const moveByKeyboard = async (mangaId: string, delta: number) => {
-    if (savingOrder) return;
+    if (!canManage || savingOrder) return;
     const snapshot = [...itemsRef.current];
     const index = snapshot.findIndex((item) => item.mangaId === mangaId);
     const targetIndex = index + delta;
@@ -182,6 +187,7 @@ export function UserList() {
   };
 
   const removeItem = async (mangaId: string) => {
+    if (!canManage) return;
     const snapshot = [...itemsRef.current];
     updateItems(snapshot.filter((item) => item.mangaId !== mangaId));
     setList((current) => current ? { ...current, itemCount: Math.max(0, current.itemCount - 1) } : current);
@@ -196,6 +202,7 @@ export function UserList() {
   };
 
   const saveEdit = async (name: string, description: string) => {
+    if (!canManage) return;
     setBusyEdit(true);
     setError("");
     try {
@@ -210,7 +217,7 @@ export function UserList() {
   };
 
   const deleteList = async () => {
-    if (busyDelete) return;
+    if (!canManage || busyDelete) return;
     setBusyDelete(true);
     setError("");
     try {
@@ -226,7 +233,7 @@ export function UserList() {
   if (loading) {
     return (
       <>
-        <Back to="/lists" />
+        <Back to={backTo} />
         <div className="list-detail-loading" aria-label="جاري تحميل القائمة">
           <span />
           <span />
@@ -239,7 +246,7 @@ export function UserList() {
   if (!list) {
     return (
       <>
-        <Back to="/lists" />
+        <Back to={backTo} />
         <h1>تعذر فتح القائمة</h1>
         <p className="error">{error || "القائمة غير موجودة."}</p>
       </>
@@ -248,21 +255,23 @@ export function UserList() {
 
   return (
     <>
-      <Back to="/lists" />
+      <Back to={backTo} />
       <header className="list-detail-header">
         <div>
           <p className="eyebrow">{list.itemCount} عمل</p>
           <h1>{list.name}<span className="accent">.</span></h1>
           {list.description && <p className="muted">{list.description}</p>}
         </div>
-        <div className="list-detail-actions">
-          <button className="secondary" type="button" onClick={() => setShowEdit(true)}>
-            تعديل القائمة
-          </button>
-          <button className="list-danger-button" type="button" onClick={() => setShowDelete(true)}>
-            حذف
-          </button>
-        </div>
+        {canManage && (
+          <div className="list-detail-actions">
+            <button className="secondary" type="button" onClick={() => setShowEdit(true)}>
+              تعديل القائمة
+            </button>
+            <button className="list-danger-button" type="button" onClick={() => setShowDelete(true)}>
+              حذف
+            </button>
+          </div>
+        )}
       </header>
 
       {savingOrder && <p className="list-saving-order" role="status">جاري حفظ الترتيب…</p>}
@@ -272,8 +281,8 @@ export function UserList() {
         <div className="lists-empty-state list-detail-empty">
           <span className="list-card-icon"><Icon name="lists" /></span>
           <h2>هذه القائمة فارغة</h2>
-          <p>أضف أعمالًا إليها من صفحات الأعمال.</p>
-          <Link className="primary" to="/discover">استكشف الأعمال</Link>
+          <p>{canManage ? "أضف أعمالًا إليها من صفحات الأعمال." : "لا توجد أعمال في هذه القائمة حتى الآن."}</p>
+          {canManage && <Link className="primary" to="/discover">استكشف الأعمال</Link>}
         </div>
       ) : (
         <section className="list-sortable" aria-label={`أعمال قائمة ${list.name}`}>
@@ -286,7 +295,7 @@ export function UserList() {
                   data-list-work-id={entry.mangaId}
                   key={entry.mangaId}
                 >
-                  <button
+                  {canManage && <button
                     className="list-drag-handle"
                     type="button"
                     aria-label={`تغيير ترتيب العنصر ${index + 1}`}
@@ -300,12 +309,16 @@ export function UserList() {
                     }}
                   >
                     <span aria-hidden="true">☰</span>
-                  </button>
+                  </button>}
                   <div className="list-work-copy">
                     <b>{entry.mangaId}</b>
                     <small>تعذر تحميل بيانات العمل من المصدر حاليًا.</small>
                   </div>
-                  <button className="list-remove" type="button" onClick={() => void removeItem(entry.mangaId)}>إزالة</button>
+                  {canManage && (
+                    <button className="list-remove" type="button" onClick={() => void removeItem(entry.mangaId)}>
+                      إزالة
+                    </button>
+                  )}
                 </article>
               );
             }
@@ -357,16 +370,18 @@ export function UserList() {
                   </span>
                 </Link>
 
-                <button className="list-remove" type="button" onClick={() => void removeItem(entry.mangaId)}>
-                  إزالة
-                </button>
+                {canManage && (
+                  <button className="list-remove" type="button" onClick={() => void removeItem(entry.mangaId)}>
+                    إزالة
+                  </button>
+                )}
               </article>
             );
           })}
         </section>
       )}
 
-      <ListEditorDialog
+      {canManage && <ListEditorDialog
         open={showEdit}
         title="تعديل القائمة"
         submitLabel="حفظ"
@@ -378,9 +393,9 @@ export function UserList() {
           if (!busyEdit) setShowEdit(false);
         }}
         onSubmit={saveEdit}
-      />
+      />}
 
-      {showDelete && (
+      {canManage && showDelete && (
         <div
           className="list-dialog-backdrop"
           onMouseDown={(event) => {
