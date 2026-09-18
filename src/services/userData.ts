@@ -7,6 +7,8 @@ import type {
   UserData,
   UserListDetail,
   UserListSummary,
+  UserProfileSection,
+  UserProfileSectionInput,
 } from "../types";
 
 export interface UserDataService {
@@ -34,6 +36,8 @@ export interface UserDataService {
     beforeId?: string | null,
     afterId?: string | null,
   ): Promise<void>;
+  getProfileSections(previewLimit?: number): Promise<UserProfileSection[]>;
+  saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
@@ -65,6 +69,20 @@ class ApiError extends Error {
 const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|ml):/.test(value));
 const isListId = (value?: string | null) =>
   Boolean(value && /^[a-zA-Z0-9_-]{1,128}$/.test(value));
+const isProfileSectionType = (value?: string | null) =>
+  value === "continue_reading" || value === "favorites" || value === "custom_list";
+
+function normalizeProfileSections(sections: UserProfileSection[]): UserProfileSection[] {
+  return (sections ?? []).flatMap((section) => {
+    if (!isProfileSectionType(section.sectionType)) return [];
+    if (section.sectionType === "custom_list" && !isListId(section.referenceId)) return [];
+    return [{
+      ...section,
+      referenceId: section.sectionType === "custom_list" ? section.referenceId : null,
+      previewItems: (section.previewItems ?? []).filter((id) => isLiveKey(id)),
+    }];
+  });
+}
 
 function normalizeData(data: UserData): UserData {
   const favorites = (data.favorites ?? []).filter((id) => isLiveKey(id));
@@ -296,6 +314,39 @@ class ApiUserDataService implements UserDataService {
       method: "PUT",
       body: JSON.stringify({ mangaId, beforeId, afterId }),
     });
+  }
+
+  async getProfileSections(previewLimit = 8) {
+    const limit = Math.max(1, Math.min(10, Math.trunc(previewLimit)));
+    const result = await this.request<{ sections: UserProfileSection[] }>(
+      `profile/sections?limit=${limit}`,
+    );
+    return normalizeProfileSections(result.sections);
+  }
+
+  async saveProfileSections(sections: UserProfileSectionInput[]) {
+    if (!Array.isArray(sections) || sections.length > 100) {
+      throw new Error("ترتيب الأقسام غير صالح.");
+    }
+    const normalized = sections.map((section) => ({
+      sectionType: section.sectionType,
+      referenceId: section.sectionType === "custom_list" ? section.referenceId : null,
+      isVisible: Boolean(section.isVisible),
+    }));
+    if (
+      normalized.some(
+        (section) =>
+          !isProfileSectionType(section.sectionType) ||
+          (section.sectionType === "custom_list" && !isListId(section.referenceId)),
+      )
+    ) {
+      throw new Error("ترتيب الأقسام غير صالح.");
+    }
+    const result = await this.request<{ sections: UserProfileSection[] }>("profile/sections", {
+      method: "PUT",
+      body: JSON.stringify({ sections: normalized }),
+    });
+    return normalizeProfileSections(result.sections);
   }
 
   async recordChapterOpen(mangaId: string, chapter: number) {
