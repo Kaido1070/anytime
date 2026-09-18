@@ -41,7 +41,7 @@ test("FYP gives matching content a materially stronger result than unrelated con
   );
 
   assert.equal(results[0].item.key, "mt:match");
-  assert.ok(results[0].reason.includes("المفضلة"));
+  assert.ok(results[0].reason.includes("مفضلتك"));
   assert.ok(results.every((result) => result.item.key !== "mt:favorite"));
 });
 
