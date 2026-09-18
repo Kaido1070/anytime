@@ -24,6 +24,8 @@ export async function onRequestPost(context) {
   await db.batch([
     db.prepare(`DELETE FROM favorites WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
     db.prepare(`DELETE FROM reading_progress WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
+    db.prepare(`DELETE FROM user_library WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
+    db.prepare(`DELETE FROM reading_history WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
     db
       .prepare(`UPDATE user_state SET last_manga_id = NULL, last_chapter = NULL, updated_at = ? WHERE last_manga_id IN (${placeholders})`)
       .bind(Date.now(), ...DEMO_IDS),
