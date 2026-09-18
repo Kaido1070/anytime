@@ -495,13 +495,10 @@ function parseJsonArray(value) {
 // MangaTime -----------------------------------------------------------------
 
 async function mangaTimeList(db, { page, sortBy, query = null }) {
-  const result = await mangaTimeTrpc("search.searchSeries", {
-    page,
-    limit: 24,
-    sortBy,
-    sortOrder: "desc",
-    query,
-  });
+  const result = await mangaTimeTrpc(
+    "search.searchSeries",
+    mangaTimeSearchInput({ page, sortBy, query }),
+  );
   const items = await Promise.all(
     (result?.results ?? []).map(async (row) => ({
       key: await makeSourceKey("mt", String(row.id)),
@@ -519,6 +516,17 @@ async function mangaTimeList(db, { page, sortBy, query = null }) {
   );
   await rememberItems(db, items);
   return { items, hasMore: Boolean(result?.hasMore), page };
+}
+
+function mangaTimeSearchInput({ page, sortBy, query = null }) {
+  const normalizedQuery = typeof query === "string" ? query.trim() : "";
+  return {
+    page,
+    limit: 24,
+    sortBy,
+    sortOrder: "desc",
+    ...(normalizedQuery ? { query: normalizedQuery } : {}),
+  };
 }
 
 async function mangaTimeSeries(db, item) {
@@ -2366,6 +2374,7 @@ export const __test = {
   normalizeAsqType,
   mangaTimeTypeGenres,
   mangaTimeSeriesGenres,
+  mangaTimeSearchInput,
   mangaTimeTrpc,
   sourceHeaders,
   isNovelLabel,
