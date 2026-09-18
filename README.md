@@ -1,6 +1,6 @@
-# Anytime
+# Wany
 
-Anytime is a private, mobile-first Arabic manga/manhwa reading web app. The current project is no longer a local mock-only prototype: it uses React on the frontend, Cloudflare Pages Functions for the API, and Cloudflare D1 for persistent user data.
+Wany is a private, mobile-first Arabic manga/manhwa reading web app. The current project is no longer a local mock-only prototype: it uses React on the frontend, Cloudflare Pages Functions for the API, and Cloudflare D1 for persistent user data.
 
 The application is designed around reading first: source discovery, work details, chapter reading, per-user libraries and reading progress, personal lists, profiles, friends/activity, avatar selection, and administration.
 
@@ -169,7 +169,7 @@ PWA/offline behavior should still be verified on the actual target browsers/devi
 
 ## UI principles
 
-Anytime is mobile-first and uses its existing dark visual language. When extending the application:
+Wany is mobile-first and uses its existing dark visual language. When extending the application:
 
 - preserve the current design system and responsive behavior;
 - prioritize phone layouts;
