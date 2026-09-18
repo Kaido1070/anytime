@@ -33,7 +33,7 @@ No manual SQL migration is required for first use: the API creates the Phase 2 s
 
 ## Initial accounts
 
-The private accounts remain `mahdi`, `kaido`, and `ahmed`. Their original Phase 1 password remains valid initially, but it is not stored as plaintext in the database or migration. Change it from **Profile → تغيير كلمة المرور** after the first login.
+The private accounts remain `has`, `yas`, and `m`. Their original Phase 1 password remains valid initially, but it is not stored as plaintext in the database or migration. Change it from **Profile → تغيير كلمة المرور** after the first login.
 
 ## API routes
 
