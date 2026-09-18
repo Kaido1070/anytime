@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ActivityFeed } from "./ActivityFeed";
+import { Icon } from "./UI";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
 import { getContinueChapter } from "../services/reading";
@@ -23,10 +24,16 @@ export function ProfileIdentityHeader({
   user,
   actions,
   privateState = false,
+  friends,
+  friendsTo = "/friends",
+  pendingFriendRequests = 0,
 }: {
   user: User | null;
   actions?: ReactNode;
   privateState?: boolean;
+  friends?: number;
+  friendsTo?: string;
+  pendingFriendRequests?: number;
 }) {
   return (
     <header className="profile-overview-header">
@@ -38,6 +45,24 @@ export function ProfileIdentityHeader({
             <p dir="ltr">@{user?.username ?? "—"}</p>
             {privateState && <span className="profile-overview-private">حساب خاص</span>}
           </div>
+          {friends != null && (
+            <Link
+              className="profile-header-friends"
+              to={friendsTo}
+              aria-label={`${formatCount(friends)} من الأصدقاء`}
+            >
+              <strong>{formatCount(friends)}</strong>
+              <span>الأصدقاء</span>
+              {pendingFriendRequests > 0 && (
+                <small
+                  className="profile-header-friends-badge"
+                  aria-label={`${pendingFriendRequests} طلب صداقة جديد`}
+                >
+                  {pendingFriendRequests > 99 ? "99+" : pendingFriendRequests}
+                </small>
+              )}
+            </Link>
+          )}
           {actions && <div className="profile-overview-actions">{actions}</div>}
         </div>
       </div>
@@ -45,70 +70,15 @@ export function ProfileIdentityHeader({
   );
 }
 
-export function ProfileSummaryStrip({
-  friends,
-  lists,
-  works,
-  pendingFriendRequests = 0,
-  friendsTo = "/friends",
-  listsTo = "/lists",
-  worksTo = "#profile-reading",
-}: {
-  friends: number;
-  lists: number;
-  works: number;
-  pendingFriendRequests?: number;
-  friendsTo?: string;
-  listsTo?: string;
-  worksTo?: string;
-}) {
-  const navigate = useNavigate();
-  const cells = [
-    {
-      label: "الأصدقاء",
-      value: friends,
-      to: friendsTo,
-      badge: pendingFriendRequests,
-    },
-    { label: "القوائم", value: lists, to: listsTo, badge: 0 },
-    { label: "قصص", value: works, to: worksTo, badge: 0 },
-  ];
-
-  return (
-    <nav className="profile-summary-strip" aria-label="ملخص الحساب">
-      {cells.map((cell) => (
-        <button
-          className="profile-summary-cell"
-          type="button"
-          onClick={() => navigate(cell.to)}
-          key={cell.label}
-        >
-          <strong>{formatCount(cell.value)}</strong>
-          <span>{cell.label}</span>
-          {cell.badge > 0 && (
-            <small className="profile-summary-badge" aria-label={`${cell.badge} طلب صداقة جديد`}>
-              {cell.badge > 99 ? "99+" : cell.badge}
-            </small>
-          )}
-        </button>
-      ))}
-    </nav>
-  );
-}
-
 export function ProfileStatsSection({ stats }: { stats: ProfileStats }) {
   const metrics = [
-    { value: stats.chaptersRead, label: "فصل مقروء" },
-    { value: stats.completed, label: "قصة مكتملة" },
+    { value: stats.chaptersRead, label: "فصول مقروءة" },
+    { value: stats.completed, label: "قصص مكتملة" },
     { value: stats.reading, label: "أقرأ الآن" },
-    { value: stats.works, label: "إجمالي القصص" },
   ];
 
   return (
-    <section className="profile-overview-section profile-stats-section" aria-labelledby="profile-stats-title">
-      <div className="profile-overview-section-heading">
-        <h2 id="profile-stats-title">إحصائيات القراءة</h2>
-      </div>
+    <section className="profile-overview-section profile-stats-section" aria-label="إحصائيات القراءة">
       <div className="profile-stats-grid">
         {metrics.map((metric) => (
           <div className="profile-stat" key={metric.label}>
@@ -155,6 +125,7 @@ export function ProfileListsSection({
   viewAllTo = "/lists",
   error = "",
   onRetry,
+  onCustomize,
 }: {
   favorites: string[];
   favoriteCount: number;
@@ -163,6 +134,7 @@ export function ProfileListsSection({
   viewAllTo?: string;
   error?: string;
   onRetry?: () => void;
+  onCustomize?: () => void;
 }) {
   const cards = [
     {
@@ -187,7 +159,20 @@ export function ProfileListsSection({
     <section className="profile-overview-section" id="profile-lists" aria-labelledby="profile-lists-title">
       <div className="profile-overview-section-heading">
         <h2 id="profile-lists-title">القوائم</h2>
-        {viewAllTo && <Link to={viewAllTo}>عرض الكل</Link>}
+        <div className="profile-section-heading-actions">
+          {onCustomize && (
+            <button
+              className="profile-section-edit"
+              type="button"
+              onClick={onCustomize}
+              aria-label="تعديل ترتيب أقسام الحساب"
+              title="تعديل ترتيب الأقسام"
+            >
+              <Icon name="edit" />
+            </button>
+          )}
+          {viewAllTo && <Link to={viewAllTo}>عرض الكل</Link>}
+        </div>
       </div>
       {cards.length ? (
         <div className="profile-list-preview-strip">
@@ -377,7 +362,6 @@ export function ProfileActivitySection({
 export function ProfileOverviewSkeleton() {
   return (
     <div className="profile-overview-skeleton" aria-label="جاري تحميل الحساب">
-      <span className="summary" />
       <span className="stats" />
       <span className="section" />
       <span className="section short" />
