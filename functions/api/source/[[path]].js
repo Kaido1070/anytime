@@ -238,10 +238,15 @@ async function ensureSourceSchema(db) {
           chapter_number REAL,
           published_at TEXT,
           first_seen_at INTEGER NOT NULL,
+          is_baseline INTEGER NOT NULL DEFAULT 0,
           PRIMARY KEY (source_key, chapter_identity),
           FOREIGN KEY (source_key) REFERENCES source_items(source_key) ON DELETE CASCADE
         )`)
         .run();
+      const chapterColumns = await db.prepare("PRAGMA table_info(source_chapter_seen)").all();
+      if (!(chapterColumns.results ?? []).some((column) => column.name === "is_baseline")) {
+        await db.prepare("ALTER TABLE source_chapter_seen ADD COLUMN is_baseline INTEGER NOT NULL DEFAULT 0").run();
+      }
       await db
         .prepare("CREATE INDEX IF NOT EXISTS idx_source_chapter_seen_release ON source_chapter_seen(first_seen_at DESC, source_key)")
         .run();
@@ -315,7 +320,8 @@ async function rememberChapterAvailability(db, item) {
     .bind(item.key)
     .first();
   const now = Date.now();
-  const baseline = Number(current?.count ?? 0) === 0
+  const isBaseline = Number(current?.count ?? 0) === 0;
+  const baseline = isBaseline
     ? Number(sourceItem?.first_seen_at ?? now)
     : now;
 
@@ -324,8 +330,8 @@ async function rememberChapterAvailability(db, item) {
     await db.batch(
       chunk.map((chapter) =>
         db.prepare(`INSERT INTO source_chapter_seen
-          (source_key, chapter_identity, chapter_number, published_at, first_seen_at)
-          VALUES (?, ?, ?, ?, ?)
+          (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
+          VALUES (?, ?, ?, ?, ?, ?)
           ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
             chapter_number = excluded.chapter_number,
             published_at = COALESCE(excluded.published_at, source_chapter_seen.published_at)`)
@@ -335,6 +341,7 @@ async function rememberChapterAvailability(db, item) {
             Number.isFinite(Number(chapter.number)) ? Number(chapter.number) : null,
             chapter.publishedAt ? String(chapter.publishedAt) : null,
             baseline,
+            isBaseline ? 1 : 0,
           ),
       ),
     );
@@ -344,7 +351,7 @@ async function rememberChapterAvailability(db, item) {
   if (!identities.length) return item;
   const placeholders = identities.map(() => "?").join(",");
   const seen = await db
-    .prepare(`SELECT chapter_identity, first_seen_at, published_at
+    .prepare(`SELECT chapter_identity, first_seen_at, published_at, is_baseline
       FROM source_chapter_seen
       WHERE source_key = ? AND chapter_identity IN (${placeholders})`)
     .bind(item.key, ...identities)
@@ -362,6 +369,7 @@ async function rememberChapterAvailability(db, item) {
             ...chapter,
             publishedAt: chapter.publishedAt ?? row.published_at ?? null,
             firstSeenAt: Number(row.first_seen_at),
+            baselineObserved: Number(row.is_baseline ?? 0) === 1,
           }
         : chapter;
     }),
