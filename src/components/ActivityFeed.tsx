@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SourceCoverImage } from "./SourceCoverImage";
+import { UserAvatar } from "./UserAvatar";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import type { ActivityEvent, SourceManga } from "../types";
@@ -189,11 +190,11 @@ export function ActivityFeed({
               <article className="activity-card" key={event.id}>
                 {showActor ? (
                   <Link
-                    className="avatar activity-avatar"
+                    className="activity-avatar-link"
                     to={`/friends/${encodeURIComponent(event.user.id)}`}
                     aria-label={`فتح حساب ${event.user.name}`}
                   >
-                    {event.user.name.slice(0, 1)}
+                    <UserAvatar user={event.user} className="activity-avatar" />
                   </Link>
                 ) : (
                   <span className="activity-dot" aria-hidden="true" />
