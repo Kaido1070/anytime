@@ -610,23 +610,40 @@ async function mangaTimeChapter(context, db, item, number) {
 }
 
 async function mangaTimeTrpc(endpoint, input) {
-  const url = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
-  url.searchParams.set("batch", "1");
-  url.searchParams.set("input", JSON.stringify({ "0": { json: input } }));
-  const response = await fetch(url, {
-    headers: sourceHeaders(MANGATIME_BASE, "application/json,text/plain,*/*"),
-    cf: { cacheTtl: endpoint.startsWith("search.") ? 45 : 20, cacheEverything: true },
-  });
+  const headers = sourceHeaders(MANGATIME_BASE, "application/json,text/plain,*/*");
+  const cache = { cacheTtl: endpoint.startsWith("search.") ? 45 : 20, cacheEverything: true };
+
+  // tRPC supports a normal single-procedure request. Prefer it because MangaTime
+  // no longer consistently accepts the legacy batched GET shape from Workers.
+  let url = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
+  url.searchParams.set("input", JSON.stringify({ json: input }));
+  let response = await fetch(url, { headers, cf: cache });
+
+  // Keep the old batch transport as a compatibility fallback for procedures
+  // that may still be deployed with the previous MangaTime router.
+  let batched = false;
+  if (!response.ok) {
+    url = new URL(`${MANGATIME_BASE}/api/trpc/${endpoint}`);
+    url.searchParams.set("batch", "1");
+    url.searchParams.set("input", JSON.stringify({ "0": { json: input } }));
+    response = await fetch(url, { headers, cf: cache });
+    batched = true;
+  }
+
   if (!response.ok) {
     throw new SourceError("MANGATIME_UPSTREAM", `MangaTime رجع HTTP ${response.status}.`, 502);
   }
+
   const payload = await response.json();
-  const first = Array.isArray(payload) ? payload[0] : null;
-  if (first?.error) {
-    const message = first.error?.json?.message || first.error?.message || "MangaTime API error";
+  const envelope = batched
+    ? (Array.isArray(payload) ? payload[0] : null)
+    : (Array.isArray(payload) ? payload[0] : payload);
+
+  if (envelope?.error) {
+    const message = envelope.error?.json?.message || envelope.error?.message || "MangaTime API error";
     throw new SourceError("MANGATIME_API", String(message), 502);
   }
-  return first?.result?.data?.json;
+  return envelope?.result?.data?.json;
 }
 
 async function mangaTimeTrackView(seriesId, chapterId) {
