@@ -148,3 +148,46 @@
     margin-top: 0;
   }
 }
+
+
+/* Keep the mobile login hero and form visually connected as one composition. */
+@media (max-width: 759px) {
+  .login {
+    padding-top: calc(28px + env(safe-area-inset-top));
+  }
+
+  .login-art {
+    padding-bottom: 18px;
+  }
+
+  .login-art > .brand-mark {
+    margin-bottom: 22px;
+  }
+
+  .login-art > p {
+    margin-bottom: 8px;
+  }
+
+  .login-form {
+    margin-top: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .login-form .eyebrow {
+    margin-bottom: 8px;
+  }
+
+  .login-form h2 {
+    margin: 0 0 8px;
+  }
+
+  .login-form > .muted {
+    margin: 0;
+    line-height: 1.75;
+  }
+
+  .login-form form {
+    margin-top: 22px;
+  }
+}
