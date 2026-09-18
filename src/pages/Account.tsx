@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { UserAvatar } from "../components/UserAvatar";
 import { useLibrary } from "../hooks/useLibrary";
 import { Home } from "./Home";
 import { Lists } from "./Lists";
@@ -25,7 +26,7 @@ export function Account() {
       <header className="account-header">
         <div className="account-header-row">
           <div className="account-identity">
-            <span className="avatar account-avatar">{user?.name?.slice(0, 1)}</span>
+            <UserAvatar user={user} className="account-avatar" loading="eager" />
             <div>
               <p className="eyebrow">حسابي</p>
               <h1>
