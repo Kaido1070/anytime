@@ -90,6 +90,24 @@ export interface UserListDetail extends UserListSummary {
   items: UserListItem[];
 }
 
+export type UserProfileSectionType = "continue_reading" | "favorites" | "custom_list";
+
+export interface UserProfileSection {
+  key: string;
+  sectionType: UserProfileSectionType;
+  referenceId: string | null;
+  position: number;
+  isVisible: boolean;
+  list: UserListSummary | null;
+  previewItems: string[];
+}
+
+export interface UserProfileSectionInput {
+  sectionType: UserProfileSectionType;
+  referenceId: string | null;
+  isVisible: boolean;
+}
+
 export interface ReadingProgress {
   mangaId: string;
   chapter: number;
