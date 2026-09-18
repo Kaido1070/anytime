@@ -124,3 +124,39 @@ test("profile summary uses real buttons and the mobile layout keeps three cells 
   assert.match(css, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(css, /@media \(max-width: 359px\)/);
 });
+
+
+test("profile redesign uses an identity card and 2x2 mobile reading stats", async () => {
+  const css = await readFile(new URL("../src/profileOverview.css", import.meta.url), "utf8");
+  assert.match(css, /\.profile-overview-avatar \{[\s\S]*?width: 88px;[\s\S]*?height: 88px;/);
+  assert.match(css, /\.profile-overview-header \+ \.profile-summary-strip/);
+  assert.match(
+    css,
+    /@media \(max-width: 759px\)[\s\S]*?\.profile-stats-grid \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+  );
+});
+
+test("profile summary emphasizes the number before its label", async () => {
+  const overview = await readFile(
+    new URL("../src/components/ProfileOverview.tsx", import.meta.url),
+    "utf8",
+  );
+  const cell = overview.slice(
+    overview.indexOf('className="profile-summary-cell"'),
+    overview.indexOf("{cell.badge > 0"),
+  );
+  assert.ok(cell.indexOf("<strong>") < cell.indexOf("<span>"));
+  assert.match(overview, /إحصائيات القراءة/);
+});
+
+test("profile source failures stay inside their own preview sections", async () => {
+  const [account, overview] = await Promise.all([
+    readFile(new URL("../src/pages/Account.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/components/ProfileOverview.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(account, /worksError/);
+  assert.match(account, /readingError/);
+  assert.match(account, /setSectionRetry/);
+  assert.match(overview, /onRetry\?: \(\) => void/);
+  assert.match(overview, /profile-section-error compact/);
+});
