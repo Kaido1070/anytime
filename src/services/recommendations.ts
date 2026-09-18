@@ -104,11 +104,11 @@ function reasonFor(candidate: SourceManga, signals: TasteSignal[]) {
 
   const title = best.signal.item.title;
   if (best.signal.kind === "favorite") return `مشابه لـ ${title} الموجود في مفضلتك`;
-  if (best.signal.kind === "completed") return `مشابه لعمل أكملته: ${title}`;
+  if (best.signal.kind === "completed") return `مشابه لقصة أكملتها: ${title}`;
   if (best.signal.kind === "reading" || best.signal.kind === "history") {
     return `لأنك تقرأ ${title}`;
   }
-  if (best.signal.kind === "list") return `قريب من أعمال قوائمك مثل ${title}`;
+  if (best.signal.kind === "list") return `قريب من قصص قوائمك مثل ${title}`;
   return `قريب من ${title} الذي حفظته للقراءة`;
 }
 
@@ -182,7 +182,7 @@ export function rankRecommendations(
         ...candidate,
         score: candidate.popularity + candidate.freshness * 0.25,
         confidence: 0,
-        reason: "عمل متاح للقراءة الآن",
+        reason: "قصة متاحة للقراءة الآن",
         algorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
       }));
   }
