@@ -111,7 +111,7 @@ test("Phase 10.5 navigation exposes exactly the four social destinations and kee
   }
   assert.match(app, /path="fyp" element={<Fyp \/>}/);
   assert.match(app, /path="new" element={<NewChapters \/>}/);
-  assert.match(layout, /unreadFollowedCount/);
+  assert.match(layout, /loadUnreadFollowedCount/);
   assert.doesNotMatch(adminLayout, /FYP|جديد|استكشف|حسابي/);
 });
 
@@ -129,7 +129,7 @@ test("New tracking is an active union and exact read state reuses reading_histor
   assert.match(api, /FROM reading_history/);
   assert.match(api, /ABS\(chapter - \?\) < 0\.000001/);
   assert.match(api, /ADMIN_NOT_SOCIAL/);
-  assert.match(feed, /chapter\.releaseAt >= Number\(group\.trackingStartedAt\)/);
+  assert.match(feed, /chapter\.releaseAt > Number\(group\.trackingStartedAt\)/);
   assert.match(migration, /idx_reading_history_user_chapter/);
 });
 
@@ -141,6 +141,8 @@ test("chapter availability uses published time first and stable first_seen fallb
 
   assert.match(sourceApi, /source_chapter_seen/);
   assert.match(sourceApi, /first_seen_at/);
+  assert.match(sourceApi, /synthetic: true/);
+  assert.match(sourceApi, /filter\(\(chapter\) => !chapter\.synthetic\)/);
   assert.match(sourceApi, /published_at = COALESCE\(excluded\.published_at, source_chapter_seen\.published_at\)/);
   assert.match(feed, /parsePublished\(chapter\.publishedAt\)/);
   assert.match(feed, /chapter\.firstSeenAt/);
