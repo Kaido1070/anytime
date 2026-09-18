@@ -9,6 +9,9 @@ import type { SourceChapterPayload } from "../types";
 
 const INITIAL_READER_PAGES = 2;
 const READER_PRELOAD_MARGIN = "1400px 0px";
+const PROGRESS_SAVE_DELAY_MS = 60 * 1000;
+const PROGRESS_MIN_DELTA = 3;
+const PROGRESS_NOOP_DELTA = 0.25;
 
 type NavigatorWithConnection = Navigator & {
   connection?: {
@@ -173,9 +176,15 @@ function ReaderChapter({
     let timer: ReturnType<typeof setTimeout>;
     let restoreTimer: ReturnType<typeof setTimeout>;
     let latest = saved;
+    let lastPersisted = saved;
+    let completionFlushed = saved >= 98;
 
-    const persist = () => {
+    const persist = (force = false) => {
       if (markedUnreadRef.current) return;
+      const delta = Math.abs(latest - lastPersisted);
+      if (delta < PROGRESS_NOOP_DELTA) return;
+      if (!force && latest < 98 && delta < PROGRESS_MIN_DELTA) return;
+      lastPersisted = latest;
       void saveRef.current({
         mangaId: sourceKey,
         chapter,
@@ -194,7 +203,6 @@ function ReaderChapter({
       window.scrollTo(0, (Math.max(0, max) * saved) / 100);
       restoredRef.current = true;
       ready = true;
-      persist();
     };
 
     restoreTimer = setTimeout(restore, 120);
@@ -205,28 +213,39 @@ function ReaderChapter({
       latest = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
       setPercent(latest);
       clearTimeout(timer);
-      timer = setTimeout(persist, 1000);
+
+      if (latest >= 98 && !completionFlushed) {
+        completionFlushed = true;
+        persist(true);
+        return;
+      }
+
+      timer = setTimeout(() => persist(false), PROGRESS_SAVE_DELAY_MS);
     };
 
     const hidden = () => {
-      if (document.visibilityState === "hidden") persist();
+      if (document.visibilityState === "hidden") persist(true);
     };
 
     window.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("pagehide", persist);
+    window.addEventListener("pagehide", () => persist(true));
     document.addEventListener("visibilitychange", hidden);
+
+    const pageHide = () => persist(true);
+    window.removeEventListener("pagehide", pageHide);
+    window.addEventListener("pagehide", pageHide);
 
     return () => {
       clearTimeout(timer);
       clearTimeout(restoreTimer);
       window.removeEventListener("scroll", scroll);
-      window.removeEventListener("pagehide", persist);
+      window.removeEventListener("pagehide", pageHide);
       document.removeEventListener("visibilitychange", hidden);
-      if (ready) persist();
+      if (ready) persist(true);
       history.scrollRestoration = previousRestoration;
       restoredRef.current = false;
     };
-  }, [sourceKey, chapter, payload.pages.length]);
+  }, [sourceKey, chapter, payload.pages.length, saved]);
 
   useEffect(() => {
     if (percent < 75 || payload.next == null || prefetchedNextRef.current === payload.next) {
