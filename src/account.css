@@ -1,12 +1,20 @@
 .account-header {
-  padding: 10px 0 0;
+  padding: 10px 0 22px;
   border-bottom: 1px solid var(--line);
+}
+
+.account-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .account-identity {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .account-avatar {
@@ -23,37 +31,11 @@
   font-size: 30px;
 }
 
-.account-tabs {
-  display: flex;
-  gap: 4px;
-  margin-top: 24px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.account-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.account-tabs button {
-  min-height: 43px;
-  padding: 10px 16px;
+.account-settings-link {
   flex: 0 0 auto;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
 }
 
-.account-tabs button.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.account-tab-content {
+.account-content {
   min-width: 0;
 }
 
@@ -65,8 +47,15 @@
   padding: 18px 0 4px;
 }
 
+.account-lists-section {
+  margin-top: 34px;
+  padding-top: 30px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 24px;
+}
+
 .account-lists-header {
-  margin-top: 24px;
+  margin-top: 0;
 }
 
 .account-settings-intro {
@@ -76,6 +65,13 @@
 @media (max-width: 759px) {
   .account-header {
     padding-top: 0;
+    padding-bottom: 18px;
+  }
+
+  .account-header-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
   }
 
   .account-avatar {
@@ -88,18 +84,13 @@
     font-size: 27px;
   }
 
-  .account-tabs {
-    margin-inline: -18px;
-    padding-inline: 18px;
-    scroll-padding-inline: 18px;
-  }
-
-  .account-tabs button {
-    min-height: 46px;
-    padding-inline: 14px;
-  }
-
+  .account-settings-link,
   .account-home-toolbar .secondary {
     width: 100%;
+  }
+
+  .account-lists-section {
+    margin-top: 28px;
+    padding-top: 24px;
   }
 }
