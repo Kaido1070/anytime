@@ -4,12 +4,14 @@ const TEAMX_BASE = "https://olympustaff.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
-// Exact SHA-256 fingerprints of the two user-approved Team-X promo images.
-// Nothing else is removed. Dimensions are only a cheap pre-check before hashing.
-const BLOCKED_TEAMX_IMAGES = new Map([
-  ["536x1532", "39ed77a599e8f8078628a2e349a003380342125af39c55bc9e6139405fbbc190"],
-  ["1280x518", "7654f3184ab27288688d8d317c651feaa28ffa64e03d54c071e55e99196fbd89"],
+// Exact SHA-256 fingerprints of the user-approved Team-X promo images.
+// Match the binary itself instead of canvas dimensions because Team-X may render
+// the same promo at different display sizes or omit width/height metadata.
+const BLOCKED_TEAMX_IMAGE_HASHES = new Set([
+  "39ed77a599e8f8078628a2e349a003380342125af39c55bc9e6139405fbbc190",
+  "7654f3184ab27288688d8d317c651feaa28ffa64e03d54c071e55e99196fbd89",
 ]);
+const teamXBannerResultCache = new Map();
 
 export async function onRequest(context) {
   const response = await handleSourceRequest(context);
@@ -44,8 +46,8 @@ export async function onRequest(context) {
     let pageMeta = parseTeamXCanvasPageMeta(html);
     if (!pageMeta.length) return response;
 
-    // Hash only dimension-matched candidates, then remove only an exact binary match.
-    // A different page with the same dimensions is preserved.
+    // Remove approved promo images by exact binary fingerprint. Do not rely on
+    // canvas dimensions: the same asset can be displayed at different sizes.
     pageMeta = await filterKnownTeamXBanners(pageMeta, chapterUrl);
 
     payload.chapter.pages = pageMeta.map((page) => page.url);
@@ -70,10 +72,8 @@ async function filterKnownTeamXBanners(pageMeta, chapterUrl) {
 }
 
 async function isKnownTeamXBanner(page, chapterUrl) {
-  const width = Math.round(Number(page.width));
-  const height = Math.round(Number(page.height));
-  const expectedHash = BLOCKED_TEAMX_IMAGES.get(`${width}x${height}`);
-  if (!expectedHash) return false;
+  const cached = teamXBannerResultCache.get(page.url);
+  if (cached !== undefined) return cached;
 
   try {
     const response = await fetch(page.url, {
@@ -86,11 +86,19 @@ async function isKnownTeamXBanner(page, chapterUrl) {
       cf: { cacheTtl: 86400, cacheEverything: true },
     });
     if (!response.ok) return false;
+
     const bytes = await response.arrayBuffer();
     const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return bytesToHex(new Uint8Array(digest)) === expectedHash;
+    const blocked = BLOCKED_TEAMX_IMAGE_HASHES.has(bytesToHex(new Uint8Array(digest)));
+
+    teamXBannerResultCache.set(page.url, blocked);
+    if (teamXBannerResultCache.size > 256) {
+      const oldest = teamXBannerResultCache.keys().next().value;
+      if (oldest) teamXBannerResultCache.delete(oldest);
+    }
+    return blocked;
   } catch {
-    // Fail open: if verification cannot be completed, keep the image.
+    // Fail open: if verification cannot be completed, keep the chapter readable.
     return false;
   }
 }
