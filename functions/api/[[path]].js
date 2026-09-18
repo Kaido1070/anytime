@@ -2003,7 +2003,10 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "9" || version?.value === "10" || version?.value === "11" || version?.value === "12" || version?.value === "13" || version?.value === "14") return;
+  // Schema v9+ is already bootstrapped. Newer versions are handled by
+  // incremental migrations in ensureApiRuntime; never run the fresh bootstrap
+  // again or ALTER TABLE statements (such as avatar_id) will fail on live DBs.
+  if (Number(version?.value ?? 0) >= 9) return;
   if (version?.value === "8") {
     await db.batch([
       ...avatarSchemaStatements(db),
