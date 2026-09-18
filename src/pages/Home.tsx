@@ -1,19 +1,184 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Link } from "react-router-dom";
-import { useLibrary } from "../hooks/useLibrary";
-import { SectionTitle, Icon } from "../components/UI";
-import { SourceCard } from "../components/SourceCard";
+import { ProfileSectionEditor } from "../components/ProfileSectionEditor";
 import { SourceCoverImage } from "../components/SourceCoverImage";
+import { useLibrary } from "../hooks/useLibrary";
 import { getContinueChapter } from "../services/reading";
-import { mergeSourceItems, type SourceGroup } from "../services/sourceMerge";
+import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
-import type { SourceManga } from "../types";
+import { userDataService } from "../services/userData";
+import type {
+  LibraryEntry,
+  SourceManga,
+  UserProfileSection,
+  UserProfileSectionInput,
+} from "../types";
+
+const PREVIEW_LIMIT = 6;
+
+type ContinueCard = {
+  entry: LibraryEntry;
+  item: SourceManga;
+  resumeChapter: number;
+  percent: number;
+};
+
+function WorkStrip({
+  title,
+  items,
+  to,
+  emptyText,
+}: {
+  title: string;
+  items: SourceManga[];
+  to?: string;
+  emptyText: string;
+}) {
+  return (
+    <section className="profile-module">
+      <div className="profile-module-heading">
+        <h2>{title}</h2>
+        {to && (
+          <Link to={to}>
+            عرض الكل <span aria-hidden="true">↗</span>
+          </Link>
+        )}
+      </div>
+      {items.length ? (
+        <div className="profile-work-strip">
+          {items.map((item) => {
+            const titleText = sourceDisplayTitle(item);
+            return (
+              <Link
+                className="profile-work-card"
+                to={`/source/${encodeURIComponent(item.key)}`}
+                key={item.key}
+              >
+                <span className="profile-work-cover">
+                  {item.cover ? (
+                    <SourceCoverImage
+                      item={item}
+                      alt={`غلاف ${titleText}`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span className="source-cover-placeholder">
+                      {titleText.slice(0, 1)}
+                    </span>
+                  )}
+                </span>
+                <b dir="auto">{titleText}</b>
+                <small>{sourceService.sourceLabel(item.source)}</small>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="profile-module-empty">{emptyText}</p>
+      )}
+    </section>
+  );
+}
+
+function ContinueReading({ cards }: { cards: ContinueCard[] }) {
+  if (!cards.length) return null;
+  return (
+    <section className="profile-module">
+      <div className="profile-module-heading">
+        <h2>أكمل القراءة</h2>
+      </div>
+      <div className="profile-continue-strip">
+        {cards.map(({ entry, item, resumeChapter, percent }) => {
+          const titleText = sourceDisplayTitle(item);
+          return (
+            <Link
+              className="profile-continue-card"
+              key={entry.mangaId}
+              to={`/read-source/${encodeURIComponent(item.key)}/${resumeChapter}`}
+            >
+              <span className="profile-work-cover">
+                {item.cover ? (
+                  <SourceCoverImage
+                    item={item}
+                    alt={`غلاف ${titleText}`}
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className="source-cover-placeholder">
+                    {titleText.slice(0, 1)}
+                  </span>
+                )}
+              </span>
+              <span className="profile-continue-copy">
+                <b dir="auto">{titleText}</b>
+                <small>متابعة من الفصل {resumeChapter}</small>
+                <span
+                  className="profile-mini-progress"
+                  role="progressbar"
+                  aria-label={`تقدم الفصل في ${titleText}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(percent)}
+                >
+                  <span style={{ width: `${percent}%` }} />
+                </span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function toSaveInput(sections: UserProfileSection[]): UserProfileSectionInput[] {
+  return sections.map((section) => ({
+    sectionType: section.sectionType,
+    referenceId: section.referenceId,
+    isVisible: section.isVisible,
+  }));
+}
 
 export function Home() {
-  const { user, data, friends } = useLibrary();
-  const [sourceItems, setSourceItems] = useState<Record<string, SourceManga>>({});
+  const { user, data } = useLibrary();
+  const [sections, setSections] = useState<UserProfileSection[]>([]);
+  const [persistedSections, setPersistedSections] = useState<UserProfileSection[]>([]);
+  const [works, setWorks] = useState<Record<string, SourceManga>>({});
   const [continueSeries, setContinueSeries] = useState<Record<string, SourceManga>>({});
-  const [latest, setLatest] = useState<SourceGroup[]>([]);
+  const [loadingSections, setLoadingSections] = useState(true);
+  const [editMode, setEditMode] = useState(false);
+  const [savingSections, setSavingSections] = useState(false);
+  const [pageError, setPageError] = useState("");
+
+  const loadSections = useCallback(async () => {
+    setLoadingSections(true);
+    setPageError("");
+    try {
+      const next = await userDataService.getProfileSections(PREVIEW_LIMIT);
+      setSections(next);
+      setPersistedSections(next);
+    } catch (cause) {
+      setPageError(
+        cause instanceof Error ? cause.message : "تعذر تحميل ترتيب صفحتك.",
+      );
+    } finally {
+      setLoadingSections(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSections();
+  }, [loadSections]);
+
+  const visibleSections = useMemo(
+    () => sections.filter((section) => section.isVisible),
+    [sections],
+  );
 
   const continueEntries = useMemo(
     () =>
@@ -26,231 +191,252 @@ export function Home() {
             sourceService.isSourceKey(entry.mangaId),
         )
         .sort((a, b) => (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0))
-        .slice(0, 4),
+        .slice(0, PREVIEW_LIMIT),
     [data?.library],
   );
 
-  const continueKeys = continueEntries.map((entry) => entry.mangaId);
+  const continueVisible = visibleSections.some(
+    (section) => section.sectionType === "continue_reading",
+  );
+  const favoritesVisible = visibleSections.some(
+    (section) => section.sectionType === "favorites",
+  );
 
-  const sourceKeys = useMemo(() => {
+  const workKeys = useMemo(() => {
     const keys = new Set<string>();
-    const add = (key?: string | null) => {
-      if (sourceService.isSourceKey(key)) keys.add(key!);
-    };
-    data?.favorites.forEach(add);
-    data?.library.forEach((entry) => add(entry.mangaId));
-    friends.forEach((friend) => {
-      add(friend.reading?.mangaId);
-      friend.favorites.forEach(add);
-    });
+    if (continueVisible) {
+      continueEntries.forEach((entry) => keys.add(entry.mangaId));
+    }
+    if (favoritesVisible) {
+      (data?.favorites ?? [])
+        .filter((id) => sourceService.isSourceKey(id))
+        .slice(0, PREVIEW_LIMIT)
+        .forEach((id) => keys.add(id));
+    }
+    visibleSections
+      .filter((section) => section.sectionType === "custom_list")
+      .forEach((section) =>
+        section.previewItems
+          .filter((id) => sourceService.isSourceKey(id))
+          .slice(0, PREVIEW_LIMIT)
+          .forEach((id) => keys.add(id)),
+      );
     return [...keys];
-  }, [data?.favorites, data?.library, friends]);
+  }, [
+    continueEntries,
+    continueVisible,
+    data?.favorites,
+    favoritesVisible,
+    visibleSections,
+  ]);
 
   useEffect(() => {
     let active = true;
-    if (!sourceKeys.length) {
-      setSourceItems({});
+    if (!workKeys.length) {
+      setWorks({});
       return;
     }
     sourceService
-      .resolve(sourceKeys)
+      .resolve(workKeys)
       .then((items) => {
-        if (active) setSourceItems(Object.fromEntries(items.map((item) => [item.key, item])));
+        if (active) {
+          setWorks(Object.fromEntries(items.map((item) => [item.key, item])));
+        }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) setWorks({});
+      });
     return () => {
       active = false;
     };
-  }, [sourceKeys.join("|")]);
+  }, [workKeys.join("|")]);
 
   useEffect(() => {
     let active = true;
-    if (!continueKeys.length) {
+    const keys = continueVisible ? continueEntries.map((entry) => entry.mangaId) : [];
+    if (!keys.length) {
       setContinueSeries({});
       return;
     }
-    Promise.allSettled(continueKeys.map((key) => sourceService.getSeries(key))).then((results) => {
-      if (!active) return;
-      const entries = results.flatMap((result, index) =>
-        result.status === "fulfilled" ? [[continueKeys[index], result.value] as const] : [],
-      );
-      setContinueSeries(Object.fromEntries(entries));
-    });
-    return () => {
-      active = false;
-    };
-  }, [continueKeys.join("|")]);
-
-  useEffect(() => {
-    let active = true;
-    Promise.allSettled([
-      sourceService.latest("mangatime", 1),
-      sourceService.latest("teamx", 1),
-      sourceService.latest("3asq", 1),
-      sourceService.latest("starzmanga", 1),
-      sourceService.latest("xsano", 1),
-      sourceService.latest("mangalik", 1),
-    ]).then((results) => {
-      if (!active) return;
-      const mangaTime = results[0].status === "fulfilled" ? results[0].value.items : [];
-      const teamX = results[1].status === "fulfilled" ? results[1].value.items : [];
-      const asq = results[2].status === "fulfilled" ? results[2].value.items : [];
-      const starz = results[3].status === "fulfilled" ? results[3].value.items : [];
-      const xsano = results[4].status === "fulfilled" ? results[4].value.items : [];
-      const mangalik = results[5].status === "fulfilled" ? results[5].value.items : [];
-      const interleaved: SourceManga[] = [];
-      const max = Math.max(mangaTime.length, teamX.length, asq.length, starz.length, xsano.length, mangalik.length);
-      for (let i = 0; i < max; i += 1) {
-        if (teamX[i]) interleaved.push(teamX[i]);
-        if (asq[i]) interleaved.push(asq[i]);
-        if (starz[i]) interleaved.push(starz[i]);
-        if (xsano[i]) interleaved.push(xsano[i]);
-        if (mangalik[i]) interleaved.push(mangalik[i]);
-        if (mangaTime[i]) interleaved.push(mangaTime[i]);
-      }
-      setLatest(mergeSourceItems(interleaved).slice(0, 4));
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const continueCards = continueEntries.flatMap((entry) => {
-    const item = continueSeries[entry.mangaId] ?? sourceItems[entry.mangaId];
-    const highest = entry.highestReachedChapter;
-    if (!item || highest == null) return [];
-    const completed = data?.completed.includes(`${entry.mangaId}:${highest}`) ?? false;
-    const resumeChapter = getContinueChapter(
-      continueSeries[entry.mangaId]?.chapters,
-      highest,
-      completed,
+    Promise.allSettled(keys.map((key) => sourceService.getSeries(key))).then(
+      (results) => {
+        if (!active) return;
+        const entries = results.flatMap((result, index) =>
+          result.status === "fulfilled"
+            ? [[keys[index], result.value] as const]
+            : [],
+        );
+        setContinueSeries(Object.fromEntries(entries));
+      },
     );
-    return [{ entry, item, highest, resumeChapter }];
-  });
+    return () => {
+      active = false;
+    };
+  }, [continueVisible, continueEntries.map((entry) => entry.mangaId).join("|")]);
 
-  const favoriteItems = (data?.favorites ?? [])
-    .filter((id) => sourceService.isSourceKey(id))
-    .map((id) => sourceItems[id])
-    .filter((item): item is SourceManga => Boolean(item));
-  const favoriteGroups = mergeSourceItems(favoriteItems).slice(0, 4);
+  const continueCards = useMemo<ContinueCard[]>(
+    () =>
+      continueEntries.flatMap((entry) => {
+        const item = continueSeries[entry.mangaId] ?? works[entry.mangaId];
+        const highest = entry.highestReachedChapter;
+        if (!item || highest == null) return [];
+        const completed =
+          data?.completed.includes(`${entry.mangaId}:${highest}`) ?? false;
+        const resumeChapter = getContinueChapter(
+          continueSeries[entry.mangaId]?.chapters,
+          highest,
+          completed,
+        );
+        const percent =
+          data?.progress[`${entry.mangaId}:${highest}`]?.percent ?? 0;
+        return [{ entry, item, resumeChapter, percent }];
+      }),
+    [continueEntries, continueSeries, data?.completed, data?.progress, works],
+  );
+
+  const favoriteItems = useMemo(
+    () =>
+      (data?.favorites ?? [])
+        .filter((id) => sourceService.isSourceKey(id))
+        .slice(0, PREVIEW_LIMIT)
+        .map((id) => works[id])
+        .filter((item): item is SourceManga => Boolean(item)),
+    [data?.favorites, works],
+  );
+
+  const saveSections = async () => {
+    if (savingSections) return;
+    const rollback = persistedSections;
+    const optimistic = sections;
+    setSavingSections(true);
+    setPageError("");
+    setEditMode(false);
+    try {
+      const saved = await userDataService.saveProfileSections(
+        toSaveInput(optimistic),
+      );
+      setSections(saved);
+      setPersistedSections(saved);
+    } catch (cause) {
+      setSections(rollback);
+      setPersistedSections(rollback);
+      setEditMode(true);
+      setPageError(
+        cause instanceof Error ? cause.message : "تعذر حفظ ترتيب الصفحة.",
+      );
+    } finally {
+      setSavingSections(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    if (savingSections) return;
+    setSections(persistedSections);
+    setPageError("");
+    setEditMode(false);
+  };
+
+  const renderSection = (section: UserProfileSection) => {
+    if (section.sectionType === "continue_reading") {
+      return <ContinueReading key={section.key} cards={continueCards} />;
+    }
+
+    if (section.sectionType === "favorites") {
+      return (
+        <WorkStrip
+          key={section.key}
+          title="المفضلة"
+          items={favoriteItems}
+          to="/favorites"
+          emptyText="ما أضفت أعمالًا إلى المفضلة حتى الآن."
+        />
+      );
+    }
+
+    const list = section.list;
+    if (!list) return null;
+    const items = section.previewItems
+      .map((id) => works[id])
+      .filter((item): item is SourceManga => Boolean(item));
+    return (
+      <WorkStrip
+        key={section.key}
+        title={list.name}
+        items={items}
+        to={`/lists/${encodeURIComponent(list.id)}`}
+        emptyText="لا توجد أعمال في هذه القائمة حتى الآن."
+      />
+    );
+  };
 
   return (
     <>
-      <div className="greeting">
-        <p className="eyebrow">خذ لك وقت بسيط</p>
-        <h1>
-          أهلا برجعتك، {user?.name}
-          <span className="accent">.</span>
-        </h1>
-        <p className="muted">فصلك الجاي ينتظرك.</p>
-      </div>
-
-      <SectionTitle title="أكمل القراءة" />
-      {continueCards.length ? (
-        <section className="continue-reading-grid" aria-label="أكمل القراءة">
-          {continueCards.map(({ entry, item, highest, resumeChapter }) => (
-            <article className="continue-reading-card" key={entry.mangaId}>
-              <Link
-                className="continue-reading-cover"
-                to={`/source/${encodeURIComponent(item.key)}`}
-                aria-label={`فتح ${item.title}`}
-              >
-                {item.cover ? (
-                  <SourceCoverImage item={item} alt={`غلاف ${item.title}`} />
-                ) : (
-                  <div className="source-cover-placeholder">{item.title.slice(0, 1)}</div>
-                )}
-              </Link>
-              <div className="continue-reading-copy">
-                <p className="eyebrow">{sourceService.sourceLabel(item.source)}</p>
-                <Link to={`/source/${encodeURIComponent(item.key)}`}>
-                  <h2 dir="auto">{item.title}</h2>
-                </Link>
-                <p className="continue-reading-meta">
-                  أبعد وصول: الفصل {highest}
-                  {entry.lastReadChapter != null && entry.lastReadChapter !== highest
-                    ? ` · آخر فتح: ${entry.lastReadChapter}`
-                    : ""}
-                </p>
-                <Link
-                  className="primary"
-                  to={`/read-source/${encodeURIComponent(item.key)}/${resumeChapter}`}
-                >
-                  متابعة من الفصل {resumeChapter} <Icon name="arrow" />
-                </Link>
-              </div>
-            </article>
-          ))}
-        </section>
-      ) : (
-        <div className="empty">
-          <p>ابدأ قراءة عمل من المصادر وراح يظهر هنا بدون ما يرجع تقدمك للخلف.</p>
-          <Link className="primary" to="/discover">استكشف الأعمال ←</Link>
+      <section className="profile-dashboard-header">
+        <div className="profile-dashboard-identity">
+          <span className="avatar profile-dashboard-avatar">
+            {user?.name?.slice(0, 1)}
+          </span>
+          <div>
+            <p className="eyebrow">مساحتك الشخصية</p>
+            <h1>
+              {user?.name}
+              <span className="accent">.</span>
+            </h1>
+            <p className="muted">@{user?.username}</p>
+          </div>
         </div>
+        <div className="profile-dashboard-actions">
+          <Link className="secondary" to="/profile">
+            الإعدادات
+          </Link>
+          <button
+            className="secondary"
+            type="button"
+            onClick={() => {
+              setPageError("");
+              setEditMode(true);
+            }}
+            disabled={loadingSections || savingSections}
+          >
+            تعديل الصفحة
+          </button>
+        </div>
+      </section>
+
+      {pageError && !editMode && (
+        <p className="error profile-dashboard-error" role="alert">
+          {pageError}
+        </p>
       )}
 
-      <section>
-        <SectionTitle title="آخر التحديثات" to="/discover" label="استكشف" />
-        {latest.length ? (
-          <div className="cover-grid home-grid source-grid">
-            {latest.map((group) => (
-              <SourceCard key={group.id} item={group.primary} sources={group.items} />
-            ))}
-          </div>
-        ) : (
-          <div className="source-callout">
-            <div>
-              <b>Team-X + 3asq + StarzManga + XSano + MangaLik + MangaTime</b>
-              <p className="muted">بحث وفصول حقيقية داخل قارئ Anytime.</p>
+      {editMode ? (
+        <ProfileSectionEditor
+          sections={sections}
+          busy={savingSections}
+          error={pageError}
+          onChange={setSections}
+          onDone={() => void saveSections()}
+          onCancel={cancelEdit}
+        />
+      ) : loadingSections ? (
+        <div className="profile-modules-loading" aria-label="جاري تحميل صفحتك">
+          <span />
+          <span />
+          <span />
+        </div>
+      ) : (
+        <div className="profile-modules">
+          {visibleSections.map(renderSection)}
+          {!visibleSections.length && (
+            <div className="profile-all-hidden">
+              <h2>كل الأقسام مخفية</h2>
+              <p className="muted">
+                استخدم “تعديل الصفحة” لإظهار الأقسام التي تريدها.
+              </p>
             </div>
-            <Link className="primary" to="/discover">فتح الاستكشاف</Link>
-          </div>
-        )}
-      </section>
-
-      <section>
-        <SectionTitle title="مفضلتك" to="/favorites" label="عرض الكل" />
-        <div className="cover-grid home-grid">
-          {favoriteGroups.map((group) => (
-            <SourceCard key={group.id} item={group.primary} sources={group.items} />
-          ))}
+          )}
         </div>
-        {!favoriteGroups.length && (
-          <p className="empty">أضف الأعمال اللي تحبها من المصادر عشان تظهر هنا.</p>
-        )}
-      </section>
-
-      <section>
-        <SectionTitle title="نشاط الأصدقاء" to="/friends" label="الأصدقاء" />
-        <div className="activity">
-          {friends.map((friend, i) => {
-            const friendReading = friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
-              ? friend.reading
-              : null;
-            const readingTitle = friendReading ? sourceItems[friendReading.mangaId]?.title : null;
-            const favoriteCount = friend.favorites.filter((id) => sourceService.isSourceKey(id)).length;
-            return (
-              <Link to={`/friends/${friend.user.id}`} key={friend.user.id}>
-                <span className={`avatar tone-${i}`}>{friend.user.name[0]}</span>
-                <div>
-                  <p>
-                    <b>{friend.user.name}</b>{" "}
-                    {friendReading && readingTitle
-                      ? `يقرأ ${readingTitle}`
-                      : favoriteCount
-                        ? "حدّث مكتبته"
-                        : "ما بدأ قراءة بعد"}
-                  </p>
-                  <small>
-                    {friendReading ? `الفصل ${friendReading.chapter}` : `${favoriteCount} في المفضلة`}
-                  </small>
-                </div>
-                <span aria-hidden="true">↗</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      )}
 
       <footer className="page-footer">مكان هادي وقصة حلوة في أي وقت.</footer>
     </>
