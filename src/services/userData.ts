@@ -1,6 +1,7 @@
 import type {
   Friend,
   LibraryStatus,
+  ProfileVisibility,
   ReadingHistoryEntry,
   ReadingProgress,
   User,
@@ -9,6 +10,7 @@ import type {
   UserListSummary,
   UserProfileSection,
   UserProfileSectionInput,
+  UserProfileView,
 } from "../types";
 
 export interface UserDataService {
@@ -38,6 +40,8 @@ export interface UserDataService {
   ): Promise<void>;
   getProfileSections(previewLimit?: number): Promise<UserProfileSection[]>;
   saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
+  getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
+  setProfileVisibility(visibility: ProfileVisibility): Promise<User>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
@@ -98,12 +102,34 @@ function normalizeData(data: UserData): UserData {
   return { ...data, version: 3, favorites, library, progress, completed, lastOpened };
 }
 
+function normalizeUser(user: User): User {
+  return {
+    ...user,
+    profileVisibility: user.profileVisibility === "public" ? "public" : "private",
+  };
+}
+
 function normalizeFriends(friends: Friend[]): Friend[] {
   return friends.map((friend) => ({
     ...friend,
+    user: normalizeUser(friend.user),
     reading: friend.reading && isLiveKey(friend.reading.mangaId) ? friend.reading : null,
     favorites: friend.favorites.filter((id) => isLiveKey(id)),
   }));
+}
+
+function normalizeUserProfile(profile: UserProfileView): UserProfileView {
+  return {
+    ...profile,
+    user: normalizeUser(profile.user),
+    favorites: (profile.favorites ?? []).filter((id) => isLiveKey(id)),
+    library: profile.library?.filter((item) => isLiveKey(item.mangaId)),
+    lists: profile.lists?.map((list) => ({
+      ...list,
+      previewItems: (list.previewItems ?? []).filter((id) => isLiveKey(id)),
+    })),
+    friends: profile.friends?.map(normalizeUser),
+  };
 }
 
 class ApiUserDataService implements UserDataService {
@@ -143,9 +169,9 @@ class ApiUserDataService implements UserDataService {
 
   async getUser() {
     const result = await this.request<{ user: User | null }>("session");
-    this.currentUser = result.user;
+    this.currentUser = result.user ? normalizeUser(result.user) : null;
     this.cleaned = false;
-    return result.user;
+    return this.currentUser;
   }
 
   async signIn(username: string, password: string) {
@@ -153,10 +179,10 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
     });
-    this.currentUser = result.user;
+    this.currentUser = normalizeUser(result.user);
     this.cleaned = false;
     await this.cleanupDemoData();
-    return result.user;
+    return this.currentUser;
   }
 
   async signOut() {
@@ -347,6 +373,25 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify({ sections: normalized }),
     });
     return normalizeProfileSections(result.sections);
+  }
+
+  async getUserProfile(id: string, previewLimit = 8) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const limit = Math.max(1, Math.min(10, Math.trunc(previewLimit)));
+    const result = await this.request<{ profile: UserProfileView }>(
+      `profiles/${encodeURIComponent(id)}?limit=${limit}`,
+    );
+    return normalizeUserProfile(result.profile);
+  }
+
+  async setProfileVisibility(visibility: ProfileVisibility) {
+    const normalized: ProfileVisibility = visibility === "public" ? "public" : "private";
+    const result = await this.request<{ user: User }>("profile/visibility", {
+      method: "PUT",
+      body: JSON.stringify({ visibility: normalized }),
+    });
+    this.currentUser = normalizeUser(result.user);
+    return this.currentUser;
   }
 
   async recordChapterOpen(mangaId: string, chapter: number) {
