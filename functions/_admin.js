@@ -35,7 +35,7 @@ export async function ensureAdminSchema(db) {
       .run();
   }
 
-  await db.batch([
+  const statements = [
     db.prepare("CREATE INDEX IF NOT EXISTS idx_users_role ON users(role, id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_users_role_visibility ON users(role, profile_visibility, id)"),
     db.prepare(`CREATE TABLE IF NOT EXISTS admin_audit_log (
@@ -48,7 +48,8 @@ export async function ensureAdminSchema(db) {
       FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE SET NULL
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(admin_user_id, created_at DESC, id DESC)"),
-  ]);
+  ];
+  for (const statement of statements) await statement.run();
 }
 
 export async function recordAdminAudit(db, adminUserId, action, targetUserId = null) {
