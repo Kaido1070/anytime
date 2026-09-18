@@ -1,0 +1,105 @@
+.account-header {
+  padding: 10px 0 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.account-avatar {
+  width: 58px;
+  height: 58px;
+  font-size: 21px;
+}
+
+.account-identity .eyebrow {
+  margin-bottom: 4px;
+}
+
+.account-identity h1 {
+  font-size: 30px;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.account-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.account-tabs button {
+  min-height: 43px;
+  padding: 10px 16px;
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.account-tabs button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.account-tab-content {
+  min-width: 0;
+}
+
+.account-home-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 0 4px;
+}
+
+.account-lists-header {
+  margin-top: 24px;
+}
+
+.account-settings-intro {
+  margin: 26px 0 18px;
+}
+
+@media (max-width: 759px) {
+  .account-header {
+    padding-top: 0;
+  }
+
+  .account-avatar {
+    width: 50px;
+    height: 50px;
+    font-size: 18px;
+  }
+
+  .account-identity h1 {
+    font-size: 27px;
+  }
+
+  .account-tabs {
+    margin-inline: -18px;
+    padding-inline: 18px;
+    scroll-padding-inline: 18px;
+  }
+
+  .account-tabs button {
+    min-height: 46px;
+    padding-inline: 14px;
+  }
+
+  .account-home-toolbar .secondary {
+    width: 100%;
+  }
+}
