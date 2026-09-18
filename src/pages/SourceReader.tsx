@@ -242,7 +242,7 @@ function ReaderChapter({
       history.scrollRestoration = previousRestoration;
       restoredRef.current = false;
     };
-  }, [sourceKey, chapter, payload.pages.length, saved]);
+  }, [sourceKey, chapter, payload.pages.length]);
 
   useEffect(() => {
     if (percent < 75 || payload.next == null || prefetchedNextRef.current === payload.next) {
