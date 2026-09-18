@@ -168,3 +168,33 @@ test("XSano category type recognizes novels", () => {
   assert.equal(__test.xsanoTypeFromCategories(["Series", "Manga", "Drama"]), "manga");
   assert.equal(__test.xsanoTypeFromCategories(["Series", "Novel", "Fantasy"]), "novel");
 });
+
+
+test("MangaLik parses Madara chapter numbers and URLs", () => {
+  const html = `
+    <ul>
+      <li class="wp-manga-chapter"><a href="https://mangalik.net/manga/omniscient-readers-viewpoint/311/">311</a></li>
+      <li class="wp-manga-chapter"><a href="/manga/omniscient-readers-viewpoint/290-5/">290.5</a></li>
+    </ul>
+  `;
+  const chapters = __test.parseMangalikChapters(
+    html,
+    "https://mangalik.net/manga/omniscient-readers-viewpoint/",
+  );
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [311, 290.5]);
+  assert.ok(chapters[0].url.includes("/manga/omniscient-readers-viewpoint/311/"));
+});
+
+test("MangaLik reader parser keeps chapter images from its CDN", () => {
+  const html = `
+    <div class="reading-content">
+      <div class="page-break"><img data-src="https://s2solo.mangalik.net/manga/a/chapter/image-01.jpg"></div>
+      <div class="page-break"><img src="https://s2solo.mangalik.net/manga/a/chapter/image-02.jpg"></div>
+    </div>
+    <footer><img src="https://mangalik.net/logo.png"></footer>
+  `;
+  assert.deepEqual(__test.parseMangalikPages(html), [
+    "https://s2solo.mangalik.net/manga/a/chapter/image-01.jpg",
+    "https://s2solo.mangalik.net/manga/a/chapter/image-02.jpg",
+  ]);
+});

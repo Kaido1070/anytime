@@ -132,12 +132,12 @@ export const sourceService = {
   },
 
   async coverCandidates(item: SourceManga) {
-    const fallback = item.source === "3asq" || item.source === "starzmanga"
+    const fallback = item.source === "3asq" || item.source === "starzmanga" || item.source === "mangalik"
       ? uniqueCovers([wordpressOriginalCover(item.cover), item.cover])
       : item.source === "xsano"
         ? uniqueCovers([bloggerOriginalCover(item.cover), item.cover])
         : uniqueCovers([item.cover]);
-    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga" && item.source !== "xsano") return fallback;
+    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga" && item.source !== "xsano" && item.source !== "mangalik") return fallback;
 
     const cached = coverRequests.get(item.key);
     if (cached) return cached;
@@ -159,7 +159,7 @@ export const sourceService = {
   },
 
   isSourceKey(key?: string | null) {
-    return Boolean(key && /^(mt|tx|aq|sz|xs):/.test(key));
+    return Boolean(key && /^(mt|tx|aq|sz|xs|ml):/.test(key));
   },
 
   sourceLabel(source: SourceName) {
@@ -167,6 +167,7 @@ export const sourceService = {
     if (source === "teamx") return "Team-X";
     if (source === "3asq") return "3asq";
     if (source === "starzmanga") return "StarzManga";
-    return "XSano Manga";
+    if (source === "xsano") return "XSano Manga";
+    return "MangaLik";
   },
 };

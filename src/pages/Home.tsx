@@ -51,6 +51,7 @@ export function Home() {
       sourceService.latest("3asq", 1),
       sourceService.latest("starzmanga", 1),
       sourceService.latest("xsano", 1),
+      sourceService.latest("mangalik", 1),
     ]).then((results) => {
       if (!active) return;
       const mangaTime = results[0].status === "fulfilled" ? results[0].value.items : [];
@@ -58,13 +59,15 @@ export function Home() {
       const asq = results[2].status === "fulfilled" ? results[2].value.items : [];
       const starz = results[3].status === "fulfilled" ? results[3].value.items : [];
       const xsano = results[4].status === "fulfilled" ? results[4].value.items : [];
+      const mangalik = results[5].status === "fulfilled" ? results[5].value.items : [];
       const interleaved: SourceManga[] = [];
-      const max = Math.max(mangaTime.length, teamX.length, asq.length, starz.length, xsano.length);
+      const max = Math.max(mangaTime.length, teamX.length, asq.length, starz.length, xsano.length, mangalik.length);
       for (let i = 0; i < max; i += 1) {
         if (teamX[i]) interleaved.push(teamX[i]);
         if (asq[i]) interleaved.push(asq[i]);
         if (starz[i]) interleaved.push(starz[i]);
         if (xsano[i]) interleaved.push(xsano[i]);
+        if (mangalik[i]) interleaved.push(mangalik[i]);
         if (mangaTime[i]) interleaved.push(mangaTime[i]);
       }
       setLatest(mergeSourceItems(interleaved).slice(0, 4));
@@ -142,7 +145,7 @@ export function Home() {
         ) : (
           <div className="source-callout">
             <div>
-              <b>Team-X + 3asq + StarzManga + XSano + MangaTime</b>
+              <b>Team-X + 3asq + StarzManga + XSano + MangaLik + MangaTime</b>
               <p className="muted">بحث وفصول حقيقية داخل قارئ Anytime.</p>
             </div>
             <Link className="primary" to="/discover">فتح الاستكشاف</Link>
