@@ -305,7 +305,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async addFavorite(id: string) {
-    if (!isLiveKey(id)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    if (!isLiveKey(id)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
     await this.request<{ ok: boolean }>("favorites", {
       method: "POST",
       body: JSON.stringify({ mangaId: id }),
@@ -321,7 +321,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async addToLibrary(id: string, status: LibraryStatus = "planned") {
-    if (!isLiveKey(id)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    if (!isLiveKey(id)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
     await this.request<{ ok: boolean }>("library", {
       method: "POST",
       body: JSON.stringify({ mangaId: id, status }),
@@ -330,7 +330,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async setLibraryStatus(id: string, status: LibraryStatus) {
-    if (!isLiveKey(id)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    if (!isLiveKey(id)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
     await this.request<{ ok: boolean }>("library", {
       method: "PUT",
       body: JSON.stringify({ mangaId: id, status }),
@@ -363,7 +363,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async getListMembership(mangaId: string) {
-    if (!isLiveKey(mangaId)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    if (!isLiveKey(mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
     const result = await this.request<{ listIds: string[] }>(
       `lists/membership/${encodeURIComponent(mangaId)}`,
     );
@@ -643,7 +643,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async saveReadingProgress(progress: ReadingProgress) {
-    if (!isLiveKey(progress.mangaId)) throw new Error("هذا العمل ليس من مصدر مدعوم.");
+    if (!isLiveKey(progress.mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
     await this.request<{ ok: boolean }>("progress", {
       method: "PUT",
       body: JSON.stringify(progress),
