@@ -409,8 +409,9 @@ export function FriendProfile() {
     );
   }
 
+  const profileUserId = profile.user.id;
   const isPrivate = profile.access === "private";
-  const isFriend = friends.some((friend) => friend.user.id === profile.user.id);
+  const isFriend = friends.some((friend) => friend.user.id === profileUserId);
   const listById = new Map((profile.lists ?? []).map((list) => [list.id, list]));
 
   async function remove() {
@@ -418,7 +419,7 @@ export function FriendProfile() {
     setRemoving(true);
     setRemoveError("");
     try {
-      await removeFriend(profile.user.id);
+      await removeFriend(profileUserId);
       navigate("/profile#account-friends", { replace: true });
     } catch (cause) {
       setRemoveError(cause instanceof Error ? cause.message : "تعذر حذف الصديق.");
