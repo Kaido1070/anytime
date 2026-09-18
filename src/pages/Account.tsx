@@ -46,8 +46,8 @@ function groupIdForSection(section: UserProfileSection): ContentGroupId | null {
 
 function buildContentGroups(sections: UserProfileSection[]): ContentGroup[] {
   const definitions: Array<{ id: ContentGroupId; label: string; fallback: number }> = [
-    { id: "lists", label: "القوائم", fallback: 1024 },
-    { id: "reading", label: "أقرأ الآن", fallback: 2048 },
+    { id: "reading", label: "أقرأ الآن", fallback: 1024 },
+    { id: "lists", label: "القوائم", fallback: 2048 },
     { id: "activity", label: "آخر النشاط", fallback: 3072 },
   ];
 
@@ -117,11 +117,14 @@ async function resolveWorks(keys: string[]) {
     chunks.push(unique.slice(index, index + 60));
   }
   const settled = await Promise.allSettled(chunks.map((chunk) => sourceService.resolve(chunk)));
-  return Object.fromEntries(
-    settled
-      .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
-      .map((item) => [item.key, item]),
-  );
+  return {
+    works: Object.fromEntries(
+      settled
+        .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+        .map((item) => [item.key, item]),
+    ),
+    partialFailure: settled.some((result) => result.status === "rejected"),
+  };
 }
 
 function ProfileContentEditor({
@@ -352,6 +355,9 @@ export function Account() {
   const [groups, setGroups] = useState<ContentGroup[]>([]);
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
   const [series, setSeries] = useState<Record<string, SourceManga>>({});
+  const [worksError, setWorksError] = useState("");
+  const [readingError, setReadingError] = useState("");
+  const [sectionRetry, setSectionRetry] = useState(0);
   const [loading, setLoading] = useState(true);
   const [customizing, setCustomizing] = useState(false);
   const [savingLayout, setSavingLayout] = useState(false);
@@ -391,21 +397,28 @@ export function Account() {
 
   useEffect(() => {
     let active = true;
+    setWorksError("");
     if (!sourceKeys.length) {
       setWorks({});
       return;
     }
     resolveWorks(sourceKeys)
       .then((next) => {
-        if (active) setWorks(next);
+        if (!active) return;
+        setWorks(next.works);
+        setWorksError(
+          next.partialFailure ? "تعذر تحميل بعض أغلفة القوائم. يمكنك المحاولة مرة أخرى." : "",
+        );
       })
       .catch(() => {
-        if (active) setWorks({});
+        if (!active) return;
+        setWorks({});
+        setWorksError("تعذر تحميل أغلفة القوائم. يمكنك المحاولة مرة أخرى.");
       });
     return () => {
       active = false;
     };
-  }, [sourceKeys.join("|")]);
+  }, [sourceKeys.join("|"), sectionRetry]);
 
   const readingEntries = useMemo(
     () => (profile?.library ?? []).filter((entry) => entry.status === "reading"),
@@ -415,28 +428,36 @@ export function Account() {
 
   useEffect(() => {
     let active = true;
+    setReadingError("");
     if (!readingEntries.length) {
       setSeries({});
       return;
     }
     Promise.allSettled(
       readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
-    ).then((results) => {
-      if (!active) return;
-      setSeries(
-        Object.fromEntries(
-          results.flatMap((result, index) =>
-            result.status === "fulfilled"
-              ? [[readingEntries[index].mangaId, result.value]]
-              : [],
+    )
+      .then((results) => {
+        if (!active) return;
+        setSeries(
+          Object.fromEntries(
+            results.flatMap((result, index) =>
+              result.status === "fulfilled"
+                ? [[readingEntries[index].mangaId, result.value]]
+                : [],
+            ),
           ),
-        ),
-      );
-    });
+        );
+        if (results.some((result) => result.status === "rejected")) {
+          setReadingError("تعذر تحميل تقدم بعض الأعمال. يمكنك المحاولة مرة أخرى.");
+        }
+      })
+      .catch(() => {
+        if (active) setReadingError("تعذر تحميل بيانات القراءة. يمكنك المحاولة مرة أخرى.");
+      });
     return () => {
       active = false;
     };
-  }, [readingSignature]);
+  }, [readingSignature, sectionRetry]);
 
   const saveLayout = async () => {
     if (savingLayout) return;
@@ -510,6 +531,14 @@ export function Account() {
         user={user}
         actions={
           <>
+            <Link
+              className="profile-icon-action"
+              to="/profile?tab=settings"
+              aria-label="إعدادات الحساب"
+              title="الإعدادات"
+            >
+              <Icon name="settings" />
+            </Link>
             <button
               className="profile-icon-action"
               type="button"
@@ -520,14 +549,6 @@ export function Account() {
             >
               <Icon name="more" />
             </button>
-            <Link
-              className="profile-icon-action"
-              to="/profile?tab=settings"
-              aria-label="إعدادات الحساب"
-              title="الإعدادات"
-            >
-              <Icon name="settings" />
-            </Link>
           </>
         }
       />
@@ -576,6 +597,8 @@ export function Account() {
                       favoriteCount={profile.favoriteCount}
                       lists={profile.lists ?? []}
                       works={works}
+                      error={worksError}
+                      onRetry={() => setSectionRetry((value) => value + 1)}
                     />
                   );
                 }
@@ -588,6 +611,8 @@ export function Account() {
                       own
                       completed={completed}
                       viewAllTo="/profile?tab=reading"
+                      error={readingError}
+                      onRetry={() => setSectionRetry((value) => value + 1)}
                     />
                   );
                 }
