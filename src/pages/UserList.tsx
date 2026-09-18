@@ -291,7 +291,7 @@ export function UserList() {
             if (!work) {
               return (
                 <article
-                  className={`list-sortable-row missing ${draggingId === entry.mangaId ? "dragging" : ""}`}
+                  className={`list-sortable-row missing ${canManage ? "" : "read-only"} ${draggingId === entry.mangaId ? "dragging" : ""}`}
                   data-list-work-id={entry.mangaId}
                   key={entry.mangaId}
                 >
@@ -327,34 +327,37 @@ export function UserList() {
               <article
                 className={[
                   "list-sortable-row",
+                  canManage ? "" : "read-only",
                   draggingId === entry.mangaId ? "dragging" : "",
                   dropTargetId === entry.mangaId ? `drop-target drop-${dropPlacement}` : "",
                 ].filter(Boolean).join(" ")}
                 data-list-work-id={entry.mangaId}
                 key={entry.mangaId}
               >
-                <button
-                  className="list-drag-handle"
-                  type="button"
-                  aria-label={`تغيير ترتيب ${title}. الموضع الحالي ${index + 1}`}
-                  title="اسحب لتغيير الترتيب"
-                  onPointerDown={(event) => onPointerDown(event, entry.mangaId)}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={(event) => void endPointerDrag(event.pointerId)}
-                  onPointerCancel={(event) => void endPointerDrag(event.pointerId, true)}
-                  onKeyDown={(event) => {
-                    if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      void moveByKeyboard(entry.mangaId, -1);
-                    }
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      void moveByKeyboard(entry.mangaId, 1);
-                    }
-                  }}
-                >
-                  <span aria-hidden="true">☰</span>
-                </button>
+                {canManage && (
+                  <button
+                    className="list-drag-handle"
+                    type="button"
+                    aria-label={`تغيير ترتيب ${title}. الموضع الحالي ${index + 1}`}
+                    title="اسحب لتغيير الترتيب"
+                    onPointerDown={(event) => onPointerDown(event, entry.mangaId)}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={(event) => void endPointerDrag(event.pointerId)}
+                    onPointerCancel={(event) => void endPointerDrag(event.pointerId, true)}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        void moveByKeyboard(entry.mangaId, -1);
+                      }
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        void moveByKeyboard(entry.mangaId, 1);
+                      }
+                    }}
+                  >
+                    <span aria-hidden="true">☰</span>
+                  </button>
+                )}
 
                 <Link className="list-work-link" to={`/source/${encodeURIComponent(work.key)}`}>
                   <span className="list-work-cover">
