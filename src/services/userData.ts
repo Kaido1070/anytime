@@ -107,6 +107,14 @@ const isProfileSectionType = (value?: string | null) =>
   value === "friends_activity" ||
   value === "custom_list";
 
+export const PERSONALIZATION_CHANGE_EVENT = "wany:personalization-change";
+
+function emitPersonalizationChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(PERSONALIZATION_CHANGE_EVENT));
+  }
+}
+
 function normalizeProfileSections(sections: UserProfileSection[]): UserProfileSection[] {
   return (sections ?? []).flatMap((section) => {
     if (!isProfileSectionType(section.sectionType)) return [];
@@ -302,12 +310,14 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId: id }),
     });
+    emitPersonalizationChange();
   }
 
   async removeFavorite(id: string) {
     await this.request<{ ok: boolean }>(`favorites/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    emitPersonalizationChange();
   }
 
   async addToLibrary(id: string, status: LibraryStatus = "planned") {
@@ -316,6 +326,7 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId: id, status }),
     });
+    emitPersonalizationChange();
   }
 
   async setLibraryStatus(id: string, status: LibraryStatus) {
@@ -324,12 +335,14 @@ class ApiUserDataService implements UserDataService {
       method: "PUT",
       body: JSON.stringify({ mangaId: id, status }),
     });
+    emitPersonalizationChange();
   }
 
   async removeFromLibrary(id: string) {
     await this.request<{ ok: boolean }>(`library/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    emitPersonalizationChange();
   }
 
   async getLists() {
@@ -392,6 +405,7 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId }),
     });
+    emitPersonalizationChange();
   }
 
   async removeWorkFromList(listId: string, mangaId: string) {
@@ -402,6 +416,7 @@ class ApiUserDataService implements UserDataService {
       `lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(mangaId)}`,
       { method: "DELETE" },
     );
+    emitPersonalizationChange();
   }
 
   async reorderListItem(
@@ -559,11 +574,13 @@ class ApiUserDataService implements UserDataService {
     if (!isLiveKey(mangaId) || !Number.isFinite(chapter) || chapter < 0) {
       throw new Error("بيانات الفصل غير صالحة.");
     }
-    return await this.request<{ ok: boolean; readAt: number }>("reading/open", {
+    const result = await this.request<{ ok: boolean; readAt: number }>("reading/open", {
       method: "POST",
       body: JSON.stringify({ mangaId, chapter }),
       keepalive: true,
     });
+    emitPersonalizationChange();
+    return result;
   }
 
   async markChapterUnread(mangaId: string, chapter: number) {
@@ -574,6 +591,7 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId, chapter }),
     });
+    emitPersonalizationChange();
   }
 
   async getReadingHistory(limit = 100) {
