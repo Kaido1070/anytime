@@ -36,6 +36,7 @@ export interface SourceChapter {
   title: string;
   publishedAt?: string | null;
   firstSeenAt?: number | null;
+  baselineObserved?: boolean;
   synthetic?: boolean;
   url?: string;
 }
