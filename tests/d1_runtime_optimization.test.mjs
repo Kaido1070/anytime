@@ -12,8 +12,8 @@ test("general API bootstraps D1 once per binding instead of on every request", a
   assert.doesNotMatch(requestHandler, /ensureDatabase\(db\)/);
   assert.doesNotMatch(requestHandler, /INSERT OR REPLACE INTO schema_meta/);
   assert.match(api, /const apiRuntimeReady = new WeakMap\(\)/);
-  assert.match(api, /if \(version === "11"\) return/);
-  assert.match(api, /schema_version', '11'/);
+  assert.match(api, /if \(version === "12"\) return/);
+  assert.match(api, /schema_version', '12'/);
 });
 
 test("profile section GET is read-only after the one-time backfill", async () => {
