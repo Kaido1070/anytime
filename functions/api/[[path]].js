@@ -649,7 +649,11 @@ async function route(request, url, db) {
     ]);
 
     const correctedHighest = highestForWork?.chapter == null ? null : Number(highestForWork.chapter);
-    await reconcileProgressActivity(db, user.id, mangaId, correctedHighest);
+    try {
+      await reconcileProgressActivity(db, user.id, mangaId, correctedHighest);
+    } catch (error) {
+      console.error("Progress activity reconciliation failed", { userId: user.id, mangaId, error });
+    }
     return json({
       ok: true,
       lastReadChapter: latestForWork?.chapter == null ? null : Number(latestForWork.chapter),
@@ -2424,7 +2428,11 @@ async function recordReadingActivity(db, userId, mangaId, chapter, previous, now
       ? null
       : Number(previous.highest_reached_chapter);
   if (previousHighest == null || chapter > previousHighest) {
-    await recordProgressActivity(db, userId, mangaId, chapter, now);
+    try {
+      await recordProgressActivity(db, userId, mangaId, chapter, now);
+    } catch (error) {
+      console.error("Progress activity write failed", { userId, mangaId, chapter, error });
+    }
   }
 }
 
