@@ -35,6 +35,9 @@ export interface SourceChapter {
   number: number;
   title: string;
   publishedAt?: string | null;
+  firstSeenAt?: number | null;
+  baselineObserved?: boolean;
+  synthetic?: boolean;
   url?: string;
 }
 
@@ -93,6 +96,28 @@ export interface ReadingHistoryEntry {
   mangaId: string;
   chapter: number;
   readAt: number;
+}
+
+export interface FollowedWorkState {
+  mangaId: string;
+  trackingStartedAt: number;
+}
+
+export interface ReadingWorkState {
+  mangaId: string;
+  readCount: number;
+  lastReadAt: number | null;
+  highestChapter: number | null;
+}
+
+export interface PersonalizationState {
+  followed: FollowedWorkState[];
+  readingWorks: ReadingWorkState[];
+}
+
+export interface ReadChapterPair {
+  mangaId: string;
+  chapter: number;
 }
 
 export interface UserListSummary {

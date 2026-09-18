@@ -8,7 +8,9 @@ import type {
   FriendRequests,
   FriendSearchResult,
   LibraryStatus,
+  PersonalizationState,
   ProfileVisibility,
+  ReadChapterPair,
   ReadingHistoryEntry,
   ReadingProgress,
   User,
@@ -59,6 +61,8 @@ export interface UserDataService {
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
+  getPersonalizationState(): Promise<PersonalizationState>;
+  getReadChapterPairs(chapters: ReadChapterPair[]): Promise<ReadChapterPair[]>;
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
   saveReadingProgress(progress: ReadingProgress): Promise<void>;
   getFriends(): Promise<Friend[]>;
@@ -102,6 +106,14 @@ const isProfileSectionType = (value?: string | null) =>
   value === "my_activity" ||
   value === "friends_activity" ||
   value === "custom_list";
+
+export const PERSONALIZATION_CHANGE_EVENT = "wany:personalization-change";
+
+function emitPersonalizationChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(PERSONALIZATION_CHANGE_EVENT));
+  }
+}
 
 function normalizeProfileSections(sections: UserProfileSection[]): UserProfileSection[] {
   return (sections ?? []).flatMap((section) => {
@@ -298,12 +310,14 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId: id }),
     });
+    emitPersonalizationChange();
   }
 
   async removeFavorite(id: string) {
     await this.request<{ ok: boolean }>(`favorites/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    emitPersonalizationChange();
   }
 
   async addToLibrary(id: string, status: LibraryStatus = "planned") {
@@ -312,6 +326,7 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId: id, status }),
     });
+    emitPersonalizationChange();
   }
 
   async setLibraryStatus(id: string, status: LibraryStatus) {
@@ -320,12 +335,14 @@ class ApiUserDataService implements UserDataService {
       method: "PUT",
       body: JSON.stringify({ mangaId: id, status }),
     });
+    emitPersonalizationChange();
   }
 
   async removeFromLibrary(id: string) {
     await this.request<{ ok: boolean }>(`library/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
+    emitPersonalizationChange();
   }
 
   async getLists() {
@@ -388,6 +405,7 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId }),
     });
+    emitPersonalizationChange();
   }
 
   async removeWorkFromList(listId: string, mangaId: string) {
@@ -398,6 +416,7 @@ class ApiUserDataService implements UserDataService {
       `lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(mangaId)}`,
       { method: "DELETE" },
     );
+    emitPersonalizationChange();
   }
 
   async reorderListItem(
@@ -555,11 +574,13 @@ class ApiUserDataService implements UserDataService {
     if (!isLiveKey(mangaId) || !Number.isFinite(chapter) || chapter < 0) {
       throw new Error("بيانات الفصل غير صالحة.");
     }
-    return await this.request<{ ok: boolean; readAt: number }>("reading/open", {
+    const result = await this.request<{ ok: boolean; readAt: number }>("reading/open", {
       method: "POST",
       body: JSON.stringify({ mangaId, chapter }),
       keepalive: true,
     });
+    emitPersonalizationChange();
+    return result;
   }
 
   async markChapterUnread(mangaId: string, chapter: number) {
@@ -570,6 +591,7 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ mangaId, chapter }),
     });
+    emitPersonalizationChange();
   }
 
   async getReadingHistory(limit = 100) {
@@ -578,6 +600,42 @@ class ApiUserDataService implements UserDataService {
       `reading/history?limit=${normalizedLimit}`,
     );
     return result.history.filter((item) => isLiveKey(item.mangaId));
+  }
+
+  async getPersonalizationState() {
+    const result = await this.request<PersonalizationState>("personalization-state");
+    return {
+      followed: (result.followed ?? []).filter((item) => isLiveKey(item.mangaId)),
+      readingWorks: (result.readingWorks ?? []).filter((item) => isLiveKey(item.mangaId)),
+    };
+  }
+
+  async getReadChapterPairs(chapters: ReadChapterPair[]) {
+    const normalized = chapters.filter(
+      (item) => isLiveKey(item.mangaId) && Number.isFinite(item.chapter) && item.chapter >= 0,
+    );
+    if (!normalized.length) return [];
+
+    const chunks: ReadChapterPair[][] = [];
+    for (let index = 0; index < normalized.length; index += 200) {
+      chunks.push(normalized.slice(index, index + 200));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        this.request<{ read: ReadChapterPair[] }>("personalization-state", {
+          method: "POST",
+          body: JSON.stringify({ chapters: chunk }),
+        }),
+      ),
+    );
+    const unique = new Map<string, ReadChapterPair>();
+    for (const result of results) {
+      for (const item of result.read ?? []) {
+        if (!isLiveKey(item.mangaId) || !Number.isFinite(item.chapter)) continue;
+        unique.set(`${item.mangaId}:${item.chapter}`, item);
+      }
+    }
+    return [...unique.values()];
   }
 
   async getReadingProgress() {

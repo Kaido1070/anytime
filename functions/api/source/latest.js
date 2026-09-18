@@ -110,20 +110,27 @@ async function ensureSchema(db) {
     slug TEXT NOT NULL, type TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '',
     title TEXT NOT NULL, cover_url TEXT NOT NULL DEFAULT '', description TEXT,
     status TEXT, genres_json TEXT NOT NULL DEFAULT '[]', updated_at INTEGER NOT NULL,
+    first_seen_at INTEGER,
     UNIQUE(source, source_id)
   )`).run();
+  const columns = await db.prepare("PRAGMA table_info(source_items)").all();
+  if (!(columns.results ?? []).some((column) => column.name === "first_seen_at")) {
+    await db.prepare("ALTER TABLE source_items ADD COLUMN first_seen_at INTEGER").run();
+  }
+  await db.prepare("UPDATE source_items SET first_seen_at = updated_at WHERE first_seen_at IS NULL").run();
 }
 
 async function rememberItems(db, items) {
   if (!items.length) return;
   const now = Date.now();
   await db.batch(items.slice(0, 80).map((item) => db.prepare(`INSERT INTO source_items
-    (source_key, source, source_id, slug, type, url, title, cover_url, description, status, genres_json, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (source_key, source, source_id, slug, type, url, title, cover_url, description, status, genres_json, updated_at, first_seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(source_key) DO UPDATE SET source_id=excluded.source_id, slug=excluded.slug,
     type=excluded.type, url=excluded.url, title=excluded.title,
     cover_url=CASE WHEN excluded.cover_url <> '' THEN excluded.cover_url ELSE source_items.cover_url END,
-    updated_at=excluded.updated_at`).bind(item.key, item.source, item.sourceId, item.slug, item.type, item.url, item.title, item.cover, null, null, "[]", now)));
+    updated_at=excluded.updated_at,
+    first_seen_at=COALESCE(source_items.first_seen_at, excluded.first_seen_at)`).bind(item.key, item.source, item.sourceId, item.slug, item.type, item.url, item.title, item.cover, null, null, "[]", now, now)));
 }
 
 function safePage(value) { const page = Number(value || 1); return Number.isInteger(page) && page > 0 && page <= 100 ? page : 1; }
