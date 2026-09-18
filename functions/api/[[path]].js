@@ -81,7 +81,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 2, database: "ready" });
+    return json({ ok: true, phase: 3, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -151,6 +151,221 @@ async function route(request, url, db) {
 
   if (request.method === "GET" && path === "data") {
     return json({ data: await getUserData(db, user.id) });
+  }
+
+  if (request.method === "GET" && path === "lists") {
+    return json({ lists: await getUserLists(db, user.id) });
+  }
+
+  if (request.method === "POST" && path === "lists") {
+    const body = await readJson(request);
+    const input = normalizeListInput(body);
+    if (!input) {
+      return json(
+        { error: "INVALID_LIST", message: "اسم القائمة مطلوب وبحد أقصى 80 حرفًا." },
+        400,
+      );
+    }
+    const last = await db
+      .prepare("SELECT MAX(position) AS position FROM user_lists WHERE user_id = ?")
+      .bind(user.id)
+      .first();
+    const now = Date.now();
+    const list = {
+      id: crypto.randomUUID(),
+      name: input.name,
+      description: input.description,
+      position: Number(last?.position ?? 0) + 1024,
+      itemCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db
+      .prepare(
+        `INSERT INTO user_lists
+          (id, user_id, name, description, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        list.id,
+        user.id,
+        list.name,
+        list.description,
+        list.position,
+        list.createdAt,
+        list.updatedAt,
+      )
+      .run();
+    return json({ list }, 201);
+  }
+
+  const membershipMatch = path.match(/^lists\/membership\/(.+)$/);
+  if (request.method === "GET" && membershipMatch) {
+    const mangaId = safeId(decodeURIComponent(membershipMatch[1]));
+    if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+    const result = await db
+      .prepare(
+        `SELECT i.list_id
+         FROM user_list_items i
+         JOIN user_lists l ON l.id = i.list_id
+         WHERE l.user_id = ? AND i.manga_id = ?
+         ORDER BY l.position ASC, l.created_at ASC`,
+      )
+      .bind(user.id, mangaId)
+      .all();
+    return json({ listIds: (result.results ?? []).map((row) => row.list_id) });
+  }
+
+  const listReorderMatch = path.match(/^lists\/([^/]+)\/reorder$/);
+  if (request.method === "PUT" && listReorderMatch) {
+    const listId = safeId(decodeURIComponent(listReorderMatch[1]));
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    const beforeId = body.beforeId == null ? "" : safeId(body.beforeId);
+    const afterId = body.afterId == null ? "" : safeId(body.afterId);
+    if (!listId || !mangaId || (body.beforeId != null && !beforeId) || (body.afterId != null && !afterId)) {
+      return json({ error: "INVALID_REORDER" }, 400);
+    }
+    const result = await reorderUserListItem(
+      db,
+      user.id,
+      listId,
+      mangaId,
+      beforeId || null,
+      afterId || null,
+    );
+    if (!result.ok) return json({ error: result.error }, result.status);
+    return json({ ok: true });
+  }
+
+  const listItemsMatch = path.match(/^lists\/([^/]+)\/items(?:\/(.+))?$/);
+  if (listItemsMatch) {
+    const listId = safeId(decodeURIComponent(listItemsMatch[1]));
+    if (!listId) return json({ error: "INVALID_LIST" }, 400);
+    const owned = await db
+      .prepare("SELECT id FROM user_lists WHERE id = ? AND user_id = ? LIMIT 1")
+      .bind(listId, user.id)
+      .first();
+    if (!owned) return json({ error: "LIST_NOT_FOUND" }, 404);
+
+    if (request.method === "POST" && !listItemsMatch[2]) {
+      const body = await readJson(request);
+      const mangaId = safeId(body.mangaId);
+      if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+      const last = await db
+        .prepare("SELECT MAX(position) AS position FROM user_list_items WHERE list_id = ?")
+        .bind(listId)
+        .first();
+      const now = Date.now();
+      await db.batch([
+        db
+          .prepare(
+            `INSERT OR IGNORE INTO user_list_items
+              (list_id, manga_id, position, added_at)
+             VALUES (?, ?, ?, ?)`,
+          )
+          .bind(listId, mangaId, Number(last?.position ?? 0) + 1024, now),
+        db.prepare("UPDATE user_lists SET updated_at = ? WHERE id = ? AND user_id = ?")
+          .bind(now, listId, user.id),
+      ]);
+      return json({ ok: true }, 201);
+    }
+
+    if (request.method === "DELETE" && listItemsMatch[2]) {
+      const mangaId = safeId(decodeURIComponent(listItemsMatch[2]));
+      if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+      const now = Date.now();
+      await db.batch([
+        db.prepare("DELETE FROM user_list_items WHERE list_id = ? AND manga_id = ?")
+          .bind(listId, mangaId),
+        db.prepare("UPDATE user_lists SET updated_at = ? WHERE id = ? AND user_id = ?")
+          .bind(now, listId, user.id),
+      ]);
+      return json({ ok: true });
+    }
+  }
+
+  const listMatch = path.match(/^lists\/([^/]+)$/);
+  if (listMatch) {
+    const listId = safeId(decodeURIComponent(listMatch[1]));
+    if (!listId) return json({ error: "INVALID_LIST" }, 400);
+
+    if (request.method === "GET") {
+      const listRow = await db
+        .prepare(
+          `SELECT id, name, description, position, created_at, updated_at
+           FROM user_lists
+           WHERE id = ? AND user_id = ?
+           LIMIT 1`,
+        )
+        .bind(listId, user.id)
+        .first();
+      if (!listRow) return json({ error: "LIST_NOT_FOUND" }, 404);
+      const itemResult = await db
+        .prepare(
+          `SELECT manga_id, position, added_at
+           FROM user_list_items
+           WHERE list_id = ?
+           ORDER BY position ASC, added_at ASC, manga_id ASC`,
+        )
+        .bind(listId)
+        .all();
+      const items = (itemResult.results ?? []).map((row) => ({
+        mangaId: row.manga_id,
+        position: Number(row.position),
+        addedAt: Number(row.added_at),
+      }));
+      return json({
+        list: {
+          ...mapUserList(listRow),
+          itemCount: items.length,
+        },
+        items,
+      });
+    }
+
+    if (request.method === "PUT") {
+      const body = await readJson(request);
+      const input = normalizeListInput(body);
+      if (!input) {
+        return json(
+          { error: "INVALID_LIST", message: "اسم القائمة مطلوب وبحد أقصى 80 حرفًا." },
+          400,
+        );
+      }
+      const now = Date.now();
+      const result = await db
+        .prepare(
+          `UPDATE user_lists
+           SET name = ?, description = ?, updated_at = ?
+           WHERE id = ? AND user_id = ?`,
+        )
+        .bind(input.name, input.description, now, listId, user.id)
+        .run();
+      if (!result.meta?.changes) return json({ error: "LIST_NOT_FOUND" }, 404);
+      const updated = await db
+        .prepare(
+          `SELECT
+             l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+             COUNT(i.manga_id) AS item_count
+           FROM user_lists l
+           LEFT JOIN user_list_items i ON i.list_id = l.id
+           WHERE l.id = ? AND l.user_id = ?
+           GROUP BY l.id`,
+        )
+        .bind(listId, user.id)
+        .first();
+      return json({ list: mapUserList(updated) });
+    }
+
+    if (request.method === "DELETE") {
+      const result = await db
+        .prepare("DELETE FROM user_lists WHERE id = ? AND user_id = ?")
+        .bind(listId, user.id)
+        .run();
+      if (!result.meta?.changes) return json({ error: "LIST_NOT_FOUND" }, 404);
+      return json({ ok: true });
+    }
   }
 
   if (request.method === "GET" && path === "library") {
@@ -505,12 +720,20 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "3") return;
+  if (version?.value === "4") return;
+  if (version?.value === "3") {
+    await db.batch([
+      ...listSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '4')"),
+    ]);
+    return;
+  }
   if (version?.value === "2") {
     await db.batch([
       ...librarySchemaStatements(db),
       ...libraryBackfillStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '3')"),
+      ...listSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '4')"),
     ]);
     return;
   }
@@ -572,6 +795,7 @@ async function ensureDatabase(db) {
       FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
     )`),
     ...librarySchemaStatements(db),
+    ...listSchemaStatements(db),
   ];
 
   for (const seeded of SEEDED_USERS) {
@@ -645,7 +869,7 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '3')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '4')"),
   );
   await db.batch(statements);
 }
@@ -754,6 +978,148 @@ function libraryBackfillStatements(db) {
         WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
       )`),
   ];
+}
+
+function listSchemaStatements(db) {
+  return [
+    db.prepare(`CREATE TABLE IF NOT EXISTS user_lists (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      position REAL NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_user_lists_user_position ON user_lists(user_id, position ASC, created_at ASC)",
+    ),
+    db.prepare(`CREATE TABLE IF NOT EXISTS user_list_items (
+      list_id TEXT NOT NULL,
+      manga_id TEXT NOT NULL,
+      position REAL NOT NULL DEFAULT 0,
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY (list_id, manga_id),
+      FOREIGN KEY (list_id) REFERENCES user_lists(id) ON DELETE CASCADE
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_user_list_items_position ON user_list_items(list_id, position ASC, added_at ASC)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_user_list_items_work ON user_list_items(manga_id, list_id)",
+    ),
+  ];
+}
+
+async function getUserLists(db, userId) {
+  const result = await db
+    .prepare(
+      `SELECT
+         l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+         COUNT(i.manga_id) AS item_count
+       FROM user_lists l
+       LEFT JOIN user_list_items i ON i.list_id = l.id
+       WHERE l.user_id = ?
+       GROUP BY l.id
+       ORDER BY l.position ASC, l.created_at ASC, l.id ASC`,
+    )
+    .bind(userId)
+    .all();
+  return (result.results ?? []).map(mapUserList);
+}
+
+function mapUserList(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? null,
+    position: Number(row.position),
+    itemCount: Number(row.item_count ?? 0),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+
+function normalizeListInput(body) {
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const rawDescription =
+    typeof body?.description === "string" ? body.description.trim() : "";
+  if (!name || name.length > 80 || rawDescription.length > 500) return null;
+  return {
+    name,
+    description: rawDescription || null,
+  };
+}
+
+async function reorderUserListItem(db, userId, listId, mangaId, beforeId, afterId) {
+  const owned = await db
+    .prepare("SELECT id FROM user_lists WHERE id = ? AND user_id = ? LIMIT 1")
+    .bind(listId, userId)
+    .first();
+  if (!owned) return { ok: false, error: "LIST_NOT_FOUND", status: 404 };
+
+  const result = await db
+    .prepare(
+      `SELECT manga_id, position, added_at
+       FROM user_list_items
+       WHERE list_id = ?
+       ORDER BY position ASC, added_at ASC, manga_id ASC`,
+    )
+    .bind(listId)
+    .all();
+  const rows = (result.results ?? []).map((row) => ({
+    mangaId: row.manga_id,
+    position: Number(row.position),
+    addedAt: Number(row.added_at),
+  }));
+  const current = rows.find((row) => row.mangaId === mangaId);
+  if (!current) return { ok: false, error: "LIST_ITEM_NOT_FOUND", status: 404 };
+
+  const remaining = rows.filter((row) => row.mangaId !== mangaId);
+  let targetIndex = remaining.length;
+  if (beforeId) {
+    const index = remaining.findIndex((row) => row.mangaId === beforeId);
+    if (index < 0) return { ok: false, error: "INVALID_REORDER_TARGET", status: 409 };
+    targetIndex = index;
+  } else if (afterId) {
+    const index = remaining.findIndex((row) => row.mangaId === afterId);
+    if (index < 0) return { ok: false, error: "INVALID_REORDER_TARGET", status: 409 };
+    targetIndex = index + 1;
+  }
+
+  const nextOrder = [...remaining];
+  nextOrder.splice(targetIndex, 0, current);
+  const previous = nextOrder[targetIndex - 1] ?? null;
+  const next = nextOrder[targetIndex + 1] ?? null;
+  const now = Date.now();
+
+  if (previous && next && next.position - previous.position <= 0.001) {
+    const statements = nextOrder.map((row, index) =>
+      db
+        .prepare("UPDATE user_list_items SET position = ? WHERE list_id = ? AND manga_id = ?")
+        .bind((index + 1) * 1024, listId, row.mangaId),
+    );
+    statements.push(
+      db.prepare("UPDATE user_lists SET updated_at = ? WHERE id = ? AND user_id = ?")
+        .bind(now, listId, userId),
+    );
+    await db.batch(statements);
+    return { ok: true };
+  }
+
+  let position = 1024;
+  if (previous && next) position = (previous.position + next.position) / 2;
+  else if (previous) position = previous.position + 1024;
+  else if (next) position = next.position - 1024;
+
+  await db.batch([
+    db.prepare("UPDATE user_list_items SET position = ? WHERE list_id = ? AND manga_id = ?")
+      .bind(position, listId, mangaId),
+    db.prepare("UPDATE user_lists SET updated_at = ? WHERE id = ? AND user_id = ?")
+      .bind(now, listId, userId),
+  ]);
+  return { ok: true };
 }
 
 async function getSession(request, db) {

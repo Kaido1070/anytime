@@ -5,7 +5,7 @@ export function AppLayout() {
   const navItems = [
     { label: "الرئيسية", path: "/", icon: "home" },
     { label: "استكشف", path: "/discover", icon: "search" },
-    { label: "المفضلة", path: "/favorites", icon: "favorites" },
+    { label: "القوائم", path: "/lists", icon: "lists" },
     { label: "الأصدقاء", path: "/friends", icon: "friends" },
     { label: "حسابي", path: "/profile", icon: "profile" },
   ];

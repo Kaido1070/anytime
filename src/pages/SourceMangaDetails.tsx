@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ListManager } from "../components/ListManager";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
@@ -155,6 +156,7 @@ export function SourceMangaDetails() {
                 <option value="planned">مخطط له</option>
               </select>
             )}
+            <ListManager mangaId={sourceKey} />
             <button className="secondary" aria-pressed={isFavorite} onClick={() => void favorite(sourceKey)}><Icon name={isFavorite ? "check" : "favorites"} />{isFavorite ? "في المفضلة" : "إضافة للمفضلة"}</button>
           </div>
         </div>
