@@ -156,6 +156,15 @@ test("profile customization moves from the header menu to a pencil by lists", as
   assert.match(ui, /edit:/);
 });
 
+test("profile display name stays right-aligned beside the avatar", async () => {
+  const css = await readFile(new URL("../src/profileOverview.css", import.meta.url), "utf8");
+  const compact = css.slice(css.indexOf("Compact profile shell: one-row identity and stats"));
+  assert.match(
+    compact,
+    /\.profile-overview-name \{[\s\S]*?text-align: right;[\s\S]*?\.profile-overview-name h1 \{[\s\S]*?text-align: right;/,
+  );
+});
+
 test("profile source failures stay inside their own preview sections", async () => {
   const [account, overview] = await Promise.all([
     readFile(new URL("../src/pages/Account.tsx", import.meta.url), "utf8"),
