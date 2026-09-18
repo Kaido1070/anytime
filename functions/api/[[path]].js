@@ -1765,19 +1765,23 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version === "16") return;
+      if (version !== "16") {
+        await ensureDatabase(db);
+        await ensureAdminSchema(db);
 
-      await ensureDatabase(db);
-      await ensureAdminSchema(db);
+        // Migrations are strictly versioned. Never rerun an older migration against
+        // a newer schema: some legacy steps write their own schema_version.
+        if (version == null || Number(version) < 11) await applyRuntimeOptimizationMigration(db);
+        await applyUsernameMigration(db);
+        await applyUsernameMigrationV13(db);
+        await applyUserIdentityV14(db);
+        await applyYUsernameV15(db);
+        await applyHUsernameV16(db);
+      }
 
-      // Migrations are strictly versioned. Never rerun an older migration against
-      // a newer schema: some legacy steps write their own schema_version.
-      if (version == null || Number(version) < 11) await applyRuntimeOptimizationMigration(db);
-      await applyUsernameMigration(db);
-      await applyUsernameMigrationV13(db);
-      await applyUserIdentityV14(db);
-      await applyYUsernameV15(db);
-      await applyHUsernameV16(db);
+      // Repair canonical account names independently from schema_version.
+      // This fixes databases that reached v16 before the rename completed.
+      await ensureCanonicalAccountNames(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -1868,6 +1872,27 @@ async function applyUsernameMigrationV13(db) {
   await db
     .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '13')")
     .run();
+}
+
+async function ensureCanonicalAccountNames(db) {
+  const now = Date.now();
+  const targets = [
+    { id: "yas", username: "Y", name: "Y" },
+    { id: "has", username: "H", name: "H" },
+  ];
+
+  for (const target of targets) {
+    const conflict = await db
+      .prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id <> ? LIMIT 1")
+      .bind(target.username, target.id)
+      .first();
+    if (conflict) throw new Error(`Username ${target.username} is already in use.`);
+
+    await db
+      .prepare("UPDATE users SET username = ?, name = ?, updated_at = ? WHERE id = ?")
+      .bind(target.username, target.name, now, target.id)
+      .run();
+  }
 }
 
 async function applyHUsernameV16(db) {
