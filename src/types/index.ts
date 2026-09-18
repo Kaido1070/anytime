@@ -7,6 +7,24 @@ export interface User {
   name: string;
   username: string;
   profileVisibility: ProfileVisibility;
+  avatarId: string | null;
+}
+
+export interface Avatar {
+  id: string;
+  seriesId: string;
+  characterName: string;
+  imageUrl: string | null;
+  position: number;
+}
+
+export interface AvatarSeries {
+  id: string;
+  workId: string | null;
+  name: string;
+  slug: string;
+  position: number;
+  avatars: Avatar[];
 }
 
 export type SourceName = "mangatime" | "teamx" | "3asq" | "starzmanga" | "xsano" | "mangalik";
