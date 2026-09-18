@@ -22,6 +22,10 @@ class FakeStatement {
   }
 
   async first() {
+    if (this.query.includes("FROM activity_events")) {
+      this.db.sensitiveQueries.push("activity");
+      return { total: 0 };
+    }
     if (this.query.includes("SELECT value FROM schema_meta")) {
       return { value: "8" };
     }
@@ -47,6 +51,10 @@ class FakeStatement {
   }
 
   async all() {
+    if (this.query.includes("FROM activity_events")) {
+      this.db.sensitiveQueries.push("activity");
+      return { results: [] };
+    }
     if (this.query.includes("FROM favorites") && this.query.includes("total_count")) {
       return {
         results: [{ manga_id: "mt:manhwa:nano-machine", total_count: 1 }],
