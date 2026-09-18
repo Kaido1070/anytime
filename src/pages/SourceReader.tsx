@@ -271,7 +271,7 @@ function ReaderChapter({
   return (
     <main className="reader source-reader">
       <header className="reader-header">
-        <Link to={`/source/${encodeURIComponent(sourceKey)}`} aria-label="العودة إلى صفحة العمل">
+        <Link to={`/source/${encodeURIComponent(sourceKey)}`} aria-label="العودة إلى صفحة القصة">
           <Icon name="back" />
         </Link>
         <div>
