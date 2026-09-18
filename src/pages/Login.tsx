@@ -69,11 +69,6 @@ export function Login() {
             {busy ? "جاري الدخول…" : "تسجيل الدخول"} <span>←</span>
           </button>
         </form>
-        <p className="demo-note">
-          المرحلة الثانية
-          <br />
-          <span>جلسة خاصة ومزامنة عبر الحساب.</span>
-        </p>
       </div>
     </main>
   );
