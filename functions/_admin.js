@@ -32,6 +32,15 @@ export async function ensureAdminSchema(db) {
   let pending = adminSchemaReady.get(db);
   if (!pending) {
     pending = (async () => {
+      try {
+        const version = await db
+          .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+          .first();
+        if (version?.value === "10" || version?.value === "11") return;
+      } catch {
+        // Older/fresh databases may not have schema_meta yet.
+      }
+
       const columns = await db.prepare("PRAGMA table_info(users)").all();
       const hasRole = (columns.results ?? []).some((column) => column.name === "role");
       if (!hasRole) {
