@@ -147,7 +147,7 @@ function diversify(
         (max, picked) => Math.max(max, cosine(current.vector, picked.vector)),
         0,
       );
-      const adjusted = current.score - maxSimilarity * W.diversityPenalty;
+      const adjusted = current.score * (1 - maxSimilarity * W.diversityPenalty);
       const best = remaining[bestIndex];
       if (
         adjusted > bestAdjusted ||
