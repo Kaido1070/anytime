@@ -2505,7 +2505,7 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.avatar_id
+         u.id, u.username, u.name, u.profile_visibility, u.avatar_id
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -2706,7 +2706,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       .bind(targetId)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.avatar_id
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
         FROM friendships f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
@@ -2928,7 +2928,7 @@ async function getFriends(db, userId, limit = 50, offset = 0) {
       .first(),
     db
       .prepare(
-        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.avatar_id
+        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
          FROM friendships f
          JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = ?
@@ -3057,7 +3057,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId)
       .first(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.avatar_id, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.requester_id
         WHERE r.receiver_id = ?
@@ -3066,7 +3066,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId, limit)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.avatar_id, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.receiver_id
         WHERE r.requester_id = ?
