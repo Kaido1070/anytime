@@ -1765,12 +1765,13 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version === "12") return;
+      if (version === "13") return;
 
       await ensureDatabase(db);
       await ensureAdminSchema(db);
       await applyRuntimeOptimizationMigration(db);
       await applyUsernameMigration(db);
+      await applyUsernameMigrationV13(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -1837,6 +1838,29 @@ async function applyUsernameMigration(db) {
 
   await db
     .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '12')")
+    .run();
+}
+
+async function applyUsernameMigrationV13(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "13") return;
+  if (version?.value !== "12") return;
+
+  const target = await db
+    .prepare("SELECT id FROM users WHERE username = 'm' COLLATE NOCASE LIMIT 1")
+    .first();
+
+  if (!target) {
+    await db
+      .prepare("UPDATE users SET username = 'm', updated_at = ? WHERE username = 'mah' COLLATE NOCASE")
+      .bind(Date.now())
+      .run();
+  }
+
+  await db
+    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '13')")
     .run();
 }
 
