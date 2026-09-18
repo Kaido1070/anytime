@@ -291,7 +291,7 @@ async function route(request, url, db) {
     const clientUpdatedAt = Number(body.updatedAt);
     if (
       !mangaId ||
-      !Number.isInteger(chapter) ||
+      !Number.isFinite(chapter) ||
       chapter < 0 ||
       !Number.isFinite(percent)
     ) {
@@ -328,6 +328,28 @@ async function route(request, url, db) {
            WHERE excluded.updated_at >= user_state.updated_at`,
         )
         .bind(user.id, mangaId, chapter, updatedAt),
+      db
+        .prepare(`INSERT INTO user_library
+          (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+         VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, manga_id) DO UPDATE SET
+           status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
+           updated_at = MAX(user_library.updated_at, excluded.updated_at),
+           last_read_at = CASE
+             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
+               THEN excluded.last_read_at
+             ELSE user_library.last_read_at
+           END,
+           last_read_chapter = CASE
+             WHEN user_library.last_read_at IS NULL OR excluded.last_read_at >= user_library.last_read_at
+               THEN excluded.last_read_chapter
+             ELSE user_library.last_read_chapter
+           END,
+           highest_reached_chapter = CASE
+             WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+             ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
+           END`)
+        .bind(user.id, mangaId, updatedAt, updatedAt, updatedAt, chapter, chapter),
     ]);
 
     return json({ ok: true });
