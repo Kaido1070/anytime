@@ -192,7 +192,7 @@ export function AdminDashboard() {
           <select value={sort} onChange={(event) => updateParam("sort", event.target.value)}>
             <option value="activity">آخر نشاط</option>
             <option value="username">اسم المستخدم</option>
-            <option value="works">عدد الأعمال</option>
+            <option value="works">عدد القصص</option>
           </select>
         </div>
       </div>
@@ -205,7 +205,7 @@ export function AdminDashboard() {
           <table className="admin-users-table">
             <thead>
               <tr>
-                <th>الحساب</th><th>الخصوصية</th><th>الأعمال</th><th>القوائم</th>
+                <th>الحساب</th><th>الخصوصية</th><th>القصص</th><th>القوائم</th>
                 <th>الأصدقاء</th><th>آخر قراءة</th><th>آخر نشاط</th>
               </tr>
             </thead>
@@ -219,7 +219,7 @@ export function AdminDashboard() {
                     </Link>
                   </td>
                   <td data-label="الخصوصية"><span className="admin-pill">{item.user.profileVisibility === "public" ? "عام" : "خاص"}</span></td>
-                  <td data-label="الأعمال">{item.worksCount}</td>
+                  <td data-label="القصص">{item.worksCount}</td>
                   <td data-label="القوائم">{item.listsCount}</td>
                   <td data-label="الأصدقاء">{item.friendsCount}</td>
                   <td data-label="آخر قراءة">
@@ -338,7 +338,7 @@ export function AdminUserDetail() {
 
       {tab === "overview" && (
         <div className="admin-overview-grid">
-          <article><span>الأعمال</span><b>{detail.stats.works}</b></article>
+          <article><span>القصص</span><b>{detail.stats.works}</b></article>
           <article><span>القوائم</span><b>{detail.stats.lists}</b></article>
           <article><span>الأصدقاء</span><b>{detail.stats.friends}</b></article>
           <article><span>سجل القراءة</span><b>{detail.readingHistoryTotal}</b></article>
@@ -384,7 +384,7 @@ export function AdminUserDetail() {
         <div className="admin-lists">
           {detail.lists.length ? detail.lists.map((list) => (
             <article className="admin-list-card" key={list.id}>
-              <header><div><h2>{list.name}</h2>{list.description && <p className="muted">{list.description}</p>}</div><span>{list.itemCount} عمل</span></header>
+              <header><div><h2>{list.name}</h2>{list.description && <p className="muted">{list.description}</p>}</div><span>{list.itemCount} قصص</span></header>
               <ol>{list.items.map((item) => <li key={item.mangaId}><WorkIdentity mangaId={item.mangaId} works={works} /></li>)}</ol>
             </article>
           )) : <p className="empty">لا توجد قوائم.</p>}
