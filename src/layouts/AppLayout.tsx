@@ -43,19 +43,22 @@ export function AppLayout() {
       </main>
 
       <nav className="bottom-nav" aria-label="التنقل الرئيسي">
-        {navItems.map((item) => (
-          <NavLink key={item.path} to={item.path} end={item.path === "/profile"}>
-            <span className="bottom-nav-icon">
-              <Icon name={item.icon} />
-              {"badge" in item && item.badge > 0 && (
-                <span className="bottom-nav-badge" aria-label={item.badge + " فصل جديد غير مقروء"}>
-                  {item.badge > 99 ? "99+" : item.badge}
-                </span>
-              )}
-            </span>
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const badge = "badge" in item ? (item.badge ?? 0) : 0;
+          return (
+            <NavLink key={item.path} to={item.path} end={item.path === "/profile"}>
+              <span className="bottom-nav-icon">
+                <Icon name={item.icon} />
+                {badge > 0 && (
+                  <span className="bottom-nav-badge" aria-label={badge + " فصل جديد غير مقروء"}>
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
+              </span>
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
     </div>
   );
