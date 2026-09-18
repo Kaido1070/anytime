@@ -16,7 +16,7 @@ test("profile keeps a compact main page with dedicated lists and friends hubs", 
   assert.doesNotMatch(layout, /label: "الأصدقاء"/);
   assert.match(layout, /label: "حسابي"/);
 
-  assert.match(account, /ProfileSummaryStrip/);
+  assert.doesNotMatch(account, /ProfileSummaryStrip/);
   assert.match(account, /ProfileStatsSection/);
   assert.match(account, /ProfileListsSection/);
   assert.match(account, /ProfileReadingSection/);
