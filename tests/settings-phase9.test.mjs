@@ -203,12 +203,21 @@ test("password change verifies the current password and invalidates other sessio
   );
 });
 
-test("dedicated login response preserves the selected avatar", async () => {
+test("login delegates to the shared API handler that preserves avatar data", async () => {
   const login = await readFile(
     new URL("../functions/api/login.js", import.meta.url),
     "utf8",
   );
+  const api = await readFile(
+    new URL("../functions/api/[[path]].js", import.meta.url),
+    "utf8",
+  );
+  const admin = await readFile(
+    new URL("../functions/_admin.js", import.meta.url),
+    "utf8",
+  );
 
-  assert.match(login, /profile_visibility, avatar_id, password_salt/);
-  assert.match(login, /avatarId: row\.avatar_id \?\? null/);
+  assert.match(login, /handleApiRequest\(context\)/);
+  assert.match(api, /profile_visibility, avatar_id, role, password_salt/);
+  assert.match(admin, /avatarId: row\.avatar_id \?\? null/);
 });
