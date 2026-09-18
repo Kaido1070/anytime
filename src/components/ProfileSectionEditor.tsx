@@ -30,6 +30,8 @@ function moveSection(
 function sectionLabel(section: UserProfileSection) {
   if (section.sectionType === "continue_reading") return "أكمل القراءة";
   if (section.sectionType === "favorites") return "المفضلة";
+  if (section.sectionType === "my_activity") return "نشاطي";
+  if (section.sectionType === "friends_activity") return "نشاط الأصدقاء";
   return section.list?.name ?? "قائمة شخصية";
 }
 
