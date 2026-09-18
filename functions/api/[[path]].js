@@ -37,9 +37,9 @@ const SEEDED_USERS = [
 ];
 
 const SEEDED_FAVORITES = {
-  mahdi: ["returner", "solo"],
-  kaido: ["eleceed", "horizon"],
-  ahmed: ["solo", "returner"],
+  has: ["returner", "solo"],
+  yas: ["eleceed", "horizon"],
+  m: ["solo", "returner"],
 };
 
 const AVATAR_LIBRARY_SEED = [
