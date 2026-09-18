@@ -7,21 +7,21 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
 };
 
 export function SourceCoverImage({ item, onError, ...props }: Props) {
-  const [covers, setCovers] = useState<string[]>(item.cover ? [item.cover] : []);
+  const initialCovers = sourceService.coverFallbackCandidates(item);
+  const [covers, setCovers] = useState<string[]>(initialCovers);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     let active = true;
-    setCovers(item.cover ? [item.cover] : []);
+    const fallback = sourceService.coverFallbackCandidates(item);
+    setCovers(fallback);
     setIndex(0);
 
-    if (item.source === "mangatime" || item.source === "3asq" || item.source === "starzmanga" || item.source === "xsano") {
-      void sourceService.coverCandidates(item).then((next) => {
-        if (!active || !next.length) return;
-        setCovers(next);
-        setIndex(0);
-      });
-    }
+    void sourceService.coverCandidates(item).then((next) => {
+      if (!active || !next.length) return;
+      setCovers(next);
+      setIndex(0);
+    });
 
     return () => {
       active = false;

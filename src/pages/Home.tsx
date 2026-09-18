@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 import { SectionTitle, Progress, Icon } from "../components/UI";
 import { SourceCard } from "../components/SourceCard";
+import { SourceCoverImage } from "../components/SourceCoverImage";
 import { mergeSourceItems, type SourceGroup } from "../services/sourceMerge";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
@@ -103,8 +104,8 @@ export function Home() {
         <section className="continue-card">
           <Link className="continue-cover" to={`/source/${encodeURIComponent(current.key)}`}>
             {current.cover ? (
-              <img
-                src={sourceService.imageUrl(current.source, current.cover)}
+              <SourceCoverImage
+                item={current}
                 alt={`غلاف ${current.title}`}
               />
             ) : (
