@@ -144,7 +144,7 @@ function toSaveInput(sections: UserProfileSection[]): UserProfileSectionInput[] 
   }));
 }
 
-export function Home() {
+export function Home({ embedded = false }: { embedded?: boolean }) {
   const { user, data } = useLibrary();
   const [sections, setSections] = useState<UserProfileSection[]>([]);
   const [persistedSections, setPersistedSections] = useState<UserProfileSection[]>([]);
@@ -371,24 +371,8 @@ export function Home() {
 
   return (
     <>
-      <section className="profile-dashboard-header">
-        <div className="profile-dashboard-identity">
-          <span className="avatar profile-dashboard-avatar">
-            {user?.name?.slice(0, 1)}
-          </span>
-          <div>
-            <p className="eyebrow">مساحتك الشخصية</p>
-            <h1>
-              {user?.name}
-              <span className="accent">.</span>
-            </h1>
-            <p className="muted">@{user?.username}</p>
-          </div>
-        </div>
-        <div className="profile-dashboard-actions">
-          <Link className="secondary" to="/profile">
-            الإعدادات
-          </Link>
+      {embedded ? (
+        <div className="account-home-toolbar">
           <button
             className="secondary"
             type="button"
@@ -401,7 +385,39 @@ export function Home() {
             تعديل الصفحة
           </button>
         </div>
-      </section>
+      ) : (
+        <section className="profile-dashboard-header">
+          <div className="profile-dashboard-identity">
+            <span className="avatar profile-dashboard-avatar">
+              {user?.name?.slice(0, 1)}
+            </span>
+            <div>
+              <p className="eyebrow">مساحتك الشخصية</p>
+              <h1>
+                {user?.name}
+                <span className="accent">.</span>
+              </h1>
+              <p className="muted">@{user?.username}</p>
+            </div>
+          </div>
+          <div className="profile-dashboard-actions">
+            <Link className="secondary" to="/profile?tab=settings">
+              الإعدادات
+            </Link>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => {
+                setPageError("");
+                setEditMode(true);
+              }}
+              disabled={loadingSections || savingSections}
+            >
+              تعديل الصفحة
+            </button>
+          </div>
+        </section>
+      )}
 
       {pageError && !editMode && (
         <p className="error profile-dashboard-error" role="alert">
