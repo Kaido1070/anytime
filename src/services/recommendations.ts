@@ -2,7 +2,7 @@ import type { SourceManga } from "../types";
 import {
   RECOMMENDATION_ALGORITHM_VERSION,
   RECOMMENDATION_WEIGHTS as W,
-} from "./recommendationConfig";
+} from "./recommendationConfig.ts";
 
 export type TasteSignalKind =
   | "favorite"
