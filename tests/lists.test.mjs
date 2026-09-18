@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const user = { id: "mahdi", username: "has", name: "Has" };
+const user = { id: "has", username: "has", name: "Has" };
 const nano = "mt:manhwa:nano-machine";
 const solo = "tx:solo-leveling";
 const omni = "aq:omniscient-reader";
