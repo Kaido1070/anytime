@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 import { Back, SectionTitle } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
@@ -7,6 +7,9 @@ import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { userDataService } from "../services/userData";
 import type {
+  FriendRelationship,
+  FriendRequests,
+  FriendSearchResult,
   LibraryStatus,
   ProfileLibraryItem,
   ProfileListPreview,
@@ -22,6 +25,13 @@ const libraryStatusLabels: Record<LibraryStatus, string> = {
   completed: "مكتمل",
   paused: "متوقف",
   planned: "مخطط له",
+};
+
+const emptyRequests: FriendRequests = {
+  incoming: [],
+  outgoing: [],
+  incomingCount: 0,
+  outgoingCount: 0,
 };
 
 function useSourceItems(keys: string[]) {
@@ -211,38 +221,179 @@ function PublicFriendsSection({ friends }: { friends: User[] }) {
   );
 }
 
+function RelationshipActions({
+  relationship,
+  busy,
+  onSend,
+  onAccept,
+  onReject,
+  onCancel,
+  onRemove,
+}: {
+  relationship: FriendRelationship;
+  busy: boolean;
+  onSend?: () => void;
+  onAccept?: () => void;
+  onReject?: () => void;
+  onCancel?: () => void;
+  onRemove?: () => void;
+}) {
+  if (relationship === "none") {
+    return (
+      <button className="primary friend-action-primary" disabled={busy} onClick={onSend}>
+        {busy ? "جاري الإرسال…" : "إضافة صديق"}
+      </button>
+    );
+  }
+
+  if (relationship === "pending_sent") {
+    return (
+      <div className="friend-action-group">
+        <span className="friend-status-chip">تم إرسال الطلب</span>
+        <button className="secondary friend-action-small" disabled={busy} onClick={onCancel}>
+          {busy ? "جاري الإلغاء…" : "إلغاء"}
+        </button>
+      </div>
+    );
+  }
+
+  if (relationship === "pending_received") {
+    return (
+      <div className="friend-action-group">
+        <button className="primary friend-action-small" disabled={busy} onClick={onAccept}>
+          قبول
+        </button>
+        <button className="secondary friend-action-small" disabled={busy} onClick={onReject}>
+          رفض
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="friend-action-group">
+      <span className="friend-status-chip">✓ صديق</span>
+      {onRemove && (
+        <button className="secondary friend-action-small" disabled={busy} onClick={onRemove}>
+          إزالة من الأصدقاء
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function Friends({ embedded = false }: { embedded?: boolean }) {
-  const { friends, addFriend } = useLibrary();
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const {
+    friends,
+    sendFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    cancelFriendRequest,
+  } = useLibrary();
+  const [tab, setTab] = useState<"friends" | "requests">("friends");
+  const [requests, setRequests] = useState<FriendRequests>(emptyRequests);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestsError, setRequestsError] = useState("");
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<FriendSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchDone, setSearchDone] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [busyUserId, setBusyUserId] = useState("");
 
-  const sourceKeys = useMemo(() => {
-    const set = new Set<string>();
-    friends.forEach((friend) => {
-      if (sourceService.isSourceKey(friend.reading?.mangaId)) set.add(friend.reading!.mangaId);
-      friend.favorites.filter((id) => sourceService.isSourceKey(id)).forEach((id) => set.add(id));
-    });
-    return [...set];
-  }, [friends]);
-  const sourceItems = useSourceItems(sourceKeys);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const username = String(form.get("username") ?? "");
-    setBusy(true);
-    setMessage("");
-    setError("");
+  async function loadRequests() {
+    setRequestsError("");
+    setRequestsLoading(true);
     try {
-      await addFriend(username);
-      formElement.reset();
-      setMessage("تمت إضافة الصديق.");
+      setRequests(await userDataService.getFriendRequests());
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر إضافة الصديق.");
+      setRequestsError(cause instanceof Error ? cause.message : "تعذر تحميل طلبات الصداقة.");
     } finally {
-      setBusy(false);
+      setRequestsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadRequests();
+  }, [friends.length]);
+
+  async function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalized = query.trim();
+    setSearchDone(true);
+    setSearchError("");
+    if (!normalized) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      setSearchResults(await userDataService.searchUsers(normalized));
+    } catch (cause) {
+      setSearchError(cause instanceof Error ? cause.message : "تعذر البحث عن المستخدمين.");
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function updateSearchRelationship(userId: string, relationship: FriendRelationship) {
+    setSearchResults((current) =>
+      current.map((item) =>
+        item.user.id === userId ? { ...item, relationship } : item,
+      ),
+    );
+  }
+
+  function removeRequestLocally(userId: string, direction: "incoming" | "outgoing") {
+    setRequests((current) => {
+      if (direction === "incoming") {
+        return {
+          ...current,
+          incoming: current.incoming.filter((request) => request.user.id !== userId),
+          incomingCount: Math.max(0, current.incomingCount - 1),
+        };
+      }
+      return {
+        ...current,
+        outgoing: current.outgoing.filter((request) => request.user.id !== userId),
+        outgoingCount: Math.max(0, current.outgoingCount - 1),
+      };
+    });
+  }
+
+  async function runAction(
+    userId: string,
+    action: "send" | "accept" | "reject" | "cancel",
+  ) {
+    setBusyUserId(userId);
+    setSearchError("");
+    setRequestsError("");
+    try {
+      let relationship: FriendRelationship;
+      if (action === "send") {
+        relationship = await sendFriendRequest(userId);
+        if (relationship === "pending_sent") {
+          void loadRequests();
+        }
+      } else if (action === "accept") {
+        relationship = await acceptFriendRequest(userId);
+        removeRequestLocally(userId, "incoming");
+      } else if (action === "reject") {
+        relationship = await rejectFriendRequest(userId);
+        removeRequestLocally(userId, "incoming");
+      } else {
+        relationship = await cancelFriendRequest(userId);
+        removeRequestLocally(userId, "outgoing");
+      }
+      updateSearchRelationship(userId, relationship);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "تعذر تحديث حالة الصداقة.";
+      setSearchError(message);
+      setRequestsError(message);
+      void loadRequests();
+    } finally {
+      setBusyUserId("");
     }
   }
 
@@ -253,7 +404,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           <div>
             <p className="eyebrow">داخل حسابك</p>
             <h2>الأصدقاء</h2>
-            <p className="muted page-intro">شوف ملفات أصدقائك حسب إعدادات الخصوصية.</p>
+            <p className="muted page-intro">أرسل الطلبات وتابع قائمة أصدقائك من مكان واحد.</p>
           </div>
         </header>
       ) : (
@@ -262,82 +413,196 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           <h1>
             الأصدقاء<span className="accent">.</span>
           </h1>
-          <p className="muted page-intro">شوف ملفات أصدقائك حسب إعدادات الخصوصية.</p>
+          <p className="muted page-intro">أرسل الطلبات وتابع قائمة أصدقائك من مكان واحد.</p>
         </>
       )}
 
-      <div className="login-form" style={{ maxWidth: 460, marginBottom: 28 }}>
-        <form onSubmit={submit} style={{ marginTop: 0 }}>
-          <label>
-            إضافة صديق باسم المستخدم
-            <input
-              name="username"
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="مثال: yas"
-              required
-            />
-          </label>
-          {error && <p className="error">{error}</p>}
-          {message && <p className="muted">{message}</p>}
-          <button className="secondary" disabled={busy}>
-            {busy ? "جاري الإضافة…" : "إضافة صديق"}
+      <form className="friend-search" onSubmit={submitSearch}>
+        <label htmlFor="friend-search-input">البحث عن مستخدم</label>
+        <div className="friend-search-controls">
+          <input
+            id="friend-search-input"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            autoCapitalize="none"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="اسم المستخدم أو اسم العرض"
+          />
+          <button className="secondary" disabled={searching}>
+            {searching ? "جاري البحث…" : "بحث"}
           </button>
-        </form>
+        </div>
+        {searchError && <p className="error">{searchError}</p>}
+      </form>
+
+      {searchDone && (
+        <div className="friend-search-results" aria-live="polite">
+          {searchResults.map((result, index) => (
+            <div className="friend-result-card" key={result.user.id}>
+              <Link className="friend-result-identity" to={`/friends/${result.user.id}`}>
+                <span className={`avatar tone-${index % 3}`}>{result.user.name.slice(0, 1)}</span>
+                <span>
+                  <b>{result.user.name}</b>
+                  <small>@{result.user.username}</small>
+                </span>
+              </Link>
+              <RelationshipActions
+                relationship={result.relationship}
+                busy={busyUserId === result.user.id}
+                onSend={() => void runAction(result.user.id, "send")}
+                onAccept={() => void runAction(result.user.id, "accept")}
+                onReject={() => void runAction(result.user.id, "reject")}
+                onCancel={() => void runAction(result.user.id, "cancel")}
+              />
+            </div>
+          ))}
+          {!searching && !searchResults.length && (
+            <p className="friend-empty">لم نجد مستخدمًا بهذا الاسم.</p>
+          )}
+        </div>
+      )}
+
+      <div className="friend-tabs" role="tablist" aria-label="قسم الأصدقاء">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "friends"}
+          className={tab === "friends" ? "active" : ""}
+          onClick={() => setTab("friends")}
+        >
+          الأصدقاء <span>{friends.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "requests"}
+          className={tab === "requests" ? "active" : ""}
+          onClick={() => setTab("requests")}
+        >
+          الطلبات
+          {requests.incomingCount > 0 && (
+            <span className="friend-request-badge">{requests.incomingCount}</span>
+          )}
+        </button>
       </div>
 
-      <div className="friends-list">
-        {friends.map((friend, i) => {
-          const isPrivate = friend.user.profileVisibility === "private";
-          const reading =
-            !isPrivate && friend.reading && sourceService.isSourceKey(friend.reading.mangaId)
-              ? friend.reading
-              : null;
-          const current = reading ? sourceItems[reading.mangaId] : null;
-          const favorites = friend.favorites
-            .filter((id) => sourceService.isSourceKey(id))
-            .map((id) => sourceItems[id]?.title)
-            .filter(Boolean);
-
-          return (
-            <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
-              <span className={`avatar large tone-${i % 3}`}>{friend.user.name[0]}</span>
-              <div>
-                <h2>{friend.user.name}</h2>
-                <small>
-                  {isPrivate ? "حساب خاص" : reading ? "يقرأ حاليًا" : "لا توجد قراءة حالية"}
-                </small>
-                {reading && current && (
-                  <p dir="auto">
-                    {sourceDisplayTitle(current)} · وصل إلى الفصل {reading.chapter}
-                  </p>
+      {tab === "friends" ? (
+        <>
+          <div className="friends-list">
+            {friends.map((friend, index) => (
+              <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
+                <span className={`avatar large tone-${index % 3}`}>
+                  {friend.user.name.slice(0, 1)}
+                </span>
+                <div>
+                  <h2>{friend.user.name}</h2>
+                  <small>@{friend.user.username}</small>
+                </div>
+                <span aria-hidden="true">↗</span>
+              </Link>
+            ))}
+          </div>
+          {!friends.length && (
+            <div className="friend-empty-state">
+              <p>ما عندك أصدقاء حتى الآن.</p>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => document.getElementById("friend-search-input")?.focus()}
+              >
+                إضافة صديق
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="friend-requests-panel">
+          {requestsLoading ? (
+            <p className="friend-empty">جاري تحميل الطلبات…</p>
+          ) : (
+            <>
+              <section className="friend-request-section">
+                <div className="friend-request-heading">
+                  <h3>طلبات الصداقة</h3>
+                  <span>{requests.incomingCount}</span>
+                </div>
+                {requests.incoming.map((request, index) => (
+                  <div className="friend-request-card" key={request.user.id}>
+                    <Link className="friend-result-identity" to={`/friends/${request.user.id}`}>
+                      <span className={`avatar tone-${index % 3}`}>
+                        {request.user.name.slice(0, 1)}
+                      </span>
+                      <span>
+                        <b>{request.user.name}</b>
+                        <small>@{request.user.username}</small>
+                      </span>
+                    </Link>
+                    <RelationshipActions
+                      relationship="pending_received"
+                      busy={busyUserId === request.user.id}
+                      onAccept={() => void runAction(request.user.id, "accept")}
+                      onReject={() => void runAction(request.user.id, "reject")}
+                    />
+                  </div>
+                ))}
+                {!requests.incoming.length && (
+                  <p className="friend-empty">لا توجد طلبات صداقة جديدة.</p>
                 )}
-                <small>
-                  {favorites.length
-                    ? `من المفضلة: ${favorites.slice(0, 3).join(", ")}`
-                    : "المفضلة فارغة"}
-                </small>
-              </div>
-              <span>↗</span>
-            </Link>
-          );
-        })}
-      </div>
-      {!friends.length && <p className="empty">ما عندك أصدقاء مضافين حاليًا.</p>}
+              </section>
+
+              <section className="friend-request-section">
+                <div className="friend-request-heading">
+                  <h3>الطلبات المرسلة</h3>
+                  <span>{requests.outgoingCount}</span>
+                </div>
+                {requests.outgoing.map((request, index) => (
+                  <div className="friend-request-card" key={request.user.id}>
+                    <Link className="friend-result-identity" to={`/friends/${request.user.id}`}>
+                      <span className={`avatar tone-${(index + 1) % 3}`}>
+                        {request.user.name.slice(0, 1)}
+                      </span>
+                      <span>
+                        <b>{request.user.name}</b>
+                        <small>@{request.user.username}</small>
+                      </span>
+                    </Link>
+                    <RelationshipActions
+                      relationship="pending_sent"
+                      busy={busyUserId === request.user.id}
+                      onCancel={() => void runAction(request.user.id, "cancel")}
+                    />
+                  </div>
+                ))}
+                {!requests.outgoing.length && (
+                  <p className="friend-empty">لا توجد طلبات مرسلة حاليًا.</p>
+                )}
+              </section>
+            </>
+          )}
+          {requestsError && <p className="error">{requestsError}</p>}
+        </div>
+      )}
     </>
   );
 }
 
 export function FriendProfile() {
   const { id = "" } = useParams();
-  const navigate = useNavigate();
-  const { user, friends, data, favorite, removeFriend } = useLibrary();
+  const {
+    user,
+    sendFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    cancelFriendRequest,
+    removeFriend,
+  } = useLibrary();
   const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
-  const [removeError, setRemoveError] = useState("");
-  const [removing, setRemoving] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -411,19 +676,28 @@ export function FriendProfile() {
 
   const profileUserId = profile.user.id;
   const isPrivate = profile.access === "private";
-  const isFriend = friends.some((friend) => friend.user.id === profileUserId);
+  const relationship = profile.relationship;
   const listById = new Map((profile.lists ?? []).map((list) => [list.id, list]));
 
-  async function remove() {
-    if (!isFriend) return;
-    setRemoving(true);
-    setRemoveError("");
+  async function updateRelationship(action: "send" | "accept" | "reject" | "cancel" | "remove") {
+    setActionBusy(true);
+    setActionError("");
     try {
-      await removeFriend(profileUserId);
-      navigate("/profile#account-friends", { replace: true });
+      let next: FriendRelationship;
+      if (action === "send") next = await sendFriendRequest(profileUserId);
+      else if (action === "accept") next = await acceptFriendRequest(profileUserId);
+      else if (action === "reject") next = await rejectFriendRequest(profileUserId);
+      else if (action === "cancel") next = await cancelFriendRequest(profileUserId);
+      else {
+        await removeFriend(profileUserId);
+        next = "none";
+      }
+      setProfile((current) => (current ? { ...current, relationship: next } : current));
+      if (action === "remove") setRemoveConfirm(false);
     } catch (cause) {
-      setRemoveError(cause instanceof Error ? cause.message : "تعذر حذف الصديق.");
-      setRemoving(false);
+      setActionError(cause instanceof Error ? cause.message : "تعذر تحديث حالة الصداقة.");
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -441,19 +715,57 @@ export function FriendProfile() {
           </div>
         </div>
 
-        {isPrivate ? (
-          <span className="profile-private-badge">حساب خاص</span>
-        ) : (
-          profile.stats && (
-            <div className="profile-view-stats" aria-label="إحصائيات الحساب">
-              <span><b>{profile.stats.works}</b><small>عمل</small></span>
-              <span><b>{profile.stats.completed}</b><small>مكتمل</small></span>
-              <span><b>{profile.stats.lists}</b><small>قائمة</small></span>
-              <span><b>{profile.stats.friends}</b><small>صديق</small></span>
-            </div>
-          )
-        )}
+        <div className="profile-view-side">
+          {isPrivate ? (
+            <span className="profile-private-badge">حساب خاص</span>
+          ) : (
+            profile.stats && (
+              <div className="profile-view-stats" aria-label="إحصائيات الحساب">
+                <span><b>{profile.stats.works}</b><small>عمل</small></span>
+                <span><b>{profile.stats.completed}</b><small>مكتمل</small></span>
+                <span><b>{profile.stats.lists}</b><small>قائمة</small></span>
+                <span><b>{profile.stats.friends}</b><small>صديق</small></span>
+              </div>
+            )
+          )}
+
+          <RelationshipActions
+            relationship={relationship}
+            busy={actionBusy}
+            onSend={() => void updateRelationship("send")}
+            onAccept={() => void updateRelationship("accept")}
+            onReject={() => void updateRelationship("reject")}
+            onCancel={() => void updateRelationship("cancel")}
+            onRemove={() => setRemoveConfirm(true)}
+          />
+        </div>
       </header>
+
+      {removeConfirm && relationship === "friends" && (
+        <div className="friend-remove-confirm" role="alert">
+          <p>هل تريد إزالة هذا المستخدم من الأصدقاء؟</p>
+          <div>
+            <button
+              className="secondary"
+              type="button"
+              disabled={actionBusy}
+              onClick={() => setRemoveConfirm(false)}
+            >
+              إلغاء
+            </button>
+            <button
+              className="primary"
+              type="button"
+              disabled={actionBusy}
+              onClick={() => void updateRelationship("remove")}
+            >
+              {actionBusy ? "جاري الإزالة…" : "إزالة"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {actionError && <p className="error">{actionError}</p>}
 
       {isPrivate ? (
         <FavoritesSection profile={profile} works={sourceItems} />
@@ -487,13 +799,6 @@ export function FriendProfile() {
 
           <PublicFriendsSection friends={profile.friends ?? []} />
         </>
-      )}
-
-      {removeError && <p className="error">{removeError}</p>}
-      {isFriend && (
-        <button className="secondary signout" disabled={removing} onClick={() => void remove()}>
-          {removing ? "جاري الحذف…" : "حذف من الأصدقاء"}
-        </button>
       )}
     </>
   );

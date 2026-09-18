@@ -81,7 +81,7 @@ async function route(request, url, db) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
-    return json({ ok: true, phase: 5, database: "ready" });
+    return json({ ok: true, phase: 6, database: "ready" });
   }
 
   if (request.method === "POST" && path === "login") {
@@ -741,41 +741,226 @@ async function route(request, url, db) {
   }
 
   if (request.method === "GET" && path === "friends") {
-    return json({ friends: await getFriends(db, user.id) });
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
+    const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(100, Math.trunc(requestedLimit)))
+      : 50;
+    const offset = Number.isFinite(requestedOffset)
+      ? Math.max(0, Math.trunc(requestedOffset))
+      : 0;
+    return json(await getFriends(db, user.id, limit, offset));
+  }
+
+  if (request.method === "GET" && path === "friends/requests") {
+    return json(await getFriendRequests(db, user.id, 50));
+  }
+
+  if (request.method === "GET" && path === "friends/search") {
+    const query = normalizeFriendSearch(url.searchParams.get("q"));
+    if (!query) return json({ results: [] });
+    return json({ results: await searchUsersForFriends(db, user.id, query, 20) });
+  }
+
+  const relationshipMatch = path.match(/^friends\/relationship\/([^/]+)$/);
+  if (request.method === "GET" && relationshipMatch) {
+    const targetId = safeId(decodeURIComponent(relationshipMatch[1]));
+    if (!targetId || targetId === user.id) {
+      return json({ error: "INVALID_FRIEND" }, 400);
+    }
+    const target = await db
+      .prepare("SELECT id FROM users WHERE id = ? LIMIT 1")
+      .bind(targetId)
+      .first();
+    if (!target) return json({ error: "FRIEND_NOT_FOUND" }, 404);
+    return json({ relationship: await getFriendRelationship(db, user.id, targetId) });
+  }
+
+  const requestActionMatch = path.match(/^friends\/requests\/([^/]+)\/(accept|reject)$/);
+  if (request.method === "POST" && requestActionMatch) {
+    const otherUserId = safeId(decodeURIComponent(requestActionMatch[1]));
+    const action = requestActionMatch[2];
+    if (!otherUserId || otherUserId === user.id) {
+      return json({ error: "INVALID_FRIEND_REQUEST" }, 400);
+    }
+    const relationship = await getFriendRelationship(db, user.id, otherUserId);
+    if (relationship === "friends") {
+      return json({ relationship: "friends" });
+    }
+    if (relationship !== "pending_received") {
+      return json(
+        {
+          error: relationship === "pending_sent" ? "NOT_REQUEST_RECEIVER" : "FRIEND_REQUEST_NOT_FOUND",
+          message:
+            relationship === "pending_sent"
+              ? "فقط مستلم الطلب يستطيع قبوله أو رفضه."
+              : "طلب الصداقة لم يعد موجودًا.",
+        },
+        relationship === "pending_sent" ? 403 : 404,
+      );
+    }
+
+    const [pairLow, pairHigh] = canonicalFriendPair(user.id, otherUserId);
+    if (action === "reject") {
+      const result = await db
+        .prepare(`DELETE FROM friend_requests
+          WHERE pair_low_id = ? AND pair_high_id = ?
+            AND requester_id = ? AND receiver_id = ?`)
+        .bind(pairLow, pairHigh, otherUserId, user.id)
+        .run();
+      if (!result.meta?.changes) {
+        return json({ error: "FRIEND_REQUEST_NOT_FOUND" }, 404);
+      }
+      return json({ relationship: "none" });
+    }
+
+    const now = Date.now();
+    await db.batch([
+      db
+        .prepare(`INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at)
+          SELECT receiver_id, requester_id, ?
+          FROM friend_requests
+          WHERE pair_low_id = ? AND pair_high_id = ?
+            AND requester_id = ? AND receiver_id = ?`)
+        .bind(now, pairLow, pairHigh, otherUserId, user.id),
+      db
+        .prepare(`INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at)
+          SELECT requester_id, receiver_id, ?
+          FROM friend_requests
+          WHERE pair_low_id = ? AND pair_high_id = ?
+            AND requester_id = ? AND receiver_id = ?`)
+        .bind(now, pairLow, pairHigh, otherUserId, user.id),
+      db
+        .prepare(`DELETE FROM friend_requests
+          WHERE pair_low_id = ? AND pair_high_id = ?
+            AND requester_id = ? AND receiver_id = ?`)
+        .bind(pairLow, pairHigh, otherUserId, user.id),
+    ]);
+    const accepted = await getFriendRelationship(db, user.id, otherUserId);
+    if (accepted !== "friends") {
+      return json(
+        { error: "FRIEND_REQUEST_CONFLICT", message: "تغيرت حالة الطلب قبل إتمام القبول." },
+        409,
+      );
+    }
+    return json({ relationship: "friends" });
+  }
+
+  const requestCancelMatch = path.match(/^friends\/requests\/([^/]+)$/);
+  if (request.method === "DELETE" && requestCancelMatch) {
+    const otherUserId = safeId(decodeURIComponent(requestCancelMatch[1]));
+    if (!otherUserId || otherUserId === user.id) {
+      return json({ error: "INVALID_FRIEND_REQUEST" }, 400);
+    }
+    const relationship = await getFriendRelationship(db, user.id, otherUserId);
+    if (relationship !== "pending_sent") {
+      return json(
+        {
+          error: relationship === "pending_received" ? "NOT_REQUEST_SENDER" : "FRIEND_REQUEST_NOT_FOUND",
+          message:
+            relationship === "pending_received"
+              ? "فقط مرسل الطلب يستطيع إلغاءه."
+              : "طلب الصداقة لم يعد موجودًا.",
+        },
+        relationship === "pending_received" ? 403 : 404,
+      );
+    }
+    const [pairLow, pairHigh] = canonicalFriendPair(user.id, otherUserId);
+    const result = await db
+      .prepare(`DELETE FROM friend_requests
+        WHERE pair_low_id = ? AND pair_high_id = ?
+          AND requester_id = ? AND receiver_id = ?`)
+      .bind(pairLow, pairHigh, user.id, otherUserId)
+      .run();
+    if (!result.meta?.changes) {
+      return json({ error: "FRIEND_REQUEST_NOT_FOUND" }, 404);
+    }
+    return json({ relationship: "none" });
   }
 
   if (request.method === "POST" && path === "friends") {
     const body = await readJson(request);
+    const targetId = safeId(body.userId);
     const username = normalizeUsername(body.username);
-    if (!username) return json({ error: "INVALID_USERNAME" }, 400);
-    const friend = await db
-      .prepare("SELECT id, username, name, profile_visibility FROM users WHERE username = ? LIMIT 1")
-      .bind(username)
+    if (!targetId && !username) {
+      return json({ error: "INVALID_FRIEND", message: "حدد المستخدم المطلوب." }, 400);
+    }
+    const target = await db
+      .prepare(
+        targetId
+          ? "SELECT id, username, name, profile_visibility FROM users WHERE id = ? LIMIT 1"
+          : "SELECT id, username, name, profile_visibility FROM users WHERE username = ? LIMIT 1",
+      )
+      .bind(targetId || username)
       .first();
-    if (!friend || friend.id === user.id) {
+    if (!target) {
       return json({ error: "FRIEND_NOT_FOUND", message: "ما لقينا هذا الحساب." }, 404);
     }
+    if (target.id === user.id) {
+      return json(
+        { error: "SELF_FRIEND_REQUEST", message: "لا يمكنك إرسال طلب صداقة لنفسك." },
+        400,
+      );
+    }
+
+    const existing = await getFriendRelationship(db, user.id, target.id);
+    if (existing !== "none") {
+      return json({ user: publicUser(target), relationship: existing });
+    }
+
+    const [pairLow, pairHigh] = canonicalFriendPair(user.id, target.id);
     const now = Date.now();
-    await db.batch([
-      db
-        .prepare("INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)")
-        .bind(user.id, friend.id, now),
-      db
-        .prepare("INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)")
-        .bind(friend.id, user.id, now),
-    ]);
-    return json({ friend: publicUser(friend) }, 201);
+    await db
+      .prepare(`INSERT OR IGNORE INTO friend_requests
+        (pair_low_id, pair_high_id, requester_id, receiver_id, created_at)
+        SELECT ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM friendships
+          WHERE (user_id = ? AND friend_id = ?)
+             OR (user_id = ? AND friend_id = ?)
+        )`)
+      .bind(
+        pairLow,
+        pairHigh,
+        user.id,
+        target.id,
+        now,
+        user.id,
+        target.id,
+        target.id,
+        user.id,
+      )
+      .run();
+
+    const relationship = await getFriendRelationship(db, user.id, target.id);
+    if (relationship === "none") {
+      return json(
+        { error: "FRIEND_REQUEST_CONFLICT", message: "تعذر تثبيت حالة الطلب. حاول مرة ثانية." },
+        409,
+      );
+    }
+    return json(
+      { user: publicUser(target), relationship },
+      relationship === "pending_sent" ? 201 : 200,
+    );
   }
 
   const friendMatch = path.match(/^friends\/([^/]+)$/);
   if (request.method === "DELETE" && friendMatch) {
     const friendId = safeId(decodeURIComponent(friendMatch[1]));
-    if (!friendId) return json({ error: "INVALID_FRIEND" }, 400);
+    if (!friendId || friendId === user.id) return json({ error: "INVALID_FRIEND" }, 400);
+    const relationship = await getFriendRelationship(db, user.id, friendId);
+    if (relationship !== "friends") {
+      return json({ error: "FRIEND_NOT_FOUND", message: "هذا المستخدم ليس ضمن أصدقائك." }, 404);
+    }
+    const [pairLow, pairHigh] = canonicalFriendPair(user.id, friendId);
     await db.batch([
       db.prepare("DELETE FROM friendships WHERE user_id = ? AND friend_id = ?").bind(user.id, friendId),
       db.prepare("DELETE FROM friendships WHERE user_id = ? AND friend_id = ?").bind(friendId, user.id),
+      db.prepare("DELETE FROM friend_requests WHERE pair_low_id = ? AND pair_high_id = ?").bind(pairLow, pairHigh),
     ]);
-    return json({ ok: true });
+    return json({ relationship: "none" });
   }
 
   if (request.method === "POST" && path === "import") {
@@ -831,11 +1016,19 @@ async function ensureDatabase(db) {
   const version = await db
     .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
     .first();
-  if (version?.value === "6") return;
+  if (version?.value === "7") return;
+  if (version?.value === "6") {
+    await db.batch([
+      ...friendRequestSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
+    ]);
+    return;
+  }
   if (version?.value === "5") {
     await db.batch([
       ...profileVisibilitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+      ...friendRequestSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
     ]);
     return;
   }
@@ -843,7 +1036,8 @@ async function ensureDatabase(db) {
     await db.batch([
       ...profileSectionSchemaStatements(db),
       ...profileVisibilitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+      ...friendRequestSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
     ]);
     return;
   }
@@ -852,7 +1046,8 @@ async function ensureDatabase(db) {
       ...listSchemaStatements(db),
       ...profileSectionSchemaStatements(db),
       ...profileVisibilitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+      ...friendRequestSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
     ]);
     return;
   }
@@ -863,7 +1058,8 @@ async function ensureDatabase(db) {
       ...listSchemaStatements(db),
       ...profileSectionSchemaStatements(db),
       ...profileVisibilitySchemaStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+      ...friendRequestSchemaStatements(db),
+      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
     ]);
     return;
   }
@@ -926,6 +1122,7 @@ async function ensureDatabase(db) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
     )`),
+    ...friendRequestSchemaStatements(db),
     ...librarySchemaStatements(db),
     ...listSchemaStatements(db),
     ...profileSectionSchemaStatements(db),
@@ -1002,7 +1199,7 @@ async function ensureDatabase(db) {
   statements.push(...libraryBackfillStatements(db));
   statements.push(
     db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '6')"),
+      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '7')"),
   );
   await db.batch(statements);
 }
@@ -1171,6 +1368,39 @@ function profileVisibilitySchemaStatements(db) {
       CHECK (profile_visibility IN ('public','private'))`),
     db.prepare(
       "CREATE INDEX IF NOT EXISTS idx_users_profile_visibility ON users(profile_visibility, id)",
+    ),
+  ];
+}
+
+function friendRequestSchemaStatements(db) {
+  return [
+    db.prepare(`CREATE TABLE IF NOT EXISTS friend_requests (
+      pair_low_id TEXT NOT NULL,
+      pair_high_id TEXT NOT NULL,
+      requester_id TEXT NOT NULL,
+      receiver_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (pair_low_id, pair_high_id),
+      CHECK (pair_low_id <> pair_high_id),
+      CHECK (requester_id <> receiver_id),
+      CHECK (
+        (requester_id = pair_low_id AND receiver_id = pair_high_id)
+        OR (requester_id = pair_high_id AND receiver_id = pair_low_id)
+      ),
+      FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_friend_requests_receiver ON friend_requests(receiver_id, created_at DESC)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_friend_requests_requester ON friend_requests(requester_id, created_at DESC)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id, user_id)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_users_name_nocase ON users(name COLLATE NOCASE, id)",
     ),
   ];
 }
@@ -1611,6 +1841,10 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
   if (!target) return null;
 
   const access = getProfileAccess(viewer, target);
+  const relationship =
+    viewer?.id && viewer.id !== targetId
+      ? await getFriendRelationship(db, viewer.id, targetId)
+      : "none";
   const favoriteResult = await db
     .prepare(`SELECT manga_id, COUNT(*) OVER() AS total_count
       FROM favorites
@@ -1625,6 +1859,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
     access,
     favorites: favoriteRows.map((row) => row.manga_id),
     favoriteCount: Number(favoriteRows[0]?.total_count ?? 0),
+    relationship,
   };
 
   // Private profiles stop here: hidden data is never queried or serialized.
@@ -1788,19 +2023,27 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
   };
 }
 
-async function getFriends(db, userId) {
-  const result = await db
-    .prepare(
-      `SELECT u.id, u.username, u.name, u.profile_visibility
-       FROM friendships f
-       JOIN users u ON u.id = f.friend_id
-       WHERE f.user_id = ?
-       ORDER BY u.name COLLATE NOCASE ASC, u.id ASC`,
-    )
-    .bind(userId)
-    .all();
+async function getFriends(db, userId, limit = 50, offset = 0) {
+  const [countRow, result] = await Promise.all([
+    db
+      .prepare("SELECT COUNT(*) AS total FROM friendships WHERE user_id = ?")
+      .bind(userId)
+      .first(),
+    db
+      .prepare(
+        `SELECT u.id, u.username, u.name, u.profile_visibility
+         FROM friendships f
+         JOIN users u ON u.id = f.friend_id
+         WHERE f.user_id = ?
+         ORDER BY u.name COLLATE NOCASE ASC, u.id ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .bind(userId, limit, offset)
+      .all(),
+  ]);
   const users = result.results ?? [];
-  if (!users.length) return [];
+  const total = Number(countRow?.total ?? 0);
+  if (!users.length) return { friends: [], total, hasMore: offset < total };
 
   const ids = users.map((friend) => friend.id);
   const placeholders = ids.map(() => "?").join(",");
@@ -1863,7 +2106,7 @@ async function getFriends(db, userId) {
     }
   }
 
-  return users.map((friend) => ({
+  const friends = users.map((friend) => ({
     user: publicUser(friend),
     reading:
       friend.profile_visibility === "public"
@@ -1871,6 +2114,128 @@ async function getFriends(db, userId) {
         : null,
     favorites: favorites.get(friend.id) ?? [],
   }));
+  return {
+    friends,
+    total,
+    hasMore: offset + friends.length < total,
+  };
+}
+
+export function canonicalFriendPair(firstId, secondId) {
+  return firstId < secondId ? [firstId, secondId] : [secondId, firstId];
+}
+
+async function getFriendRelationship(db, currentUserId, targetUserId) {
+  if (!currentUserId || !targetUserId || currentUserId === targetUserId) return "none";
+  const friendship = await db
+    .prepare(`SELECT user_id, friend_id
+      FROM friendships
+      WHERE (user_id = ? AND friend_id = ?)
+         OR (user_id = ? AND friend_id = ?)
+      LIMIT 1`)
+    .bind(currentUserId, targetUserId, targetUserId, currentUserId)
+    .first();
+  if (friendship) return "friends";
+
+  const [pairLow, pairHigh] = canonicalFriendPair(currentUserId, targetUserId);
+  const request = await db
+    .prepare(`SELECT requester_id, receiver_id
+      FROM friend_requests
+      WHERE pair_low_id = ? AND pair_high_id = ?
+      LIMIT 1`)
+    .bind(pairLow, pairHigh)
+    .first();
+  if (!request) return "none";
+  return request.requester_id === currentUserId ? "pending_sent" : "pending_received";
+}
+
+async function getFriendRequests(db, userId, limit = 50) {
+  const [incomingCountRow, outgoingCountRow, incomingResult, outgoingResult] = await Promise.all([
+    db
+      .prepare("SELECT COUNT(*) AS total FROM friend_requests WHERE receiver_id = ?")
+      .bind(userId)
+      .first(),
+    db
+      .prepare("SELECT COUNT(*) AS total FROM friend_requests WHERE requester_id = ?")
+      .bind(userId)
+      .first(),
+    db
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, r.created_at
+        FROM friend_requests r
+        JOIN users u ON u.id = r.requester_id
+        WHERE r.receiver_id = ?
+        ORDER BY r.created_at DESC, u.id ASC
+        LIMIT ?`)
+      .bind(userId, limit)
+      .all(),
+    db
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, r.created_at
+        FROM friend_requests r
+        JOIN users u ON u.id = r.receiver_id
+        WHERE r.requester_id = ?
+        ORDER BY r.created_at DESC, u.id ASC
+        LIMIT ?`)
+      .bind(userId, limit)
+      .all(),
+  ]);
+
+  return {
+    incoming: (incomingResult.results ?? []).map((row) => ({
+      user: publicUser(row),
+      createdAt: Number(row.created_at),
+    })),
+    outgoing: (outgoingResult.results ?? []).map((row) => ({
+      user: publicUser(row),
+      createdAt: Number(row.created_at),
+    })),
+    incomingCount: Number(incomingCountRow?.total ?? 0),
+    outgoingCount: Number(outgoingCountRow?.total ?? 0),
+  };
+}
+
+async function searchUsersForFriends(db, userId, query, limit = 20) {
+  const escaped = escapeSqlLike(query);
+  const contains = `%${escaped}%`;
+  const prefix = `${escaped}%`;
+  const result = await db
+    .prepare(`SELECT id, username, name, profile_visibility
+      FROM users
+      WHERE id <> ?
+        AND (
+          username LIKE ? ESCAPE '\\' COLLATE NOCASE
+          OR name LIKE ? ESCAPE '\\' COLLATE NOCASE
+        )
+      ORDER BY
+        CASE
+          WHEN username = ? COLLATE NOCASE THEN 0
+          WHEN name = ? COLLATE NOCASE THEN 1
+          WHEN username LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 2
+          WHEN name LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 3
+          ELSE 4
+        END,
+        LENGTH(username) ASC,
+        username COLLATE NOCASE ASC,
+        id ASC
+      LIMIT ?`)
+    .bind(userId, contains, contains, query, query, prefix, prefix, limit)
+    .all();
+
+  return await Promise.all(
+    (result.results ?? []).map(async (row) => ({
+      user: publicUser(row),
+      relationship: await getFriendRelationship(db, userId, row.id),
+    })),
+  );
+}
+
+function normalizeFriendSearch(value) {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized.length > 64 ? normalized.slice(0, 64) : normalized;
+}
+
+function escapeSqlLike(value) {
+  return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 
 async function importLegacyData(db, userId, data) {

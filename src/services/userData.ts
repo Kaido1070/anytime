@@ -1,5 +1,8 @@
 import type {
   Friend,
+  FriendRelationship,
+  FriendRequests,
+  FriendSearchResult,
   LibraryStatus,
   ProfileVisibility,
   ReadingHistoryEntry,
@@ -48,7 +51,14 @@ export interface UserDataService {
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
   saveReadingProgress(progress: ReadingProgress): Promise<void>;
   getFriends(): Promise<Friend[]>;
-  addFriend(username: string): Promise<void>;
+  getFriendRequests(): Promise<FriendRequests>;
+  searchUsers(query: string): Promise<FriendSearchResult[]>;
+  getFriendRelationship(id: string): Promise<FriendRelationship>;
+  sendFriendRequest(id: string): Promise<FriendRelationship>;
+  addFriend(username: string): Promise<FriendRelationship>;
+  acceptFriendRequest(id: string): Promise<FriendRelationship>;
+  rejectFriendRequest(id: string): Promise<FriendRelationship>;
+  cancelFriendRequest(id: string): Promise<FriendRelationship>;
   removeFriend(id: string): Promise<void>;
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }
@@ -118,6 +128,29 @@ function normalizeFriends(friends: Friend[]): Friend[] {
   }));
 }
 
+function normalizeRelationship(value: unknown): FriendRelationship {
+  return value === "pending_sent" ||
+    value === "pending_received" ||
+    value === "friends"
+    ? value
+    : "none";
+}
+
+function normalizeFriendRequests(value: FriendRequests): FriendRequests {
+  return {
+    incoming: (value.incoming ?? []).map((request) => ({
+      user: normalizeUser(request.user),
+      createdAt: Number(request.createdAt),
+    })),
+    outgoing: (value.outgoing ?? []).map((request) => ({
+      user: normalizeUser(request.user),
+      createdAt: Number(request.createdAt),
+    })),
+    incomingCount: Number(value.incomingCount ?? 0),
+    outgoingCount: Number(value.outgoingCount ?? 0),
+  };
+}
+
 function normalizeUserProfile(profile: UserProfileView): UserProfileView {
   return {
     ...profile,
@@ -129,6 +162,7 @@ function normalizeUserProfile(profile: UserProfileView): UserProfileView {
       previewItems: (list.previewItems ?? []).filter((id) => isLiveKey(id)),
     })),
     friends: profile.friends?.map(normalizeUser),
+    relationship: normalizeRelationship(profile.relationship),
   };
 }
 
@@ -439,8 +473,10 @@ class ApiUserDataService implements UserDataService {
   async getFriends() {
     await this.cleanupDemoData();
     try {
-      const result = await this.request<{ friends: Friend[] }>("friends");
-      const friends = normalizeFriends(result.friends);
+      const result = await this.request<{ friends: Friend[]; total: number; hasMore: boolean }>(
+        "friends?limit=100",
+      );
+      const friends = normalizeFriends(result.friends ?? []);
       this.writeSnapshot("friends", friends);
       return friends;
     } catch (error) {
@@ -452,14 +488,77 @@ class ApiUserDataService implements UserDataService {
     }
   }
 
+  async getFriendRequests() {
+    const result = await this.request<FriendRequests>("friends/requests");
+    return normalizeFriendRequests(result);
+  }
+
+  async searchUsers(query: string) {
+    const normalized = query.trim().replace(/\s+/g, " ").slice(0, 64);
+    if (!normalized) return [];
+    const result = await this.request<{ results: FriendSearchResult[] }>(
+      `friends/search?q=${encodeURIComponent(normalized)}`,
+    );
+    return (result.results ?? []).map((item) => ({
+      user: normalizeUser(item.user),
+      relationship: normalizeRelationship(item.relationship),
+    }));
+  }
+
+  async getFriendRelationship(id: string) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const result = await this.request<{ relationship: FriendRelationship }>(
+      `friends/relationship/${encodeURIComponent(id)}`,
+    );
+    return normalizeRelationship(result.relationship);
+  }
+
+  async sendFriendRequest(id: string) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const result = await this.request<{ relationship: FriendRelationship }>("friends", {
+      method: "POST",
+      body: JSON.stringify({ userId: id }),
+    });
+    return normalizeRelationship(result.relationship);
+  }
+
   async addFriend(username: string) {
-    await this.request("friends", {
+    const result = await this.request<{ relationship: FriendRelationship }>("friends", {
       method: "POST",
       body: JSON.stringify({ username: username.trim().toLowerCase() }),
     });
+    return normalizeRelationship(result.relationship);
+  }
+
+  async acceptFriendRequest(id: string) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const result = await this.request<{ relationship: FriendRelationship }>(
+      `friends/requests/${encodeURIComponent(id)}/accept`,
+      { method: "POST" },
+    );
+    return normalizeRelationship(result.relationship);
+  }
+
+  async rejectFriendRequest(id: string) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const result = await this.request<{ relationship: FriendRelationship }>(
+      `friends/requests/${encodeURIComponent(id)}/reject`,
+      { method: "POST" },
+    );
+    return normalizeRelationship(result.relationship);
+  }
+
+  async cancelFriendRequest(id: string) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
+    const result = await this.request<{ relationship: FriendRelationship }>(
+      `friends/requests/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    );
+    return normalizeRelationship(result.relationship);
   }
 
   async removeFriend(id: string) {
+    if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
     await this.request(`friends/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
