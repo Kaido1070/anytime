@@ -1791,65 +1791,84 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
 async function getFriends(db, userId) {
   const result = await db
     .prepare(
-      `SELECT u.id, u.username, u.name
+      `SELECT u.id, u.username, u.name, u.profile_visibility
        FROM friendships f
        JOIN users u ON u.id = f.friend_id
        WHERE f.user_id = ?
-       ORDER BY u.name COLLATE NOCASE ASC`,
+       ORDER BY u.name COLLATE NOCASE ASC, u.id ASC`,
     )
     .bind(userId)
     .all();
   const users = result.results ?? [];
   if (!users.length) return [];
 
-  const ids = users.map((user) => user.id);
+  const ids = users.map((friend) => friend.id);
   const placeholders = ids.map(() => "?").join(",");
-  const [favoritesResult, stateResult, progressResult] = await Promise.all([
-    db
-      .prepare(`SELECT user_id, manga_id FROM favorites WHERE user_id IN (${placeholders}) ORDER BY created_at ASC`)
-      .bind(...ids)
-      .all(),
-    db
-      .prepare(`SELECT user_id, last_manga_id, last_chapter FROM user_state WHERE user_id IN (${placeholders})`)
-      .bind(...ids)
-      .all(),
-    db
-      .prepare(
-        `SELECT user_id, manga_id, chapter, updated_at
-         FROM reading_progress
-         WHERE user_id IN (${placeholders})
-         ORDER BY updated_at DESC`,
-      )
-      .bind(...ids)
-      .all(),
-  ]);
+  const favoritesResult = await db
+    .prepare(`WITH ranked AS (
+      SELECT
+        user_id,
+        manga_id,
+        ROW_NUMBER() OVER (
+          PARTITION BY user_id
+          ORDER BY created_at DESC, manga_id ASC
+        ) AS row_number
+      FROM favorites
+      WHERE user_id IN (${placeholders})
+    )
+    SELECT user_id, manga_id
+    FROM ranked
+    WHERE row_number <= 3
+    ORDER BY user_id ASC, row_number ASC`)
+    .bind(...ids)
+    .all();
 
   const favorites = new Map(ids.map((id) => [id, []]));
   for (const row of favoritesResult.results ?? []) {
     favorites.get(row.user_id)?.push(row.manga_id);
   }
 
+  const publicIds = users
+    .filter((friend) => friend.profile_visibility === "public")
+    .map((friend) => friend.id);
   const reading = new Map();
-  for (const row of stateResult.results ?? []) {
-    if (row.last_manga_id != null && row.last_chapter != null) {
-      reading.set(row.user_id, {
-        mangaId: row.last_manga_id,
-        chapter: Number(row.last_chapter),
-      });
-    }
-  }
-  for (const row of progressResult.results ?? []) {
-    if (!reading.has(row.user_id)) {
+  if (publicIds.length) {
+    const publicPlaceholders = publicIds.map(() => "?").join(",");
+    const readingResult = await db
+      .prepare(`WITH ranked AS (
+        SELECT
+          user_id,
+          manga_id,
+          highest_reached_chapter,
+          ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY COALESCE(last_read_at, updated_at) DESC, updated_at DESC, manga_id ASC
+          ) AS row_number
+        FROM user_library
+        WHERE user_id IN (${publicPlaceholders})
+          AND status = 'reading'
+          AND highest_reached_chapter IS NOT NULL
+      )
+      SELECT user_id, manga_id, highest_reached_chapter
+      FROM ranked
+      WHERE row_number = 1`)
+      .bind(...publicIds)
+      .all();
+
+    for (const row of readingResult.results ?? []) {
       reading.set(row.user_id, {
         mangaId: row.manga_id,
-        chapter: Number(row.chapter),
+        chapter: Number(row.highest_reached_chapter),
       });
     }
   }
 
   return users.map((friend) => ({
     user: publicUser(friend),
-    reading: reading.get(friend.id) ?? null,
+    reading:
+      friend.profile_visibility === "public"
+        ? reading.get(friend.id) ?? null
+        : null,
     favorites: favorites.get(friend.id) ?? [],
   }));
 }
