@@ -22,13 +22,19 @@ export async function onRequestPost(context) {
 
   const placeholders = DEMO_IDS.map(() => "?").join(",");
   await db.batch([
-    db.prepare(`DELETE FROM favorites WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
-    db.prepare(`DELETE FROM reading_progress WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
-    db.prepare(`DELETE FROM user_library WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
-    db.prepare(`DELETE FROM reading_history WHERE manga_id IN (${placeholders})`).bind(...DEMO_IDS),
+    db.prepare(`DELETE FROM favorites WHERE user_id = ? AND manga_id IN (${placeholders})`)
+      .bind(session.user_id, ...DEMO_IDS),
+    db.prepare(`DELETE FROM reading_progress WHERE user_id = ? AND manga_id IN (${placeholders})`)
+      .bind(session.user_id, ...DEMO_IDS),
+    db.prepare(`DELETE FROM user_library WHERE user_id = ? AND manga_id IN (${placeholders})`)
+      .bind(session.user_id, ...DEMO_IDS),
+    db.prepare(`DELETE FROM reading_history WHERE user_id = ? AND manga_id IN (${placeholders})`)
+      .bind(session.user_id, ...DEMO_IDS),
     db
-      .prepare(`UPDATE user_state SET last_manga_id = NULL, last_chapter = NULL, updated_at = ? WHERE last_manga_id IN (${placeholders})`)
-      .bind(Date.now(), ...DEMO_IDS),
+      .prepare(`UPDATE user_state
+        SET last_manga_id = NULL, last_chapter = NULL, updated_at = ?
+        WHERE user_id = ? AND last_manga_id IN (${placeholders})`)
+      .bind(Date.now(), session.user_id, ...DEMO_IDS),
   ]);
 
   return json({ ok: true });
