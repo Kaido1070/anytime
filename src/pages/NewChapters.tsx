@@ -5,43 +5,43 @@ import { formatArabicRelativeTime } from "../services/dateFormat";
 import {
   loadNewChapterFeed,
   type ChapterFeedGroup,
+  type FeedChapter,
   type NewChapterFeed,
 } from "../services/newChapters";
 
-type Tab = "followed" | "all";
+interface FlatChapterEntry {
+  key: string;
+  group: ChapterFeedGroup;
+  chapter: FeedChapter;
+}
 
-function mergeGroups(pages: NewChapterFeed[], kind: Tab) {
-  const map = new Map<string, ChapterFeedGroup>();
+function mergeChapters(pages: NewChapterFeed[]) {
+  const entries = new Map<string, FlatChapterEntry>();
+
   for (const page of pages) {
-    const groups = kind === "followed" ? page.followed : page.all;
-    for (const group of groups) {
-      const existing = map.get(group.id);
-      if (!existing) {
-        map.set(group.id, { ...group, chapters: [...group.chapters] });
-        continue;
-      }
-      const chapters = new Map(existing.chapters.map((chapter) => [chapter.identity, chapter]));
+    for (const group of page.all) {
       for (const chapter of group.chapters) {
-        const previous = chapters.get(chapter.identity);
-        if (!previous || chapter.releaseAt > previous.releaseAt) {
-          chapters.set(chapter.identity, chapter);
+        const key = `${group.id}:${chapter.identity}`;
+        const existing = entries.get(key);
+        if (!existing || chapter.releaseAt > existing.chapter.releaseAt) {
+          entries.set(key, { key, group, chapter });
         }
       }
-      existing.chapters = [...chapters.values()].sort(
-        (a, b) => b.releaseAt - a.releaseAt || b.number - a.number,
-      );
-      existing.newestAt = existing.chapters[0]?.releaseAt ?? existing.newestAt;
     }
   }
-  return [...map.values()].sort(
-    (a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id),
+
+  return [...entries.values()].sort(
+    (a, b) =>
+      b.chapter.releaseAt - a.chapter.releaseAt ||
+      b.chapter.number - a.chapter.number ||
+      a.key.localeCompare(b.key),
   );
 }
 
 function FeedSkeleton() {
   return (
     <div className="new-feed-skeleton" aria-label="جاري تحميل الفصول">
-      {Array.from({ length: 5 }, (_, index) => (
+      {Array.from({ length: 7 }, (_, index) => (
         <div className="new-skeleton-row" key={index}>
           <span className="skeleton-cover" />
           <span className="skeleton-lines">
@@ -56,15 +56,12 @@ function FeedSkeleton() {
 }
 
 export function NewChapters() {
-  const [tab, setTab] = useState<Tab>("followed");
   const [pages, setPages] = useState<NewChapterFeed[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
-  const followed = useMemo(() => mergeGroups(pages, "followed"), [pages]);
-  const all = useMemo(() => mergeGroups(pages, "all"), [pages]);
-  const groups = tab === "followed" ? followed : all;
+  const chapters = useMemo(() => mergeChapters(pages), [pages]);
   const hasMore = pages.at(-1)?.hasMore ?? false;
   const nextPage = (pages.at(-1)?.page ?? 0) + 1;
 
@@ -73,6 +70,7 @@ export function NewChapters() {
     let active = true;
     setLoading(true);
     setError("");
+
     loadNewChapterFeed(1)
       .then((feed) => {
         if (!active) return;
@@ -122,30 +120,10 @@ export function NewChapters() {
     <section className="new-page">
       <div className="page-intro new-intro">
         <div>
-          <p className="eyebrow">الفصول المتاحة الآن</p>
+          <p className="eyebrow">آخر 24 ساعة</p>
           <h1>جديد</h1>
+          <p className="muted">أحدث الفصول من جميع المصادر، مرتبة من الأحدث إلى الأقدم.</p>
         </div>
-      </div>
-
-      <div className="new-tabs" role="tablist" aria-label="أقسام الفصول الجديدة">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "followed"}
-          className={tab === "followed" ? "active" : ""}
-          onClick={() => setTab("followed")}
-        >
-          متابعتي
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "all"}
-          className={tab === "all" ? "active" : ""}
-          onClick={() => setTab("all")}
-        >
-          الكل
-        </button>
       </div>
 
       {loading ? (
@@ -157,55 +135,43 @@ export function NewChapters() {
             إعادة المحاولة
           </button>
         </div>
-      ) : groups.length ? (
-        <div className="new-feed">
-          {groups.map((group) => (
-            <article className="new-work-group" key={group.id}>
-              <div className="new-work-head">
-                <div className="new-cover">
-                  <SourceCoverImage item={group.item} loading="lazy" alt="" />
-                </div>
-                <div className="new-work-title">
-                  <h2 dir="auto">{group.item.title}</h2>
-                  {group.chapters.length > 1 && (
-                    <small>{group.chapters.length} فصول جديدة</small>
-                  )}
-                </div>
-              </div>
+      ) : chapters.length ? (
+        <div className="new-feed new-flat-feed">
+          {chapters.map(({ key, group, chapter }) => (
+            <Link
+              className="new-flat-row"
+              key={key}
+              to={"/read-source/" + encodeURIComponent(chapter.sourceKey) + "/" + chapter.number}
+            >
+              <span className="new-flat-cover" aria-hidden="true">
+                <SourceCoverImage item={group.item} loading="lazy" alt="" />
+              </span>
 
-              <div className="new-chapter-list">
-                {group.chapters.map((chapter) => (
-                  <Link
-                    className="new-chapter-row"
-                    key={chapter.identity}
-                    to={"/read-source/" + encodeURIComponent(chapter.sourceKey) + "/" + chapter.number}
-                  >
-                    <span className={"new-dot " + (chapter.read ? "read" : "")} aria-hidden="true" />
-                    <span className="new-chapter-copy">
-                      <b>{chapter.title || "الفصل " + chapter.number}</b>
-                      <small>{formatArabicRelativeTime(chapter.releaseAt)}</small>
-                    </span>
-                    <span className={chapter.read ? "chapter-state read" : "chapter-state"}>
-                      {chapter.read ? "مقروء" : "غير مقروء"}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </article>
+              <span className="new-flat-copy">
+                <strong dir="auto">{group.item.title}</strong>
+                <b>{chapter.title || "الفصل " + chapter.number}</b>
+                <small>{formatArabicRelativeTime(chapter.releaseAt)}</small>
+              </span>
+
+              <span className={chapter.read ? "chapter-state read" : "chapter-state"}>
+                {chapter.read ? "مقروء" : "جديد"}
+              </span>
+            </Link>
           ))}
         </div>
       ) : (
-        <p className="new-empty">
-          {tab === "followed"
-            ? "ما فيه فصول جديدة في متابعتك حاليًا."
-            : "ما فيه فصول جديدة متاحة حاليًا."}
-        </p>
+        <p className="new-empty">ما نزلت فصول جديدة خلال آخر 24 ساعة.</p>
       )}
 
       {error && pages.length > 0 && <p className="inline-error">{error}</p>}
       {!loading && hasMore && (
-        <button className="secondary new-load-more" type="button" onClick={() => void loadMore()} disabled={loadingMore}>
-          {loadingMore ? "جاري التحميل…" : "تحميل المزيد"}
+        <button
+          className="secondary new-load-more"
+          type="button"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+        >
+          {loadingMore ? "جاري البحث عن فصول أحدث…" : "فحص المزيد من المصادر"}
         </button>
       )}
     </section>
