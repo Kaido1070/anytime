@@ -11,6 +11,7 @@ import { userDataService as service } from "../services/userData";
 import type {
   Friend,
   LibraryStatus,
+  ProfileVisibility,
   ReadingProgress,
   User,
   UserData,
@@ -217,6 +218,12 @@ function useLibraryState() {
     setFriends(await service.getFriends());
   };
 
+  const setProfileVisibility = async (visibility: ProfileVisibility) => {
+    setError("");
+    const updatedUser = await service.setProfileVisibility(visibility);
+    setUser(updatedUser);
+  };
+
   const changePassword = async (currentPassword: string, newPassword: string) => {
     setError("");
     await service.changePassword(currentPassword, newPassword);
@@ -240,6 +247,7 @@ function useLibraryState() {
     saveProgress,
     addFriend,
     removeFriend,
+    setProfileVisibility,
     changePassword,
   };
 }
