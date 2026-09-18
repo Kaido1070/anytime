@@ -243,3 +243,21 @@ test("MangaTime transport uses current web headers and retries the batch shape",
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("MangaTime list input omits null query but keeps real searches", () => {
+  assert.deepEqual(
+    __test.mangaTimeSearchInput({ page: 1, sortBy: "recent", query: null }),
+    { page: 1, limit: 24, sortBy: "recent", sortOrder: "desc" },
+  );
+  assert.deepEqual(
+    __test.mangaTimeSearchInput({ page: 2, sortBy: "popularity", query: "  One Piece  " }),
+    {
+      page: 2,
+      limit: 24,
+      sortBy: "popularity",
+      sortOrder: "desc",
+      query: "One Piece",
+    },
+  );
+});
