@@ -185,7 +185,7 @@ function useLibraryState() {
           library: current.library.filter((item) => item.mangaId !== mangaId),
           completed: current.completed.filter((key) => !key.startsWith(`${mangaId}:`)),
           progress,
-          lastOpened: current.lastOpened?.mangaId === mangaId ? undefined : current.lastOpened,
+          lastOpened: current.lastOpened?.mangaId === mangaId ? null : current.lastOpened,
         };
       });
     } catch (cause) {
