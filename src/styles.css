@@ -789,6 +789,41 @@ small {
   font-size: 15px;
   letter-spacing: 0;
 }
+.reader-heading {
+  flex: 1;
+  min-width: 0;
+}
+.reader-chapter-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.reader-chapter-step {
+  flex: 0 0 auto;
+  color: #d8dad8;
+  font-size: 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.reader-chapter-step.is-disabled {
+  color: #666a6c;
+  pointer-events: none;
+}
+.reader-chapter-select {
+  min-width: 0;
+  max-width: 112px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #3a3d3f;
+  border-radius: 8px;
+  background: #202224;
+  color: #f0f0ec;
+  font: inherit;
+  font-size: 11px;
+  text-align: center;
+  direction: rtl;
+}
 .reader-header > span {
   font-size: 12px;
   color: var(--accent);
