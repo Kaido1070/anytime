@@ -215,6 +215,111 @@ function ProfileContentEditor({
   );
 }
 
+function ProfileListsEditor({
+  sections,
+  lists,
+  busy,
+  error,
+  onSave,
+  onCancel,
+}: {
+  sections: UserProfileSection[];
+  lists: UserProfileView["lists"];
+  busy: boolean;
+  error: string;
+  onSave: (sections: UserProfileSection[]) => void;
+  onCancel: () => void;
+}) {
+  const initial = sections
+    .filter((section) => groupIdForSection(section) === "lists")
+    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key));
+  const [items, setItems] = useState(initial);
+
+  useEffect(() => {
+    setItems(initial);
+  }, [sections]);
+
+  const labelFor = (section: UserProfileSection) => {
+    if (section.sectionType === "favorites") return "المفضلة";
+    return lists?.find((list) => list.id === section.referenceId)?.name ?? "قائمة";
+  };
+
+  const move = (index: number, delta: number) => {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    const [moving] = next.splice(index, 1);
+    next.splice(target, 0, moving);
+    setItems(next);
+  };
+
+  return (
+    <section className="profile-content-editor" aria-labelledby="profile-lists-customize-title">
+      <div className="profile-content-editor-heading">
+        <div>
+          <p className="eyebrow">القوائم</p>
+          <h2 id="profile-lists-customize-title">ترتيب القوائم</h2>
+        </div>
+        <div>
+          <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
+            إلغاء
+          </button>
+          <button className="primary" type="button" onClick={() => onSave(items)} disabled={busy}>
+            {busy ? "جاري الحفظ…" : "حفظ"}
+          </button>
+        </div>
+      </div>
+      <p className="muted profile-content-editor-hint">
+        هذا التعديل خاص بالقوائم فقط ولا يغيّر ترتيب أقرأ الآن أو النشاط.
+      </p>
+      <div className="profile-content-editor-list">
+        {items.map((section, index) => (
+          <div className="profile-content-editor-row" key={section.key}>
+            <span className="profile-content-drag" aria-hidden="true">☰</span>
+            <b dir="auto">{labelFor(section)}</b>
+            <div className="profile-content-move">
+              <button
+                type="button"
+                disabled={busy || index === 0}
+                aria-label={`تحريك ${labelFor(section)} للأعلى`}
+                onClick={() => move(index, -1)}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                disabled={busy || index === items.length - 1}
+                aria-label={`تحريك ${labelFor(section)} للأسفل`}
+                onClick={() => move(index, 1)}
+              >
+                ↓
+              </button>
+            </div>
+            <button
+              className="profile-content-visibility"
+              type="button"
+              aria-pressed={section.isVisible}
+              onClick={() =>
+                setItems((current) =>
+                  current.map((entry) =>
+                    entry.key === section.key
+                      ? { ...entry, isVisible: !entry.isVisible }
+                      : entry,
+                  ),
+                )
+              }
+              disabled={busy}
+            >
+              {section.isVisible ? "ظاهر" : "مخفي"}
+            </button>
+          </div>
+        ))}
+      </div>
+      {error && <p className="error">{error}</p>}
+    </section>
+  );
+}
+
 function FullActivityView() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -359,8 +464,8 @@ export function Account() {
   const [worksRetry, setWorksRetry] = useState(0);
   const [readingRetry, setReadingRetry] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [customizing, setCustomizing] = useState(false);
-  const [savingLayout, setSavingLayout] = useState(false);
+  const [customizingLists, setCustomizingLists] = useState(false);
+  const [savingLists, setSavingLists] = useState(false);
   const [error, setError] = useState("");
 
   const loadOverview = useCallback(async () => {
@@ -465,21 +570,38 @@ export function Account() {
     };
   }, [readingSignature, readingRetry]);
 
-  const saveLayout = async () => {
-    if (savingLayout) return;
-    setSavingLayout(true);
+  const saveListsLayout = async (nextListSections: UserProfileSection[]) => {
+    if (savingLists) return;
+    setSavingLists(true);
     setError("");
     try {
-      const saved = await userDataService.saveProfileSections(
-        sectionsForSave(sections, groups),
+      const orderedSections = [...sections].sort(
+        (a, b) => a.position - b.position || a.key.localeCompare(b.key),
       );
+      const replacements = [...nextListSections];
+      const payload = orderedSections.map((section) => {
+        if (groupIdForSection(section) !== "lists") {
+          return {
+            sectionType: section.sectionType,
+            referenceId: section.referenceId,
+            isVisible: section.isVisible,
+          };
+        }
+        const replacement = replacements.shift() ?? section;
+        return {
+          sectionType: replacement.sectionType,
+          referenceId: replacement.referenceId,
+          isVisible: replacement.isVisible,
+        };
+      });
+      const saved = await userDataService.saveProfileSections(payload);
       setSections(saved);
       setGroups(buildContentGroups(saved));
-      setCustomizing(false);
+      setCustomizingLists(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر حفظ ترتيب الصفحة.");
+      setError(cause instanceof Error ? cause.message : "تعذر حفظ ترتيب القوائم.");
     } finally {
-      setSavingLayout(false);
+      setSavingLists(false);
     }
   };
 
@@ -562,17 +684,16 @@ export function Account() {
         <>
           <ProfileStatsSection stats={stats} />
 
-          {customizing ? (
-            <ProfileContentEditor
-              groups={groups}
-              busy={savingLayout}
+          {customizingLists ? (
+            <ProfileListsEditor
+              sections={sections}
+              lists={profile.lists ?? []}
+              busy={savingLists}
               error={error}
-              onChange={setGroups}
-              onSave={() => void saveLayout()}
+              onSave={(next) => void saveListsLayout(next)}
               onCancel={() => {
-                setGroups(buildContentGroups(sections));
                 setError("");
-                setCustomizing(false);
+                setCustomizingLists(false);
               }}
             />
           ) : (
@@ -588,7 +709,7 @@ export function Account() {
                       works={works}
                       error={worksError}
                       onRetry={() => setWorksRetry((value) => value + 1)}
-                      onCustomize={() => setCustomizing(true)}
+                      onCustomize={() => setCustomizingLists(true)}
                     />
                   );
                 }
@@ -617,7 +738,7 @@ export function Account() {
             </div>
           )}
 
-          {error && profile && !customizing && (
+          {error && profile && !customizingLists && (
             <div className="profile-section-error compact" role="alert">
               <span>{error}</span>
               <button className="secondary" type="button" onClick={() => void loadOverview()}>
