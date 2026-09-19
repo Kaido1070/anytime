@@ -1,3 +1,12 @@
+class AdminProvisionError extends Error {
+  constructor(code, cause) {
+    super(code);
+    this.name = "AdminProvisionError";
+    this.code = code;
+    this.cause = cause;
+  }
+}
+
 const ADMIN_ID = "admin";
 const ADMIN_USERNAME = "Admin";
 const ADMIN_INTERNAL_USERNAME = "__wany_admin__";
@@ -11,19 +20,32 @@ export async function ensureAdminAccount(db, env) {
     throw new Error("ADMIN_INITIAL_PASSWORD must be between 8 and 128 characters.");
   }
 
-  const existingById = await db
-    .prepare("SELECT id, username, role FROM users WHERE id = ? LIMIT 1")
-    .bind(ADMIN_ID)
-    .first();
-  const existingByUsername = await db
-    .prepare("SELECT id, username, role FROM users WHERE username = ? COLLATE NOCASE LIMIT 1")
-    .bind(ADMIN_USERNAME)
-    .first();
+  let existingById;
+  let existingByUsername;
+  try {
+    existingById = await db
+      .prepare("SELECT id, username, role FROM users WHERE id = ? LIMIT 1")
+      .bind(ADMIN_ID)
+      .first();
+    existingByUsername = await db
+      .prepare("SELECT id, username, role FROM users WHERE username = ? COLLATE NOCASE LIMIT 1")
+      .bind(ADMIN_USERNAME)
+      .first();
+  } catch (error) {
+    throw new AdminProvisionError("ADMIN_PROVISION_LOOKUP_FAILED", error);
+  }
   const existing = existingById ?? (existingByUsername?.role === "admin" ? existingByUsername : null);
 
-  const saltBytes = crypto.getRandomValues(new Uint8Array(16));
-  const salt = bytesToBase64Url(saltBytes);
-  const hash = await deriveHash(initialSecret, saltBytes, ADMIN_PASSWORD_ITERATIONS);
+  let saltBytes;
+  let salt;
+  let hash;
+  try {
+    saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    salt = bytesToBase64Url(saltBytes);
+    hash = await deriveHash(initialSecret, saltBytes, ADMIN_PASSWORD_ITERATIONS);
+  } catch (error) {
+    throw new AdminProvisionError("ADMIN_PROVISION_HASH_FAILED", error);
+  }
   const now = Date.now();
 
   if (existing) {
@@ -31,33 +53,41 @@ export async function ensureAdminAccount(db, env) {
       existingByUsername && existingByUsername.id !== existing.id
         ? ADMIN_INTERNAL_USERNAME
         : ADMIN_USERNAME;
-    await db
-      .prepare(`UPDATE users
-        SET username = ?, name = ?, profile_visibility = 'private',
-            password_salt = ?, password_hash = ?, password_iterations = ?,
-            role = 'admin', updated_at = ?
-        WHERE id = ?`)
-      .bind(
-        username,
-        ADMIN_USERNAME,
-        salt,
-        hash,
-        ADMIN_PASSWORD_ITERATIONS,
-        now,
-        existing.id,
-      )
-      .run();
+    try {
+      await db
+        .prepare(`UPDATE users
+          SET username = ?, name = ?, profile_visibility = 'private',
+              password_salt = ?, password_hash = ?, password_iterations = ?,
+              role = 'admin', updated_at = ?
+          WHERE id = ?`)
+        .bind(
+          username,
+          ADMIN_USERNAME,
+          salt,
+          hash,
+          ADMIN_PASSWORD_ITERATIONS,
+          now,
+          existing.id,
+        )
+        .run();
+    } catch (error) {
+      throw new AdminProvisionError("ADMIN_PROVISION_UPDATE_FAILED", error);
+    }
     await purgeSocialRowsBestEffort(db, existing.id);
     return { configured: true, created: false, userId: existing.id };
   }
 
   const username = existingByUsername ? ADMIN_INTERNAL_USERNAME : ADMIN_USERNAME;
-  await db
-    .prepare(`INSERT INTO users
-      (id, username, name, profile_visibility, password_salt, password_hash, password_iterations, created_at, updated_at, role)
-      VALUES (?, ?, ?, 'private', ?, ?, ?, ?, ?, 'admin')`)
-    .bind(ADMIN_ID, username, ADMIN_USERNAME, salt, hash, ADMIN_PASSWORD_ITERATIONS, now, now)
-    .run();
+  try {
+    await db
+      .prepare(`INSERT INTO users
+        (id, username, name, profile_visibility, password_salt, password_hash, password_iterations, created_at, updated_at, role)
+        VALUES (?, ?, ?, 'private', ?, ?, ?, ?, ?, 'admin')`)
+      .bind(ADMIN_ID, username, ADMIN_USERNAME, salt, hash, ADMIN_PASSWORD_ITERATIONS, now, now)
+      .run();
+  } catch (error) {
+    throw new AdminProvisionError("ADMIN_PROVISION_INSERT_FAILED", error);
+  }
 
   await purgeSocialRowsBestEffort(db, ADMIN_ID);
   return { configured: true, created: true, userId: ADMIN_ID };
