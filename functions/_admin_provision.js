@@ -10,7 +10,7 @@ class AdminProvisionError extends Error {
 const ADMIN_ID = "admin";
 const ADMIN_USERNAME = "Admin";
 const ADMIN_INTERNAL_USERNAME = "__wany_admin__";
-const ADMIN_PASSWORD_ITERATIONS = 210000;
+const ADMIN_PASSWORD_ITERATIONS = 25000;
 
 export async function ensureAdminAccount(db, env) {
   const initialSecret =
