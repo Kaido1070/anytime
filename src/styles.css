@@ -1507,13 +1507,27 @@ body.reader-edge-to-edge {
 }
 @media (max-width: 759px) {
   .chapter-bulk-confirm {
-    align-items: stretch;
-    flex-direction: column;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    padding: 9px 10px;
+    border-radius: 11px;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .chapter-bulk-confirm > span {
+    flex: 1 1 190px;
+    font-size: 11px;
   }
   .chapter-bulk-confirm-actions {
-    width: 100%;
+    width: auto;
+    margin-inline-start: auto;
   }
   .chapter-bulk-confirm-actions button {
-    flex: 1;
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 11px;
   }
 }
