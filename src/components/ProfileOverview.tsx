@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ActivityFeed } from "./ActivityFeed";
 import { Icon } from "./UI";
 import { SourceCoverImage } from "./SourceCoverImage";
@@ -7,6 +7,7 @@ import { UserAvatar } from "./UserAvatar";
 import { getContinueChapter } from "../services/reading";
 import { availableChapterProgress } from "../services/profileProgress";
 import { sourceDisplayTitle } from "../services/sourceTitles";
+import { readerPath } from "../services/readerPaths";
 import type {
   ActivityEvent,
   ProfileLibraryItem,
@@ -219,6 +220,8 @@ function ReadingCard({
   highestCompleted: boolean;
 }) {
   const title = sourceDisplayTitle(item);
+  const location = useLocation();
+  const returnState = { returnTo: `${location.pathname}${location.search}${location.hash}` };
   const highest = entry.highestReachedChapter;
   const progress = availableChapterProgress(item.chapters, highest);
   const resumeChapter =
@@ -228,7 +231,7 @@ function ReadingCard({
 
   return (
     <article className="profile-reading-card">
-      <Link className="profile-reading-cover" to={`/source/${encodeURIComponent(item.key)}`}>
+      <Link className="profile-reading-cover" to={`/source/${encodeURIComponent(item.key)}`} state={returnState}>
         <SourceCoverImage item={item} alt={`غلاف ${title}`} loading="lazy" />
       </Link>
       <div className="profile-reading-copy">
@@ -261,12 +264,12 @@ function ReadingCard({
         {own && resumeChapter != null ? (
           <Link
             className="primary profile-reading-continue"
-            to={`/read-source/${encodeURIComponent(item.key)}/${resumeChapter}`}
+            to={readerPath(item, resumeChapter)} state={returnState}
           >
             متابعة القراءة
           </Link>
         ) : (
-          <Link className="secondary profile-reading-continue" to={`/source/${encodeURIComponent(item.key)}`}>
+          <Link className="secondary profile-reading-continue" to={`/source/${encodeURIComponent(item.key)}`} state={returnState}>
             فتح القصة
           </Link>
         )}
