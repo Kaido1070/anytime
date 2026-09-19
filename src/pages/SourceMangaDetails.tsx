@@ -216,16 +216,18 @@ export function SourceMangaDetails() {
           </div>
           {jumpError && <small className="chapter-jump-error">{jumpError}</small>}
           <div className="chapter-read-tools">
-            <button className="secondary chapter-bulk-read" onClick={() => setBulkConfirm("read")}><Icon name="check" /> تمت قراءة الكل</button>
-            <button className="secondary chapter-bulk-unread" onClick={() => setBulkConfirm("unread")}>لم تتم قراءة الكل</button>
+            <button className={`secondary chapter-bulk-read ${bulkConfirm === "read" ? "is-pending" : ""}`} onClick={() => setBulkConfirm("read")}>تمت قراءة الكل</button>
+            <button className={`secondary chapter-bulk-unread ${bulkConfirm === "unread" ? "is-pending" : ""}`} onClick={() => setBulkConfirm("unread")}>لم تتم قراءة الكل</button>
           </div>
           {bulkConfirm && (
             <div className="chapter-bulk-confirm" role="alert">
-              <span>{bulkConfirm === "read" ? "تأكيد تعليم جميع الفصول كمقروءة؟" : "تأكيد تصفير حالة القراءة لجميع الفصول؟"}</span>
-              <button className="primary" disabled={bulkBusy} onClick={() => void applyBulkReadState(bulkConfirm === "read")}>
-                {bulkBusy ? "جاري…" : "تأكيد"}
-              </button>
-              <button className="secondary" disabled={bulkBusy} onClick={() => setBulkConfirm(null)}>إلغاء</button>
+              <span>{bulkConfirm === "read" ? "تعليم جميع الفصول كمقروءة؟" : "إلغاء القراءة والتتبع لهذا العمل؟"}</span>
+              <div className="chapter-bulk-confirm-actions">
+                <button className="secondary" disabled={bulkBusy} onClick={() => setBulkConfirm(null)}>إلغاء</button>
+                <button className="primary" disabled={bulkBusy} onClick={() => void applyBulkReadState(bulkConfirm === "read")}>
+                  {bulkBusy ? "جاري…" : "تأكيد"}
+                </button>
+              </div>
             </div>
           )}
         </div>
