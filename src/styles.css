@@ -1531,3 +1531,70 @@ body.reader-edge-to-edge {
     font-size: 11px;
   }
 }
+
+/* Source picker: compact, readable and independent from generic action buttons. */
+.source-switcher {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #3b3e40;
+  border-radius: 14px;
+  background: #1c1e1f;
+}
+.source-switcher-label {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.source-switcher-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.source-switch-option {
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid #444749;
+  border-radius: 11px;
+  background: #242627;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.source-switch-option small {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.source-switch-option.active {
+  border-color: var(--accent);
+  background: #2a2926;
+  color: var(--accent);
+}
+.source-switch-option.active small {
+  color: var(--accent);
+  opacity: .8;
+}
+@media (max-width: 759px) {
+  .details-hero .source-switcher {
+    margin-top: 8px;
+    padding: 10px;
+  }
+  .source-switcher-options {
+    gap: 7px;
+  }
+  .source-switch-option {
+    min-height: 42px;
+    padding: 8px 7px;
+    font-size: 12px;
+  }
+}
