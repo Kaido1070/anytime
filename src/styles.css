@@ -1598,3 +1598,97 @@ body.reader-edge-to-edge {
     font-size: 12px;
   }
 }
+
+
+.profile-lists-manager {
+  display: grid;
+  gap: 14px;
+}
+
+.profile-lists-manager-toolbar,
+.profile-lists-manager-main,
+.profile-lists-manager-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-lists-manager-toolbar {
+  justify-content: space-between;
+}
+
+.profile-lists-manager-toolbar p {
+  margin: 0;
+}
+
+.profile-lists-manager-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-lists-manager-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  border-radius: 16px;
+  background: rgba(255,255,255,.025);
+}
+
+.profile-lists-manager-main {
+  justify-content: space-between;
+}
+
+.profile-lists-manager-name {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.profile-lists-manager-name b {
+  font-size: 1rem;
+}
+
+.profile-lists-manager-name small {
+  color: var(--muted, #9a9a9a);
+}
+
+.profile-lists-manager-order,
+.profile-lists-manager-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-lists-manager-order button,
+.profile-lists-manager-actions button {
+  min-height: 38px;
+}
+
+.profile-lists-manager-status {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .profile-lists-manager-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-lists-manager-toolbar .primary {
+    width: 100%;
+  }
+
+  .profile-lists-manager-main {
+    align-items: flex-start;
+  }
+
+  .profile-lists-manager-actions {
+    width: 100%;
+  }
+
+  .profile-lists-manager-actions .secondary,
+  .profile-lists-manager-actions .list-danger-button {
+    flex: 1 1 auto;
+  }
+}
