@@ -137,6 +137,9 @@ export function ProfileListsSection({
   onRetry?: () => void;
   onCustomize?: () => void;
 }) {
+  const location = useLocation();
+  const returnState = { returnTo: `${location.pathname}${location.search}${location.hash}` };
+
   const cards = [
     {
       id: "favorites",
@@ -172,7 +175,7 @@ export function ProfileListsSection({
               <Icon name="edit" />
             </button>
           )}
-          {viewAllTo && <Link to={viewAllTo}>عرض الكل</Link>}
+          {viewAllTo && <Link to={viewAllTo} state={returnState}>عرض الكل</Link>}
         </div>
       </div>
       {cards.length ? (
@@ -181,6 +184,7 @@ export function ProfileListsSection({
             <Link
               className={"profile-list-preview-card" + (card.system ? " system" : "")}
               to={card.to}
+              state={returnState}
               key={card.id}
             >
               <Collage keys={card.keys} works={works} />
