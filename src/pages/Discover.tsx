@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { SourceCard } from "../components/SourceCard";
 import { Icon } from "../components/UI";
 import { mergeSourceItems, rankSourceGroupsByQuery } from "../services/sourceMerge";
@@ -248,6 +248,7 @@ export function Discover() {
   const [hasMoreBySource, setHasMoreBySource] = useState<HasMoreBySource>(EMPTY_HAS_MORE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const visibleGroups = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -325,6 +326,9 @@ export function Discover() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    searchInputRef.current?.blur();
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
     const term = query.trim();
     if (!term) return;
     setLoading(true);
@@ -509,6 +513,8 @@ export function Discover() {
 
       <form className="source-search" onSubmit={submit}>
         <input
+          ref={searchInputRef}
+          type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="ابحث في كل المصادر"
