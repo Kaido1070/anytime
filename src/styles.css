@@ -882,8 +882,8 @@ small {
 @media (max-width: 759px) {
   .reader-header .reader-heading {
     position: absolute;
-    left: 46%;
-    width: min(54vw, 260px);
+    left: 50%;
+    width: min(62vw, 300px);
     transform: translateX(-50%);
     text-align: center;
   }
@@ -1428,53 +1428,3 @@ small {
   color: var(--accent);
 }
 .chapter-read-toggle:disabled { opacity: .55; cursor: wait; }
-
-.reader-chapter-intro {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 18px 20px 16px;
-  text-align: center;
-  background: #111314;
-  border-bottom: 1px solid #282b2c;
-}
-.reader-chapter-intro > small {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reader-chapter-intro > h1 {
-  margin: 5px 0 12px;
-  font-size: 18px;
-  letter-spacing: 0;
-}
-.reader-chapter-intro .reader-chapter-controls {
-  width: auto;
-  justify-content: center;
-}
-@media (max-width: 759px) {
-  .reader-header {
-    height: calc(52px + env(safe-area-inset-top));
-    padding-inline: 12px;
-  }
-  .reader {
-    padding-top: calc(52px + env(safe-area-inset-top));
-  }
-  .reader-header > span {
-    margin-inline-start: auto;
-  }
-  .reader-chapter-intro {
-    padding: 13px 14px 14px;
-  }
-  .reader-chapter-intro > h1 {
-    margin-bottom: 10px;
-    font-size: 16px;
-  }
-  .reader-chapter-intro .reader-chapter-controls {
-    position: static;
-    width: 100%;
-    transform: none;
-  }
-}
