@@ -1,5 +1,6 @@
 const ADMIN_ID = "admin";
 const ADMIN_USERNAME = "Admin";
+const ADMIN_INTERNAL_USERNAME = "__wany_admin__";
 const ADMIN_PASSWORD_ITERATIONS = 210000;
 
 export async function ensureAdminAccount(db, env) {
@@ -10,10 +11,15 @@ export async function ensureAdminAccount(db, env) {
     throw new Error("ADMIN_INITIAL_PASSWORD must be between 8 and 128 characters.");
   }
 
-  const existing = await db
+  const existingById = await db
+    .prepare("SELECT id, username, role FROM users WHERE id = ? LIMIT 1")
+    .bind(ADMIN_ID)
+    .first();
+  const existingByUsername = await db
     .prepare("SELECT id, username, role FROM users WHERE username = ? COLLATE NOCASE LIMIT 1")
     .bind(ADMIN_USERNAME)
     .first();
+  const existing = existingById ?? (existingByUsername?.role === "admin" ? existingByUsername : null);
 
   const saltBytes = crypto.getRandomValues(new Uint8Array(16));
   const salt = bytesToBase64Url(saltBytes);
@@ -21,9 +27,10 @@ export async function ensureAdminAccount(db, env) {
   const now = Date.now();
 
   if (existing) {
-    if (existing.id !== ADMIN_ID && existing.role !== "admin") {
-      throw new Error("Reserved Admin username belongs to an existing user account.");
-    }
+    const username =
+      existingByUsername && existingByUsername.id !== existing.id
+        ? ADMIN_INTERNAL_USERNAME
+        : ADMIN_USERNAME;
     await db
       .prepare(`UPDATE users
         SET username = ?, name = ?, profile_visibility = 'private',
@@ -31,7 +38,7 @@ export async function ensureAdminAccount(db, env) {
             role = 'admin', updated_at = ?
         WHERE id = ?`)
       .bind(
-        ADMIN_USERNAME,
+        username,
         ADMIN_USERNAME,
         salt,
         hash,
@@ -40,27 +47,35 @@ export async function ensureAdminAccount(db, env) {
         existing.id,
       )
       .run();
-    await purgeSocialRows(db, existing.id);
+    await purgeSocialRowsBestEffort(db, existing.id);
     return { configured: true, created: false, userId: existing.id };
   }
 
+  const username = existingByUsername ? ADMIN_INTERNAL_USERNAME : ADMIN_USERNAME;
   await db
     .prepare(`INSERT INTO users
       (id, username, name, profile_visibility, password_salt, password_hash, password_iterations, created_at, updated_at, role)
       VALUES (?, ?, ?, 'private', ?, ?, ?, ?, ?, 'admin')`)
-    .bind(ADMIN_ID, ADMIN_USERNAME, ADMIN_USERNAME, salt, hash, ADMIN_PASSWORD_ITERATIONS, now, now)
+    .bind(ADMIN_ID, username, ADMIN_USERNAME, salt, hash, ADMIN_PASSWORD_ITERATIONS, now, now)
     .run();
 
-  await purgeSocialRows(db, ADMIN_ID);
+  await purgeSocialRowsBestEffort(db, ADMIN_ID);
   return { configured: true, created: true, userId: ADMIN_ID };
 }
 
-async function purgeSocialRows(db, adminId) {
-  await db.batch([
+async function purgeSocialRowsBestEffort(db, adminId) {
+  const statements = [
     db.prepare("DELETE FROM friend_requests WHERE requester_id = ? OR receiver_id = ?").bind(adminId, adminId),
     db.prepare("DELETE FROM friendships WHERE user_id = ? OR friend_id = ?").bind(adminId, adminId),
     db.prepare("DELETE FROM activity_events WHERE user_id = ?").bind(adminId),
-  ]);
+  ];
+  for (const statement of statements) {
+    try {
+      await statement.run();
+    } catch {
+      // Social cleanup must never block Admin authentication.
+    }
+  }
 }
 
 async function deriveHash(secret, salt, iterations) {
