@@ -1412,6 +1412,72 @@ async function route(request, url, db) {
     return json({ ok: true });
   }
 
+  if (request.method === "POST" && path === "reading/read-bulk") {
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    const chapters = [...new Set(
+      (Array.isArray(body.chapters) ? body.chapters : [])
+        .map(Number)
+        .filter((chapter) => Number.isFinite(chapter) && chapter >= 0),
+    )].slice(0, 40);
+
+    if (!mangaId || !chapters.length) {
+      return json({ error: "INVALID_BULK_READING_EVENT" }, 400);
+    }
+
+    const previous = await getLibraryActivityState(db, user.id, mangaId);
+    const now = Date.now();
+    const highestChapter = Math.max(...chapters);
+    const statements = [];
+
+    for (const chapter of chapters) {
+      statements.push(
+        db.prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
+          SELECT ?, ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM reading_history
+            WHERE user_id = ? AND manga_id = ?
+              AND ABS(chapter - ?) < 0.000001
+          )`).bind(user.id, mangaId, chapter, now, user.id, mangaId, chapter),
+        db.prepare(`INSERT INTO reading_progress
+          (user_id, manga_id, chapter, percent, completed, updated_at)
+          VALUES (?, ?, ?, 100, 1, ?)
+          ON CONFLICT(user_id, manga_id, chapter) DO UPDATE SET
+            percent = 100,
+            completed = 1,
+            updated_at = MAX(reading_progress.updated_at, excluded.updated_at)`)
+          .bind(user.id, mangaId, chapter, now),
+      );
+    }
+
+    statements.push(
+      db.prepare(`INSERT INTO user_library
+        (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
+        VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, manga_id) DO UPDATE SET
+          status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
+          updated_at = MAX(user_library.updated_at, excluded.updated_at),
+          last_read_at = excluded.last_read_at,
+          last_read_chapter = excluded.last_read_chapter,
+          highest_reached_chapter = CASE
+            WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+            ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
+          END`)
+        .bind(user.id, mangaId, now, now, now, highestChapter, highestChapter),
+      db.prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          last_manga_id = excluded.last_manga_id,
+          last_chapter = excluded.last_chapter,
+          updated_at = excluded.updated_at`)
+        .bind(user.id, mangaId, highestChapter, now),
+    );
+
+    await db.batch(statements);
+    await recordReadingActivity(db, user.id, mangaId, highestChapter, previous, now);
+    return json({ ok: true, processed: chapters.length });
+  }
+
   if (request.method === "PUT" && path === "progress") {
     const body = await readJson(request);
     const mangaId = safeId(body.mangaId);
