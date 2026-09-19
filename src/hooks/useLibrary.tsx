@@ -194,6 +194,39 @@ function useLibraryState() {
     }
   }, []);
 
+  const markChaptersRead = useCallback(async (mangaId: string, chapters: number[]) => {
+    if (!chapters.length) return 0;
+    try {
+      setError("");
+      const processed = await service.markChaptersRead(mangaId, chapters);
+      const now = Date.now();
+      const highest = Math.max(...chapters);
+      setData((current) => {
+        if (!current) return current;
+        const completed = new Set(current.completed);
+        const progress = { ...current.progress };
+        for (const chapter of chapters) {
+          const key = `${mangaId}:${chapter}`;
+          completed.add(key);
+          progress[key] = { mangaId, chapter, percent: 100, updatedAt: now };
+        }
+        const existing = current.library.find((item) => item.mangaId === mangaId);
+        const libraryEntry = mergeLibraryRead(existing, mangaId, highest, now);
+        return {
+          ...current,
+          library: [libraryEntry, ...current.library.filter((item) => item.mangaId !== mangaId)],
+          completed: [...completed],
+          progress,
+          lastOpened: { mangaId, chapter: highest },
+        };
+      });
+      return processed;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذر تعليم الفصول كمقروءة.");
+      throw cause;
+    }
+  }, []);
+
   const saveProgress = async (progress: ReadingProgress) => {
     const key = `${progress.mangaId}:${progress.chapter}`;
     setData((current) => {
@@ -310,6 +343,7 @@ function useLibraryState() {
     recordChapterOpen,
     markChapterUnread,
     markWorkUnread,
+    markChaptersRead,
     saveProgress,
     addFriend,
     sendFriendRequest,
