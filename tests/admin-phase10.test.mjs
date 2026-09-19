@@ -200,3 +200,21 @@ test("Admin login uses the reserved id and preserves any ordinary account named 
   assert.match(login, /FROM users WHERE id = \? AND role = 'admin' LIMIT 1/);
   assert.match(login, /\.bind\("admin"\)/);
 });
+
+
+test("Admin provisioning reports the failing production substage without leaking credentials", async () => {
+  const [provision, login] = await Promise.all([
+    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
+    readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8"),
+  ]);
+  for (const code of [
+    "ADMIN_PROVISION_LOOKUP_FAILED",
+    "ADMIN_PROVISION_HASH_FAILED",
+    "ADMIN_PROVISION_UPDATE_FAILED",
+    "ADMIN_PROVISION_INSERT_FAILED",
+  ]) {
+    assert.match(provision, new RegExp(code));
+  }
+  assert.match(login, /typeof error\.code === "string"/);
+  assert.doesNotMatch(login, /cause.*message:/);
+});
