@@ -6,8 +6,8 @@ export async function ensureAdminAccount(db, env) {
   const initialSecret =
     typeof env?.ADMIN_INITIAL_PASSWORD === "string" ? env.ADMIN_INITIAL_PASSWORD : "";
   if (!initialSecret) return { configured: false, created: false };
-  if (initialSecret.length < 20 || initialSecret.length > 128) {
-    throw new Error("ADMIN_INITIAL_PASSWORD must be between 20 and 128 characters.");
+  if (initialSecret.length < 8 || initialSecret.length > 128) {
+    throw new Error("ADMIN_INITIAL_PASSWORD must be between 8 and 128 characters.");
   }
 
   const existing = await db

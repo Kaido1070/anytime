@@ -92,7 +92,7 @@ test("admin account provisioning is secret-driven and migration contains no cred
   ]);
 
   assert.match(provision, /ADMIN_INITIAL_PASSWORD/);
-  assert.match(provision, /length < 20/);
+  assert.match(provision, /length < 8/);
   assert.match(provision, /PBKDF2/);
   assert.match(provision, /role = 'admin'|role\)\s*VALUES/s);
   assert.doesNotMatch(migration, /password_hash|password_salt|initial_password/i);
