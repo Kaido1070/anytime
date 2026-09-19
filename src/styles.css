@@ -1692,3 +1692,141 @@ body.reader-edge-to-edge {
     flex: 1 1 auto;
   }
 }
+
+
+/* Custom list drag ordering + icon picker */
+.profile-lists-manager-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-lists-manager-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  border-radius: 16px;
+  background: rgba(255,255,255,.025);
+  transition: transform .16s ease, opacity .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.profile-lists-manager-row.dragging {
+  transform: scale(.985);
+  opacity: .82;
+  border-color: var(--accent, #dcb98a);
+  background: rgba(255,255,255,.055);
+  z-index: 2;
+}
+
+.profile-list-drag-handle {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.profile-list-drag-handle:active {
+  cursor: grabbing;
+}
+
+.profile-list-drag-handle span {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.profile-list-custom-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  color: var(--accent, #dcb98a);
+  background: rgba(255,255,255,.025);
+}
+
+.profile-lists-manager-name {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.profile-lists-manager-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-lists-manager-actions button {
+  min-height: 38px;
+}
+
+.list-icon-picker {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.list-icon-picker legend {
+  margin-bottom: 10px;
+}
+
+.list-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.list-icon-grid button {
+  min-width: 0;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.list-icon-grid button.active {
+  border-color: var(--accent, #dcb98a);
+  color: var(--accent, #dcb98a);
+  background: rgba(220,185,138,.1);
+}
+
+.profile-list-preview-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.profile-list-preview-title svg {
+  flex: 0 0 auto;
+  color: var(--accent, #dcb98a);
+}
+
+@media (max-width: 640px) {
+  .profile-lists-manager-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .profile-lists-manager-actions {
+    width: 100%;
+  }
+
+  .profile-lists-manager-actions .secondary,
+  .profile-lists-manager-actions .list-danger-button {
+    flex: 1 1 0;
+  }
+
+  .list-icon-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
