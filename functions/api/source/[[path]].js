@@ -2149,13 +2149,26 @@ async function proxyImage(source, rawUrl) {
     return json({ error: "INVALID_IMAGE_HOST" }, 400);
   }
 
-  const response = await fetch(target, {
-    headers: sourceHeaders(base, "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"),
+  const imageAccept = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
+  const fetchImage = (refererBase) => fetch(target, {
+    headers: sourceHeaders(refererBase, imageAccept),
     redirect: "follow",
     cf: { cacheTtl: 86400, cacheEverything: true },
   });
+
+  // MangaTime cover URLs can live on a separate image/CDN origin. Some of
+  // those hosts validate the Referer against their own origin instead of
+  // mangatime.org, so retry with the image origin when the normal request is
+  // rejected or returns HTML.
+  let response = await fetchImage(base);
+  let type = response.headers.get("Content-Type") ?? "";
+  if (source === "mangatime" && parsed.origin !== new URL(MANGATIME_BASE).origin &&
+      (!response.ok || !type.toLowerCase().startsWith("image/"))) {
+    response = await fetchImage(parsed.origin);
+    type = response.headers.get("Content-Type") ?? "";
+  }
+
   if (!response.ok) return json({ error: "IMAGE_UPSTREAM", status: response.status }, 502);
-  const type = response.headers.get("Content-Type") ?? "";
   if (!type.toLowerCase().startsWith("image/")) {
     return json({ error: "NOT_AN_IMAGE" }, 502);
   }
