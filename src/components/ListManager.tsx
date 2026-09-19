@@ -147,6 +147,7 @@ export function ListManager({ mangaId }: { mangaId: string }) {
                       onClick={() => void toggleList(list.id)}
                     >
                       <span className="list-check">{selected ? "✓" : ""}</span>
+                      <span className="list-membership-icon" aria-hidden="true"><Icon name={list.iconKey || "lists"} /></span>
                       <span>
                         <b>{list.name}</b>
                         <small>{list.itemCount} قصص{list.description ? ` · ${list.description}` : ""}</small>
