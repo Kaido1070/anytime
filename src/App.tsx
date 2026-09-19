@@ -33,7 +33,7 @@ export default function App() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (!pathname.startsWith("/read-source/")) window.scrollTo(0, 0);
+    if (!pathname.startsWith("/read-source/") && !pathname.startsWith("/read/")) window.scrollTo(0, 0);
   }, [pathname]);
 
   if (loading) return <div className="loading">جاري فتح مكتبتك…</div>;
@@ -73,6 +73,7 @@ export default function App() {
               element={<><h1>الصفحة غير موجودة</h1><Link to="/profile">العودة لحسابي</Link></>}
             />
           </Route>
+          <Route path="read/:source/:work/:chapter" element={<SourceReader />} />
           <Route path="read-source/:key/:chapter" element={<SourceReader />} />
         </Routes>
       )}
