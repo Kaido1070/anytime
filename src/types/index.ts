@@ -124,6 +124,7 @@ export interface UserListSummary {
   id: string;
   name: string;
   description: string | null;
+  iconKey: string;
   position: number;
   itemCount: number;
   createdAt: number;
