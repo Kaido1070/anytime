@@ -107,6 +107,14 @@ function ReaderChapter({
   }, [chapter, legacyPath, navigate, payload.item]);
 
   useEffect(() => {
+    // iOS can keep a native form control in an editable/focused state and then
+    // surface "Undo Typing" on shake even when the reader has no text field.
+    // Drop any carried focus as soon as the chapter reader opens.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) active.blur();
+  }, [chapter]);
+
+  useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
     const previousRootBackground = root.style.background;
@@ -305,9 +313,11 @@ function ReaderChapter({
               className="reader-chapter-select"
               value={String(chapter)}
               aria-label="اختيار الفصل"
-              onChange={(event) =>
-                navigate(readerPath(payload.item, event.target.value))
-              }
+              onChange={(event) => {
+                const target = event.currentTarget;
+                target.blur();
+                navigate(readerPath(payload.item, target.value));
+              }}
             >
               {chapterOptions.length ? chapterOptions.map((entry) => (
                 <option key={entry.number} value={entry.number}>الفصل {entry.number}</option>
