@@ -29,7 +29,7 @@ export function SourceMangaDetails() {
   const sourceGroupParam = searchParams.get("sources");
   const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
   const requestedSourceSignature = requestedSourceKeys.join("|");
-  const { data, favorite, addToLibrary, setLibraryStatus } = useLibrary();
+  const { data, favorite, addToLibrary, setLibraryStatus, saveProgress, markChapterUnread } = useLibrary();
   const [item, setItem] = useState<SourceManga | null>(null);
   const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +37,9 @@ export function SourceMangaDetails() {
   const [ascending, setAscending] = useState(false);
   const [chapterJump, setChapterJump] = useState("");
   const [jumpError, setJumpError] = useState("");
+  const [bulkConfirm, setBulkConfirm] = useState<"read" | "unread" | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [chapterBusy, setChapterBusy] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -88,6 +91,45 @@ export function SourceMangaDetails() {
   const isFavorite = data?.favorites.includes(sourceKey);
   const displayTitle = sourceDisplayTitle(item);
   const coverItem = preferredSourceCover(sourceChoices.length ? sourceChoices : [item]) ?? item;
+
+  const setChapterReadState = async (chapterNumber: number, read: boolean) => {
+    if (chapterBusy != null) return;
+    setChapterBusy(chapterNumber);
+    try {
+      if (read) {
+        await saveProgress({ mangaId: sourceKey, chapter: chapterNumber, percent: 100, updatedAt: Date.now() });
+      } else {
+        await markChapterUnread(sourceKey, chapterNumber);
+      }
+    } finally {
+      setChapterBusy(null);
+    }
+  };
+
+  const applyBulkReadState = async (read: boolean) => {
+    if (bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      if (read) {
+        for (const entry of chapters) {
+          const key = `${sourceKey}:${entry.number}`;
+          if (!data?.completed.includes(key)) {
+            await saveProgress({ mangaId: sourceKey, chapter: entry.number, percent: 100, updatedAt: Date.now() });
+          }
+        }
+      } else {
+        for (const entry of chapters) {
+          const key = `${sourceKey}:${entry.number}`;
+          if (data?.progress[key] || data?.completed.includes(key)) {
+            await markChapterUnread(sourceKey, entry.number);
+          }
+        }
+      }
+      setBulkConfirm(null);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const jumpToChapter = () => {
     const raw = chapterJump.trim().replace(",", ".");
@@ -178,6 +220,19 @@ export function SourceMangaDetails() {
             <button className="primary" onClick={jumpToChapter}>اذهب</button>
           </div>
           {jumpError && <small className="chapter-jump-error">{jumpError}</small>}
+          <div className="chapter-read-tools">
+            <button className="secondary" onClick={() => setBulkConfirm("read")}>تمت قراءة الكل</button>
+            <button className="secondary" onClick={() => setBulkConfirm("unread")}>لم تتم قراءة الكل</button>
+          </div>
+          {bulkConfirm && (
+            <div className="chapter-bulk-confirm" role="alert">
+              <span>{bulkConfirm === "read" ? "تأكيد تعليم جميع الفصول كمقروءة؟" : "تأكيد تصفير حالة القراءة لجميع الفصول؟"}</span>
+              <button className="primary" disabled={bulkBusy} onClick={() => void applyBulkReadState(bulkConfirm === "read")}>
+                {bulkBusy ? "جاري…" : "تأكيد"}
+              </button>
+              <button className="secondary" disabled={bulkBusy} onClick={() => setBulkConfirm(null)}>إلغاء</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -186,11 +241,20 @@ export function SourceMangaDetails() {
           const progressKey = `${sourceKey}:${chapter.number}`;
           const progress = data?.progress[progressKey];
           const done = data?.completed.includes(progressKey);
-          return <Link key={`${chapter.number}:${chapter.title}`} to={`/read-source/${encodeURIComponent(sourceKey)}/${chapter.number}`} className={progress && !done ? "reading" : ""}>
-            <span className="chapter-number">{chapter.number}</span>
-            <div><h3 dir="auto">{chapter.title || `الفصل ${chapter.number}`}</h3><small>{done ? "مقروء" : progress ? `قيد القراءة · ${Math.round(progress.percent)}%` : chapter.publishedAt ? formatGregorianDate(chapter.publishedAt) : "غير مقروء"}</small></div>
-            {done ? <Icon name="check" /> : <Icon name="arrow" />}
-          </Link>;
+          return <div key={`${chapter.number}:${chapter.title}`} className={`chapter-row ${progress && !done ? "reading" : ""}`}>
+            <Link className="chapter-row-link" to={`/read-source/${encodeURIComponent(sourceKey)}/${chapter.number}`}>
+              <span className="chapter-number">{chapter.number}</span>
+              <div><h3 dir="auto">{chapter.title || `الفصل ${chapter.number}`}</h3><small>{done ? "مقروء" : progress ? `قيد القراءة · ${Math.round(progress.percent)}%` : chapter.publishedAt ? formatGregorianDate(chapter.publishedAt) : "غير مقروء"}</small></div>
+              <Icon name="arrow" />
+            </Link>
+            <button
+              className={`chapter-read-toggle ${done ? "is-read" : ""}`}
+              disabled={chapterBusy === chapter.number}
+              onClick={() => void setChapterReadState(chapter.number, !done)}
+            >
+              {chapterBusy === chapter.number ? "…" : done ? "مقروء ✓" : "غير مقروء"}
+            </button>
+          </div>;
         })}
       </div>
       {!chapters.length && <p className="empty">المصدر ما رجع فصول لهذه القصة.</p>}
