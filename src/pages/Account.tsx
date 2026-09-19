@@ -11,6 +11,7 @@ import {
 } from "../components/ProfileOverview";
 import { Icon } from "../components/UI";
 import { ProfileListsManager } from "../components/ProfileListsManager";
+import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
@@ -650,13 +651,18 @@ export function Account() {
           <ProfileStatsSection stats={stats} />
 
           {customizingLists ? (
-            <ProfileListsManager
-              onClose={() => {
-                setError("");
-                setCustomizingLists(false);
-                void loadOverview();
-              }}
-            />
+            <SectionErrorBoundary
+              fallbackTitle="تعذر فتح إدارة القوائم."
+              onReset={() => setCustomizingLists(false)}
+            >
+              <ProfileListsManager
+                onClose={() => {
+                  setError("");
+                  setCustomizingLists(false);
+                  void loadOverview();
+                }}
+              />
+            </SectionErrorBoundary>
           ) : (
             <div className="profile-content-sections">
               {orderedGroups.map((group) => {
