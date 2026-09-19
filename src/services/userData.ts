@@ -61,6 +61,7 @@ export interface UserDataService {
   setProfileVisibility(visibility: ProfileVisibility): Promise<User>;
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
+  markWorkUnread(mangaId: string): Promise<void>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
   getPersonalizationState(): Promise<PersonalizationState>;
   getReadChapterPairs(chapters: ReadChapterPair[]): Promise<ReadChapterPair[]>;
@@ -603,6 +604,15 @@ class ApiUserDataService implements UserDataService {
     await this.request<{ ok: boolean }>("reading/unread", {
       method: "POST",
       body: JSON.stringify({ mangaId, chapter }),
+    });
+    emitPersonalizationChange();
+  }
+
+  async markWorkUnread(mangaId: string) {
+    if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
+    await this.request<{ ok: boolean }>("reading/unread-work", {
+      method: "POST",
+      body: JSON.stringify({ mangaId }),
     });
     emitPersonalizationChange();
   }
