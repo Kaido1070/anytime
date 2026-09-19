@@ -42,6 +42,7 @@ export function SourceMangaDetails() {
   const [jumpError, setJumpError] = useState("");
   const [bulkConfirm, setBulkConfirm] = useState<"read" | "unread" | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [chapterBusy, setChapterBusy] = useState<number | null>(null);
 
   useEffect(() => {
@@ -112,16 +113,24 @@ export function SourceMangaDetails() {
   const applyBulkReadState = async (read: boolean) => {
     if (bulkBusy) return;
     setBulkBusy(true);
+    setBulkProgress({ done: 0, total: read ? chapters.length : 1 });
     try {
       if (read) {
-        for (const entry of chapters) {
-          const key = `${sourceKey}:${entry.number}`;
-          if (!data?.completed.includes(key)) {
-            await saveProgress({ mangaId: sourceKey, chapter: entry.number, percent: 100, updatedAt: Date.now() });
-          }
+        // Re-save every chapter, including chapters already marked complete.
+        // This keeps reading_history/statistics in sync and backfills older bulk-read data.
+        for (let index = 0; index < chapters.length; index += 1) {
+          const entry = chapters[index];
+          await saveProgress({
+            mangaId: sourceKey,
+            chapter: entry.number,
+            percent: 100,
+            updatedAt: Date.now(),
+          });
+          setBulkProgress({ done: index + 1, total: chapters.length });
         }
       } else {
         await markWorkUnread(sourceKey);
+        setBulkProgress({ done: 1, total: 1 });
       }
       setBulkConfirm(null);
     } finally {
@@ -203,7 +212,11 @@ export function SourceMangaDetails() {
               <div className="chapter-bulk-confirm-actions">
                 <button className="secondary" disabled={bulkBusy} onClick={() => setBulkConfirm(null)}>إلغاء</button>
                 <button className="primary" disabled={bulkBusy} onClick={() => void applyBulkReadState(bulkConfirm === "read")}>
-                  {bulkBusy ? "جاري…" : "تأكيد"}
+                  {bulkBusy && bulkConfirm === "read"
+                    ? `${bulkProgress.total ? Math.round((bulkProgress.done / bulkProgress.total) * 100) : 100}% · ${bulkProgress.done}/${bulkProgress.total}`
+                    : bulkBusy
+                      ? "..."
+                      : "تأكيد"}
                 </button>
               </div>
             </div>
