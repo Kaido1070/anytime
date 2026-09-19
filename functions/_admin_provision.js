@@ -21,6 +21,9 @@ export async function ensureAdminAccount(db, env) {
   const now = Date.now();
 
   if (existing) {
+    if (existing.id !== ADMIN_ID && existing.role !== "admin") {
+      throw new Error("Reserved Admin username belongs to an existing user account.");
+    }
     await db
       .prepare(`UPDATE users
         SET username = ?, name = ?, profile_visibility = 'private',
