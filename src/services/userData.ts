@@ -518,12 +518,19 @@ class ApiUserDataService implements UserDataService {
     if (query) params.set("q", query);
     if (options.visibility === "public" || options.visibility === "private") params.set("visibility", options.visibility);
     if (options.status === "reading") params.set("status", "reading");
-    if (options.sort === "username" || options.sort === "works") params.set("sort", options.sort);
+    if (options.sort === "username" || options.sort === "works" || options.sort === "chapters") params.set("sort", options.sort);
     params.set("limit", String(Math.max(1, Math.min(100, Math.trunc(options.limit ?? 50)))));
     params.set("offset", String(Math.max(0, Math.trunc(options.offset ?? 0))));
     const result = await this.request<{ users: AdminUserSummary[]; total: number; hasMore: boolean }>(`admin/users?${params.toString()}`);
     return {
-      users: (result.users ?? []).map((item) => ({ ...item, user: normalizeUser(item.user) })),
+      users: (result.users ?? []).map((item) => ({
+        ...item,
+        user: normalizeUser(item.user),
+        worksCount: Number(item.worksCount ?? 0),
+        chaptersReadCount: Number(item.chaptersReadCount ?? 0),
+        listsCount: Number(item.listsCount ?? 0),
+        friendsCount: Number(item.friendsCount ?? 0),
+      })),
       total: Number(result.total ?? 0),
       hasMore: Boolean(result.hasMore),
     };
