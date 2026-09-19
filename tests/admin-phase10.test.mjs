@@ -218,3 +218,13 @@ test("Admin provisioning reports the failing production substage without leaking
   assert.match(login, /typeof error\.code === "string"/);
   assert.doesNotMatch(login, /cause.*message:/);
 });
+
+
+test("Admin PBKDF2 cost matches the Cloudflare-safe password flow", async () => {
+  const [provision, changePassword] = await Promise.all([
+    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
+    readFile(new URL("../functions/api/change-password.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(provision, /ADMIN_PASSWORD_ITERATIONS = 25000/);
+  assert.match(changePassword, /PASSWORD_ITERATIONS = 25000/);
+});
