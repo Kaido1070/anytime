@@ -749,7 +749,7 @@ small {
 .reader {
   background: #090a0b;
   min-height: 100vh;
-  padding-top: calc(64px + env(safe-area-inset-top));
+  padding-top: 0;
   padding-bottom: 55px;
 }
 .reader-header {
@@ -880,6 +880,11 @@ small {
   font-size: 12px;
 }
 @media (max-width: 759px) {
+  .reader-header {
+    position: sticky;
+    height: calc(64px + env(safe-area-inset-top));
+  }
+
   .reader-header .reader-heading {
     position: absolute;
     left: 50%;
