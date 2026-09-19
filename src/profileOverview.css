@@ -68,16 +68,28 @@
 }
 
 .profile-icon-action {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   display: inline-grid;
   place-items: center;
+  flex: 0 0 38px;
   padding: 0;
-  border: 1px solid #383b3d;
-  border-radius: 10px;
-  background: #202224;
+  border: 1px solid #343739;
+  border-radius: 12px;
+  background: #1d1f20;
   color: #d8dad8;
   font: inherit;
+  line-height: 0;
+  text-decoration: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.profile-icon-action svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+  stroke-width: 1.8;
 }
 
 button.profile-icon-action {
@@ -88,6 +100,12 @@ button.profile-icon-action {
 .profile-icon-action:focus-visible {
   color: var(--accent);
   border-color: #56504a;
+  background: #222425;
+  outline: none;
+}
+
+.profile-icon-action:active {
+  transform: translateY(1px);
 }
 
 .profile-overview-actions .friend-action-group {
