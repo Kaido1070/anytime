@@ -1,6 +1,6 @@
 // Production reader deploy marker: Team-X images use the chapter referer path.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon, Progress } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
@@ -99,6 +99,7 @@ function ReaderChapter({
   payload: SourceChapterPayload;
 }) {
   const { data, saveProgress, recordChapterOpen, markChapterUnread } = useLibrary();
+  const navigate = useNavigate();
   const chapter = payload.number;
   const saved = data?.progress[`${sourceKey}:${chapter}`]?.percent ?? 0;
   const [percent, setPercent] = useState(saved);
@@ -175,6 +176,9 @@ function ReaderChapter({
         ? selectedChapter?.url || payload.item.url
         : undefined;
   const displayTitle = sourceDisplayTitle(payload.item);
+  const chapterOptions = [...(payload.item.chapters ?? [])]
+    .filter((entry) => Number.isFinite(Number(entry.number)))
+    .sort((a, b) => Number(b.number) - Number(a.number));
 
   useLayoutEffect(() => {
     const previousRestoration = history.scrollRestoration;
@@ -281,9 +285,52 @@ function ReaderChapter({
         <Link to={`/source/${encodeURIComponent(sourceKey)}`} aria-label="العودة إلى صفحة القصة">
           <Icon name="back" />
         </Link>
-        <div>
+        <div className="reader-heading">
           <small dir="auto">{displayTitle}</small>
-          <h1>الفصل {chapter}</h1>
+          <div className="reader-chapter-controls">
+            {payload.previous != null ? (
+              <Link
+                className="reader-chapter-step"
+                to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.previous}`}
+                aria-label="الفصل السابق"
+              >
+                السابق
+              </Link>
+            ) : (
+              <span className="reader-chapter-step is-disabled">السابق</span>
+            )}
+            <select
+              className="reader-chapter-select"
+              value={String(chapter)}
+              aria-label="اختيار الفصل"
+              onChange={(event) =>
+                navigate(
+                  `/read-source/${encodeURIComponent(sourceKey)}/${encodeURIComponent(event.target.value)}`,
+                )
+              }
+            >
+              {chapterOptions.length ? (
+                chapterOptions.map((entry) => (
+                  <option key={entry.number} value={entry.number}>
+                    الفصل {entry.number}
+                  </option>
+                ))
+              ) : (
+                <option value={chapter}>الفصل {chapter}</option>
+              )}
+            </select>
+            {payload.next != null ? (
+              <Link
+                className="reader-chapter-step"
+                to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.next}`}
+                aria-label="الفصل التالي"
+              >
+                التالي
+              </Link>
+            ) : (
+              <span className="reader-chapter-step is-disabled">التالي</span>
+            )}
+          </div>
         </div>
         <button
           className="reader-unread"
