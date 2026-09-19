@@ -36,7 +36,7 @@ export async function ensureAdminSchema(db) {
         const version = await db
           .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
           .first();
-        if (version?.value === "10" || version?.value === "11") return;
+        if (Number(version?.value ?? 0) >= 10) return;
       } catch {
         // Older/fresh databases may not have schema_meta yet.
       }
