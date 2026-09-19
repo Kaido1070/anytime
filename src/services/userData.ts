@@ -672,6 +672,7 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify(progress),
       keepalive: true,
     });
+    emitPersonalizationChange();
   }
 
   async getFriends() {
