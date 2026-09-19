@@ -62,6 +62,7 @@ export interface UserDataService {
   recordChapterOpen(mangaId: string, chapter: number): Promise<{ readAt: number }>;
   markChapterUnread(mangaId: string, chapter: number): Promise<void>;
   markWorkUnread(mangaId: string): Promise<void>;
+  markChaptersRead(mangaId: string, chapters: number[]): Promise<number>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
   getPersonalizationState(): Promise<PersonalizationState>;
   getReadChapterPairs(chapters: ReadChapterPair[]): Promise<ReadChapterPair[]>;
@@ -615,6 +616,17 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify({ mangaId }),
     });
     emitPersonalizationChange();
+  }
+
+  async markChaptersRead(mangaId: string, chapters: number[]) {
+    if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
+    const normalized = [...new Set(chapters.map(Number).filter((chapter) => Number.isFinite(chapter) && chapter >= 0))].slice(0, 40);
+    if (!normalized.length) return 0;
+    const result = await this.request<{ ok: boolean; processed: number }>("reading/read-bulk", {
+      method: "POST",
+      body: JSON.stringify({ mangaId, chapters: normalized }),
+    });
+    return Number(result.processed ?? normalized.length);
   }
 
   async getReadingHistory(limit = 100) {
