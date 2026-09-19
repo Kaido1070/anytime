@@ -1419,7 +1419,7 @@ async function route(request, url, db) {
       (Array.isArray(body.chapters) ? body.chapters : [])
         .map(Number)
         .filter((chapter) => Number.isFinite(chapter) && chapter >= 0),
-    )].slice(0, 40);
+    )].slice(0, 16);
 
     if (!mangaId || !chapters.length) {
       return json({ error: "INVALID_BULK_READING_EVENT" }, 400);
