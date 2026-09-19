@@ -37,8 +37,8 @@ export interface UserDataService {
   getLists(): Promise<UserListSummary[]>;
   getList(id: string): Promise<UserListDetail>;
   getListMembership(mangaId: string): Promise<string[]>;
-  createList(name: string, description?: string): Promise<UserListSummary>;
-  updateList(id: string, name: string, description?: string): Promise<UserListSummary>;
+  createList(name: string, description?: string, iconKey?: string): Promise<UserListSummary>;
+  updateList(id: string, name: string, description?: string, iconKey?: string): Promise<UserListSummary>;
   deleteList(id: string): Promise<void>;
   addWorkToList(listId: string, mangaId: string): Promise<void>;
   removeWorkFromList(listId: string, mangaId: string): Promise<void>;
@@ -385,21 +385,21 @@ class ApiUserDataService implements UserDataService {
     return (result.listIds ?? []).filter((id) => isListId(id));
   }
 
-  async createList(name: string, description = "") {
+  async createList(name: string, description = "", iconKey = "lists") {
     const result = await this.request<{ list: UserListSummary }>("lists", {
       method: "POST",
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, iconKey }),
     });
     return result.list;
   }
 
-  async updateList(id: string, name: string, description = "") {
+  async updateList(id: string, name: string, description = "", iconKey = "lists") {
     if (!isListId(id)) throw new Error("معرّف القائمة غير صالح.");
     const result = await this.request<{ list: UserListSummary }>(
       `lists/${encodeURIComponent(id)}`,
       {
         method: "PUT",
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, iconKey }),
       },
     );
     return result.list;
