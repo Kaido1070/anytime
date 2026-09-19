@@ -746,11 +746,24 @@ small {
   padding: 30vh 20px;
   color: var(--muted);
 }
+html.reader-edge-to-edge,
+body.reader-edge-to-edge,
+body.reader-edge-to-edge #root {
+  margin: 0;
+  min-height: 100%;
+  background: #090a0b;
+}
+
+body.reader-edge-to-edge {
+  overscroll-behavior-y: none;
+}
+
 .reader {
   background: #090a0b;
-  min-height: 100vh;
+  min-height: 100dvh;
   padding-top: 0;
   padding-bottom: 55px;
+  overflow: visible;
 }
 .reader-header {
   position: fixed;
@@ -882,7 +895,20 @@ small {
 @media (max-width: 759px) {
   .reader-header {
     position: sticky;
+    top: 0;
     height: calc(64px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .reader-panels.source-pages {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .reader-panels.source-pages img {
+    width: 100%;
+    max-width: none;
   }
 
   .reader-header .reader-heading {
