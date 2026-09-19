@@ -285,6 +285,7 @@ export interface AdminLastRead {
 export interface AdminUserSummary {
   user: User;
   worksCount: number;
+  chaptersReadCount: number;
   listsCount: number;
   friendsCount: number;
   lastActivityAt: number | null;

@@ -1,5 +1,4 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
-import { Icon } from "../components/UI";
+import { Link, Outlet } from "react-router-dom";
 import { useLibrary } from "../hooks/useLibrary";
 
 export function AdminLayout() {
@@ -21,13 +20,6 @@ export function AdminLayout() {
       <main className="page admin-page">
         <Outlet />
       </main>
-
-      <nav className="bottom-nav admin-bottom-nav" aria-label="تنقل الإدارة">
-        <NavLink to="/admin" end>
-          <Icon name="profile" />
-          <span>الحسابات</span>
-        </NavLink>
-      </nav>
     </div>
   );
 }

@@ -228,3 +228,19 @@ test("Admin PBKDF2 cost matches the Cloudflare-safe password flow", async () => 
   assert.match(provision, /ADMIN_PASSWORD_ITERATIONS = 25000/);
   assert.match(changePassword, /PASSWORD_ITERATIONS = 25000/);
 });
+
+
+test("admin dashboard removes redundant navigation and surfaces chapters read", async () => {
+  const [layout, page, api, types] = await Promise.all([
+    readFile(new URL("../src/layouts/AdminLayout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/pages/Admin.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../functions/api/admin/[[path]].js", import.meta.url), "utf8"),
+    readFile(new URL("../src/types/index.ts", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(layout, /admin-bottom-nav|<NavLink|الحسابات<\/span>/);
+  assert.match(page, /الفصول المقروءة/);
+  assert.match(page, /item\.chaptersReadCount/);
+  assert.match(api, /chapters_read_count/);
+  assert.match(api, /GROUP BY manga_id, chapter/);
+  assert.match(types, /chaptersReadCount: number/);
+});

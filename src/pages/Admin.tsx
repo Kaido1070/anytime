@@ -193,6 +193,7 @@ export function AdminDashboard() {
             <option value="activity">آخر نشاط</option>
             <option value="username">اسم المستخدم</option>
             <option value="works">عدد القصص</option>
+            <option value="chapters">الفصول المقروءة</option>
           </select>
         </div>
       </div>
@@ -205,8 +206,8 @@ export function AdminDashboard() {
           <table className="admin-users-table">
             <thead>
               <tr>
-                <th>الحساب</th><th>الخصوصية</th><th>القصص</th><th>القوائم</th>
-                <th>الأصدقاء</th><th>آخر قراءة</th><th>آخر نشاط</th>
+                <th>الحساب</th><th>الفصول المقروءة</th><th>القصص</th><th>القوائم</th>
+                <th>الأصدقاء</th><th>الخصوصية</th><th>آخر قراءة</th>
               </tr>
             </thead>
             <tbody>
@@ -218,10 +219,11 @@ export function AdminDashboard() {
                       <span><b>{item.user.name}</b><small>@{item.user.username}</small></span>
                     </Link>
                   </td>
-                  <td data-label="الخصوصية"><span className="admin-pill">{item.user.profileVisibility === "public" ? "عام" : "خاص"}</span></td>
+                  <td data-label="الفصول المقروءة" className="admin-chapters-read"><b>{item.chaptersReadCount}</b><span>فصل</span></td>
                   <td data-label="القصص">{item.worksCount}</td>
                   <td data-label="القوائم">{item.listsCount}</td>
                   <td data-label="الأصدقاء">{item.friendsCount}</td>
+                  <td data-label="الخصوصية"><span className="admin-pill">{item.user.profileVisibility === "public" ? "عام" : "خاص"}</span></td>
                   <td data-label="آخر قراءة">
                     {item.lastRead ? (
                       <div className="admin-last-read">
@@ -230,7 +232,6 @@ export function AdminDashboard() {
                       </div>
                     ) : "—"}
                   </td>
-                  <td data-label="آخر نشاط">{formatDate(item.lastActivityAt)}</td>
                 </tr>
               ))}
             </tbody>
