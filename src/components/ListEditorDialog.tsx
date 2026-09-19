@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Icon } from "./UI";
 
 export function ListEditorDialog({
   open,
@@ -6,6 +7,7 @@ export function ListEditorDialog({
   submitLabel,
   initialName = "",
   initialDescription = "",
+  initialIconKey = "lists",
   busy = false,
   error = "",
   onClose,
@@ -16,19 +18,22 @@ export function ListEditorDialog({
   submitLabel: string;
   initialName?: string;
   initialDescription?: string | null;
+  initialIconKey?: string;
   busy?: boolean;
   error?: string;
   onClose: () => void;
-  onSubmit: (name: string, description: string) => Promise<void> | void;
+  onSubmit: (name: string, description: string, iconKey: string) => Promise<void> | void;
 }) {
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? "");
+  const [iconKey, setIconKey] = useState(initialIconKey);
 
   useEffect(() => {
     if (!open) return;
     setName(initialName);
     setDescription(initialDescription ?? "");
-  }, [open, initialName, initialDescription]);
+    setIconKey(initialIconKey);
+  }, [open, initialName, initialDescription, initialIconKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +50,7 @@ export function ListEditorDialog({
     event.preventDefault();
     const normalized = name.trim();
     if (!normalized || busy) return;
-    await onSubmit(normalized, description.trim());
+    await onSubmit(normalized, description.trim(), iconKey);
   };
 
   return (
@@ -86,6 +91,38 @@ export function ListEditorDialog({
               placeholder="وصف مختصر للقائمة"
             />
           </label>
+          <fieldset className="list-icon-picker">
+            <legend>أيقونة القائمة</legend>
+            <div className="list-icon-grid">
+              {[
+                ["lists", "قائمة"],
+                ["book", "كتاب"],
+                ["star", "نجمة"],
+                ["heart", "قلب"],
+                ["flame", "نار"],
+                ["sword", "سيف"],
+                ["crown", "تاج"],
+                ["ghost", "شبح"],
+                ["moon", "قمر"],
+                ["bolt", "برق"],
+                ["mask", "قناع"],
+                ["dragon", "تنين"],
+                ["spark", "لمعة"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={iconKey === key ? "active" : ""}
+                  aria-pressed={iconKey === key}
+                  aria-label={label}
+                  title={label}
+                  onClick={() => setIconKey(key)}
+                >
+                  <Icon name={key} />
+                </button>
+              ))}
+            </div>
+          </fieldset>
           {error && <p className="error">{error}</p>}
           <div className="list-dialog-actions">
             <button className="secondary" type="button" onClick={onClose} disabled={busy}>إلغاء</button>
