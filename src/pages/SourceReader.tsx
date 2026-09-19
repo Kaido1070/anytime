@@ -270,55 +270,41 @@ function ReaderChapter({
         <Link to={`/source/${encodeURIComponent(sourceKey)}`} aria-label="العودة إلى صفحة القصة">
           <Icon name="back" />
         </Link>
-        <div className="reader-heading">
-          <small dir="auto">{displayTitle}</small>
-          <div className="reader-chapter-controls">
-            {payload.previous != null ? (
-              <Link
-                className="reader-chapter-step"
-                to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.previous}`}
-                aria-label="الفصل السابق"
-              >
-                السابق
-              </Link>
-            ) : (
-              <span className="reader-chapter-step is-disabled">السابق</span>
-            )}
-            <select
-              className="reader-chapter-select"
-              value={String(chapter)}
-              aria-label="اختيار الفصل"
-              onChange={(event) =>
-                navigate(
-                  `/read-source/${encodeURIComponent(sourceKey)}/${encodeURIComponent(event.target.value)}`,
-                )
-              }
-            >
-              {chapterOptions.length ? (
-                chapterOptions.map((entry) => (
-                  <option key={entry.number} value={entry.number}>
-                    الفصل {entry.number}
-                  </option>
-                ))
-              ) : (
-                <option value={chapter}>الفصل {chapter}</option>
-              )}
-            </select>
-            {payload.next != null ? (
-              <Link
-                className="reader-chapter-step"
-                to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.next}`}
-                aria-label="الفصل التالي"
-              >
-                التالي
-              </Link>
-            ) : (
-              <span className="reader-chapter-step is-disabled">التالي</span>
-            )}
-          </div>
-        </div>
         {showProgress && <span>{Math.round(percent)}%</span>}
       </header>
+
+      <section className="reader-chapter-intro" aria-label="معلومات الفصل">
+        <small dir="auto">{displayTitle}</small>
+        <h1>الفصل {chapter}</h1>
+        <div className="reader-chapter-controls">
+          {payload.previous != null ? (
+            <Link className="reader-chapter-step" to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.previous}`}>
+              السابق
+            </Link>
+          ) : (
+            <span className="reader-chapter-step is-disabled">السابق</span>
+          )}
+          <select
+            className="reader-chapter-select"
+            value={String(chapter)}
+            aria-label="اختيار الفصل"
+            onChange={(event) =>
+              navigate(`/read-source/${encodeURIComponent(sourceKey)}/${encodeURIComponent(event.target.value)}`)
+            }
+          >
+            {chapterOptions.length ? chapterOptions.map((entry) => (
+              <option key={entry.number} value={entry.number}>الفصل {entry.number}</option>
+            )) : <option value={chapter}>الفصل {chapter}</option>}
+          </select>
+          {payload.next != null ? (
+            <Link className="reader-chapter-step" to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.next}`}>
+              التالي
+            </Link>
+          ) : (
+            <span className="reader-chapter-step is-disabled">التالي</span>
+          )}
+        </div>
+      </section>
 
       <div className="reader-panels source-pages">
         {payload.pages.map((page, index) => (
