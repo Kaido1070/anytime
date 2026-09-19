@@ -175,3 +175,14 @@ test("admin provisioning never hijacks an ordinary existing account named Admin"
     /if \(existing\.id !== ADMIN_ID && existing\.role !== "admin"\)[\s\S]*Reserved Admin username belongs to an existing user account/,
   );
 });
+
+
+test("admin login exposes safe stage diagnostics without leaking secrets", async () => {
+  const login = await readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8");
+  assert.match(login, /ADMIN_SCHEMA_FAILED/);
+  assert.match(login, /ADMIN_PROVISION_FAILED/);
+  assert.match(login, /ADMIN_LOOKUP_FAILED/);
+  assert.match(login, /ADMIN_SESSION_FAILED/);
+  assert.match(login, /ADMIN_SECRET_MISSING/);
+  assert.doesNotMatch(login, /initialSecret.*message|suppliedSecret.*message/);
+});

@@ -14,8 +14,26 @@ export async function onRequestPost(context) {
   if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
 
   try {
-    await ensureAdminSchema(db);
-    await ensureAdminAccount(db, context.env);
+    try {
+      await ensureAdminSchema(db);
+    } catch (error) {
+      return adminStageError("ADMIN_SCHEMA_FAILED", error);
+    }
+
+    try {
+      const result = await ensureAdminAccount(db, context.env);
+      if (!result?.configured) {
+        return json(
+          {
+            error: "ADMIN_SECRET_MISSING",
+            message: "تعذر تسجيل الدخول الآن. (ADMIN_SECRET_MISSING)",
+          },
+          500,
+        );
+      }
+    } catch (error) {
+      return adminStageError("ADMIN_PROVISION_FAILED", error);
+    }
 
     const body = await request.json().catch(() => ({}));
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
@@ -24,12 +42,17 @@ export async function onRequestPost(context) {
       return invalidLogin();
     }
 
-    const user = await db
-      .prepare(`SELECT id, username, name, profile_visibility, avatar_id, role,
-        password_salt, password_hash, password_iterations
-        FROM users WHERE username = ? COLLATE NOCASE AND role = 'admin' LIMIT 1`)
-      .bind("Admin")
-      .first();
+    let user;
+    try {
+      user = await db
+        .prepare(`SELECT id, username, name, profile_visibility, avatar_id, role,
+          password_salt, password_hash, password_iterations
+          FROM users WHERE username = ? COLLATE NOCASE AND role = 'admin' LIMIT 1`)
+        .bind("Admin")
+        .first();
+    } catch (error) {
+      return adminStageError("ADMIN_LOOKUP_FAILED", error);
+    }
 
     if (!user || !isAdminUser(user) || !(await verifySecret(suppliedSecret, user))) {
       await sleep(120);
@@ -41,13 +64,17 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const expiresAt = now + SESSION_TTL_MS;
 
-    await db.batch([
-      db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
-      db.prepare(
-        "INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-      ).bind(tokenHash, user.id, now, now, expiresAt),
-    ]);
-    await recordAdminAudit(db, user.id, "admin_login");
+    try {
+      await db.batch([
+        db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
+        db.prepare(
+          "INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        ).bind(tokenHash, user.id, now, now, expiresAt),
+      ]);
+      await recordAdminAudit(db, user.id, "admin_login");
+    } catch (error) {
+      return adminStageError("ADMIN_SESSION_FAILED", error);
+    }
 
     return json(
       { user: sessionUser(user) },
@@ -55,9 +82,19 @@ export async function onRequestPost(context) {
       { "Set-Cookie": sessionCookie(token, SESSION_TTL_MS) },
     );
   } catch (error) {
-    console.error("Anytime admin login error", error instanceof Error ? error.message : "unknown");
-    return json({ error: "SERVER_ERROR", message: "تعذر تسجيل الدخول الآن." }, 500);
+    return adminStageError("ADMIN_LOGIN_FAILED", error);
   }
+}
+
+function adminStageError(code, error) {
+  console.error("Anytime admin login error", code, error instanceof Error ? error.message : "unknown");
+  return json(
+    {
+      error: code,
+      message: `تعذر تسجيل الدخول الآن. (${code})`,
+    },
+    500,
+  );
 }
 
 function invalidLogin() {
