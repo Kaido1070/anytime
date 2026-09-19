@@ -882,7 +882,7 @@ small {
 @media (max-width: 759px) {
   .reader-header .reader-heading {
     position: absolute;
-    left: 50%;
+    left: 46%;
     width: min(54vw, 260px);
     transform: translateX(-50%);
     text-align: center;
