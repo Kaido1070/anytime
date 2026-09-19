@@ -751,7 +751,15 @@ body.reader-edge-to-edge,
 body.reader-edge-to-edge #root {
   margin: 0;
   min-height: 100%;
-  background: #090a0b;
+}
+
+html.reader-edge-to-edge,
+body.reader-edge-to-edge {
+  background: transparent;
+}
+
+body.reader-edge-to-edge #root {
+  background: transparent;
 }
 
 body.reader-edge-to-edge {
@@ -893,6 +901,11 @@ body.reader-edge-to-edge {
   font-size: 12px;
 }
 @media (max-width: 759px) {
+  .reader {
+    position: relative;
+    background: transparent;
+  }
+
   .reader-header {
     position: sticky;
     top: 0;
@@ -904,6 +917,7 @@ body.reader-edge-to-edge {
     width: 100%;
     max-width: none;
     margin: 0;
+    background: #090a0b;
   }
 
   .reader-panels.source-pages img {
