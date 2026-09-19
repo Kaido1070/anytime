@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLibrary } from "../hooks/useLibrary";
 import { SourceCard } from "../components/SourceCard";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { mergeSourceItems } from "../services/sourceMerge";
+import { Back } from "../components/UI";
 import { sourceService } from "../services/sources";
 import type { SourceManga } from "../types";
 
 export function Favorites() {
   const { data } = useLibrary();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || "/profile";
   const [items, setItems] = useState<SourceManga[]>([]);
   const keys = (data?.favorites ?? []).filter((id) => sourceService.isSourceKey(id));
   const groups = useMemo(() => mergeSourceItems(items), [items]);
@@ -29,6 +32,7 @@ export function Favorites() {
 
   return (
     <>
+      <Back to={returnTo} />
       <p className="eyebrow">مكتبتك الخاصة</p>
       <h1>
         المفضلة<span className="accent">.</span>
