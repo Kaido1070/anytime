@@ -1477,3 +1477,43 @@ body.reader-edge-to-edge {
   color: var(--accent);
 }
 .chapter-read-toggle:disabled { opacity: .55; cursor: wait; }
+
+.chapter-read-tools .is-pending {
+  border-color: var(--accent);
+}
+.chapter-bulk-confirm {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid #4a443b;
+  border-radius: 14px;
+  background: #1d1c19;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.chapter-bulk-confirm > span {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chapter-bulk-confirm-actions {
+  display: flex;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+.chapter-bulk-confirm-actions button {
+  min-height: 36px;
+  padding: 7px 12px;
+}
+@media (max-width: 759px) {
+  .chapter-bulk-confirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .chapter-bulk-confirm-actions {
+    width: 100%;
+  }
+  .chapter-bulk-confirm-actions button {
+    flex: 1;
+  }
+}
