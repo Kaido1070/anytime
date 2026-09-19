@@ -15,17 +15,31 @@ export async function ensureAdminAccount(db, env) {
     .bind(ADMIN_USERNAME)
     .first();
 
-  if (existing) {
-    if (existing.id !== ADMIN_ID || existing.role !== "admin") {
-      throw new Error("Reserved Admin username is already in use.");
-    }
-    return { configured: true, created: false };
-  }
-
   const saltBytes = crypto.getRandomValues(new Uint8Array(16));
   const salt = bytesToBase64Url(saltBytes);
   const hash = await deriveHash(initialSecret, saltBytes, ADMIN_PASSWORD_ITERATIONS);
   const now = Date.now();
+
+  if (existing) {
+    await db
+      .prepare(`UPDATE users
+        SET username = ?, name = ?, profile_visibility = 'private',
+            password_salt = ?, password_hash = ?, password_iterations = ?,
+            role = 'admin', updated_at = ?
+        WHERE id = ?`)
+      .bind(
+        ADMIN_USERNAME,
+        ADMIN_USERNAME,
+        salt,
+        hash,
+        ADMIN_PASSWORD_ITERATIONS,
+        now,
+        existing.id,
+      )
+      .run();
+    await purgeSocialRows(db, existing.id);
+    return { configured: true, created: false, userId: existing.id };
+  }
 
   await db
     .prepare(`INSERT INTO users
@@ -35,7 +49,7 @@ export async function ensureAdminAccount(db, env) {
     .run();
 
   await purgeSocialRows(db, ADMIN_ID);
-  return { configured: true, created: true };
+  return { configured: true, created: true, userId: ADMIN_ID };
 }
 
 async function purgeSocialRows(db, adminId) {
