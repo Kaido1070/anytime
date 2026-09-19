@@ -168,30 +168,6 @@ export function SourceMangaDetails() {
           {item.description && <p className="description" dir="auto">{item.description}</p>}
           <div className="detail-actions">
             {startChapter != null && <Link className="primary" to={`/read-source/${encodeURIComponent(sourceKey)}/${startChapter}`}>{highestChapter != null ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
-            <button
-              className="secondary"
-              aria-pressed={Boolean(libraryEntry)}
-              disabled={Boolean(libraryEntry)}
-              onClick={() => void addToLibrary(sourceKey, "planned")}
-            >
-              <Icon name={libraryEntry ? "check" : "favorites"} />
-              {libraryEntry ? "في مكتبتي" : "إضافة لمكتبتي"}
-            </button>
-            {libraryEntry && (
-              <select
-                className="library-status-select"
-                aria-label="حالة القصة في المكتبة"
-                value={libraryEntry.status}
-                onChange={(event) =>
-                  void setLibraryStatus(sourceKey, event.target.value as LibraryStatus)
-                }
-              >
-                <option value="reading">أقرأ الآن</option>
-                <option value="completed">مكتمل</option>
-                <option value="paused">متوقف مؤقتًا</option>
-                <option value="planned">مخطط له</option>
-              </select>
-            )}
             <ListManager mangaId={sourceKey} />
             <button className="secondary" aria-pressed={isFavorite} onClick={() => void favorite(sourceKey)}><Icon name={isFavorite ? "check" : "favorites"} />{isFavorite ? "في المفضلة" : "إضافة للمفضلة"}</button>
           </div>
