@@ -169,8 +169,8 @@ export function ProfileListsSection({
               className="profile-section-edit"
               type="button"
               onClick={onCustomize}
-              aria-label="تعديل ترتيب أقسام الحساب"
-              title="تعديل ترتيب الأقسام"
+              aria-label="تعديل القوائم"
+              title="تعديل القوائم"
             >
               <Icon name="edit" />
             </button>
