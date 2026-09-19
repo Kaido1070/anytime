@@ -1026,7 +1026,21 @@ async function asqSeries(db, item) {
   const genres = asqGenres(html);
   if (sourceType === "novel" || sourceType === "web-novel") genres.push("روايات");
   const normalizedGenres = [...new Set(genres)];
-  const chapters = parseAsqChapters(html, item.url || ASQ_BASE + "/manga/" + item.slug + "/");
+
+  const seriesUrl = item.url || ASQ_BASE + "/manga/" + item.slug + "/";
+  let chapterHtml = html;
+  let chapters = parseAsqChapters(chapterHtml, seriesUrl);
+
+  // 3asq currently loads Madara chapters through WordPress AJAX on many titles,
+  // so the initial series HTML can legitimately contain zero chapter rows.
+  if (!chapters.length) {
+    const postId = asqPostId(html);
+    if (postId) {
+      chapterHtml = await asqFetchChapters(postId, seriesUrl).catch(() => html);
+      chapters = parseAsqChapters(chapterHtml, seriesUrl);
+    }
+  }
+
   const updated = {
     ...item,
     type: sourceType || item.type,
@@ -1052,6 +1066,42 @@ function normalizeAsqType(value) {
   if (/مانجا|manga/.test(type)) return "manga";
   if (/كوميك|comic/.test(type)) return "comic";
   return type || "manga";
+}
+
+function asqPostId(html) {
+  return cleanText(
+    firstMatch(html, /id=["']manga-chapters-holder["'][^>]*data-id=["']([^"']+)["']/i) ||
+      firstMatch(html, /data-id=["']([^"']+)["'][^>]*id=["']manga-chapters-holder["']/i) ||
+      firstMatch(html, /class=["'][^"']*rating-post-id[^"']*["'][^>]*value=["']([^"']+)["']/i) ||
+      firstMatch(html, /value=["']([^"']+)["'][^>]*class=["'][^"']*rating-post-id/i) ||
+      firstMatch(html, /data-post=["']([^"']+)["']/i),
+  );
+}
+
+async function asqFetchChapters(postId, referer) {
+  const body = new URLSearchParams({
+    action: "manga_get_chapters",
+    manga: String(postId),
+  });
+  const response = await fetch(ASQ_BASE + "/wp-admin/admin-ajax.php", {
+    method: "POST",
+    headers: {
+      ...sourceHeaders(
+        referer || ASQ_BASE,
+        "text/html,application/xhtml+xml,*/*;q=0.8",
+      ),
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: referer || ASQ_BASE,
+    },
+    body: body.toString(),
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: false },
+  });
+  if (!response.ok) {
+    throw new SourceError("ASQ_CHAPTERS", "العاشق لم يرجع قائمة الفصول.", 502);
+  }
+  return response.text();
 }
 
 function parseAsqChapters(html, seriesUrl) {
@@ -2374,6 +2424,7 @@ export const __test = {
   parseTeamXPages,
   parseAsqChapters,
   parseAsqPages,
+  asqPostId,
   parseStarzChapters,
   parseStarzPages,
   parseMangalikChapters,
