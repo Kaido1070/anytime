@@ -1031,8 +1031,14 @@ async function asqSeries(db, item) {
   let chapterHtml = html;
   let chapters = parseAsqChapters(chapterHtml, seriesUrl);
 
-  // 3asq currently loads Madara chapters through WordPress AJAX on many titles,
-  // so the initial series HTML can legitimately contain zero chapter rows.
+  // Current 3asq/Madara pages often omit chapter rows from the initial HTML.
+  // Prefer the per-title AJAX chapter route because it does not depend on a post id.
+  if (!chapters.length) {
+    chapterHtml = await asqFetchSeriesChapters(seriesUrl).catch(() => html);
+    chapters = parseAsqChapters(chapterHtml, seriesUrl);
+  }
+
+  // Older Madara layouts expose a post id and use WordPress admin-ajax instead.
   if (!chapters.length) {
     const postId = asqPostId(html);
     if (postId) {
@@ -1066,6 +1072,30 @@ function normalizeAsqType(value) {
   if (/مانجا|manga/.test(type)) return "manga";
   if (/كوميك|comic/.test(type)) return "comic";
   return type || "manga";
+}
+
+async function asqFetchSeriesChapters(seriesUrl) {
+  const base = new URL(seriesUrl, ASQ_BASE);
+  const chapterUrl = new URL(base.pathname.replace(/\/$/, "") + "/ajax/chapters/", base.origin);
+  const response = await fetch(chapterUrl.toString(), {
+    method: "POST",
+    headers: {
+      ...sourceHeaders(
+        seriesUrl,
+        "text/html,application/xhtml+xml,*/*;q=0.8",
+      ),
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: seriesUrl,
+    },
+    body: "",
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: false },
+  });
+  if (!response.ok) {
+    throw new SourceError("ASQ_CHAPTERS", "العاشق لم يرجع قائمة الفصول.", 502);
+  }
+  return response.text();
 }
 
 function asqPostId(html) {
