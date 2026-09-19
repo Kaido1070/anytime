@@ -158,9 +158,13 @@ test("admin schema repair is non-destructive for existing user accounts", async 
   assert.doesNotMatch(helpers, /schema_version[\s\S]*return/);
 
   assert.match(api, /role TEXT NOT NULL DEFAULT 'user'[\s\S]*role IN \('user','admin'\)/);
-  assert.doesNotMatch(provision, /UPDATE users[\s\S]*WHERE (?!id = \?)/);
+  assert.doesNotMatch(provision, /DROP TABLE users|DELETE FROM users/);
+  const updateStart = provision.indexOf("UPDATE users");
+  const updateEnd = provision.indexOf(".run();", updateStart);
+  const updateBlock = provision.slice(updateStart, updateEnd);
+  assert.ok(updateStart >= 0, "Admin provisioning should update only the reserved Admin row");
+  assert.match(updateBlock, /WHERE id = \?/);
   assert.match(provision, /WHERE username = \? COLLATE NOCASE LIMIT 1/);
-  assert.match(provision, /WHERE id = \?/);
 });
 
 
