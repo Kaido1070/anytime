@@ -105,6 +105,29 @@ function ReaderChapter({
   const [percent, setPercent] = useState(saved);
   const [showProgress] = useState(readerProgressVisible);
   const saveRef = useRef(saveProgress);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootBackground = root.style.background;
+    const previousBodyBackground = body.style.background;
+    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const previousTheme = themeMeta?.content ?? "";
+
+    root.classList.add("reader-edge-to-edge");
+    body.classList.add("reader-edge-to-edge");
+    root.style.background = "#090a0b";
+    body.style.background = "#090a0b";
+    if (themeMeta) themeMeta.content = "#090a0b";
+
+    return () => {
+      root.classList.remove("reader-edge-to-edge");
+      body.classList.remove("reader-edge-to-edge");
+      root.style.background = previousRootBackground;
+      body.style.background = previousBodyBackground;
+      if (themeMeta) themeMeta.content = previousTheme;
+    };
+  }, []);
   const restoredRef = useRef(false);
   const initialPageCount = Math.min(INITIAL_READER_PAGES, payload.pages.length);
   const initialPageIndexes = Array.from({ length: initialPageCount }, (_, index) => index);
