@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { Icon } from "../components/UI";
 import { loadUnreadFollowedCount } from "../services/newChapters";
@@ -6,6 +6,8 @@ import { PERSONALIZATION_CHANGE_EVENT } from "../services/userData";
 
 export function AppLayout() {
   const [newCount, setNewCount] = useState(0);
+  const [mobileNavHidden, setMobileNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const navItems = [
     { label: "استكشف", path: "/discover", icon: "search" },
     { label: "FYP", path: "/fyp", icon: "sparkles" },
@@ -32,6 +34,44 @@ export function AppLayout() {
     };
   }, []);
 
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 759px)");
+    lastScrollY.current = window.scrollY;
+
+    const onScroll = () => {
+      if (!mobile.matches) {
+        setMobileNavHidden(false);
+        lastScrollY.current = window.scrollY;
+        return;
+      }
+
+      const currentY = Math.max(0, window.scrollY);
+      const delta = currentY - lastScrollY.current;
+
+      if (currentY < 48) {
+        setMobileNavHidden(false);
+      } else if (delta > 6) {
+        setMobileNavHidden(true);
+      } else if (delta < -6) {
+        setMobileNavHidden(false);
+      }
+
+      lastScrollY.current = currentY;
+    };
+
+    const onViewportChange = () => {
+      if (!mobile.matches) setMobileNavHidden(false);
+      lastScrollY.current = window.scrollY;
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    mobile.addEventListener?.("change", onViewportChange);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      mobile.removeEventListener?.("change", onViewportChange);
+    };
+  }, []);
+
   return (
     <div className="app-shell">
       <header
@@ -48,7 +88,7 @@ export function AppLayout() {
         <Outlet />
       </main>
 
-      <nav className="bottom-nav" aria-label="التنقل الرئيسي">
+      <nav className={`bottom-nav${mobileNavHidden ? " mobile-hidden" : ""}`} aria-label="التنقل الرئيسي">
         {navItems.map((item) => {
           const badge = "badge" in item ? (item.badge ?? 0) : 0;
           return (
