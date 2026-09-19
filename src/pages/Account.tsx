@@ -10,6 +10,7 @@ import {
   ProfileStatsSection,
 } from "../components/ProfileOverview";
 import { Icon } from "../components/UI";
+import { ProfileListsManager } from "../components/ProfileListsManager";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
@@ -465,7 +466,6 @@ export function Account() {
   const [readingRetry, setReadingRetry] = useState(0);
   const [loading, setLoading] = useState(true);
   const [customizingLists, setCustomizingLists] = useState(false);
-  const [savingLists, setSavingLists] = useState(false);
   const [error, setError] = useState("");
 
   const loadOverview = useCallback(async () => {
@@ -570,41 +570,6 @@ export function Account() {
     };
   }, [readingSignature, readingRetry]);
 
-  const saveListsLayout = async (nextListSections: UserProfileSection[]) => {
-    if (savingLists) return;
-    setSavingLists(true);
-    setError("");
-    try {
-      const orderedSections = [...sections].sort(
-        (a, b) => a.position - b.position || a.key.localeCompare(b.key),
-      );
-      const replacements = [...nextListSections];
-      const payload = orderedSections.map((section) => {
-        if (groupIdForSection(section) !== "lists") {
-          return {
-            sectionType: section.sectionType,
-            referenceId: section.referenceId,
-            isVisible: section.isVisible,
-          };
-        }
-        const replacement = replacements.shift() ?? section;
-        return {
-          sectionType: replacement.sectionType,
-          referenceId: replacement.referenceId,
-          isVisible: replacement.isVisible,
-        };
-      });
-      const saved = await userDataService.saveProfileSections(payload);
-      setSections(saved);
-      setGroups(buildContentGroups(saved));
-      setCustomizingLists(false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر حفظ ترتيب القوائم.");
-    } finally {
-      setSavingLists(false);
-    }
-  };
-
   const completed = useMemo(() => new Set(data?.completed ?? []), [data?.completed]);
 
   if (settingsOpen) {
@@ -685,15 +650,11 @@ export function Account() {
           <ProfileStatsSection stats={stats} />
 
           {customizingLists ? (
-            <ProfileListsEditor
-              sections={sections}
-              lists={profile.lists ?? []}
-              busy={savingLists}
-              error={error}
-              onSave={(next) => void saveListsLayout(next)}
-              onCancel={() => {
+            <ProfileListsManager
+              onClose={() => {
                 setError("");
                 setCustomizingLists(false);
+                void loadOverview();
               }}
             />
           ) : (
