@@ -145,3 +145,33 @@ test("admin responses are no-store and public user serializer does not expose ro
   const sessionPart = helpers.slice(helpers.indexOf("export function sessionUser"), helpers.indexOf("export async function ensureAdminSchema"));
   assert.match(sessionPart, /role:/);
 });
+
+
+test("admin schema repair is non-destructive for existing user accounts", async () => {
+  const helpers = await readFile(new URL("../functions/_admin.js", import.meta.url), "utf8");
+  const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
+  const api = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
+
+  assert.match(helpers, /PRAGMA table_info\(users\)/);
+  assert.match(helpers, /ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'/);
+  assert.doesNotMatch(helpers, /DROP TABLE users|DELETE FROM users|UPDATE users/);
+  assert.doesNotMatch(helpers, /schema_version[\s\S]*return/);
+
+  assert.match(api, /role TEXT NOT NULL DEFAULT 'user'[\s\S]*role IN \('user','admin'\)/);
+  assert.doesNotMatch(provision, /DROP TABLE users|DELETE FROM users/);
+  const updateStart = provision.indexOf("UPDATE users");
+  const updateEnd = provision.indexOf(".run();", updateStart);
+  const updateBlock = provision.slice(updateStart, updateEnd);
+  assert.ok(updateStart >= 0, "Admin provisioning should update only the reserved Admin row");
+  assert.match(updateBlock, /WHERE id = \?/);
+  assert.match(provision, /WHERE username = \? COLLATE NOCASE LIMIT 1/);
+});
+
+
+test("admin provisioning never hijacks an ordinary existing account named Admin", async () => {
+  const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
+  assert.match(
+    provision,
+    /if \(existing\.id !== ADMIN_ID && existing\.role !== "admin"\)[\s\S]*Reserved Admin username belongs to an existing user account/,
+  );
+});

@@ -2262,6 +2262,8 @@ async function ensureDatabase(db) {
       name TEXT NOT NULL,
       profile_visibility TEXT NOT NULL DEFAULT 'private'
         CHECK (profile_visibility IN ('public','private')),
+      role TEXT NOT NULL DEFAULT 'user'
+        CHECK (role IN ('user','admin')),
       password_salt TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       password_iterations INTEGER NOT NULL DEFAULT 210000,
