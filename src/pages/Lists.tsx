@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ListEditorDialog } from "../components/ListEditorDialog";
-import { Icon } from "../components/UI";
+import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { userDataService } from "../services/userData";
 import type { UserListSummary } from "../types";
 
 export function Lists({ embedded = false }: { embedded?: boolean }) {
   const { data } = useLibrary();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || "/profile";
+  const currentPage = `${location.pathname}${location.search}${location.hash}`;
   const [lists, setLists] = useState<UserListSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -48,6 +51,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <>
+      {!embedded && <Back to={returnTo} />}
       <header className={`lists-page-header ${embedded ? "account-lists-header" : ""}`}>
         <div>
           <p className="eyebrow">{embedded ? "داخل حسابك" : "رتب قصصك بطريقتك"}</p>
@@ -70,7 +74,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
 
       <section aria-label="قوائمك">
         <div className="lists-overview-grid">
-          <Link className="user-list-card system-list-card" to="/favorites">
+          <Link className="user-list-card system-list-card" to="/favorites" state={{ returnTo: currentPage }}>
             <div className="list-card-top">
               <span className="list-card-icon"><Icon name="favorites" /></span>
               <span className="list-count">{favoritesCount} قصص</span>
@@ -90,7 +94,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
                 </div>
               ))
             : lists.map((list) => (
-                <Link className="user-list-card" to={`/lists/${encodeURIComponent(list.id)}`} key={list.id}>
+                <Link className="user-list-card" to={`/lists/${encodeURIComponent(list.id)}`} state={{ returnTo: currentPage }} key={list.id}>
                   <div className="list-card-top">
                     <span className="list-card-icon"><Icon name="lists" /></span>
                     <span className="list-count">{list.itemCount} قصص</span>
