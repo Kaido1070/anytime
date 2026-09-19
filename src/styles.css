@@ -903,12 +903,14 @@ body.reader-edge-to-edge {
 @media (max-width: 759px) {
   .reader {
     position: relative;
-    background: transparent;
+    background: #090a0b;
   }
 
+  /* Safari's collapsed top chrome is about one safe-area tall. Pull the reader
+     canvas into it; keep the chapter toolbar padded so its controls remain safe. */
   .reader-header {
     position: sticky;
-    top: 0;
+    top: calc(-1 * env(safe-area-inset-top));
     height: calc(64px + env(safe-area-inset-top));
     padding-top: env(safe-area-inset-top);
   }
@@ -916,7 +918,8 @@ body.reader-edge-to-edge {
   .reader-panels.source-pages {
     width: 100%;
     max-width: none;
-    margin: 0;
+    margin: calc(-1 * env(safe-area-inset-top)) 0 0;
+    padding-top: env(safe-area-inset-top);
     background: #090a0b;
   }
 
