@@ -32,15 +32,9 @@ export async function ensureAdminSchema(db) {
   let pending = adminSchemaReady.get(db);
   if (!pending) {
     pending = (async () => {
-      try {
-        const version = await db
-          .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-          .first();
-        if (Number(version?.value ?? 0) >= 10) return;
-      } catch {
-        // Older/fresh databases may not have schema_meta yet.
-      }
-
+      // Never trust schema_meta alone here. Production databases can have a newer
+      // runtime version while still missing the Phase 10 role column.
+      // PRAGMA is read-only and preserves every existing user row.
       const columns = await db.prepare("PRAGMA table_info(users)").all();
       const hasRole = (columns.results ?? []).some((column) => column.name === "role");
       if (!hasRole) {
