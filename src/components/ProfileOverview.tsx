@@ -147,6 +147,7 @@ export function ProfileListsSection({
       count: favoriteCount,
       keys: favorites,
       to: "/favorites",
+      iconKey: "favorites",
       system: true,
     },
     ...lists.map((list) => ({
@@ -155,6 +156,7 @@ export function ProfileListsSection({
       count: list.itemCount,
       keys: list.previewItems,
       to: `/lists/${encodeURIComponent(list.id)}`,
+      iconKey: list.iconKey || "lists",
       system: false,
     })),
   ];
@@ -189,7 +191,10 @@ export function ProfileListsSection({
             >
               <Collage keys={card.keys} works={works} />
               <span className="profile-list-preview-copy">
-                <b dir="auto">{card.name}</b>
+                <span className="profile-list-preview-title">
+                  <Icon name={card.iconKey} />
+                  <b dir="auto">{card.name}</b>
+                </span>
                 <small>{formatCount(card.count)} قصص</small>
               </span>
             </Link>
