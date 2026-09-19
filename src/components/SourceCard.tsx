@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { SourceManga } from "../types";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
@@ -16,6 +16,8 @@ export function SourceCard({
   sources?: SourceManga[];
 }) {
   const { data } = useLibrary();
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
   const groupedItems = sources?.length ? sources : [item];
   const groupedKeys = new Set(groupedItems.map((entry) => entry.key));
   const progress = Object.values(data?.progress ?? {})
@@ -30,7 +32,7 @@ export function SourceCard({
   const merged = sourceNames.length > 1;
 
   return (
-    <Link className="manga-card source-card" to={sourceDetailsPath(linkedItem.key, groupedItems)}>
+    <Link className="manga-card source-card" to={sourceDetailsPath(linkedItem.key, groupedItems)} state={{ returnTo }}>
       <div className="cover-wrap">
         {coverItem.cover ? (
           <SourceCoverImage
