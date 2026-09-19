@@ -211,13 +211,30 @@ function useLibraryState() {
           progress[key] = { mangaId, chapter, percent: 100, updatedAt: now };
         }
         const existing = current.library.find((item) => item.mangaId === mangaId);
-        const libraryEntry = mergeLibraryRead(existing, mangaId, highest, now);
+        const libraryEntry = existing
+          ? {
+              ...existing,
+              status: existing.status === "planned" ? "reading" as const : existing.status,
+              updatedAt: Math.max(existing.updatedAt, now),
+              highestReachedChapter:
+                existing.highestReachedChapter == null
+                  ? highest
+                  : Math.max(existing.highestReachedChapter, highest),
+            }
+          : {
+              mangaId,
+              status: "reading" as const,
+              addedAt: now,
+              updatedAt: now,
+              lastReadAt: null,
+              lastReadChapter: null,
+              highestReachedChapter: highest,
+            };
         return {
           ...current,
           library: [libraryEntry, ...current.library.filter((item) => item.mangaId !== mangaId)],
           completed: [...completed],
           progress,
-          lastOpened: { mangaId, chapter: highest },
         };
       });
       return processed;
