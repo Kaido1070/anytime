@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ListEditorDialog } from "../components/ListEditorDialog";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
@@ -35,6 +35,7 @@ export function UserList() {
   const { id = "" } = useParams();
   const listId = decodeURIComponent(id);
   const navigate = useNavigate();
+  const location = useLocation();
   const [list, setList] = useState<Omit<UserListDetail, "items"> | null>(null);
   const [items, setItems] = useState<UserListItem[]>([]);
   const itemsRef = useRef<UserListItem[]>([]);
@@ -51,10 +52,12 @@ export function UserList() {
   const [busyDelete, setBusyDelete] = useState(false);
   const [error, setError] = useState("");
   const canManage = list?.canManage !== false;
+  const preservedReturnTo = (location.state as { returnTo?: string } | null)?.returnTo;
   const backTo =
-    list?.owner && list.canManage === false
+    preservedReturnTo ||
+    (list?.owner && list.canManage === false
       ? `/friends/${list.owner.id}`
-      : "/lists";
+      : "/lists");
 
   const updateItems = useCallback((next: UserListItem[]) => {
     itemsRef.current = next;
