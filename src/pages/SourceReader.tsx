@@ -116,9 +116,9 @@ function ReaderChapter({
 
     root.classList.add("reader-edge-to-edge");
     body.classList.add("reader-edge-to-edge");
-    root.style.background = "#090a0b";
-    body.style.background = "#090a0b";
-    if (themeMeta) themeMeta.content = "#090a0b";
+    root.style.background = "transparent";
+    body.style.background = "transparent";
+    if (themeMeta) themeMeta.content = "#17191b";
 
     return () => {
       root.classList.remove("reader-edge-to-edge");
