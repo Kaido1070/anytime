@@ -204,12 +204,12 @@ export function UserList() {
     }
   };
 
-  const saveEdit = async (name: string, description: string) => {
+  const saveEdit = async (name: string, description: string, iconKey: string) => {
     if (!canManage) return;
     setBusyEdit(true);
     setError("");
     try {
-      const updated = await userDataService.updateList(listId, name, description);
+      const updated = await userDataService.updateList(listId, name, description, iconKey);
       setList(updated);
       setShowEdit(false);
     } catch (cause) {
@@ -393,6 +393,7 @@ export function UserList() {
         submitLabel="حفظ"
         initialName={list.name}
         initialDescription={list.description}
+        initialIconKey={list.iconKey || "lists"}
         busy={busyEdit}
         error={showEdit ? error : ""}
         onClose={() => {
