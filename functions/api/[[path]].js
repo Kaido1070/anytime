@@ -1458,25 +1458,15 @@ async function route(request, url, db) {
 
       db.prepare(`INSERT INTO user_library
         (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
-        VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
+        VALUES (?, ?, 'reading', ?, ?, NULL, NULL, ?)
         ON CONFLICT(user_id, manga_id) DO UPDATE SET
           status = CASE WHEN user_library.status = 'planned' THEN 'reading' ELSE user_library.status END,
           updated_at = MAX(user_library.updated_at, excluded.updated_at),
-          last_read_at = excluded.last_read_at,
-          last_read_chapter = excluded.last_read_chapter,
           highest_reached_chapter = CASE
             WHEN user_library.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
             ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
           END`)
-        .bind(user.id, mangaId, now, now, now, highestChapter, highestChapter),
-
-      db.prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET
-          last_manga_id = excluded.last_manga_id,
-          last_chapter = excluded.last_chapter,
-          updated_at = excluded.updated_at`)
-        .bind(user.id, mangaId, highestChapter, now),
+        .bind(user.id, mangaId, now, now, highestChapter),
     ]);
 
     await recordReadingActivity(db, user.id, mangaId, highestChapter, previous, now);
