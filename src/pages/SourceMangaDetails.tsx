@@ -159,7 +159,6 @@ export function SourceMangaDetails() {
                     to={sourceDetailsPath(option.key, requestedSourceKeys)}
                   >
                     {sourceService.sourceLabel(option.source)}
-                    {option.key === sourceKey && <small>الحالي</small>}
                   </Link>
                 ))}
               </div>
