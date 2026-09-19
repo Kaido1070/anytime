@@ -143,7 +143,7 @@ export function SourceMangaDetails() {
 
   return (
     <>
-      <Back to="/discover" />
+      <Back to={returnTo} />
       <div className="details-hero">
         {coverItem.cover ? <SourceCoverImage item={coverItem} className="detail-cover" alt={`غلاف ${displayTitle}`} /> :
           <div className="detail-cover source-cover-placeholder source-detail-placeholder">{item.title.slice(0, 1)}</div>}
