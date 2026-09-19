@@ -94,13 +94,21 @@ async function getAdminUsers(db, url) {
       ? "u.username COLLATE NOCASE ASC, u.id ASC"
       : sort === "works"
         ? "works_count DESC, u.username COLLATE NOCASE ASC"
-        : "last_activity_at DESC, u.username COLLATE NOCASE ASC";
+        : sort === "chapters"
+          ? "chapters_read_count DESC, u.username COLLATE NOCASE ASC"
+          : "last_activity_at DESC, u.username COLLATE NOCASE ASC";
 
   const [countRow, result] = await Promise.all([
     db.prepare(`SELECT COUNT(*) AS total FROM users u WHERE ${where}`).bind(...args).first(),
     db.prepare(`SELECT
       u.id, u.username, u.name, u.profile_visibility, u.avatar_id,
       (SELECT COUNT(*) FROM user_library ul WHERE ul.user_id = u.id) AS works_count,
+      (SELECT COUNT(*) FROM (
+        SELECT manga_id, chapter
+        FROM reading_history rh
+        WHERE rh.user_id = u.id
+        GROUP BY manga_id, chapter
+      )) AS chapters_read_count,
       (SELECT COUNT(*) FROM user_lists l WHERE l.user_id = u.id) AS lists_count,
       (SELECT COUNT(*)
         FROM friendships f
@@ -137,6 +145,7 @@ async function getAdminUsers(db, url) {
     users: rows.map((row) => ({
       user: publicUser(row),
       worksCount: Number(row.works_count ?? 0),
+      chaptersReadCount: Number(row.chapters_read_count ?? 0),
       listsCount: Number(row.lists_count ?? 0),
       friendsCount: Number(row.friends_count ?? 0),
       lastActivityAt: row.last_activity_at ? Number(row.last_activity_at) : null,
