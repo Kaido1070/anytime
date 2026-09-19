@@ -918,9 +918,16 @@ body.reader-edge-to-edge {
   .reader-panels.source-pages {
     width: 100%;
     max-width: none;
-    margin: calc(-1 * env(safe-area-inset-top)) 0 0;
-    padding-top: env(safe-area-inset-top);
+    margin: calc(-1 * (64px + env(safe-area-inset-top))) 0 0;
+    padding-top: calc(64px + env(safe-area-inset-top));
     background: #090a0b;
+  }
+
+  /* Keep the first page painted behind Safari's collapsed top chrome.
+     The toolbar remains in normal flow and scrolls away above it. */
+  .reader-panels.source-pages > :first-child {
+    position: relative;
+    z-index: 0;
   }
 
   .reader-panels.source-pages img {
