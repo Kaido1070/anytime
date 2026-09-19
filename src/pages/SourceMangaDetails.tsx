@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ListManager } from "../components/ListManager";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
@@ -26,6 +26,8 @@ export function SourceMangaDetails() {
   const { key = "" } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo || "/discover";
   const sourceKey = decodeURIComponent(key);
   const sourceGroupParam = searchParams.get("sources");
   const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
@@ -71,8 +73,8 @@ export function SourceMangaDetails() {
     [data?.library, sourceKey],
   );
 
-  if (loading) return <><Back to="/discover" /><p className="empty">جاري تحميل القصة والفصول من المصدر…</p></>;
-  if (!item || error) return <><Back to="/discover" /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
+  if (loading) return <><Back to={returnTo} /><p className="empty">جاري تحميل القصة والفصول من المصدر…</p></>;
+  if (!item || error) return <><Back to={returnTo} /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
 
   const optionMap = new Map(sourceOptions.map((entry) => [entry.key, entry]));
   optionMap.set(item.key, item);
