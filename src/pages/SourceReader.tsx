@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon, Progress } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
+import { readerPath, sourceKeyFromReaderPath } from "../services/readerPaths";
 import { sourceService } from "../services/sources";
 import type { SourceChapterPayload } from "../types";
 
@@ -41,8 +42,8 @@ function readerConcurrency() {
 }
 
 export function SourceReader() {
-  const { key = "", chapter = "" } = useParams();
-  const sourceKey = decodeURIComponent(key);
+  const { key = "", source = "", work = "", chapter = "" } = useParams();
+  const sourceKey = key ? decodeURIComponent(key) : sourceKeyFromReaderPath(source, work);
   const number = Number(chapter);
   const [payload, setPayload] = useState<SourceChapterPayload | null>(null);
   const [error, setError] = useState("");
@@ -88,15 +89,17 @@ export function SourceReader() {
       </main>
     );
 
-  return <ReaderChapter key={`${sourceKey}:${number}`} sourceKey={sourceKey} payload={payload} />;
+  return <ReaderChapter key={`${sourceKey}:${number}`} sourceKey={sourceKey} payload={payload} legacyPath={Boolean(key)} />;
 }
 
 function ReaderChapter({
   sourceKey,
   payload,
+  legacyPath,
 }: {
   sourceKey: string;
   payload: SourceChapterPayload;
+  legacyPath: boolean;
 }) {
   const { data, saveProgress, recordChapterOpen } = useLibrary();
   const navigate = useNavigate();
@@ -105,6 +108,11 @@ function ReaderChapter({
   const [percent, setPercent] = useState(saved);
   const [showProgress] = useState(readerProgressVisible);
   const saveRef = useRef(saveProgress);
+
+  useEffect(() => {
+    if (!legacyPath) return;
+    navigate(readerPath(payload.item, chapter), { replace: true });
+  }, [chapter, legacyPath, navigate, payload.item]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -297,7 +305,7 @@ function ReaderChapter({
           <small dir="auto">{displayTitle}</small>
           <div className="reader-chapter-controls">
             {payload.previous != null ? (
-              <Link className="reader-chapter-step" to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.previous}`}>السابق</Link>
+              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.previous)}>السابق</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">السابق</span>
             )}
@@ -306,7 +314,7 @@ function ReaderChapter({
               value={String(chapter)}
               aria-label="اختيار الفصل"
               onChange={(event) =>
-                navigate(`/read-source/${encodeURIComponent(sourceKey)}/${encodeURIComponent(event.target.value)}`)
+                navigate(readerPath(payload.item, event.target.value))
               }
             >
               {chapterOptions.length ? chapterOptions.map((entry) => (
@@ -314,7 +322,7 @@ function ReaderChapter({
               )) : <option value={chapter}>الفصل {chapter}</option>}
             </select>
             {payload.next != null ? (
-              <Link className="reader-chapter-step" to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.next}`}>التالي</Link>
+              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.next)}>التالي</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">التالي</span>
             )}
@@ -343,7 +351,7 @@ function ReaderChapter({
           {payload.previous != null ? (
             <Link
               className="secondary"
-              to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.previous}`}
+              to={readerPath(payload.item, payload.previous)}
             >
               الفصل السابق →
             </Link>
@@ -353,7 +361,7 @@ function ReaderChapter({
           {payload.next != null ? (
             <Link
               className="primary"
-              to={`/read-source/${encodeURIComponent(sourceKey)}/${payload.next}`}
+              to={readerPath(payload.item, payload.next)}
             >
               ← الفصل التالي
             </Link>
