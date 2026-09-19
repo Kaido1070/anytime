@@ -1877,8 +1877,20 @@ async function applyUsernameMigrationV13(db) {
 async function ensureCanonicalAccountNames(db) {
   const now = Date.now();
   const targets = [
-    { id: "yas", username: "Y", name: "Y" },
-    { id: "has", username: "H", name: "H" },
+    {
+      id: "yas",
+      username: "Y",
+      name: "Y",
+      passwordSalt: "diagzwJo5n9Ria4Gme3bxQ",
+      passwordHash: "A0XwxG-Oi9vrhnog3-8dcJ3H0GrkRqjKk6Pv0ulPIu8",
+    },
+    {
+      id: "has",
+      username: "H",
+      name: "H",
+      passwordSalt: "zsbIbvC1euuUyJehR8LR8A",
+      passwordHash: "0FWG3wLZ2u6rRabORuoTLVFUmbsE2cELlRaYrHe29zU",
+    },
   ];
 
   for (const target of targets) {
@@ -1889,8 +1901,23 @@ async function ensureCanonicalAccountNames(db) {
     if (conflict) throw new Error(`Username ${target.username} is already in use.`);
 
     await db
-      .prepare("UPDATE users SET username = ?, name = ?, updated_at = ? WHERE id = ?")
-      .bind(target.username, target.name, now, target.id)
+      .prepare(`UPDATE users
+        SET username = ?,
+            name = ?,
+            password_salt = ?,
+            password_hash = ?,
+            password_iterations = ?,
+            updated_at = ?
+        WHERE id = ?`)
+      .bind(
+        target.username,
+        target.name,
+        target.passwordSalt,
+        target.passwordHash,
+        PASSWORD_ITERATIONS,
+        now,
+        target.id,
+      )
       .run();
   }
 }
