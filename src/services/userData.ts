@@ -620,7 +620,7 @@ class ApiUserDataService implements UserDataService {
 
   async markChaptersRead(mangaId: string, chapters: number[]) {
     if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
-    const normalized = [...new Set(chapters.map(Number).filter((chapter) => Number.isFinite(chapter) && chapter >= 0))].slice(0, 40);
+    const normalized = [...new Set(chapters.map(Number).filter((chapter) => Number.isFinite(chapter) && chapter >= 0))].slice(0, 16);
     if (!normalized.length) return 0;
     const result = await this.request<{ ok: boolean; processed: number }>("reading/read-bulk", {
       method: "POST",
