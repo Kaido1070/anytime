@@ -117,7 +117,7 @@ export function SourceMangaDetails() {
     try {
       if (read) {
         const chapterNumbers = chapters.map((entry) => entry.number);
-        const batchSize = 16;
+        const batchSize = 1000;
         let done = 0;
         for (let index = 0; index < chapterNumbers.length; index += batchSize) {
           const batch = chapterNumbers.slice(index, index + batchSize);
