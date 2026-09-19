@@ -401,7 +401,13 @@ function FullReadingView({
 }) {
   const [series, setSeries] = useState<Record<string, SourceManga>>({});
   const [loading, setLoading] = useState(true);
-  const reading = useMemo(() => entries.filter((entry) => entry.status === "reading"), [entries]);
+  const reading = useMemo(
+    () =>
+      entries
+        .filter((entry) => entry.status === "reading")
+        .sort((a, b) => (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0)),
+    [entries],
+  );
   const signature = reading.map((entry) => entry.mangaId).join("|");
 
   useEffect(() => {
@@ -532,10 +538,16 @@ export function Account() {
     };
   }, [sourceKeys.join("|"), worksRetry]);
 
-  const readingEntries = useMemo(
-    () => (profile?.library ?? []).filter((entry) => entry.status === "reading"),
-    [profile?.library],
-  );
+  const readingEntries = useMemo(() => {
+    const latestOpenedId = data?.lastOpened?.mangaId ?? null;
+    return (profile?.library ?? [])
+      .filter((entry) => entry.status === "reading")
+      .sort((a, b) => {
+        if (a.mangaId === latestOpenedId && b.mangaId !== latestOpenedId) return -1;
+        if (b.mangaId === latestOpenedId && a.mangaId !== latestOpenedId) return 1;
+        return (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0);
+      });
+  }, [data?.lastOpened?.mangaId, profile?.library]);
   const readingSignature = readingEntries.map((entry) => entry.mangaId).join("|");
 
   useEffect(() => {
