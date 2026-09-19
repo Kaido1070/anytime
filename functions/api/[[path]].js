@@ -1419,7 +1419,7 @@ async function route(request, url, db) {
       (Array.isArray(body.chapters) ? body.chapters : [])
         .map(Number)
         .filter((chapter) => Number.isFinite(chapter) && chapter >= 0),
-    )].slice(0, 16);
+    )].slice(0, 1000);
 
     if (!mangaId || !chapters.length) {
       return json({ error: "INVALID_BULK_READING_EVENT" }, 400);
@@ -1428,29 +1428,32 @@ async function route(request, url, db) {
     const previous = await getLibraryActivityState(db, user.id, mangaId);
     const now = Date.now();
     const highestChapter = Math.max(...chapters);
-    const statements = [];
+    const chaptersJson = JSON.stringify(chapters);
 
-    for (const chapter of chapters) {
-      statements.push(
-        db.prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
-          SELECT ?, ?, ?, ?
-          WHERE NOT EXISTS (
-            SELECT 1 FROM reading_history
-            WHERE user_id = ? AND manga_id = ?
-              AND ABS(chapter - ?) < 0.000001
-          )`).bind(user.id, mangaId, chapter, now, user.id, mangaId, chapter),
-        db.prepare(`INSERT INTO reading_progress
-          (user_id, manga_id, chapter, percent, completed, updated_at)
-          VALUES (?, ?, ?, 100, 1, ?)
-          ON CONFLICT(user_id, manga_id, chapter) DO UPDATE SET
-            percent = 100,
-            completed = 1,
-            updated_at = MAX(reading_progress.updated_at, excluded.updated_at)`)
-          .bind(user.id, mangaId, chapter, now),
-      );
-    }
+    await db.batch([
+      db.prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
+        SELECT ?, ?, CAST(j.value AS REAL), ?
+        FROM json_each(?) AS j
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM reading_history h
+          WHERE h.user_id = ?
+            AND h.manga_id = ?
+            AND ABS(h.chapter - CAST(j.value AS REAL)) < 0.000001
+        )`)
+        .bind(user.id, mangaId, now, chaptersJson, user.id, mangaId),
 
-    statements.push(
+      db.prepare(`INSERT INTO reading_progress
+        (user_id, manga_id, chapter, percent, completed, updated_at)
+        SELECT ?, ?, CAST(j.value AS REAL), 100, 1, ?
+        FROM json_each(?) AS j
+        WHERE 1
+        ON CONFLICT(user_id, manga_id, chapter) DO UPDATE SET
+          percent = 100,
+          completed = 1,
+          updated_at = MAX(reading_progress.updated_at, excluded.updated_at)`)
+        .bind(user.id, mangaId, now, chaptersJson),
+
       db.prepare(`INSERT INTO user_library
         (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
         VALUES (?, ?, 'reading', ?, ?, ?, ?, ?)
@@ -1464,6 +1467,7 @@ async function route(request, url, db) {
             ELSE MAX(user_library.highest_reached_chapter, excluded.highest_reached_chapter)
           END`)
         .bind(user.id, mangaId, now, now, now, highestChapter, highestChapter),
+
       db.prepare(`INSERT INTO user_state (user_id, last_manga_id, last_chapter, updated_at)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
@@ -1471,9 +1475,8 @@ async function route(request, url, db) {
           last_chapter = excluded.last_chapter,
           updated_at = excluded.updated_at`)
         .bind(user.id, mangaId, highestChapter, now),
-    );
+    ]);
 
-    await db.batch(statements);
     await recordReadingActivity(db, user.id, mangaId, highestChapter, previous, now);
     return json({ ok: true, processed: chapters.length });
   }
