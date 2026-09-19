@@ -306,8 +306,8 @@
   .filter-sheet-actions { bottom: calc(-1 * max(18px, env(safe-area-inset-bottom))); }
   .source-callout { align-items: stretch; flex-direction: column; }
   .source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bottom-nav { width: 100%; padding-inline: 6px; }
-  .bottom-nav a { font-size: 8px; }
+  .bottom-nav { padding-inline: 15px; }
+  .bottom-nav a { font-size: 9px; }
   .chapter-tools { align-items: stretch; }
   .chapter-sort { width: 100%; justify-content: center; }
   .chapter-jump { width: 100%; min-width: 0; }
