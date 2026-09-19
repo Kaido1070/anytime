@@ -170,10 +170,10 @@ test("admin schema repair is non-destructive for existing user accounts", async 
 
 test("admin provisioning never hijacks an ordinary existing account named Admin", async () => {
   const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
-  assert.match(
-    provision,
-    /if \(existing\.id !== ADMIN_ID && existing\.role !== "admin"\)[\s\S]*Reserved Admin username belongs to an existing user account/,
-  );
+  assert.match(provision, /existingByUsername\?\.role === "admin" \? existingByUsername : null/);
+  assert.match(provision, /existingByUsername && existingByUsername\.id !== existing\.id/);
+  assert.match(provision, /ADMIN_INTERNAL_USERNAME/);
+  assert.doesNotMatch(provision, /UPDATE users[\s\S]*WHERE username = \?/);
 });
 
 
@@ -185,4 +185,18 @@ test("admin login exposes safe stage diagnostics without leaking secrets", async
   assert.match(login, /ADMIN_SESSION_FAILED/);
   assert.match(login, /ADMIN_SECRET_MISSING/);
   assert.doesNotMatch(login, /initialSecret.*message|suppliedSecret.*message/);
+});
+
+
+test("Admin login uses the reserved id and preserves any ordinary account named Admin", async () => {
+  const [provision, login] = await Promise.all([
+    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
+    readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(provision, /ADMIN_INTERNAL_USERNAME = "__wany_admin__"/);
+  assert.match(provision, /existingByUsername && existingByUsername\.id !== existing\.id/);
+  assert.match(provision, /const username = existingByUsername \? ADMIN_INTERNAL_USERNAME : ADMIN_USERNAME/);
+  assert.match(provision, /purgeSocialRowsBestEffort/);
+  assert.match(login, /FROM users WHERE id = \? AND role = 'admin' LIMIT 1/);
+  assert.match(login, /\.bind\("admin"\)/);
 });
