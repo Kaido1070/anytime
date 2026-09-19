@@ -2928,22 +2928,38 @@ async function saveUserProfileSections(db, userId, sections) {
   }
 
   const now = Date.now();
-  const statements = sections.map((section, index) =>
-    db
-      .prepare(
-        `UPDATE user_profile_sections
-         SET position = ?, is_visible = ?, updated_at = ?
-         WHERE user_id = ? AND section_type = ? AND reference_id = ?`,
-      )
-      .bind(
-        (index + 1) * 1024,
-        section.isVisible ? 1 : 0,
-        now,
-        userId,
-        section.sectionType,
-        section.referenceId,
-      ),
-  );
+  const statements = [];
+  for (const [index, section] of sections.entries()) {
+    const position = (index + 1) * 1024;
+    statements.push(
+      db
+        .prepare(
+          `UPDATE user_profile_sections
+           SET position = ?, is_visible = ?, updated_at = ?
+           WHERE user_id = ? AND section_type = ? AND reference_id = ?`,
+        )
+        .bind(
+          position,
+          section.isVisible ? 1 : 0,
+          now,
+          userId,
+          section.sectionType,
+          section.referenceId,
+        ),
+    );
+
+    // Keep the standalone Lists page in the same order as the profile preview.
+    if (section.sectionType === "custom_list" && section.referenceId) {
+      statements.push(
+        db
+          .prepare(
+            "UPDATE user_lists SET position = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+          )
+          .bind(position, now, section.referenceId, userId),
+      );
+    }
+  }
+
   await db.batch(statements);
   return { ok: true };
 }
