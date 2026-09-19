@@ -329,15 +329,9 @@ export function Discover() {
     const term = query.trim();
     if (!term) return;
 
-    // iOS Safari can restore focus after a synchronous submit. Blur again on
-    // the next frame so both the keyboard Search key and the accessory Done
-    // button leave editing mode.
     searchInputRef.current?.blur();
-    requestAnimationFrame(() => {
-      searchInputRef.current?.blur();
-      const active = document.activeElement;
-      if (active instanceof HTMLElement) active.blur();
-    });
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
     setLoading(true);
     setError("");
     try {
