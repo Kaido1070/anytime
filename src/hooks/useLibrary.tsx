@@ -171,6 +171,29 @@ function useLibraryState() {
     }
   }, []);
 
+  const markWorkUnread = useCallback(async (mangaId: string) => {
+    try {
+      setError("");
+      await service.markWorkUnread(mangaId);
+      setData((current) => {
+        if (!current) return current;
+        const progress = Object.fromEntries(
+          Object.entries(current.progress).filter(([key]) => !key.startsWith(`${mangaId}:`)),
+        );
+        return {
+          ...current,
+          library: current.library.filter((item) => item.mangaId !== mangaId),
+          completed: current.completed.filter((key) => !key.startsWith(`${mangaId}:`)),
+          progress,
+          lastOpened: current.lastOpened?.mangaId === mangaId ? undefined : current.lastOpened,
+        };
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذر إلغاء تتبع العمل.");
+      throw cause;
+    }
+  }, []);
+
   const saveProgress = async (progress: ReadingProgress) => {
     const key = `${progress.mangaId}:${progress.chapter}`;
     setData((current) => {
@@ -286,6 +309,7 @@ function useLibraryState() {
     removeFromLibrary,
     recordChapterOpen,
     markChapterUnread,
+    markWorkUnread,
     saveProgress,
     addFriend,
     sendFriendRequest,
