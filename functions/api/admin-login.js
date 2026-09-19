@@ -32,7 +32,11 @@ export async function onRequestPost(context) {
         );
       }
     } catch (error) {
-      return adminStageError("ADMIN_PROVISION_FAILED", error);
+      const code =
+        error && typeof error === "object" && typeof error.code === "string"
+          ? error.code
+          : "ADMIN_PROVISION_FAILED";
+      return adminStageError(code, error);
     }
 
     const body = await request.json().catch(() => ({}));
