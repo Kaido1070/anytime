@@ -5,7 +5,6 @@ import { useLibrary } from "../hooks/useLibrary";
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
 const PASSWORD_MAX_LENGTH = 128;
-const READER_PROGRESS_VISIBILITY_KEY = "wany:reader-progress-visible";
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 
 function normalizeDisplayName(value: string) {
@@ -45,10 +44,6 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
-
-  const [showReaderProgress, setShowReaderProgress] = useState(() =>
-    typeof window === "undefined" || window.localStorage.getItem(READER_PROGRESS_VISIBILITY_KEY) !== "false",
-  );
 
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
@@ -315,43 +310,6 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
               {privacyMessage}
             </p>
           )}
-        </section>
-
-        <section className="settings-card" aria-labelledby="settings-reader-title">
-          <div className="settings-card-header">
-            <div>
-              <p className="eyebrow">القارئ</p>
-              <h3 id="settings-reader-title">نسبة تقدم القراءة</h3>
-            </div>
-          </div>
-
-          <div className="settings-choice-group" role="group" aria-label="عرض نسبة تقدم القراءة">
-            <button
-              type="button"
-              className={showReaderProgress ? "active" : ""}
-              aria-pressed={showReaderProgress}
-              onClick={() => {
-                window.localStorage.setItem(READER_PROGRESS_VISIBILITY_KEY, "true");
-                setShowReaderProgress(true);
-              }}
-            >
-              إظهار
-            </button>
-            <button
-              type="button"
-              className={!showReaderProgress ? "active" : ""}
-              aria-pressed={!showReaderProgress}
-              onClick={() => {
-                window.localStorage.setItem(READER_PROGRESS_VISIBILITY_KEY, "false");
-                setShowReaderProgress(false);
-              }}
-            >
-              إخفاء
-            </button>
-          </div>
-          <p className="muted settings-privacy-description">
-            إظهار أو إخفاء نسبة تقدم القراءة الموجودة أعلى القارئ.
-          </p>
         </section>
 
         <section className="settings-card" aria-labelledby="settings-security-title">
