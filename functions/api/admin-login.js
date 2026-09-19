@@ -47,8 +47,8 @@ export async function onRequestPost(context) {
       user = await db
         .prepare(`SELECT id, username, name, profile_visibility, avatar_id, role,
           password_salt, password_hash, password_iterations
-          FROM users WHERE username = ? COLLATE NOCASE AND role = 'admin' LIMIT 1`)
-        .bind("Admin")
+          FROM users WHERE id = ? AND role = 'admin' LIMIT 1`)
+        .bind("admin")
         .first();
     } catch (error) {
       return adminStageError("ADMIN_LOOKUP_FAILED", error);
