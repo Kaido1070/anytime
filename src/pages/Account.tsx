@@ -12,7 +12,7 @@ import {
 import { Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
-import { userDataService } from "../services/userData";
+import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
 import type {
   ActivityEvent,
   ProfileLibraryItem,
@@ -385,6 +385,13 @@ export function Account() {
   useEffect(() => {
     if (!settingsOpen && !activityOpen && !readingOpen) void loadOverview();
   }, [loadOverview, settingsOpen, activityOpen, readingOpen]);
+
+  useEffect(() => {
+    if (settingsOpen || activityOpen || readingOpen) return;
+    const refreshProfile = () => void loadOverview();
+    window.addEventListener(PERSONALIZATION_CHANGE_EVENT, refreshProfile);
+    return () => window.removeEventListener(PERSONALIZATION_CHANGE_EVENT, refreshProfile);
+  }, [activityOpen, loadOverview, readingOpen, settingsOpen]);
 
   const sourceKeys = useMemo(() => {
     if (!profile) return [];
