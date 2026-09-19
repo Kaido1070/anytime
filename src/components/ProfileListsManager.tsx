@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { ListEditorDialog } from "./ListEditorDialog";
+import { Icon } from "./UI";
 import { userDataService } from "../services/userData";
 import type {
   UserListSummary,
@@ -13,9 +20,16 @@ type ListRow = {
   referenceId: string | null;
   name: string;
   description: string | null;
+  iconKey: string;
   itemCount: number;
   isVisible: boolean;
   system: boolean;
+};
+
+type DragState = {
+  key: string;
+  pointerId: number;
+  snapshot: ListRow[];
 };
 
 function isManagedListSection(section: UserProfileSection) {
@@ -25,6 +39,7 @@ function isManagedListSection(section: UserProfileSection) {
 function rowsFromData(
   sections: UserProfileSection[],
   lists: UserListSummary[],
+  favoritesCount: number,
 ): ListRow[] {
   const listMap = new Map(lists.map((list) => [list.id, list]));
   const ordered = [...sections]
@@ -40,7 +55,8 @@ function rowsFromData(
         referenceId: null,
         name: "المفضلة",
         description: "قائمة نظامية",
-        itemCount: 0,
+        iconKey: "favorites",
+        itemCount: favoritesCount,
         isVisible: section.isVisible,
         system: true,
       });
@@ -57,6 +73,7 @@ function rowsFromData(
       referenceId: list.id,
       name: list.name,
       description: list.description,
+      iconKey: list.iconKey || "lists",
       itemCount: list.itemCount,
       isVisible: section.isVisible,
       system: false,
@@ -89,16 +106,24 @@ function buildSectionPayload(
       };
     }
 
-    const replacement = listRows[listIndex];
-    listIndex += 1;
-    return (
-      replacement ?? {
-        sectionType: section.sectionType,
-        referenceId: section.referenceId,
-        isVisible: section.isVisible,
-      }
-    );
+    const replacement = listRows[listIndex++];
+    return replacement ?? {
+      sectionType: section.sectionType,
+      referenceId: section.referenceId,
+      isVisible: section.isVisible,
+    };
   });
+}
+
+function moveRow(rows: ListRow[], movingKey: string, targetKey: string, after: boolean) {
+  const moving = rows.find((row) => row.key === movingKey);
+  if (!moving || movingKey === targetKey) return rows;
+  const remaining = rows.filter((row) => row.key !== movingKey);
+  const targetIndex = remaining.findIndex((row) => row.key === targetKey);
+  if (targetIndex < 0) return rows;
+  const next = [...remaining];
+  next.splice(targetIndex + (after ? 1 : 0), 0, moving);
+  return next;
 }
 
 export function ProfileListsManager({
@@ -109,7 +134,9 @@ export function ProfileListsManager({
   const [sections, setSections] = useState<UserProfileSection[]>([]);
   const [lists, setLists] = useState<UserListSummary[]>([]);
   const [rows, setRows] = useState<ListRow[]>([]);
-  const [favoritesCount, setFavoritesCount] = useState(0);
+  const rowsRef = useRef<ListRow[]>([]);
+  const dragRef = useRef<DragState | null>(null);
+  const [draggingKey, setDraggingKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -117,6 +144,11 @@ export function ProfileListsManager({
   const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const updateRows = useCallback((next: ListRow[]) => {
+    rowsRef.current = next;
+    setRows(next);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,52 +161,91 @@ export function ProfileListsManager({
       ]);
       setSections(nextSections);
       setLists(nextLists);
-      setFavoritesCount(data.favorites.length);
-      const nextRows = rowsFromData(nextSections, nextLists).map((row) =>
-        row.system ? { ...row, itemCount: data.favorites.length } : row,
-      );
-      setRows(nextRows);
+      updateRows(rowsFromData(nextSections, nextLists, data.favorites.length));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تحميل القوائم.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [updateRows]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => () => {
+    dragRef.current = null;
+  }, []);
 
   const persistRows = async (nextRows: ListRow[]) => {
     const saved = await userDataService.saveProfileSections(
       buildSectionPayload(sections, nextRows),
     );
     setSections(saved);
-    setRows(
-      rowsFromData(saved, lists).map((row) =>
-        row.system ? { ...row, itemCount: favoritesCount } : row,
-      ),
-    );
+    const favoritesCount = nextRows.find((row) => row.system)?.itemCount ?? 0;
+    updateRows(rowsFromData(saved, lists, favoritesCount));
   };
 
-  const move = async (index: number, delta: number) => {
-    const target = index + delta;
-    if (busy || target < 0 || target >= rows.length) return;
+  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>, key: string) => {
+    if (busy || event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      key,
+      pointerId: event.pointerId,
+      snapshot: [...rowsRef.current],
+    };
+    setDraggingKey(key);
+    setMessage("");
+  };
 
-    const previous = rows;
-    const next = [...rows];
-    const [moving] = next.splice(index, 1);
-    next.splice(target, 0, moving);
-    setRows(next);
+  const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+
+    const target = document
+      .elementsFromPoint(event.clientX, event.clientY)
+      .map((element) => element.closest<HTMLElement>("[data-profile-list-key]"))
+      .find((element) => element?.dataset.profileListKey && element.dataset.profileListKey !== drag.key);
+
+    const targetKey = target?.dataset.profileListKey;
+    if (!target || !targetKey) return;
+
+    const rect = target.getBoundingClientRect();
+    const after = event.clientY > rect.top + rect.height / 2;
+    const next = moveRow(rowsRef.current, drag.key, targetKey, after);
+    if (next !== rowsRef.current) updateRows(next);
+
+    const edge = Math.min(88, window.innerHeight * 0.14);
+    if (event.clientY < edge) window.scrollBy({ top: -14, behavior: "auto" });
+    else if (event.clientY > window.innerHeight - edge) {
+      window.scrollBy({ top: 14, behavior: "auto" });
+    }
+  };
+
+  const endDrag = async (pointerId: number, cancelled = false) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== pointerId) return;
+    dragRef.current = null;
+    setDraggingKey("");
+
+    if (cancelled) {
+      updateRows(drag.snapshot);
+      return;
+    }
+
+    const before = drag.snapshot.map((row) => row.key).join("|");
+    const after = rowsRef.current.map((row) => row.key).join("|");
+    if (before === after) return;
+
     setBusy(true);
     setError("");
-    setMessage("");
-
     try {
-      await persistRows(next);
-      setMessage("تم تحديث ترتيب القوائم.");
+      await persistRows(rowsRef.current);
+      setMessage("تم حفظ ترتيب القوائم.");
     } catch (cause) {
-      setRows(previous);
+      updateRows(drag.snapshot);
       setError(cause instanceof Error ? cause.message : "تعذر حفظ ترتيب القوائم.");
     } finally {
       setBusy(false);
@@ -183,11 +254,11 @@ export function ProfileListsManager({
 
   const toggleVisibility = async (key: string) => {
     if (busy) return;
-    const previous = rows;
-    const next = rows.map((row) =>
+    const previous = rowsRef.current;
+    const next = previous.map((row) =>
       row.key === key ? { ...row, isVisible: !row.isVisible } : row,
     );
-    setRows(next);
+    updateRows(next);
     setBusy(true);
     setError("");
     setMessage("");
@@ -196,19 +267,19 @@ export function ProfileListsManager({
       await persistRows(next);
       setMessage("تم تحديث ظهور القائمة.");
     } catch (cause) {
-      setRows(previous);
+      updateRows(previous);
       setError(cause instanceof Error ? cause.message : "تعذر تحديث ظهور القائمة.");
     } finally {
       setBusy(false);
     }
   };
 
-  const createList = async (name: string, description: string) => {
+  const createList = async (name: string, description: string, iconKey: string) => {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
-      await userDataService.createList(name, description);
+      await userDataService.createList(name, description, iconKey);
       setShowCreate(false);
       await load();
       setMessage("تم إنشاء القائمة.");
@@ -219,12 +290,12 @@ export function ProfileListsManager({
     }
   };
 
-  const updateList = async (name: string, description: string) => {
+  const updateList = async (name: string, description: string, iconKey: string) => {
     if (!editingId || busy) return;
     setBusy(true);
     setError("");
     try {
-      await userDataService.updateList(editingId, name, description);
+      await userDataService.updateList(editingId, name, description, iconKey);
       setEditingId(null);
       await load();
       setMessage("تم تعديل القائمة.");
@@ -268,7 +339,7 @@ export function ProfileListsManager({
 
       <div className="profile-lists-manager-toolbar">
         <p className="muted">
-          رتّب القوائم من الأسهم، وعدّل الاسم أو احذف القائمة مباشرة.
+          امسك الثلاث خطوط واسحب القائمة لمكانها. الحفظ تلقائي عند الإفلات.
         </p>
         <button className="primary" type="button" onClick={() => setShowCreate(true)} disabled={busy}>
           + قائمة جديدة
@@ -281,32 +352,33 @@ export function ProfileListsManager({
         </div>
       ) : (
         <div className="profile-lists-manager-rows">
-          {rows.map((row, index) => (
-            <div className="profile-lists-manager-row" key={row.key}>
-              <div className="profile-lists-manager-main">
-                <div className="profile-lists-manager-name">
-                  <b dir="auto">{row.name}</b>
-                  <small>{row.itemCount} قصص</small>
-                </div>
+          {rows.map((row) => (
+            <div
+              className={"profile-lists-manager-row" + (draggingKey === row.key ? " dragging" : "")}
+              data-profile-list-key={row.key}
+              key={row.key}
+            >
+              <button
+                className="profile-list-drag-handle"
+                type="button"
+                aria-label={`اسحب لتغيير ترتيب ${row.name}`}
+                title="اسحب لتغيير الترتيب"
+                disabled={busy}
+                onPointerDown={(event) => onPointerDown(event, row.key)}
+                onPointerMove={onPointerMove}
+                onPointerUp={(event) => void endDrag(event.pointerId)}
+                onPointerCancel={(event) => void endDrag(event.pointerId, true)}
+              >
+                <span aria-hidden="true">☰</span>
+              </button>
 
-                <div className="profile-lists-manager-order" aria-label={`ترتيب ${row.name}`}>
-                  <button
-                    type="button"
-                    disabled={busy || index === 0}
-                    aria-label={`رفع ${row.name}`}
-                    onClick={() => void move(index, -1)}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy || index === rows.length - 1}
-                    aria-label={`خفض ${row.name}`}
-                    onClick={() => void move(index, 1)}
-                  >
-                    ↓
-                  </button>
-                </div>
+              <span className="profile-list-custom-icon" aria-hidden="true">
+                <Icon name={row.iconKey} />
+              </span>
+
+              <div className="profile-lists-manager-name">
+                <b dir="auto">{row.name}</b>
+                <small>{row.itemCount} قصص</small>
               </div>
 
               <div className="profile-lists-manager-actions">
@@ -376,6 +448,7 @@ export function ProfileListsManager({
         submitLabel="حفظ"
         initialName={editingList?.name ?? ""}
         initialDescription={editingList?.description ?? ""}
+        initialIconKey={editingList?.iconKey ?? "lists"}
         busy={busy}
         error={editingList ? error : ""}
         onClose={() => {
