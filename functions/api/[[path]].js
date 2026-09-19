@@ -1875,7 +1875,15 @@ async function applyUsernameMigrationV13(db) {
 }
 
 async function ensureCanonicalAccountNames(db) {
-  const now = Date.now();
+  // One-time repair only. Once the marker exists this costs a single indexed
+  // schema_meta read during a fresh Worker isolate and performs no writes.
+  const repairKey = "account_repair_yh_v1";
+  const repaired = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = ? LIMIT 1")
+    .bind(repairKey)
+    .first();
+  if (repaired?.value === "done") return;
+
   const targets = [
     {
       id: "yas",
@@ -1893,6 +1901,7 @@ async function ensureCanonicalAccountNames(db) {
     },
   ];
 
+  const now = Date.now();
   for (const target of targets) {
     const conflict = await db
       .prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id <> ? LIMIT 1")
@@ -1920,6 +1929,11 @@ async function ensureCanonicalAccountNames(db) {
       )
       .run();
   }
+
+  await db
+    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, 'done')")
+    .bind(repairKey)
+    .run();
 }
 
 async function applyHUsernameV16(db) {
