@@ -33,11 +33,11 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
     void loadLists();
   }, [loadLists]);
 
-  const createList = async (name: string, description: string) => {
+  const createList = async (name: string, description: string, iconKey: string) => {
     setCreating(true);
     setError("");
     try {
-      const created = await userDataService.createList(name, description);
+      const created = await userDataService.createList(name, description, iconKey);
       setLists((current) => [...current, created]);
       setShowCreate(false);
     } catch (cause) {
@@ -96,7 +96,7 @@ export function Lists({ embedded = false }: { embedded?: boolean }) {
             : lists.map((list) => (
                 <Link className="user-list-card" to={`/lists/${encodeURIComponent(list.id)}`} state={{ returnTo: currentPage }} key={list.id}>
                   <div className="list-card-top">
-                    <span className="list-card-icon"><Icon name="lists" /></span>
+                    <span className="list-card-icon"><Icon name={list.iconKey || "lists"} /></span>
                     <span className="list-count">{list.itemCount} قصص</span>
                   </div>
                   <div>
