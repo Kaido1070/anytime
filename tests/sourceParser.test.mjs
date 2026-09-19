@@ -40,6 +40,11 @@ test("source status normalization supports Arabic and English", () => {
 });
 
 
+test("3asq extracts Madara post id for AJAX chapter loading", () => {
+  const html = '<div id="manga-chapters-holder" data-id="12345"></div>';
+  assert.equal(__test.asqPostId(html), "12345");
+});
+
 test("3asq parser reads Madara chapter numbers and URLs", () => {
   const html = `
     <ul>
