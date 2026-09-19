@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { useLibrary } from "../hooks/useLibrary";
 import {
@@ -363,6 +363,8 @@ function FypSkeleton() {
 
 export function Fyp() {
   const { user, data } = useLibrary();
+  const location = useLocation();
+  const returnState = { returnTo: `${location.pathname}${location.search}${location.hash}` };
   const [snapshot, setSnapshot] = useState<FypSnapshot | null>(null);
   const [visibleCount, setVisibleCount] = useState(FYP_INITIAL_COUNT);
   const [loading, setLoading] = useState(true);
@@ -441,13 +443,13 @@ export function Fyp() {
               <article className="fyp-card" key={recommendation.item.key}>
                 <Link
                   className="fyp-cover"
-                  to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)}
+                  to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)} state={returnState}
                   aria-label={"فتح " + recommendation.item.title}
                 >
                   <SourceCoverImage item={recommendation.item} loading="lazy" alt="" />
                 </Link>
                 <div className="fyp-copy">
-                  <Link to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)}>
+                  <Link to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)} state={returnState}>
                     <h2 dir="auto">{recommendation.item.title}</h2>
                   </Link>
                   <div className="fyp-tags">
@@ -460,7 +462,7 @@ export function Fyp() {
                   <p className="fyp-reason">{recommendation.reason}</p>
                   <Link
                     className="secondary fyp-open"
-                    to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)}
+                    to={sourceDetailsPath(recommendation.item.key, recommendation.sourceKeys)} state={returnState}
                   >
                     فتح القصة
                   </Link>
