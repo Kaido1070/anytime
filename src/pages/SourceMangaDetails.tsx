@@ -29,7 +29,7 @@ export function SourceMangaDetails() {
   const sourceGroupParam = searchParams.get("sources");
   const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
   const requestedSourceSignature = requestedSourceKeys.join("|");
-  const { data, favorite, addToLibrary, setLibraryStatus, saveProgress, markChapterUnread } = useLibrary();
+  const { data, favorite, addToLibrary, setLibraryStatus, saveProgress, markChapterUnread, markWorkUnread } = useLibrary();
   const [item, setItem] = useState<SourceManga | null>(null);
   const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,12 +118,7 @@ export function SourceMangaDetails() {
           }
         }
       } else {
-        for (const entry of chapters) {
-          const key = `${sourceKey}:${entry.number}`;
-          if (data?.progress[key] || data?.completed.includes(key)) {
-            await markChapterUnread(sourceKey, entry.number);
-          }
-        }
+        await markWorkUnread(sourceKey);
       }
       setBulkConfirm(null);
     } finally {
