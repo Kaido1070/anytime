@@ -216,13 +216,13 @@ export function SourceMangaDetails() {
             {ascending ? "من الأقدم للأحدث" : "من الأحدث للأقدم"}
           </button>
           <div className="chapter-jump">
-            <input inputMode="decimal" value={chapterJump} onChange={(event) => { setChapterJump(event.target.value); setJumpError(""); }} onKeyDown={(event) => { if (event.key === "Enter") jumpToChapter(); }} placeholder="رقم الفصل" aria-label="رقم الفصل" />
-            <button className="primary" onClick={jumpToChapter}>اذهب</button>
+            <input inputMode="decimal" value={chapterJump} onChange={(event) => { setChapterJump(event.target.value); setJumpError(""); }} onKeyDown={(event) => { if (event.key === "Enter") jumpToChapter(); }} placeholder="اكتب رقم الفصل" aria-label="اكتب رقم الفصل" />
+            <button className="primary chapter-jump-submit" onClick={jumpToChapter} aria-label="بحث عن الفصل" title="بحث عن الفصل"><Icon name="search" /></button>
           </div>
           {jumpError && <small className="chapter-jump-error">{jumpError}</small>}
           <div className="chapter-read-tools">
-            <button className="secondary" onClick={() => setBulkConfirm("read")}>تمت قراءة الكل</button>
-            <button className="secondary" onClick={() => setBulkConfirm("unread")}>لم تتم قراءة الكل</button>
+            <button className="secondary chapter-bulk-read" onClick={() => setBulkConfirm("read")}><Icon name="check" /> تمت قراءة الكل</button>
+            <button className="secondary chapter-bulk-unread" onClick={() => setBulkConfirm("unread")}>لم تتم قراءة الكل</button>
           </div>
           {bulkConfirm && (
             <div className="chapter-bulk-confirm" role="alert">
