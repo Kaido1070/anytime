@@ -1,7 +1,7 @@
 // Production reader deploy marker: Team-X images use the chapter referer path.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Icon, Progress } from "../components/UI";
+import { Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath, sourceKeyFromReaderPath } from "../services/readerPaths";
@@ -13,13 +13,6 @@ const READER_PRELOAD_MARGIN = "1400px 0px";
 const PROGRESS_SAVE_DELAY_MS = 60 * 1000;
 const PROGRESS_MIN_DELTA = 3;
 const PROGRESS_NOOP_DELTA = 0.25;
-const READER_PROGRESS_VISIBILITY_KEY = "wany:reader-progress-visible";
-
-function readerProgressVisible() {
-  if (typeof window === "undefined") return true;
-  return window.localStorage.getItem(READER_PROGRESS_VISIBILITY_KEY) !== "false";
-}
-
 type NavigatorWithConnection = Navigator & {
   connection?: {
     effectiveType?: string;
@@ -106,7 +99,6 @@ function ReaderChapter({
   const chapter = payload.number;
   const saved = data?.progress[`${sourceKey}:${chapter}`]?.percent ?? 0;
   const [percent, setPercent] = useState(saved);
-  const [showProgress] = useState(readerProgressVisible);
   const saveRef = useRef(saveProgress);
 
   useEffect(() => {
@@ -328,7 +320,6 @@ function ReaderChapter({
             )}
           </div>
         </div>
-        {showProgress && <span>{Math.round(percent)}%</span>}
       </header>
 
       <div className="reader-panels source-pages">
