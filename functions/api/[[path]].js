@@ -917,6 +917,7 @@ async function route(request, url, db) {
       id: crypto.randomUUID(),
       name: input.name,
       description: input.description,
+      iconKey: input.iconKey,
       position: Number(last?.position ?? 0) + 1024,
       itemCount: 0,
       createdAt: now,
@@ -926,14 +927,15 @@ async function route(request, url, db) {
       db
         .prepare(
           `INSERT INTO user_lists
-            (id, user_id, name, description, position, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            (id, user_id, name, description, icon_key, position, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           list.id,
           user.id,
           list.name,
           list.description,
+          list.iconKey,
           list.position,
           list.createdAt,
           list.updatedAt,
@@ -1065,7 +1067,7 @@ async function route(request, url, db) {
       const listRow = await db
         .prepare(
           `SELECT
-             l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+             l.id, l.name, l.description, l.icon_key, l.position, l.created_at, l.updated_at,
              u.id AS owner_id, u.username AS owner_username, u.name AS owner_name,
              u.profile_visibility AS owner_profile_visibility
            FROM user_lists l
@@ -1129,16 +1131,16 @@ async function route(request, url, db) {
       const result = await db
         .prepare(
           `UPDATE user_lists
-           SET name = ?, description = ?, updated_at = ?
+           SET name = ?, description = ?, icon_key = ?, updated_at = ?
            WHERE id = ? AND user_id = ?`,
         )
-        .bind(input.name, input.description, now, listId, user.id)
+        .bind(input.name, input.description, input.iconKey, now, listId, user.id)
         .run();
       if (!result.meta?.changes) return json({ error: "LIST_NOT_FOUND" }, 404);
       const updated = await db
         .prepare(
           `SELECT
-             l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+             l.id, l.name, l.description, l.icon_key, l.position, l.created_at, l.updated_at,
              COUNT(i.manga_id) AS item_count
            FROM user_lists l
            LEFT JOIN user_list_items i ON i.list_id = l.id
@@ -1854,7 +1856,7 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version !== "16") {
+      if (version !== "17") {
         await ensureDatabase(db);
         await ensureAdminSchema(db);
 
@@ -1866,6 +1868,7 @@ async function ensureApiRuntime(db) {
         await applyUserIdentityV14(db);
         await applyYUsernameV15(db);
         await applyHUsernameV16(db);
+        await applyListIconsV17(db);
       }
 
       // Repair canonical account names independently from schema_version.
@@ -2022,6 +2025,23 @@ async function ensureCanonicalAccountNames(db) {
   await db
     .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, 'done')")
     .bind(repairKey)
+    .run();
+}
+
+async function applyListIconsV17(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "17") return;
+  if (version?.value !== "16") return;
+
+  const columns = await db.prepare("PRAGMA table_info(user_lists)").all();
+  const hasIconKey = (columns.results ?? []).some((column) => column.name === "icon_key");
+  if (!hasIconKey) {
+    await db.prepare("ALTER TABLE user_lists ADD COLUMN icon_key TEXT NOT NULL DEFAULT 'lists'").run();
+  }
+  await db
+    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '17')")
     .run();
 }
 
@@ -2968,7 +2988,7 @@ async function getUserLists(db, userId) {
   const result = await db
     .prepare(
       `SELECT
-         l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+         l.id, l.name, l.description, l.icon_key, l.position, l.created_at, l.updated_at,
          COUNT(i.manga_id) AS item_count
        FROM user_lists l
        LEFT JOIN user_list_items i ON i.list_id = l.id
@@ -2986,6 +3006,7 @@ function mapUserList(row) {
     id: row.id,
     name: row.name,
     description: row.description ?? null,
+    iconKey: typeof row.icon_key === "string" && row.icon_key ? row.icon_key : "lists",
     position: Number(row.position),
     itemCount: Number(row.item_count ?? 0),
     createdAt: Number(row.created_at),
@@ -2998,9 +3019,15 @@ function normalizeListInput(body) {
   const rawDescription =
     typeof body?.description === "string" ? body.description.trim() : "";
   if (!name || name.length > 80 || rawDescription.length > 500) return null;
+  const allowedIcons = new Set([
+    "lists", "book", "star", "heart", "flame", "sword", "crown",
+    "ghost", "moon", "bolt", "mask", "dragon", "spark",
+  ]);
+  const requestedIcon = typeof body?.iconKey === "string" ? body.iconKey : "lists";
   return {
     name,
     description: rawDescription || null,
+    iconKey: allowedIcons.has(requestedIcon) ? requestedIcon : "lists",
   };
 }
 
@@ -3225,7 +3252,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       .all(),
     db
       .prepare(`SELECT
-        l.id, l.name, l.description, l.position, l.created_at, l.updated_at,
+        l.id, l.name, l.description, l.icon_key, l.position, l.created_at, l.updated_at,
         COALESCE(s.position, 3072 + l.position) AS section_position,
         COUNT(i.manga_id) AS item_count
       FROM user_lists l
