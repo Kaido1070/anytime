@@ -32,7 +32,7 @@ export function SourceMangaDetails() {
   const sourceGroupParam = searchParams.get("sources");
   const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
   const requestedSourceSignature = requestedSourceKeys.join("|");
-  const { data, favorite, addToLibrary, setLibraryStatus, saveProgress, markChapterUnread, markWorkUnread } = useLibrary();
+  const { data, favorite, addToLibrary, setLibraryStatus, saveProgress, markChapterUnread, markWorkUnread, markChaptersRead } = useLibrary();
   const [item, setItem] = useState<SourceManga | null>(null);
   const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,17 +116,14 @@ export function SourceMangaDetails() {
     setBulkProgress({ done: 0, total: read ? chapters.length : 1 });
     try {
       if (read) {
-        // Re-save every chapter, including chapters already marked complete.
-        // This keeps reading_history/statistics in sync and backfills older bulk-read data.
-        for (let index = 0; index < chapters.length; index += 1) {
-          const entry = chapters[index];
-          await saveProgress({
-            mangaId: sourceKey,
-            chapter: entry.number,
-            percent: 100,
-            updatedAt: Date.now(),
-          });
-          setBulkProgress({ done: index + 1, total: chapters.length });
+        const chapterNumbers = chapters.map((entry) => entry.number);
+        const batchSize = 40;
+        let done = 0;
+        for (let index = 0; index < chapterNumbers.length; index += batchSize) {
+          const batch = chapterNumbers.slice(index, index + batchSize);
+          const processed = await markChaptersRead(sourceKey, batch);
+          done += processed;
+          setBulkProgress({ done, total: chapterNumbers.length });
         }
       } else {
         await markWorkUnread(sourceKey);
