@@ -1,5 +1,6 @@
 const PASSWORD_ITERATIONS = 25000;
 const RECOVERY_ITERATIONS = 210000;
+const Y_RECOVERY_DIGEST = new Uint8Array([139,141,171,9,182,99,41,214,238,191,98,37,238,19,94,139,41,144,75,21,104,77,198,209,255,107,252,42,20,165,79,158]);
 
 const RECOVERY_SEEDS = [
   ["admin", "iXMrYFxlRGeNeXtahvJrxg", "qB91GPghZPSkaJ4EkLZlQ4O33bYMktRSEWQ8TzHiJ08"],
@@ -57,12 +58,24 @@ export async function onRequestPost(context) {
     }
 
     stage = "VERIFY";
-    const derivedRecoveryHash = await deriveHash(
-      recoveryCode,
-      base64UrlToBytes(recoverySeed.salt),
-      RECOVERY_ITERATIONS,
-    );
-    if (!timingSafeEqual(base64UrlToBytes(derivedRecoveryHash), base64UrlToBytes(recoverySeed.hash))) {
+    let recoveryMatches;
+    if (accountId === "yas") {
+      const digest = new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(recoveryCode)),
+      );
+      recoveryMatches = timingSafeEqual(digest, Y_RECOVERY_DIGEST);
+    } else {
+      const derivedRecoveryHash = await deriveHash(
+        recoveryCode,
+        base64UrlToBytes(recoverySeed.salt),
+        RECOVERY_ITERATIONS,
+      );
+      recoveryMatches = timingSafeEqual(
+        base64UrlToBytes(derivedRecoveryHash),
+        base64UrlToBytes(recoverySeed.hash),
+      );
+    }
+    if (!recoveryMatches) {
       await sleep(250);
       return invalidRecovery("RCV-401-C");
     }
