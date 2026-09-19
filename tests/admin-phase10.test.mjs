@@ -162,3 +162,12 @@ test("admin schema repair is non-destructive for existing user accounts", async 
   assert.match(provision, /WHERE username = \? COLLATE NOCASE LIMIT 1/);
   assert.match(provision, /WHERE id = \?/);
 });
+
+
+test("admin provisioning never hijacks an ordinary existing account named Admin", async () => {
+  const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
+  assert.match(
+    provision,
+    /if \(existing\.id !== ADMIN_ID && existing\.role !== "admin"\)[\s\S]*Reserved Admin username belongs to an existing user account/,
+  );
+});
