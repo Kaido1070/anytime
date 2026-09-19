@@ -427,6 +427,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
         </header>
       ) : (
         <>
+          <Back to="/profile" />
           <p className="eyebrow">مجتمعك في Wany</p>
           <h1>الأصدقاء<span className="accent">.</span></h1>
           <p className="muted page-intro">أصدقاؤك وطلبات الصداقة والبحث في مكان واحد.</p>
