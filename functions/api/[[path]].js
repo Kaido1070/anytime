@@ -1277,6 +1277,28 @@ async function route(request, url, db) {
     return json({ ok: true, readAt: now });
   }
 
+  if (request.method === "POST" && path === "reading/unread-work") {
+    const body = await readJson(request);
+    const mangaId = safeId(body.mangaId);
+    if (!mangaId) return json({ error: "INVALID_READING_EVENT" }, 400);
+
+    const now = Date.now();
+    await db.batch([
+      db.prepare("DELETE FROM reading_history WHERE user_id = ? AND manga_id = ?").bind(user.id, mangaId),
+      db.prepare("DELETE FROM reading_progress WHERE user_id = ? AND manga_id = ?").bind(user.id, mangaId),
+      db.prepare("DELETE FROM user_library WHERE user_id = ? AND manga_id = ?").bind(user.id, mangaId),
+      db.prepare(`UPDATE user_state
+        SET last_manga_id = NULL, last_chapter = NULL, updated_at = ?
+        WHERE user_id = ? AND last_manga_id = ?`).bind(now, user.id, mangaId),
+    ]);
+    try {
+      await reconcileProgressActivity(db, user.id, mangaId, null);
+    } catch (error) {
+      console.error("Unread work activity reconciliation failed", { userId: user.id, mangaId, error });
+    }
+    return json({ ok: true });
+  }
+
   if (request.method === "POST" && path === "reading/unread") {
     const body = await readJson(request);
     const mangaId = safeId(body.mangaId);
