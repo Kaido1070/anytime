@@ -1436,6 +1436,16 @@ async function route(request, url, db) {
 
     await db.batch([
       db
+        .prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
+          SELECT ?, ?, ?, ?
+          WHERE ? = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM reading_history
+              WHERE user_id = ? AND manga_id = ?
+                AND ABS(chapter - ?) < 0.000001
+            )`)
+        .bind(user.id, mangaId, chapter, updatedAt, completed, user.id, mangaId, chapter),
+      db
         .prepare(`INSERT INTO reading_progress
           (user_id, manga_id, chapter, percent, completed, updated_at)
           VALUES (?, ?, ?, ?, ?, ?)
