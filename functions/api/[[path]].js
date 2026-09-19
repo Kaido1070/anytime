@@ -14,15 +14,15 @@ const READING_OPEN_DEDUP_MS = 5 * 60 * 1000;
 
 const SEEDED_USERS = [
   {
-    id: "has",
-    username: "has",
+    id: "h",
+    username: "h",
     name: "Has",
     salt: "nckWsLoOqPQ2ko0y6KFcdQ",
     hash: "Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE",
   },
   {
-    id: "yas",
-    username: "yas",
+    id: "y",
+    username: "y",
     name: "Yas",
     salt: "w-fi6L0FIdkx0NNSYyhvdg",
     hash: "g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y",
@@ -37,8 +37,8 @@ const SEEDED_USERS = [
 ];
 
 const SEEDED_FAVORITES = {
-  has: ["returner", "solo"],
-  yas: ["eleceed", "horizon"],
+  h: ["returner", "solo"],
+  y: ["eleceed", "horizon"],
   m: ["solo", "returner"],
 };
 
@@ -522,10 +522,10 @@ const AVATAR_LIBRARY_SEED = [
 ];
 
 const SEEDED_PROGRESS = [
-  ["has", "returner", 141, 100, 1],
-  ["has", "returner", 142, 100, 1],
-  ["has", "returner", 143, 62, 0],
-  ["yas", "eleceed", 315, 45, 0],
+  ["h", "returner", 141, 100, 1],
+  ["h", "returner", 142, 100, 1],
+  ["h", "returner", 143, 62, 0],
+  ["y", "eleceed", 315, 45, 0],
   ["m", "solo", 197, 55, 0],
 ];
 
@@ -795,11 +795,7 @@ async function route(request, url, db) {
       .prepare("UPDATE users SET avatar_id = ?, updated_at = ? WHERE id = ?")
       .bind(avatar.id, now, user.id)
       .run();
-    const updated = await db
-      .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
-      .bind(user.id)
-      .first();
-    return json({ user: publicUser(updated) });
+    return json({ user: publicUser({ ...user, avatar_id: avatar.id }) });
   }
 
   if (request.method === "PUT" && path === "profile/name") {
@@ -816,11 +812,7 @@ async function route(request, url, db) {
       .prepare("UPDATE users SET name = ?, updated_at = ? WHERE id = ?")
       .bind(name, now, user.id)
       .run();
-    const updated = await db
-      .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
-      .bind(user.id)
-      .first();
-    return json({ user: publicUser(updated) });
+    return json({ user: publicUser({ ...user, name }) });
   }
 
   if (request.method === "PUT" && path === "profile/visibility") {
@@ -837,11 +829,7 @@ async function route(request, url, db) {
       .prepare("UPDATE users SET profile_visibility = ?, updated_at = ? WHERE id = ?")
       .bind(visibility, now, user.id)
       .run();
-    const updated = await db
-      .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? LIMIT 1")
-      .bind(user.id)
-      .first();
-    return json({ user: publicUser(updated) });
+    return json({ user: publicUser({ ...user, profile_visibility: visibility }) });
   }
 
   const profileMatch = path.match(/^profiles\/([^/]+)$/);
@@ -2266,8 +2254,8 @@ async function ensureDatabase(db) {
   }
 
   for (const [userId, mangaId, chapter] of [
-    ["has", "returner", 143],
-    ["yas", "eleceed", 315],
+    ["h", "returner", 143],
+    ["y", "eleceed", 315],
     ["m", "solo", 197],
   ]) {
     statements.push(
