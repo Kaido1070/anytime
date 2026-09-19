@@ -274,7 +274,12 @@
   direction: rtl;
 }
 .chapter-jump input::placeholder { color: #777b7e; }
-.chapter-jump .primary { min-width: 64px; min-height: 42px; }
+.chapter-jump .primary { min-width: 52px; min-height: 42px; }
+.chapter-jump-submit { display: inline-flex; align-items: center; justify-content: center; padding-inline: 13px; }
+.chapter-jump-submit svg { width: 20px; height: 20px; }
+.chapter-read-tools { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 0; }
+.chapter-read-tools button { min-width: 0; min-height: 44px; justify-content: center; white-space: nowrap; }
+.chapter-read-tools button svg { width: 18px; height: 18px; }
 .chapter-jump-error { width: 100%; color: #ff8b80; margin-top: -4px; }
 
 @media (min-width: 641px) {
@@ -301,7 +306,7 @@
   .filter-sheet-actions { bottom: calc(-1 * max(18px, env(safe-area-inset-bottom))); }
   .source-callout { align-items: stretch; flex-direction: column; }
   .source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bottom-nav { width: min(94vw, 430px); padding-inline: 6px; }
+  .bottom-nav { width: 100%; padding-inline: 6px; }
   .bottom-nav a { font-size: 8px; }
   .chapter-tools { align-items: stretch; }
   .chapter-sort { width: 100%; justify-content: center; }
