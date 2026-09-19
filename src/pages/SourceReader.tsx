@@ -98,7 +98,7 @@ function ReaderChapter({
   sourceKey: string;
   payload: SourceChapterPayload;
 }) {
-  const { data, saveProgress, recordChapterOpen, markChapterUnread } = useLibrary();
+  const { data, saveProgress, recordChapterOpen } = useLibrary();
   const navigate = useNavigate();
   const chapter = payload.number;
   const saved = data?.progress[`${sourceKey}:${chapter}`]?.percent ?? 0;
@@ -117,7 +117,6 @@ function ReaderChapter({
   );
   const prefetchedNextRef = useRef<number | null>(null);
   const markedUnreadRef = useRef(false);
-  const [markingUnread, setMarkingUnread] = useState(false);
   saveRef.current = saveProgress;
 
   useEffect(() => {
@@ -265,20 +264,6 @@ function ReaderChapter({
     });
   }, [percent, payload.next, sourceKey]);
 
-  const handleMarkUnread = async () => {
-    if (markingUnread) return;
-    markedUnreadRef.current = true;
-    setMarkingUnread(true);
-    try {
-      await markChapterUnread(sourceKey, chapter);
-      setPercent(0);
-    } catch {
-      markedUnreadRef.current = false;
-    } finally {
-      setMarkingUnread(false);
-    }
-  };
-
   return (
     <main className="reader source-reader">
       <header className="reader-header">
@@ -332,14 +317,6 @@ function ReaderChapter({
             )}
           </div>
         </div>
-        <button
-          className="reader-unread"
-          type="button"
-          disabled={markingUnread}
-          onClick={() => void handleMarkUnread()}
-        >
-          {markingUnread ? "جاري…" : "غير مقروء"}
-        </button>
         {showProgress && <span>{Math.round(percent)}%</span>}
       </header>
 
