@@ -2103,3 +2103,107 @@ button.profile-icon-action {
   font-size:10px;
   font-weight:600;
 }
+
+.reading-trophy-category.compact{
+  gap:10px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#1f2123;
+}
+.reading-trophy-category-heading{
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:12px;
+}
+.reading-trophy-category-heading h4{
+  color:#e7e4de;
+  font-size:11px;
+}
+.reading-trophy-category-heading span{
+  color:var(--muted);
+  font-size:8px;
+  text-align:left;
+}
+.reading-trophy-ladder{
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  overflow-x:auto;
+  padding:6px 2px 10px;
+  scrollbar-width:none;
+}
+.reading-trophy-ladder::-webkit-scrollbar{display:none}
+.reading-trophy-node{
+  flex:0 0 auto;
+  min-width:72px;
+  display:grid;
+  justify-items:center;
+  gap:5px;
+  text-align:center;
+}
+.reading-trophy-node-icon{
+  display:grid;
+  place-items:center;
+  border:1px solid #3b3e41;
+  border-radius:50%;
+  background:#26282a;
+  color:#65696d;
+  transition:transform .2s ease,border-color .2s ease,background .2s ease;
+}
+.reading-trophy-node.earned .reading-trophy-node-icon{
+  border-color:#7b674f;
+  background:#30281f;
+  color:var(--accent);
+  box-shadow:0 0 16px #dbb99117;
+}
+.reading-trophy-node.next .reading-trophy-node-icon{
+  border-color:#8a755a;
+  transform:translateY(-2px);
+}
+.reading-trophy-node-icon span{
+  font-size:13px;
+  line-height:1;
+}
+.reading-trophy-node b{
+  max-width:82px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:8px;
+  color:#d8d6d1;
+}
+.reading-trophy-node.locked b{
+  color:#777b7f;
+}
+.reading-trophy-node small{
+  color:var(--muted);
+  font-size:7px;
+}
+.reading-trophy-progress-meta{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  color:var(--muted);
+  font-size:8px;
+}
+.reading-trophy-progress-track{
+  height:6px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#35383a;
+}
+.reading-trophy-progress-track span{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:var(--accent);
+}
+@media(max-width:759px){
+  .reading-trophy-category.compact{padding:12px}
+  .reading-trophy-category-heading{align-items:start}
+  .reading-trophy-category-heading span{max-width:170px}
+  .reading-trophy-ladder{gap:8px}
+  .reading-trophy-node{min-width:64px}
+}
