@@ -52,7 +52,7 @@ export async function onRequest(context) {
       const source = sourceFromQuery(url);
       const page = safePage(url.searchParams.get("page"));
       const payload = source === "mangatime"
-        ? await mangaTimeList(db, { page, sortBy: "recent" })
+        ? await mangaTimeLatest(context, db, page)
         : source === "teamx"
           ? await teamXLatest(context, db, page)
           : source === "3asq"
@@ -500,7 +500,197 @@ function parseJsonArray(value) {
   }
 }
 
+async function recentVerifiedReleasesFromDb(db, source, cutoffIso) {
+  const result = await db
+    .prepare(`SELECT
+        i.source_key,
+        i.source,
+        i.source_id,
+        i.slug,
+        i.type,
+        i.url,
+        i.title,
+        i.cover_url,
+        i.description,
+        i.status,
+        i.genres_json,
+        c.chapter_number,
+        c.published_at
+      FROM source_chapter_seen c
+      JOIN source_items i ON i.source_key = c.source_key
+      WHERE i.source = ?
+        AND c.published_at IS NOT NULL
+        AND c.published_at > ?
+      ORDER BY c.published_at DESC
+      LIMIT 180`)
+    .bind(source, cutoffIso)
+    .all();
+
+  const byKey = new Map();
+  for (const row of result.results ?? []) {
+    const number = Number(row.chapter_number);
+    const publishedAt = String(row.published_at ?? "");
+    if (!Number.isFinite(number) || !Number.isFinite(Date.parse(publishedAt))) continue;
+
+    let item = byKey.get(row.source_key);
+    if (!item) {
+      item = {
+        key: row.source_key,
+        source: row.source,
+        sourceId: row.source_id,
+        slug: row.slug,
+        type: row.type,
+        url: row.url,
+        title: row.title,
+        cover: row.cover_url,
+        description: row.description ?? "",
+        status: row.status ?? "",
+        genres: parseJsonArray(row.genres_json),
+        latest: number,
+        chapters: [],
+      };
+      byKey.set(row.source_key, item);
+    }
+
+    item.latest = Math.max(Number(item.latest || 0), number);
+    item.chapters.push({
+      number,
+      title: `الفصل ${number}`,
+      publishedAt,
+    });
+  }
+
+  return [...byKey.values()];
+}
+
+async function rememberRecentVerifiedChapters(db, item, now = Date.now()) {
+  if (!item?.key || !Array.isArray(item.chapters)) return;
+
+  // Background source refreshes only need a small rolling release cache.
+  // Keep at most 8 verified chapters per work from the last 48 hours. Full
+  // chapter history is still recorded only when the user opens the series.
+  const retentionCutoff = now - 48 * 60 * 60_000;
+  const chapters = item.chapters
+    .filter((chapter) => {
+      if (chapter?.synthetic || !chapter?.publishedAt) return false;
+      const timestamp = Date.parse(String(chapter.publishedAt));
+      return Number.isFinite(timestamp) && timestamp > retentionCutoff;
+    })
+    .sort((a, b) => Date.parse(String(b.publishedAt)) - Date.parse(String(a.publishedAt)))
+    .slice(0, 8);
+
+  if (!chapters.length) return;
+
+  const writes = chapters.map((chapter) => {
+    const identity = sourceChapterIdentity(chapter);
+    const number = Number(chapter.number);
+    return db.prepare(`INSERT INTO source_chapter_seen
+      (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
+      VALUES (?, ?, ?, ?, ?, 0)
+      ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
+        chapter_number = excluded.chapter_number,
+        published_at = COALESCE(excluded.published_at, source_chapter_seen.published_at)`)
+      .bind(
+        item.key,
+        identity,
+        Number.isFinite(number) ? number : null,
+        String(chapter.publishedAt),
+        now,
+      );
+  });
+
+  await db.batch(writes);
+}
+
 // MangaTime -----------------------------------------------------------------
+
+async function mangaTimeLatest(context, db, page) {
+  if (page > 1) return { items: [], hasMore: false, page };
+
+  const now = Date.now();
+  const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
+  const cached = await recentVerifiedReleasesFromDb(db, "mangatime", cutoffIso);
+
+  const state = await db
+    .prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'mangatime' LIMIT 1")
+    .first();
+  const lastStartedAt = Number(state?.last_started_at ?? 0);
+
+  if (now - lastStartedAt >= 5 * 60_000) {
+    await db
+      .prepare(`INSERT INTO source_sync_state (source, last_started_at)
+        VALUES ('mangatime', ?)
+        ON CONFLICT(source) DO UPDATE SET last_started_at = excluded.last_started_at`)
+      .bind(now)
+      .run();
+
+    context.waitUntil(
+      syncMangaTimeLatest(db).catch((error) => {
+        console.error("MangaTime background sync failed", error);
+      }),
+    );
+  }
+
+  return { items: cached, hasMore: false, page };
+}
+
+async function syncMangaTimeLatest(db) {
+  const result = await mangaTimeTrpc(
+    "search.searchSeries",
+    mangaTimeSearchInput({ page: 1, sortBy: "recent", query: null }),
+  );
+
+  const items = await Promise.all(
+    (result?.results ?? []).slice(0, 24).map(async (row) => ({
+      key: await makeSourceKey("mt", String(row.id)),
+      source: "mangatime",
+      sourceId: String(row.id),
+      slug: String(row.slug ?? ""),
+      type: String(row.type ?? "manga"),
+      url: `${MANGATIME_BASE}/${encodeURIComponent(String(row.type ?? "manga"))}/${encodeURIComponent(String(row.slug ?? ""))}`,
+      title: String(row.title ?? row.slug ?? "بدون عنوان"),
+      cover: absoluteUrl(MANGATIME_BASE, row.coverUrl),
+      description: "",
+      status: "",
+      genres: mangaTimeTypeGenres(row.type),
+    })),
+  );
+
+  await rememberItems(db, items);
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(4, items.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) break;
+      const item = items[index];
+
+      try {
+        const chapterPayload = await mangaTimeTrpc("content.getChapters", {
+          seriesId: item.sourceId,
+          limit: 12,
+        });
+        const chapters = mangaTimeChaptersFromPayload(chapterPayload);
+        await rememberRecentVerifiedChapters(db, { ...item, chapters });
+      } catch (error) {
+        console.warn("MangaTime recent sync skipped", item.key, error);
+      }
+    }
+  });
+
+  await Promise.all(workers);
+}
+
+function mangaTimeChaptersFromPayload(chapterPayload) {
+  return (chapterPayload?.chapters ?? [])
+    .map((chapter) => ({
+      number: Number(chapter.number),
+      title: String(chapter.title ?? `الفصل ${chapter.number}`),
+      publishedAt: chapter.publishedAt ?? null,
+    }))
+    .filter((chapter) => Number.isFinite(chapter.number))
+    .sort((a, b) => b.number - a.number);
+}
 
 async function mangaTimeList(db, { page, sortBy, query = null }) {
   const result = await mangaTimeTrpc(
@@ -543,14 +733,7 @@ async function mangaTimeSeries(db, item) {
     mangaTimeTrpc("content.getChapters", { seriesId: item.sourceId, limit: -1 }),
   ]);
 
-  const chapters = (chapterPayload?.chapters ?? [])
-    .map((chapter) => ({
-      number: Number(chapter.number),
-      title: String(chapter.title ?? `الفصل ${chapter.number}`),
-      publishedAt: chapter.publishedAt ?? null,
-    }))
-    .filter((chapter) => Number.isFinite(chapter.number))
-    .sort((a, b) => b.number - a.number);
+  const chapters = mangaTimeChaptersFromPayload(chapterPayload);
 
   const updated = {
     ...item,
@@ -725,12 +908,14 @@ async function teamXPopular(db, page) {
 }
 
 async function teamXLatest(context, db, page) {
+  if (page > 1) return { items: [], hasMore: false, page };
+
   const now = Date.now();
   const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
 
   // Serve only verified timestamps already cached in D1. This keeps the user
   // request fast and independent from Team-X series-page latency.
-  const cached = await teamXRecentFromDb(db, cutoffIso);
+  const cached = await recentVerifiedReleasesFromDb(db, "teamx", cutoffIso);
 
   // Refresh Team-X in the background at most once every five minutes. The
   // current request never waits for the N series-page checks.
@@ -758,78 +943,6 @@ async function teamXLatest(context, db, page) {
   return { items: cached, hasMore: false, page };
 }
 
-async function teamXRecentFromDb(db, cutoffIso) {
-  const result = await db
-    .prepare(`SELECT
-        i.source_key,
-        i.source,
-        i.source_id,
-        i.slug,
-        i.type,
-        i.url,
-        i.title,
-        i.cover_url,
-        i.description,
-        i.status,
-        i.genres_json,
-        c.chapter_number,
-        c.published_at
-      FROM source_chapter_seen c
-      JOIN source_items i ON i.source_key = c.source_key
-      WHERE i.source = 'teamx'
-        AND c.published_at IS NOT NULL
-        AND c.published_at > ?
-      ORDER BY c.published_at DESC
-      LIMIT 180`)
-    .bind(cutoffIso)
-    .all();
-
-  const byKey = new Map();
-  for (const row of result.results ?? []) {
-    const number = Number(row.chapter_number);
-    const publishedAt = String(row.published_at ?? "");
-    if (!Number.isFinite(number) || !Number.isFinite(Date.parse(publishedAt))) continue;
-
-    let item = byKey.get(row.source_key);
-    if (!item) {
-      item = {
-        key: row.source_key,
-        source: row.source,
-        sourceId: row.source_id,
-        slug: row.slug,
-        type: row.type,
-        url: row.url,
-        title: row.title,
-        cover: row.cover_url,
-        description: row.description ?? "",
-        status: row.status ?? "",
-        genres: parseJsonArray(row.genres_json),
-        latest: number,
-        chapters: [],
-      };
-      byKey.set(row.source_key, item);
-    }
-
-    item.latest = Math.max(Number(item.latest || 0), number);
-    item.chapters.push({
-      number,
-      title: `الفصل ${number}`,
-      publishedAt,
-      url: `${String(item.url).replace(/\/$/, "")}/${number}`,
-    });
-  }
-
-  return [...byKey.values()];
-}
-
-function teamXLatestSection(html) {
-  const source = String(html ?? "");
-  const latestMarker = source.search(/(?:اخر|آخر)\s+الفصول/i);
-  if (latestMarker >= 0) return source.slice(latestMarker);
-
-  const postBodyMarker = source.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
-  return postBodyMarker >= 0 ? source.slice(postBodyMarker) : source;
-}
 
 async function syncTeamXLatest(db) {
   const html = await teamXFetchText("/");
@@ -860,7 +973,7 @@ async function syncTeamXLatest(db) {
           chapters,
         };
         await rememberItems(db, [detail]);
-        await rememberChapterAvailability(db, detail);
+        await rememberRecentVerifiedChapters(db, detail);
       } catch (error) {
         console.warn("Team-X series sync skipped", item.key, error);
       }
@@ -3163,6 +3276,7 @@ export const __test = {
   xsanoTypeFromCategories,
   asqChapterNumber,
   normalizeAsqType,
+  mangaTimeChaptersFromPayload,
   mangaTimeTypeGenres,
   mangaTimeSeriesGenres,
   mangaTimeSearchInput,
