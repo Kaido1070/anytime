@@ -17,6 +17,46 @@ test("Team-X parser finds real chapter links and synthesizes gaps", () => {
   assert.ok(chapters.some((chapter) => chapter.number === 356));
 });
 
+test("Team-X parser attaches each relative timestamp to the correct chapter", () => {
+  const now = Date.UTC(2026, 8, 20, 18, 0, 0);
+  const html = `
+    <div>
+      <a href="/series/TES/129">الفصل 129 العزلة</a>
+      <span>18 hours ago</span>
+    </div>
+    <div>
+      <a href="/series/TES/128">الفصل 128 السادة الغامضون</a>
+      <span>1 week ago</span>
+    </div>
+  `;
+  const chapters = __test.parseTeamXChapters(
+    html,
+    "https://olympustaff.com/series/TES",
+    now,
+  );
+  assert.equal(chapters[0].number, 129);
+  assert.equal(
+    chapters[0].publishedAt,
+    new Date(now - 18 * 60 * 60 * 1000).toISOString(),
+  );
+  assert.equal(chapters[1].number, 128);
+  assert.equal(chapters[1].publishedAt, null);
+});
+
+test("Team-X strict date parser accepts minutes and hours only", () => {
+  const now = Date.UTC(2026, 8, 20, 18, 0, 0);
+  assert.equal(
+    __test.parseTeamXPublishedAt("<span>7 hours ago</span>", now),
+    new Date(now - 7 * 60 * 60 * 1000).toISOString(),
+  );
+  assert.equal(
+    __test.parseTeamXPublishedAt("<span>14 minutes ago</span>", now),
+    new Date(now - 14 * 60 * 1000).toISOString(),
+  );
+  assert.equal(__test.parseTeamXPublishedAt("<span>1 day ago</span>", now), null);
+  assert.equal(__test.parseTeamXPublishedAt("<span>1 week ago</span>", now), null);
+});
+
 test("Team-X page parser prefers the image_list area", () => {
   const html = `
     <img src="/logo.png">
