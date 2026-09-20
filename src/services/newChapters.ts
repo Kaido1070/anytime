@@ -16,6 +16,7 @@ const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq"];
 
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
+const VERIFIED_SOURCE_SCAN_PAGES = 5;
 
 export interface FeedChapter {
   identity: string;
@@ -212,17 +213,29 @@ function collectReadChecks(groups: SourceGroup[]) {
 
 export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   const safePage = Math.max(1, Math.min(20, Math.trunc(page)));
+  // Scan several title-list pages from each verified source before applying
+  // the strict chapter-level 24-hour cutoff. Madara's latest listing is
+  // title-oriented, so releases from the same day can spill beyond page 1.
+  const scanStart = (safePage - 1) * VERIFIED_SOURCE_SCAN_PAGES + 1;
+  const scanPages = Array.from(
+    { length: VERIFIED_SOURCE_SCAN_PAGES },
+    (_, index) => scanStart + index,
+  );
   const [state, latestSettled] = await Promise.all([
     userDataService.getPersonalizationState(),
-    Promise.allSettled(VERIFIED_NEW_FEED_SOURCES.map((source) => sourceService.latest(source, safePage))),
+    Promise.allSettled(
+      VERIFIED_NEW_FEED_SOURCES.flatMap((source) =>
+        scanPages.map((sourcePage) => sourceService.latest(source, sourcePage)),
+      ),
+    ),
   ]);
 
-  // "New" must discover the whole verified source window, not just page 1.
-  // Madara's latest page is title-oriented, so several releases in the last
-  // 24 hours can spill onto later pages.
-  const latestItems = latestSettled.flatMap((result) =>
-    result.status === "fulfilled" ? result.value.items : [],
-  );
+  const latestItemsByKey = new Map<string, SourceManga>();
+  for (const result of latestSettled) {
+    if (result.status !== "fulfilled") continue;
+    for (const item of result.value.items) latestItemsByKey.set(item.key, item);
+  }
+  const latestItems = [...latestItemsByKey.values()];
   const hasMore = latestSettled.some(
     (result) => result.status === "fulfilled" && result.value.hasMore,
   );
