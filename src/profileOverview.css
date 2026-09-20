@@ -3573,3 +3573,65 @@ button.profile-icon-action {
     width:min(100%,240px);
   }
 }
+
+
+/* Rank image assets — flat 2D Wany badges */
+.reading-rank-badge{
+  width:clamp(40px,4.2vw,52px);
+  height:clamp(40px,4.2vw,52px);
+  display:grid;
+  place-items:center;
+  color:inherit;
+  filter:none;
+}
+.reading-rank-badge::before,
+.reading-rank-badge::after{
+  content:none !important;
+  display:none !important;
+}
+.reading-rank-image{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.reading-rank-badge.earned{
+  opacity:1;
+  filter:none;
+}
+.reading-rank-badge.locked{
+  opacity:.32;
+  filter:grayscale(.72);
+}
+.reading-rank-badge.next{
+  opacity:.9;
+  transform:translateY(-2px) scale(1.05);
+  filter:none;
+}
+.profile-header-achievement-badge.reading-rank-badge{
+  width:42px;
+  height:42px;
+}
+@media (max-width:640px){
+  .reading-rank-badge{
+    width:40px;
+    height:40px;
+  }
+  .profile-header-achievement-badge.reading-rank-badge{
+    width:38px;
+    height:38px;
+  }
+}
+@media (min-width:1100px){
+  .reading-rank-badge{
+    width:50px;
+    height:50px;
+  }
+  .profile-header-achievement-badge.reading-rank-badge{
+    width:44px;
+    height:44px;
+  }
+}
