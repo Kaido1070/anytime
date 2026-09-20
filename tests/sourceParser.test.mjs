@@ -471,6 +471,31 @@ test("MangaLik parses Madara chapter numbers and URLs", () => {
   assert.ok(chapters[0].url.includes("/manga/omniscient-readers-viewpoint/311/"));
 });
 
+test("MangaLik latest parser reads newest chapter cards without series hydration", () => {
+  const html = `
+    <div class="page-item-detail">
+      <a href="https://mangalik.net/manga/the-bully-in-charge/" title="The Bully In Charge">
+        <img src="https://cdn.example.com/bully.webp" alt="The Bully In Charge">
+      </a>
+      <li class="wp-manga-chapter">
+        <a href="https://mangalik.net/manga/the-bully-in-charge/200/">200</a>
+        <span class="chapter-release-date">سبتمبر 20, 2026</span>
+      </li>
+      <li class="wp-manga-chapter">
+        <a href="https://mangalik.net/manga/the-bully-in-charge/199/">199</a>
+        <span class="chapter-release-date">سبتمبر 15, 2026</span>
+      </li>
+    </div>
+  `;
+  const items = __test.mangalikLatestItemsFromHtml(html);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].title, "The Bully In Charge");
+  assert.equal(items[0].cover, "https://cdn.example.com/bully.webp");
+  assert.deepEqual(items[0].chapters.map((chapter) => chapter.number), [200, 199]);
+  assert.equal(items[0].chapters[0].publishedAt, "2026-09-20T00:00:00.000Z");
+  assert.equal(items[0].chapters[1].publishedAt, "2026-09-15T00:00:00.000Z");
+});
+
 test("MangaLik reader parser keeps chapter images from its CDN", () => {
   const html = `
     <div class="reading-content">
