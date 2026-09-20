@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ActivityFeed } from "./ActivityFeed";
 import { Icon } from "./UI";
@@ -36,6 +36,9 @@ export function ProfileIdentityHeader({
   friendsTo = "/friends",
   pendingFriendRequests = 0,
   achievements = [],
+  editableIdentity = false,
+  onSaveDisplayName,
+  onEditAvatar,
 }: {
   user: User | null;
   actions?: ReactNode;
@@ -44,15 +47,104 @@ export function ProfileIdentityHeader({
   friendsTo?: string;
   pendingFriendRequests?: number;
   achievements?: ProfileAchievementSummaryItem[];
+  editableIdentity?: boolean;
+  onSaveDisplayName?: (name: string) => Promise<void>;
+  onEditAvatar?: () => void;
 }) {
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(user?.name ?? "");
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameError, setNameError] = useState("");
+
+  useEffect(() => {
+    setNameDraft(user?.name ?? "");
+  }, [user?.name]);
+
+  async function submitHeaderName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!onSaveDisplayName || nameBusy) return;
+    const normalized = nameDraft.trim();
+    if (!normalized || normalized.length > 50) {
+      setNameError("اسم العرض مطلوب ويجب ألا يتجاوز 50 حرفًا.");
+      return;
+    }
+    setNameBusy(true);
+    setNameError("");
+    try {
+      await onSaveDisplayName(normalized);
+      setEditingName(false);
+    } catch (cause) {
+      setNameError(cause instanceof Error ? cause.message : "تعذر حفظ اسم العرض.");
+    } finally {
+      setNameBusy(false);
+    }
+  }
   return (
     <header className="profile-overview-header">
       <div className="profile-overview-identity">
-        <UserAvatar user={user} className="profile-overview-avatar" loading="eager" />
+        <div className={editableIdentity ? "profile-overview-avatar-editable" : ""}>
+          <UserAvatar user={user} className="profile-overview-avatar" loading="eager" />
+          {editableIdentity && onEditAvatar && (
+            <button
+              className="profile-overview-inline-edit profile-overview-avatar-pencil"
+              type="button"
+              aria-label="تغيير الصورة الشخصية"
+              onClick={onEditAvatar}
+            >
+              <Icon name="edit" />
+            </button>
+          )}
+        </div>
         <div className="profile-overview-details">
           <div className="profile-overview-name">
-            <h1 dir="auto">{user?.name ?? "—"}</h1>
+            {editableIdentity && onSaveDisplayName ? (
+              editingName ? (
+                <form className="profile-header-name-editor" onSubmit={submitHeaderName}>
+                  <input
+                    value={nameDraft}
+                    maxLength={50}
+                    autoFocus
+                    disabled={nameBusy}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    aria-label="اسم العرض"
+                  />
+                  <button className="profile-header-name-save" type="submit" disabled={nameBusy}>
+                    {nameBusy ? "…" : "حفظ"}
+                  </button>
+                  <button
+                    className="profile-header-name-cancel"
+                    type="button"
+                    disabled={nameBusy}
+                    onClick={() => {
+                      setNameDraft(user?.name ?? "");
+                      setNameError("");
+                      setEditingName(false);
+                    }}
+                  >
+                    إلغاء
+                  </button>
+                </form>
+              ) : (
+                <div className="profile-overview-name-editable">
+                  <h1 dir="auto">{user?.name ?? "—"}</h1>
+                  <button
+                    className="profile-overview-inline-edit"
+                    type="button"
+                    aria-label="تعديل اسم العرض"
+                    onClick={() => {
+                      setNameError("");
+                      setEditingName(true);
+                    }}
+                  >
+                    <Icon name="edit" />
+                  </button>
+                </div>
+              )
+            ) : (
+              <h1 dir="auto">{user?.name ?? "—"}</h1>
+            )}
             <p dir="ltr">@{user?.username ?? "—"}</p>
+            {nameError && <small className="profile-header-name-error">{nameError}</small>}
             {privateState && <span className="profile-overview-private">حساب خاص</span>}
           </div>
           {friends != null && (
