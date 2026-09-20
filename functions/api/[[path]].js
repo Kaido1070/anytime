@@ -1614,7 +1614,7 @@ async function route(request, url, db, covers) {
   }
 
   if (request.method === "GET" && path === "reading/stats") {
-    const [account, totals, bulkPacks, daily] = await Promise.all([
+    const [account, totals, bulkPacks, daily, completedOrganic] = await Promise.all([
       db.prepare("SELECT created_at FROM users WHERE id = ? LIMIT 1")
         .bind(user.id)
         .first(),
@@ -1643,7 +1643,7 @@ async function route(request, url, db, covers) {
         .first(),
       db.prepare(`SELECT
           date(read_at / 1000, 'unixepoch', '+3 hours') AS day,
-          COUNT(*) AS chapters
+          COUNT(DISTINCT manga_id || ':' || printf('%.6f', chapter)) AS chapters
         FROM reading_history
         WHERE user_id = ? AND entry_type = 'organic'
         GROUP BY day
@@ -1651,6 +1651,28 @@ async function route(request, url, db, covers) {
         LIMIT 120`)
         .bind(user.id)
         .all(),
+      db.prepare(`SELECT COUNT(*) AS total
+        FROM reading_progress p
+        WHERE p.user_id = ?
+          AND p.completed = 1
+          AND EXISTS (
+            SELECT 1
+            FROM reading_history h
+            WHERE h.user_id = p.user_id
+              AND h.manga_id = p.manga_id
+              AND ABS(h.chapter - p.chapter) < 0.000001
+              AND h.entry_type = 'organic'
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM reading_history h
+            WHERE h.user_id = p.user_id
+              AND h.manga_id = p.manga_id
+              AND ABS(h.chapter - p.chapter) < 0.000001
+              AND h.entry_type = 'bulk'
+          )`)
+        .bind(user.id)
+        .first(),
     ]);
 
     const createdAt = Number(account?.created_at ?? Date.now());
@@ -1706,6 +1728,7 @@ async function route(request, url, db, covers) {
         organicStories: Number(totals?.organic_stories ?? 0),
         bulkStories: Number(totals?.bulk_stories ?? 0),
         organicChapters,
+        organicCompletedChapters: Number(completedOrganic?.total ?? 0),
         bulkChapters: Number(totals?.bulk_chapters ?? 0),
         bulkPacks: Number(bulkPacks?.total ?? 0),
         activeDays: Number(totals?.active_days ?? 0),
