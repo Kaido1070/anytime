@@ -937,86 +937,38 @@ async function asqLatest(db, page) {
 function asqLatestItemsFromHtml(html) {
   const source = String(html ?? "");
   const bySlug = new Map();
-  const chapterLink = /<a\b([^>]*href=["'][^"']*\/manga\/([^/"']+)\/([^/"']+)\/?[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi;
-  let match;
+  // Madara latest pages already group the series title/cover and its recent
+  // chapter rows inside one page-item-detail card. Keep that boundary intact:
+  // using the nearest <li> loses the series metadata and can accidentally use
+  // editor/UI text (for example AddText_...) as the work title.
+  const blocks = madaraBlocksByClass(source, ["page-item-detail", "c-tabs-item__content"]);
+  const candidates = blocks.length ? blocks : [source];
 
-  while ((match = chapterLink.exec(source))) {
-    const attrs = parseAttrs(match[1]);
-    const href = absoluteUrl(ASQ_BASE, attrs.href);
-    if (!href) continue;
+  for (const block of candidates) {
+    const item = asqItemsFromHtml(block)[0];
+    if (!item) continue;
 
-    let parsed;
-    try {
-      parsed = new URL(href);
-    } catch {
+    const chapters = parseAsqChapters(block, item.url)
+      .filter((chapter) => Boolean(chapter.publishedAt));
+    if (!chapters.length) continue;
+
+    const existing = bySlug.get(item.slug);
+    if (existing) {
+      existing.chapters.push(...chapters);
+      existing.latest = Math.max(
+        Number(existing.latest || 0),
+        ...chapters.map((chapter) => Number(chapter.number || 0)),
+      );
+      if (!existing.cover && item.cover) existing.cover = item.cover;
+      if (!existing.title && item.title) existing.title = item.title;
       continue;
     }
-    if (!/^(?:www\.)?3asq\.online$/i.test(parsed.hostname)) continue;
 
-    const slug = decodeURIComponent(match[2]);
-    const chapterId = decodeURIComponent(match[3]);
-    const chapterTitle = cleanText(stripTags(match[4])) || chapterId;
-    const number = asqChapterNumber(chapterTitle, chapterId);
-    if (!slug || !Number.isFinite(number)) continue;
-
-    // Scope metadata to this chapter link's surrounding update row/card only.
-    const start = Math.max(
-      source.lastIndexOf("<li", match.index),
-      source.lastIndexOf('<div class="row', match.index),
-      source.lastIndexOf("<div class='row", match.index),
-      source.lastIndexOf('<div class="page-item-detail', match.index),
-      source.lastIndexOf("<div class='page-item-detail", match.index),
-    );
-    const nextLi = source.indexOf("<li", chapterLink.lastIndex);
-    const nextRow = source.indexOf('<div class="row', chapterLink.lastIndex);
-    const candidates = [nextLi, nextRow].filter((value) => value >= 0);
-    const end = candidates.length ? Math.min(...candidates) : Math.min(source.length, chapterLink.lastIndex + 2500);
-    const block = source.slice(start >= 0 ? start : Math.max(0, match.index - 1200), end);
-
-    const publishedAt = parseAsqPublishedAt(block);
-    if (!publishedAt) continue;
-
-    const seriesAnchor = extractAnchors(block).find((entry) => {
-      const url = absoluteUrl(ASQ_BASE, entry.href);
-      if (!url) return false;
-      try {
-        return new URL(url).pathname.replace(/\/$/, "") === "/manga/" + slug;
-      } catch {
-        return false;
-      }
+    bySlug.set(item.slug, {
+      ...item,
+      latest: Math.max(...chapters.map((chapter) => Number(chapter.number || 0))),
+      chapters,
     });
-    const title =
-      cleanText(stripTags(seriesAnchor?.inner || "")) ||
-      cleanText(firstImgAttr(block, "alt")) ||
-      slug.replace(/[-_]+/g, " ");
-    const cover = absoluteUrl(ASQ_BASE, asqFirstImage(block));
-
-    const key = "aq:" + safeSlugKey(slug);
-    const existing = bySlug.get(slug) || {
-      key,
-      source: "3asq",
-      sourceId: slug,
-      slug,
-      type: "manga",
-      url: ASQ_BASE + "/manga/" + encodeURIComponent(slug) + "/",
-      title,
-      cover,
-      description: "",
-      status: "",
-      genres: [],
-      latest: number,
-      chapters: [],
-    };
-    existing.latest = Math.max(Number(existing.latest || number), number);
-    existing.chapters.push({
-      number,
-      title: chapterTitle || "الفصل " + number,
-      publishedAt,
-      url: href,
-    });
-    if (!existing.cover && cover) existing.cover = cover;
-    if ((!existing.title || existing.title === slug.replace(/[-_]+/g, " ")) && title) existing.title = title;
-    bySlug.set(slug, existing);
   }
 
   return [...bySlug.values()].map((item) => ({
@@ -1025,10 +977,14 @@ function asqLatestItemsFromHtml(html) {
       .filter((chapter, index, list) =>
         list.findIndex((candidate) => Number(candidate.number) === Number(chapter.number)) === index,
       )
-      .sort((a, b) => Number(b.number) - Number(a.number)),
+      .sort((a, b) => {
+        const byDate = Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || "");
+        return Number.isFinite(byDate) && byDate !== 0
+          ? byDate
+          : Number(b.number) - Number(a.number);
+      }),
   }));
 }
-
 async function asqPopular(db, page) {
   return asqList(db, { page, order: "views" });
 }
