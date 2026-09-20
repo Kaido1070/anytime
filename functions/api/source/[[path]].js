@@ -566,9 +566,8 @@ async function recentVerifiedReleasesFromDb(db, source, cutoffIso) {
 async function rememberRecentVerifiedChapters(db, item, now = Date.now()) {
   if (!item?.key || !Array.isArray(item.chapters)) return;
 
-  // Background source refreshes only need a small rolling release cache.
-  // Keep at most 8 verified chapters per work from the last 48 hours. Full
-  // chapter history is still recorded only when the user opens the series.
+  // The public feed itself is capped at five chapters per work. Keep only a
+  // 48-hour safety window in D1 so background refreshes stay cheap.
   const retentionCutoff = now - 48 * 60 * 60_000;
   const chapters = item.chapters
     .filter((chapter) => {
@@ -577,29 +576,50 @@ async function rememberRecentVerifiedChapters(db, item, now = Date.now()) {
       return Number.isFinite(timestamp) && timestamp > retentionCutoff;
     })
     .sort((a, b) => Date.parse(String(b.publishedAt)) - Date.parse(String(a.publishedAt)))
-    .slice(0, 8);
+    .slice(0, 5);
 
   if (!chapters.length) return;
 
-  const writes = chapters.map((chapter) => {
-    const identity = sourceChapterIdentity(chapter);
-    const number = Number(chapter.number);
-    return db.prepare(`INSERT INTO source_chapter_seen
-      (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
-      VALUES (?, ?, ?, ?, ?, 0)
-      ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
-        chapter_number = excluded.chapter_number,
-        published_at = COALESCE(excluded.published_at, source_chapter_seen.published_at)`)
-      .bind(
-        item.key,
-        identity,
-        Number.isFinite(number) ? number : null,
-        String(chapter.publishedAt),
-        now,
-      );
-  });
+  const identities = chapters.map(sourceChapterIdentity).filter(Boolean);
+  const placeholders = identities.map(() => "?").join(",");
+  const existingResult = await db
+    .prepare(`SELECT chapter_identity, chapter_number, published_at
+      FROM source_chapter_seen
+      WHERE source_key = ? AND chapter_identity IN (${placeholders})`)
+    .bind(item.key, ...identities)
+    .all();
+  const existing = new Map(
+    (existingResult.results ?? []).map((row) => [String(row.chapter_identity), row]),
+  );
 
-  await db.batch(writes);
+  const writes = [];
+  for (const chapter of chapters) {
+    const identity = sourceChapterIdentity(chapter);
+    if (!identity) continue;
+
+    const number = Number(chapter.number);
+    const chapterNumber = Number.isFinite(number) ? number : null;
+    const publishedAt = String(chapter.publishedAt);
+    const row = existing.get(identity);
+
+    if (row &&
+        Number(row.chapter_number) === chapterNumber &&
+        String(row.published_at ?? "") === publishedAt) {
+      continue;
+    }
+
+    writes.push(
+      db.prepare(`INSERT INTO source_chapter_seen
+        (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
+        VALUES (?, ?, ?, ?, ?, 0)
+        ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
+          chapter_number = excluded.chapter_number,
+          published_at = COALESCE(excluded.published_at, source_chapter_seen.published_at)`)
+        .bind(item.key, identity, chapterNumber, publishedAt, now),
+    );
+  }
+
+  if (writes.length) await db.batch(writes);
 }
 
 // MangaTime -----------------------------------------------------------------
@@ -2152,8 +2172,22 @@ function parseStarzPublishedAt(block, now = Date.now()) {
     .trim();
   if (!text) return null;
 
+  if (/(?:منذ\s*)?(?:دقيقة واحدة|دقيقة)\b/i.test(text)) {
+    return new Date(now - 60_000).toISOString();
+  }
+  if (/(?:منذ\s*)?دقيقتين\b/i.test(text)) {
+    return new Date(now - 2 * 60_000).toISOString();
+  }
+
   let relative = text.match(/(?:منذ\s*)?(\d+)\s*(?:دقيقة|دقائق|minute|minutes)\s*(?:ago)?/i);
   if (relative) return new Date(now - Number(relative[1]) * 60_000).toISOString();
+
+  if (/(?:منذ\s*)?(?:ساعة واحدة|ساعة)\b/i.test(text)) {
+    return new Date(now - 3_600_000).toISOString();
+  }
+  if (/(?:منذ\s*)?ساعتين\b/i.test(text)) {
+    return new Date(now - 2 * 3_600_000).toISOString();
+  }
 
   relative = text.match(/(?:منذ\s*)?(\d+)\s*(?:ساعة|ساعات|hour|hours)\s*(?:ago)?/i);
   if (relative) return new Date(now - Number(relative[1]) * 3_600_000).toISOString();
