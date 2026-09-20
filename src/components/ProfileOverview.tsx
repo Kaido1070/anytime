@@ -203,7 +203,27 @@ export function ProfileListsSection({
       ) : (
         <p className="profile-overview-empty">لا توجد قوائم حتى الآن.</p>
       )}
-      {error && (
+      {issues.length > 0 && (
+        <div className="profile-reading-issues" role="status" aria-live="polite">
+          {issues.map((issue) => (
+            <div className="profile-reading-issue" key={issue.mangaId}>
+              <span>
+                تعذر تحديث <b dir="auto">{issue.title}</b>
+                {issue.chapter != null ? ` عند الفصل ${issue.chapter}` : ""}.
+              </span>
+              <Link className="secondary" to={issue.to}>
+                {issue.chapter != null ? `فتح الفصل ${issue.chapter}` : "فتح القصة"}
+              </Link>
+            </div>
+          ))}
+          {onRetry && (
+            <button className="secondary profile-reading-retry" type="button" onClick={onRetry}>
+              إعادة المحاولة
+            </button>
+          )}
+        </div>
+      )}
+      {error && !issues.length && (
         <div className="profile-section-error compact" role="alert">
           <span>{error}</span>
           {onRetry && (
@@ -215,6 +235,13 @@ export function ProfileListsSection({
       )}
     </section>
   );
+}
+
+export interface ProfileReadingIssue {
+  mangaId: string;
+  title: string;
+  chapter: number | null;
+  to: string;
 }
 
 function ReadingCard({
@@ -306,6 +333,7 @@ export function ProfileReadingSection({
   completed = new Set<string>(),
   viewAllTo,
   error = "",
+  issues = [],
   onRetry,
 }: {
   entries: ProfileLibraryItem[];
@@ -314,6 +342,7 @@ export function ProfileReadingSection({
   completed?: Set<string>;
   viewAllTo?: string;
   error?: string;
+  issues?: ProfileReadingIssue[];
   onRetry?: () => void;
 }) {
   const available = entries.filter(
