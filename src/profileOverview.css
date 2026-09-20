@@ -2995,19 +2995,18 @@ button.profile-icon-action {
   text-align:center;
 }
 .profile-header-achievement-badge{
-  width:34px;
-  height:34px;
+  width:36px;
+  height:36px;
   display:grid;
   place-items:center;
-  border:1px solid currentColor;
-  border-radius:10px;
-  background:#1d1f20;
-  color:#9a623c;
+  border:0;
+  border-radius:0;
+  background:transparent;
 }
-.profile-header-achievement-badge svg{
-  width:17px;
-  height:17px;
-  stroke-width:1.8;
+.profile-header-achievement-badge.reading-rank-badge{
+  width:36px;
+  height:36px;
+  opacity:1;
 }
 .profile-header-achievement b{
   width:100%;
@@ -3028,15 +3027,6 @@ button.profile-icon-action {
   font-size:6.5px;
   line-height:1.2;
 }
-.profile-header-achievement-badge.tier-bronze{color:#9a623c}
-.profile-header-achievement-badge.tier-silver{color:#aeb6c0}
-.profile-header-achievement-badge.tier-gold{color:#d6a84f}
-.profile-header-achievement-badge.tier-platinum{color:#7f9fb8}
-.profile-header-achievement-badge.tier-diamond{color:#5fd0e7}
-.profile-header-achievement-badge.tier-master{color:#8f68de}
-.profile-header-achievement-badge.tier-elite{color:#c14f6f}
-.profile-header-achievement-badge.tier-legend{color:#e4c369}
-.profile-header-achievement-badge.tier-mythic{color:#f2d58b}
 
 @media(max-width:759px){
   .profile-header-achievements{
@@ -3046,9 +3036,9 @@ button.profile-icon-action {
   .profile-header-achievement{
     padding:6px 2px 5px;
   }
-  .profile-header-achievement-badge{
-    width:31px;
-    height:31px;
+  .profile-header-achievement-badge.reading-rank-badge{
+    width:32px;
+    height:32px;
   }
   .profile-header-achievement b{
     font-size:7.5px;
