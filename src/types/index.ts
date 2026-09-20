@@ -98,6 +98,28 @@ export interface ReadingHistoryEntry {
   readAt: number;
 }
 
+export interface ReadingStatsDay {
+  day: string;
+  chapters: number;
+}
+
+export interface ReadingStats {
+  accountCreatedAt: number;
+  accountDays: number;
+  storiesRead: number;
+  organicStories: number;
+  bulkStories: number;
+  organicChapters: number;
+  bulkChapters: number;
+  bulkPacks: number;
+  activeDays: number;
+  dailyAverage: number;
+  currentStreak: number;
+  bestStreak: number;
+  bestDay: ReadingStatsDay | { day: null; chapters: number };
+  recentDays: ReadingStatsDay[];
+}
+
 export interface FollowedWorkState {
   mangaId: string;
   trackingStartedAt: number;
