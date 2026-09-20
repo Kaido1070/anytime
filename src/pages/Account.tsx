@@ -786,40 +786,23 @@ export function Account() {
   const achievementSummary: ProfileAchievementSummaryItem[] = (() => {
     if (!readingStatsSummary) return [];
 
-    const tierNames: ProfileAchievementSummaryItem["tier"][] = [
-      "bronze",
-      "silver",
-      "gold",
-      "platinum",
-      "diamond",
-      "master",
-      "elite",
-      "legend",
-      "mythic",
-    ];
-
     const highestAchievement = (
       value: number,
       levels: ReadonlyArray<readonly [number, string]>,
-      icon: ProfileAchievementSummaryItem["icon"],
+      kind: ProfileAchievementSummaryItem["kind"],
       category: string,
     ): ProfileAchievementSummaryItem => {
       let achievement = "لم يُفتح بعد";
-      let tier: ProfileAchievementSummaryItem["tier"] = "bronze";
-      let unlockedIndex = -1;
+      let tierIndex = 0;
 
       levels.forEach(([threshold, name], index) => {
         if (value >= threshold) {
           achievement = name;
-          unlockedIndex = index;
+          tierIndex = index;
         }
       });
 
-      if (unlockedIndex >= 0) {
-        tier = tierNames[Math.min(unlockedIndex, tierNames.length - 1)];
-      }
-
-      return { category, achievement, tier, icon };
+      return { category, achievement, tierIndex, kind };
     };
 
     return [
@@ -836,7 +819,7 @@ export function Account() {
           [2500, "قارئ استثنائي"],
           [5000, "أسطورة Wany"],
         ],
-        "book",
+        "chapters",
         "إنجاز الفصول",
       ),
       highestAchievement(
@@ -849,7 +832,7 @@ export function Account() {
           [50, "خمسون عملًا"],
           [100, "مئة عمل"],
         ],
-        "lists",
+        "stories",
         "إنجاز الأعمال",
       ),
       highestAchievement(
@@ -860,7 +843,7 @@ export function Account() {
           [14, "أسبوعان متواصلان"],
           [30, "شهر متواصل"],
         ],
-        "flame",
+        "streak",
         "إنجاز الاستمرارية",
       ),
     ];
