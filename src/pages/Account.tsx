@@ -13,6 +13,7 @@ import {
 import { Icon } from "../components/UI";
 import { ProfileListsManager } from "../components/ProfileListsManager";
 import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
+import { ReadingStatsDashboard } from "../components/ReadingStatsDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import type { SourceName } from "../types";
@@ -525,6 +526,7 @@ export function Account() {
   const settingsOpen = tab === "settings";
   const activityOpen = tab === "activity";
   const readingOpen = tab === "reading";
+  const statsOpen = tab === "stats";
 
   const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [sections, setSections] = useState<UserProfileSection[]>([]);
@@ -560,15 +562,15 @@ export function Account() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!settingsOpen && !activityOpen && !readingOpen) void loadOverview();
-  }, [loadOverview, settingsOpen, activityOpen, readingOpen]);
+    if (!settingsOpen && !activityOpen && !readingOpen && !statsOpen) void loadOverview();
+  }, [loadOverview, settingsOpen, activityOpen, readingOpen, statsOpen]);
 
   useEffect(() => {
-    if (settingsOpen || activityOpen || readingOpen) return;
+    if (settingsOpen || activityOpen || readingOpen || statsOpen) return;
     const refreshProfile = () => void loadOverview();
     window.addEventListener(PERSONALIZATION_CHANGE_EVENT, refreshProfile);
     return () => window.removeEventListener(PERSONALIZATION_CHANGE_EVENT, refreshProfile);
-  }, [activityOpen, loadOverview, readingOpen, settingsOpen]);
+  }, [activityOpen, loadOverview, readingOpen, settingsOpen, statsOpen]);
 
   const sourceKeys = useMemo(() => {
     if (!profile) return [];
@@ -756,6 +758,24 @@ export function Account() {
     );
   }
 
+  if (statsOpen) {
+    return (
+      <>
+        <ProfileIdentityHeader user={user} />
+        <section className="profile-subview">
+          <div className="profile-subview-heading">
+            <div>
+              <p className="eyebrow">الإحصائيات</p>
+              <h2>رحلة القراءة</h2>
+            </div>
+            <Link className="secondary" to="/profile">العودة</Link>
+          </div>
+          <ReadingStatsDashboard />
+        </section>
+      </>
+    );
+  }
+
   const stats = profile?.stats;
   const orderedGroups = groups.filter((group) => group.visible);
 
@@ -788,7 +808,7 @@ export function Account() {
         </div>
       ) : profile && stats ? (
         <>
-          <ProfileStatsSection stats={stats} />
+          <ProfileStatsSection stats={stats} viewAllTo="/profile?tab=stats" />
 
           {customizingLists ? (
             <SectionErrorBoundary
