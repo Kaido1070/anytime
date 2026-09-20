@@ -1622,8 +1622,14 @@ async function route(request, url, db, covers) {
           COUNT(DISTINCT manga_id) AS stories_read,
           COUNT(DISTINCT CASE WHEN entry_type = 'organic' THEN manga_id END) AS organic_stories,
           COUNT(DISTINCT CASE WHEN entry_type = 'bulk' THEN manga_id END) AS bulk_stories,
-          SUM(CASE WHEN entry_type = 'organic' THEN 1 ELSE 0 END) AS organic_chapters,
-          SUM(CASE WHEN entry_type = 'bulk' THEN 1 ELSE 0 END) AS bulk_chapters,
+          COUNT(DISTINCT CASE
+            WHEN entry_type = 'organic'
+            THEN manga_id || ':' || printf('%.6f', chapter)
+          END) AS organic_chapters,
+          COUNT(DISTINCT CASE
+            WHEN entry_type = 'bulk'
+            THEN manga_id || ':' || printf('%.6f', chapter)
+          END) AS bulk_chapters,
           COUNT(DISTINCT CASE
             WHEN entry_type = 'organic'
             THEN date(read_at / 1000, 'unixepoch', '+3 hours')
