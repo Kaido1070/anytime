@@ -135,7 +135,14 @@ async function loadCachedSeries(keys: string[]) {
   const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
   if (!unique.length) return {} as Record<string, SourceManga>;
 
-  const snapshots = await userDataService.getWorkSnapshots(unique).catch(() => []);
+  const [snapshots, resolved] = await Promise.all([
+    userDataService.getWorkSnapshots(unique).catch(() => []),
+    // resolve() is D1-backed metadata only and does not contact upstream sites.
+    // Prefer it over an archived snapshot when available so transient source
+    // failures do not downgrade every account card to "archived".
+    sourceService.resolve(unique).catch(() => []),
+  ]);
+
   const mapped: Record<string, SourceManga> = Object.fromEntries(
     snapshots.map((snapshot) => [
       snapshot.mangaId,
@@ -143,15 +150,9 @@ async function loadCachedSeries(keys: string[]) {
     ]),
   );
 
-  const missing = unique.filter((key) => !mapped[key]);
-  if (missing.length) {
-    // resolve() is D1-backed metadata only. It can bootstrap old library rows
-    // without waiting on the external manga site.
-    const resolved = await sourceService.resolve(missing).catch(() => []);
-    for (const item of resolved) {
-      mapped[item.key] = item;
-      void saveWorkSnapshot(item);
-    }
+  for (const item of resolved) {
+    mapped[item.key] = item;
+    void saveWorkSnapshot(item);
   }
 
   return mapped;
