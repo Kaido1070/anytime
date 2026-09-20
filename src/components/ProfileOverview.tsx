@@ -176,9 +176,11 @@ export function ProfileIdentityHeader({
                 className={`profile-header-achievement-badge reading-rank-badge rank-${item.tierIndex} category-${item.kind} earned`}
                 aria-hidden="true"
               >
-                <span className="reading-rank-core">
-                  {item.kind === "chapters" ? "▤" : item.kind === "stories" ? "◆" : "✦"}
-                </span>
+                <img
+                  className="reading-rank-image"
+                  src={`/ranks/${["bronze", "silver", "gold", "platinum", "diamond", "master", "elite", "legendary", "wany-legend"][Math.min(item.tierIndex, 8)]}.svg`}
+                  alt=""
+                />
               </span>
               <b>{item.achievement}</b>
               <small>{item.category}</small>
