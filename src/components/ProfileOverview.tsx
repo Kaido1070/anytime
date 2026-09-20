@@ -24,6 +24,8 @@ function formatCount(value: number) {
 export interface ProfileAchievementSummaryItem {
   category: string;
   achievement: string;
+  tier: "bronze" | "silver" | "gold" | "platinum" | "diamond" | "master" | "elite" | "legend" | "mythic";
+  icon: "book" | "lists" | "flame";
 }
 
 export function ProfileIdentityHeader({
@@ -78,8 +80,14 @@ export function ProfileIdentityHeader({
         <div className="profile-header-achievements" aria-label="أحدث إنجازاتك">
           {achievements.map((item) => (
             <div className="profile-header-achievement" key={item.category}>
-              <span>{item.category}</span>
+              <span
+                className={`profile-header-achievement-badge tier-${item.tier}`}
+                aria-hidden="true"
+              >
+                <Icon name={item.icon} />
+              </span>
               <b>{item.achievement}</b>
+              <small>{item.category}</small>
             </div>
           ))}
         </div>
