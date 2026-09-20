@@ -193,6 +193,12 @@ export const sourceService = {
     return payload.sources ?? [];
   },
 
+  async recent(source: SourceName, page = 1) {
+    return api<SourceListResponse>(
+      `/api/source/recent?${params({ source, page })}`,
+    );
+  },
+
   async latest(source: SourceName, page = 1) {
     return api<SourceListResponse>(
       `/api/source/latest?${params({ source, page })}`,
