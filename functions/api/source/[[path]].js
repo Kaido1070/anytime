@@ -634,15 +634,21 @@ const PRIORITY_WORKS = {
   },
 };
 
-function priorityRefreshActive(now = Date.now()) {
+function priorityWindow(now = Date.now()) {
   // Saudi Arabia is UTC+3 year-round.
   const date = new Date(now + 3 * 60 * 60_000);
   const day = date.getUTCDay(); // 0 Sun .. 6 Sat
   const hour = date.getUTCHours();
 
-  const eleceedWindow = day === 2 && hour >= 19 && hour <= 23;
-  const magicWindow = (day === 5 || day === 6 || day === 0) && hour >= 4 && hour <= 7;
-  return eleceedWindow || magicWindow;
+  return {
+    eleceed: day === 2 && hour >= 19 && hour <= 23,
+    magicEmperor: (day === 5 || day === 6 || day === 0) && hour >= 4 && hour <= 7,
+  };
+}
+
+function priorityRefreshActive(now = Date.now()) {
+  const window = priorityWindow(now);
+  return window.eleceed || window.magicEmperor;
 }
 
 function sourceRefreshIntervalMs(now = Date.now()) {
@@ -688,11 +694,13 @@ async function syncMangaTimeLatest(db) {
   );
 
   const priorityRows = [];
-  if (priorityRefreshActive()) {
-    for (const query of [
-      ...PRIORITY_WORKS.eleceed.mangatimeQueries,
-      ...PRIORITY_WORKS.magicEmperor.mangatimeQueries,
-    ]) {
+  const activePriority = priorityWindow();
+  const priorityQueries = [
+    ...(activePriority.eleceed ? PRIORITY_WORKS.eleceed.mangatimeQueries : []),
+    ...(activePriority.magicEmperor ? PRIORITY_WORKS.magicEmperor.mangatimeQueries : []),
+  ];
+  if (priorityQueries.length) {
+    for (const query of priorityQueries) {
       try {
         const priorityResult = await mangaTimeTrpc(
           "search.searchSeries",
@@ -1037,7 +1045,7 @@ async function syncTeamXLatest(db) {
     status: "",
     genres: [],
   };
-  const baseItems = priorityRefreshActive()
+  const baseItems = priorityWindow().magicEmperor
     ? [priorityItem, ...parsedItems.filter((item) => item.key !== priorityItem.key)].slice(0, 30)
     : parsedItems;
 
@@ -3607,6 +3615,7 @@ export const __test = {
   xsanoTypeFromCategories,
   asqChapterNumber,
   normalizeAsqType,
+  priorityWindow,
   priorityRefreshActive,
   sourceRefreshIntervalMs,
   mangaTimeChaptersFromPayload,
