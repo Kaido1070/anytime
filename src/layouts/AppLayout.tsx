@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { Icon } from "../components/UI";
-import { loadUnreadFollowedCount } from "../services/newChapters";
-import { PERSONALIZATION_CHANGE_EVENT } from "../services/userData";
 
 export function AppLayout() {
   const [newCount, setNewCount] = useState(0);
@@ -15,24 +13,7 @@ export function AppLayout() {
     { label: "حسابي", path: "/profile", icon: "profile" },
   ];
 
-  useEffect(() => {
-    let active = true;
-    const refreshBadge = () => {
-      void loadUnreadFollowedCount()
-        .then((count) => {
-          if (active) setNewCount(count);
-        })
-        .catch(() => {
-          if (active) setNewCount(0);
-        });
-    };
-    refreshBadge();
-    window.addEventListener(PERSONALIZATION_CHANGE_EVENT, refreshBadge);
-    return () => {
-      active = false;
-      window.removeEventListener(PERSONALIZATION_CHANGE_EVENT, refreshBadge);
-    };
-  }, []);
+;
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 759px)");
