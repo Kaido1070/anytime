@@ -13,6 +13,7 @@ import type {
   ReadChapterPair,
   ReadingHistoryEntry,
   ReadingProgress,
+  ReadingStats,
   User,
   UserData,
   UserListDetail,
@@ -65,6 +66,7 @@ export interface UserDataService {
   markWorkUnread(mangaId: string): Promise<void>;
   markChaptersRead(mangaId: string, chapters: number[]): Promise<number>;
   getReadingHistory(limit?: number): Promise<ReadingHistoryEntry[]>;
+  getReadingStats(): Promise<ReadingStats>;
   getPersonalizationState(): Promise<PersonalizationState>;
   getReadChapterPairs(chapters: ReadChapterPair[]): Promise<ReadChapterPair[]>;
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
@@ -653,6 +655,11 @@ class ApiUserDataService implements UserDataService {
       `reading/history?limit=${normalizedLimit}`,
     );
     return result.history.filter((item) => isLiveKey(item.mangaId));
+  }
+
+  async getReadingStats() {
+    const result = await this.request<{ stats: ReadingStats }>("reading/stats");
+    return result.stats;
   }
 
   async getPersonalizationState() {
