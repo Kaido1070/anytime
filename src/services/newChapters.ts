@@ -217,6 +217,9 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
     Promise.allSettled(VERIFIED_NEW_FEED_SOURCES.map((source) => sourceService.latest(source, safePage))),
   ]);
 
+  // "New" must discover the whole verified source window, not just page 1.
+  // Madara's latest page is title-oriented, so several releases in the last
+  // 24 hours can spill onto later pages.
   const latestItems = latestSettled.flatMap((result) =>
     result.status === "fulfilled" ? result.value.items : [],
   );
