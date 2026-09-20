@@ -305,10 +305,22 @@ function ReadingCard({
             <small>{Math.round(progress.percent)}% من الفصول المتاحة</small>
           </>
         )}
-        {archived ? (
-          <span className="secondary profile-reading-continue is-disabled">
-            المصدر غير متاح · نسخة محفوظة
-          </span>
+        {archived && own && highest != null ? (
+          <Link
+            className="secondary profile-reading-continue"
+            to={`/read-source/${encodeURIComponent(item.key)}/${highest}`}
+            state={returnState}
+          >
+            محاولة فتح الفصل {highest}
+          </Link>
+        ) : archived ? (
+          <Link
+            className="secondary profile-reading-continue"
+            to={`/source/${encodeURIComponent(item.key)}`}
+            state={returnState}
+          >
+            فتح القصة
+          </Link>
         ) : own && resumeChapter != null ? (
           <Link
             className="primary profile-reading-continue"
