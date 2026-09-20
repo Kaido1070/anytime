@@ -51,6 +51,7 @@ function circuitAllows(key: string) {
   const bucket = sourceBucketFromKey(key);
   const state = sourceCircuits.get(bucket);
   if (!state) return true;
+  if (state.openUntil === 0) return true;
   if (state.openUntil <= Date.now()) {
     sourceCircuits.delete(bucket);
     return true;
