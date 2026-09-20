@@ -900,6 +900,7 @@ async function mangaTimeChapter(context, db, item, number) {
   if (!Number.isInteger(number)) {
     throw new SourceError("UNSUPPORTED_CHAPTER", "هذا المصدر يتطلب رقم فصل صحيح.", 400);
   }
+
   const result = await mangaTimeTrpc("content.getChapterPages", {
     seriesSlug: item.slug,
     chapterNumber: number,
@@ -908,9 +909,27 @@ async function mangaTimeChapter(context, db, item, number) {
     throw new SourceError("CHAPTER_LOCKED", "هذا الفصل مقفل في المصدر.", 423);
   }
 
-  const series = await mangaTimeSeries(db, item);
-  const pages = (result?.pages ?? []).map((page) => absoluteUrl(MANGATIME_BASE, page)).filter(Boolean);
-  if (!pages.length) throw new SourceError("NO_PAGES", "المصدر لم يرجع صور الفصل.", 502);
+  const pages = (result?.pages ?? [])
+    .map((page) => absoluteUrl(MANGATIME_BASE, page))
+    .filter(Boolean);
+  if (!pages.length) {
+    throw new SourceError("NO_PAGES", "المصدر لم يرجع صور الفصل.", 502);
+  }
+
+  // The pages endpoint is the critical path. Series metadata/chapter-list
+  // refresh is useful for navigation, but it must never make an otherwise
+  // readable chapter fail. Fall back to the D1-cached item when MangaTime's
+  // secondary metadata endpoints are temporarily unavailable.
+  let series = item;
+  try {
+    series = await mangaTimeSeries(db, item);
+  } catch (error) {
+    console.warn("MangaTime chapter metadata refresh failed; using cached item", {
+      key: item.key,
+      chapter: number,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   const navigation = chapterNavigation(series.chapters ?? [], number);
   if (result?.seriesId && result?.id) {
@@ -918,10 +937,13 @@ async function mangaTimeChapter(context, db, item, number) {
       mangaTimeTrackView(String(result.seriesId), String(result.id)).catch(() => undefined),
     );
   }
+
   return {
     item: series,
     number,
-    title: series.chapters?.find((chapter) => chapter.number === number)?.title ?? `الفصل ${number}`,
+    title:
+      series.chapters?.find((chapter) => chapter.number === number)?.title ??
+      `الفصل ${number}`,
     pages,
     ...navigation,
   };
