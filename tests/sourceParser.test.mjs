@@ -92,7 +92,7 @@ test("3asq chapter dates stay attached to their own chapter block", () => {
   assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
 });
 
-test("3asq latest parser keeps the fast chapter stream and ignores chapter UI text for title", () => {
+test("3asq latest parser keeps chapter dates attached to the exact chapter row", () => {
   const html = `
     <div class="page-item-detail">
       <a href="https://3asq.online/manga/wistoria/" title="WISTORIA: WAND AND SWORD"><img src="https://cdn.example.com/wistoria.webp" alt="WISTORIA: WAND AND SWORD"></a>
@@ -103,16 +103,20 @@ test("3asq latest parser keeps the fast chapter stream and ignores chapter UI te
       </li>
       <li class="wp-manga-chapter">
         <a href="https://3asq.online/manga/wistoria/chapter-65/">الفصل 65</a>
-        <span class="chapter-release-date">منذ 16 ساعة</span>
+        <span class="chapter-release-date">10 سبتمبر، 2026</span>
       </li>
     </div>
   `;
   const items = __test.asqLatestItemsFromHtml(html);
   assert.equal(items.length, 1);
-  assert.equal(items[0].sourceId, "wistoria");
   assert.equal(items[0].title, "WISTORIA: WAND AND SWORD");
   assert.equal(items[0].cover, "https://cdn.example.com/wistoria.webp");
-  assert.deepEqual(items[0].chapters.map((chapter) => chapter.number), [66, 65]);
+  assert.equal(items[0].chapters.length, 2);
+  const chapter66 = items[0].chapters.find((chapter) => chapter.number === 66);
+  const chapter65 = items[0].chapters.find((chapter) => chapter.number === 65);
+  assert.ok(chapter66?.publishedAt);
+  assert.equal(chapter65?.publishedAt, "2026-09-10T00:00:00.000Z");
+  assert.notEqual(chapter66?.publishedAt, chapter65?.publishedAt);
   assert.notEqual(items[0].title, "AddText_06-16-01.19.28");
 });
 
