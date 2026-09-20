@@ -49,7 +49,7 @@ function trophyRows(stats: ReadingStats): Trophy[] {
       id: `chapters-${threshold}`,
       label,
       description,
-      value: stats.organicChapters,
+      value: stats.organicCompletedChapters,
       threshold,
       category: "chapters" as const,
     })),
@@ -73,7 +73,7 @@ function trophyRows(stats: ReadingStats): Trophy[] {
 }
 
 function nextChapterGoal(stats: ReadingStats) {
-  return CHAPTER_TROPHIES.find(([threshold]) => stats.organicChapters < threshold) ?? null;
+  return CHAPTER_TROPHIES.find(([threshold]) => stats.organicCompletedChapters < threshold) ?? null;
 }
 
 function recentCalendar(stats: ReadingStats) {
@@ -116,7 +116,7 @@ export function ReadingStatsDashboard() {
   const unlocked = trophies.filter((trophy) => trophy.value >= trophy.threshold);
   const next = nextChapterGoal(stats);
   const nextPercent = next
-    ? Math.min(100, Math.round((stats.organicChapters / next[0]) * 100))
+    ? Math.min(100, Math.round((stats.organicCompletedChapters / next[0]) * 100))
     : 100;
 
   return (
@@ -186,7 +186,7 @@ export function ReadingStatsDashboard() {
             <p className="eyebrow">الهدف القادم</p>
             <h3>{next ? next[1] : "أعلى رتبة حالية"}</h3>
           </div>
-          <strong>{next ? `${formatNumber(stats.organicChapters)} / ${formatNumber(next[0])}` : "100%"}</strong>
+          <strong>{next ? `${formatNumber(stats.organicCompletedChapters)} / ${formatNumber(next[0])}` : "100%"}</strong>
         </div>
         <div className="reading-next-goal-track" aria-label="تقدم الهدف القادم">
           <span style={{ width: `${nextPercent}%` }} />
