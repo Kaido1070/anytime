@@ -110,6 +110,7 @@ export interface ReadingStats {
   organicStories: number;
   bulkStories: number;
   organicChapters: number;
+  organicCompletedChapters: number;
   bulkChapters: number;
   bulkPacks: number;
   activeDays: number;
