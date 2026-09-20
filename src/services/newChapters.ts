@@ -239,19 +239,15 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   const hasMore = latestSettled.some(
     (result) => result.status === "fulfilled" && result.value.hasMore,
   );
-  const followedItems = await resolveInChunks(state.followed.map((entry) => entry.mangaId));
-  const allMerged = mergeSourceItems([...latestItems, ...followedItems]);
-  const latestKeys = new Set(latestItems.map((item) => item.key));
-  const relevant = allMerged.filter((group) =>
-    group.items.some((item) => latestKeys.has(item.key)),
-  );
-
-  const hydrated = await mapWithConcurrency(relevant, 6, hydrateGroup);
-  const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(hydrated));
+  // Latest adapters already return the chapter rows needed by the public
+  // feed. Do not re-open every series here: that turns one lightweight latest
+  // request into N detail requests and is the main source of page latency.
+  const latestGroups = mergeSourceItems(latestItems);
+  const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(latestGroups));
   const read = new Set(readPairs.map((entry) => readKey(entry.mangaId, entry.chapter)));
   const now = Date.now();
 
-  const groups = hydrated
+  const groups = latestGroups
     .map((group) => groupChapters(group, state, read, now))
     .filter((group): group is ChapterFeedGroup => Boolean(group))
     .sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
