@@ -402,12 +402,7 @@ export function Profile({
           )}
         </section>
 
-        <section className="settings-logout-card" aria-label="تسجيل الخروج">
-          <div>
-            <p className="eyebrow">الجلسة</p>
-            <h3>تسجيل الخروج</h3>
-            <p className="muted">ينهي الجلسة الحالية على هذا الجهاز.</p>
-          </div>
+        <div className="settings-logout-simple">
           <button
             className="settings-logout-danger"
             type="button"
@@ -417,7 +412,7 @@ export function Profile({
             {logoutBusy ? "جارٍ تسجيل الخروج…" : "تسجيل الخروج"}
           </button>
           {logoutError && <p className="settings-feedback error" role="alert">{logoutError}</p>}
-        </section>
+        </div>
       </div>
 
       {avatarPickerOpen && (
