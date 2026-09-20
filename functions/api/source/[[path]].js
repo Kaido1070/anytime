@@ -84,7 +84,7 @@ export async function onRequest(context) {
       });
     }
 
-    if (action === "latest") {
+    if (action === "recent") {
       const source = sourceFromQuery(url);
       const page = safePage(url.searchParams.get("page"));
       const payload = source === "mangatime"
@@ -97,6 +97,23 @@ export async function onRequest(context) {
               ? await starzLatest(db, page)
               : source === "xsano"
                 ? await xsanoLatest(context, db, page)
+                : await mangalikLatest(db, page);
+      return json(payload, 200, shortCache());
+    }
+
+    if (action === "latest") {
+      const source = sourceFromQuery(url);
+      const page = safePage(url.searchParams.get("page"));
+      const payload = source === "mangatime"
+        ? await mangaTimeList(db, { page, sortBy: "recent" })
+        : source === "teamx"
+          ? await teamXCatalogLatest(db, page)
+          : source === "3asq"
+            ? await asqLatest(db, page)
+            : source === "starzmanga"
+              ? await starzList(db, { page, order: "latest" })
+              : source === "xsano"
+                ? await xsanoCatalogLatest(db, page)
                 : await mangalikLatest(db, page);
       return json(payload, 200, shortCache());
     }
@@ -1046,6 +1063,20 @@ async function teamXPopular(db, page) {
   const items = await teamXItemsFromHtml(html);
   await rememberItems(db, items);
   return { items, hasMore: teamXHasNext(html), page };
+}
+
+async function teamXCatalogLatest(db, page) {
+  if (page > 1) {
+    // Team-X does not expose a dedicated paginated "latest" API. Its series
+    // catalogue is still useful for Discover continuation pages.
+    return teamXPopular(db, page);
+  }
+
+  const html = await teamXFetchText("/");
+  const scoped = teamXLatestSection(html);
+  const items = await teamXItemsFromHtml(scoped);
+  await rememberItems(db, items);
+  return { items: items.slice(0, 24), hasMore: false, page };
 }
 
 async function teamXLatest(context, db, page) {
@@ -2941,6 +2972,10 @@ function mangalikHasNext(html) {
 
 
 // XSano Manga / ZeistManga ---------------------------------------------------
+
+async function xsanoCatalogLatest(db, page) {
+  return xsanoFeedList(db, { page });
+}
 
 async function xsanoLatest(context, db, page) {
   if (page > 1) return { items: [], hasMore: false, page };
