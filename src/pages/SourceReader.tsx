@@ -6,6 +6,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath, sourceKeyFromReaderPath } from "../services/readerPaths";
 import { sourceService } from "../services/sources";
+import { saveWorkSnapshot } from "../services/workSnapshots";
 import type { SourceChapterPayload } from "../types";
 
 const INITIAL_READER_PAGES = 2;
@@ -153,6 +154,10 @@ function ReaderChapter({
   useEffect(() => {
     void recordChapterOpen(sourceKey, chapter);
   }, [chapter, recordChapterOpen, sourceKey]);
+
+  useEffect(() => {
+    void saveWorkSnapshot(payload.item, chapter);
+  }, [chapter, payload.item]);
 
   const pumpImageQueue = useCallback(() => {
     let changed = false;
