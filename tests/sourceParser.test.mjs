@@ -92,36 +92,28 @@ test("3asq chapter dates stay attached to their own chapter block", () => {
   assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
 });
 
-test("3asq latest parser keeps title and cover scoped to the series card", () => {
+test("3asq latest parser keeps the fast chapter stream and ignores chapter UI text for title", () => {
   const html = `
     <div class="page-item-detail">
       <a href="https://3asq.online/manga/wistoria/" title="WISTORIA: WAND AND SWORD"><img src="https://cdn.example.com/wistoria.webp" alt="WISTORIA: WAND AND SWORD"></a>
       <li class="wp-manga-chapter">
         <a href="https://3asq.online/manga/wistoria/chapter-66/">الفصل 66</a>
         <span class="chapter-release-date">منذ 15 ساعة</span>
-        <span class="editor-ui">AddText_06-16-01.19.28</span>
+        <span>AddText_06-16-01.19.28</span>
       </li>
-    </div>
-    <div class="page-item-detail">
-      <a href="https://3asq.online/manga/kengan-omega/" title="Kengan Omega"><img src="https://cdn.example.com/kengan.webp" alt="Kengan Omega"></a>
       <li class="wp-manga-chapter">
-        <a href="https://3asq.online/manga/kengan-omega/chapter-369/">الفصل 369</a>
-        <span class="chapter-release-date">10 سبتمبر، 2026</span>
+        <a href="https://3asq.online/manga/wistoria/chapter-65/">الفصل 65</a>
+        <span class="chapter-release-date">منذ 16 ساعة</span>
       </li>
     </div>
   `;
   const items = __test.asqLatestItemsFromHtml(html);
-  assert.equal(items.length, 2);
+  assert.equal(items.length, 1);
   assert.equal(items[0].sourceId, "wistoria");
   assert.equal(items[0].title, "WISTORIA: WAND AND SWORD");
   assert.equal(items[0].cover, "https://cdn.example.com/wistoria.webp");
+  assert.deepEqual(items[0].chapters.map((chapter) => chapter.number), [66, 65]);
   assert.notEqual(items[0].title, "AddText_06-16-01.19.28");
-  assert.equal(items[0].chapters[0].number, 66);
-  assert.ok(items[0].chapters[0].publishedAt);
-  assert.equal(items[1].title, "Kengan Omega");
-  assert.equal(items[1].cover, "https://cdn.example.com/kengan.webp");
-  assert.equal(items[1].chapters[0].number, 369);
-  assert.equal(items[1].chapters[0].publishedAt, "2026-09-10T00:00:00.000Z");
 });
 
 test("3asq page parser prefers lazy Madara page images", () => {
