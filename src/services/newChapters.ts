@@ -263,7 +263,7 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
       // already sorted newest-first after cross-source deduplication, so cap
       // each work only after applying the strict 24-hour publication window.
       chapters: group.chapters
-        .filter((chapter) => chapter.releaseAt >= cutoff)
+        .filter((chapter) => chapter.releaseAt > cutoff)
         .slice(0, MAX_NEW_CHAPTERS_PER_WORK),
     }))
     .filter((group) => group.chapters.length > 0)
