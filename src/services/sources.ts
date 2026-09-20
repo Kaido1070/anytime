@@ -9,6 +9,70 @@ const coverRequests = new Map<string, Promise<string[]>>();
 const chapterRequests = new Map<string, Promise<SourceChapterPayload>>();
 const MAX_CHAPTER_REQUESTS = 8;
 
+class SourceRequestError extends Error {
+  status: number;
+  code?: string;
+  retryable: boolean;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "SourceRequestError";
+    this.status = status;
+    this.code = code;
+    this.retryable =
+      status === 0 ||
+      status === 408 ||
+      status === 429 ||
+      status >= 500;
+  }
+}
+
+type CircuitState = {
+  failures: number;
+  openUntil: number;
+};
+
+const sourceCircuits = new Map<string, CircuitState>();
+const CIRCUIT_FAILURE_THRESHOLD = 3;
+const CIRCUIT_COOLDOWN_MS = 60_000;
+
+function sourceBucketFromKey(key: string) {
+  return key.split(":", 1)[0] || key;
+}
+
+function circuitAllows(key: string) {
+  const bucket = sourceBucketFromKey(key);
+  const state = sourceCircuits.get(bucket);
+  if (!state) return true;
+  if (state.openUntil <= Date.now()) {
+    sourceCircuits.delete(bucket);
+    return true;
+  }
+  return false;
+}
+
+function recordSourceSuccess(key: string) {
+  sourceCircuits.delete(sourceBucketFromKey(key));
+}
+
+function recordSourceFailure(key: string, error: unknown) {
+  if (!(error instanceof SourceRequestError) || !error.retryable) return;
+  const bucket = sourceBucketFromKey(key);
+  const current = sourceCircuits.get(bucket) ?? { failures: 0, openUntil: 0 };
+  const failures = current.failures + 1;
+  sourceCircuits.set(bucket, {
+    failures,
+    openUntil:
+      failures >= CIRCUIT_FAILURE_THRESHOLD
+        ? Date.now() + CIRCUIT_COOLDOWN_MS
+        : 0,
+  });
+}
+
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
 function rememberChapterRequest(key: string, request: Promise<SourceChapterPayload>) {
   chapterRequests.delete(key);
   chapterRequests.set(key, request);
@@ -20,15 +84,44 @@ function rememberChapterRequest(key: string, request: Promise<SourceChapterPaylo
 }
 
 async function api<T>(path: string): Promise<T> {
-  const response = await fetch(path, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    throw new SourceRequestError(
+      "تعذر الاتصال بمصدر القراءة.",
+      0,
+      "SOURCE_NETWORK_ERROR",
+    );
+  }
+
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.message || "تعذر الوصول إلى مصدر القراءة.");
+    throw new SourceRequestError(
+      payload.message || "تعذر الوصول إلى مصدر القراءة.",
+      response.status,
+      payload.error,
+    );
   }
   return payload as T;
+}
+
+async function apiWithRetry<T>(path: string, attempts = 2): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await api<T>(path);
+    } catch (error) {
+      lastError = error;
+      const retryable = error instanceof SourceRequestError && error.retryable;
+      if (!retryable || attempt === attempts - 1) break;
+      await delay(250 + attempt * 500);
+    }
+  }
+  throw lastError;
 }
 
 function params(input: Record<string, string | number | undefined>) {
@@ -106,10 +199,25 @@ export const sourceService = {
   },
 
   async getSeries(key: string) {
-    const payload = await api<{ item: SourceManga }>(
-      `/api/source/series?${params({ key })}`,
-    );
-    return payload.item;
+    if (!circuitAllows(key)) {
+      throw new SourceRequestError(
+        "المصدر متعثر مؤقتًا ويجري الانتظار قبل المحاولة التالية.",
+        503,
+        "SOURCE_CIRCUIT_OPEN",
+      );
+    }
+
+    try {
+      const payload = await apiWithRetry<{ item: SourceManga }>(
+        `/api/source/series?${params({ key })}`,
+        2,
+      );
+      recordSourceSuccess(key);
+      return payload.item;
+    } catch (error) {
+      recordSourceFailure(key, error);
+      throw error;
+    }
   },
 
   async getChapter(key: string, chapter: number) {
