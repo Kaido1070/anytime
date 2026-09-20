@@ -1963,7 +1963,17 @@ function asqHasNext(html) {
 // StarzManga / Manga Starz ---------------------------------------------------
 
 async function starzLatest(db, page) {
-  return starzList(db, { page, order: "latest" });
+  const html = await starzFetchText(
+    "/manga/page/" + page + "/?m_orderby=latest",
+  );
+  const items = starzLatestItemsFromHtml(html);
+
+  if (items.length) {
+    await rememberItems(db, items);
+    return { items: items.slice(0, 48), hasMore: starzHasNext(html), page };
+  }
+
+  return { items: [], hasMore: starzHasNext(html), page };
 }
 
 async function starzPopular(db, page) {
@@ -2118,7 +2128,42 @@ async function starzFetchChapters(postId) {
   return response.text();
 }
 
-function parseStarzChapters(html, seriesUrl) {
+function parseStarzPublishedAt(block, now = Date.now()) {
+  const source = String(block ?? "");
+
+  const machine =
+    firstMatch(source, /\bdatetime=["']([^"']+)["']/i) ||
+    firstMatch(source, /\bdata-(?:time|datetime|published)=["']([^"']+)["']/i);
+  if (machine) {
+    const parsed = Date.parse(machine);
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  }
+
+  const timestamp = firstMatch(source, /\bdata-timestamp=["'](\d{10,13})["']/i);
+  if (timestamp) {
+    const raw = Number(timestamp);
+    const parsed = timestamp.length === 10 ? raw * 1000 : raw;
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  }
+
+  const text = cleanText(stripTags(source))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return null;
+
+  let relative = text.match(/(?:منذ\s*)?(\d+)\s*(?:دقيقة|دقائق|minute|minutes)\s*(?:ago)?/i);
+  if (relative) return new Date(now - Number(relative[1]) * 60_000).toISOString();
+
+  relative = text.match(/(?:منذ\s*)?(\d+)\s*(?:ساعة|ساعات|hour|hours)\s*(?:ago)?/i);
+  if (relative) return new Date(now - Number(relative[1]) * 3_600_000).toISOString();
+
+  // Starz often exposes calendar dates without a time. Those are useful on
+  // series pages, but not precise enough for Wany's strict <24h feed.
+  return null;
+}
+
+function parseStarzChapters(html, seriesUrl, now = Date.now()) {
   const base = new URL(seriesUrl, STARZ_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
   const found = new Map();
@@ -2145,9 +2190,82 @@ function parseStarzChapters(html, seriesUrl) {
     const title = cleanText(stripTags(anchor.inner)) || chapterId;
     const number = asqChapterNumber(title, chapterId);
     if (!Number.isFinite(number)) continue;
-    found.set(number, { number, title: title || "الفصل " + number, publishedAt: null, url });
+    found.set(number, {
+      number,
+      title: title || "الفصل " + number,
+      publishedAt: parseStarzPublishedAt(block, now),
+      url,
+    });
   }
   return [...found.values()].sort((a, b) => b.number - a.number);
+}
+
+function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now()) {
+  const base = new URL(seriesUrl, STARZ_BASE);
+  const basePath = base.pathname.replace(/\/$/, "");
+  const anchors = extractAnchors(block)
+    .map((anchor) => {
+      const href = absoluteUrl(STARZ_BASE, anchor.href);
+      if (!href) return null;
+      try {
+        const parsed = new URL(href);
+        if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") return null;
+        const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+        const title = cleanText(stripTags(anchor.inner)) || chapterId;
+        const number = asqChapterNumber(title, chapterId);
+        if (!Number.isFinite(number)) return null;
+        return { ...anchor, href, title, number };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.start - b.start);
+
+  const found = new Map();
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
+    const nextStart = anchors[index + 1]?.start ?? block.length;
+    const row = block.slice(anchor.start, nextStart);
+    const publishedAt = parseStarzPublishedAt(row, now);
+    if (!publishedAt) continue;
+
+    found.set(anchor.number, {
+      number: anchor.number,
+      title: anchor.title || "الفصل " + anchor.number,
+      publishedAt,
+      url: anchor.href,
+    });
+  }
+  return [...found.values()].sort((a, b) =>
+    Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || "") || b.number - a.number,
+  );
+}
+
+function starzLatestItemsFromHtml(html, now = Date.now()) {
+  const source = String(html ?? "");
+  let blocks = madaraBlocksByClass(source, ["page-item-detail"]);
+  if (!blocks.length) blocks = madaraBlocksByClass(source, ["c-tabs-item__content"]);
+
+  const byKey = new Map();
+  for (const block of blocks) {
+    const item = starzItemsFromHtml(block)[0];
+    if (!item) continue;
+
+    let chapters = parseStarzChapters(block, item.url, now)
+      .filter((chapter) => Boolean(chapter.publishedAt));
+    if (!chapters.length) chapters = parseStarzLatestCardChapters(block, item.url, now);
+    if (!chapters.length) continue;
+
+    const candidate = {
+      ...item,
+      latest: Math.max(...chapters.map((chapter) => Number(chapter.number))),
+      chapters,
+    };
+    byKey.set(candidate.key, candidate);
+  }
+
+  return [...byKey.values()];
 }
 
 async function starzChapter(db, item, number) {
@@ -3370,6 +3488,9 @@ export const __test = {
   parseAsqPages,
   asqPostId,
   parseStarzChapters,
+  parseStarzPublishedAt,
+  parseStarzLatestCardChapters,
+  starzLatestItemsFromHtml,
   parseStarzPages,
   parseMangalikChapters,
   parseMangalikPublishedAt,
