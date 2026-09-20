@@ -1723,3 +1723,44 @@ button.profile-icon-action {
     grid-auto-columns: 136px;
   }
 }
+
+.profile-reading-issues{
+  display:grid;
+  gap:8px;
+  margin:12px 0;
+}
+.profile-reading-issue{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid #4d3c38;
+  border-radius:9px;
+  background:#28211f;
+  color:#e1b9ae;
+  font-size:10px;
+  line-height:1.55;
+}
+.profile-reading-issue b{
+  color:#f0d0c6;
+  font-weight:600;
+}
+.profile-reading-issue .secondary,
+.profile-reading-retry{
+  min-height:34px;
+  padding:7px 10px;
+  font-size:9px;
+}
+.profile-reading-retry{
+  justify-self:start;
+}
+@media(max-width:759px){
+  .profile-reading-issue{
+    grid-template-columns:1fr;
+  }
+  .profile-reading-issue .secondary{
+    width:100%;
+    justify-content:center;
+  }
+}
