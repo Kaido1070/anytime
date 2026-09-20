@@ -328,6 +328,7 @@ export function ProfileReadingSection({
   error = "",
   issues = [],
   onRetry,
+  onRemoveIssue,
 }: {
   entries: ProfileLibraryItem[];
   series: Record<string, SourceManga>;
@@ -337,6 +338,7 @@ export function ProfileReadingSection({
   error?: string;
   issues?: ProfileReadingIssue[];
   onRetry?: () => void;
+  onRemoveIssue?: (mangaId: string) => void;
 }) {
   const available = entries.filter(
     (entry) => entry.status === "reading" && Boolean(series[entry.mangaId]),
@@ -380,9 +382,20 @@ export function ProfileReadingSection({
                 {issue.chapter != null ? ` عند الفصل ${issue.chapter}` : ""}.
                 <small> المصدر: {issue.sourceLabel}</small>
               </span>
-              <Link className="secondary" to={issue.to}>
-                {issue.chapter != null ? `فتح الفصل ${issue.chapter}` : "فتح القصة"}
-              </Link>
+              <div className="profile-reading-issue-actions">
+                <Link className="secondary" to={issue.to}>
+                  {issue.chapter != null ? `فتح الفصل ${issue.chapter}` : "فتح القصة"}
+                </Link>
+                {onRemoveIssue && (
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => onRemoveIssue(issue.mangaId)}
+                  >
+                    إزالة من أقرأ الآن
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           {onRetry && (
