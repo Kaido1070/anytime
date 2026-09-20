@@ -532,6 +532,7 @@ const SEEDED_PROGRESS = [
 export async function onRequest(context) {
   const request = context.request;
   const db = context.env?.DB;
+  const covers = context.env?.WANY_COVERS ?? null;
   if (!db) {
     return json(
       {
@@ -552,7 +553,7 @@ export async function onRequest(context) {
 
   try {
     await ensureApiRuntime(db);
-    return await route(request, url, db);
+    return await route(request, url, db, covers);
   } catch (error) {
     console.error("Anytime API error", error);
     return json(
@@ -565,7 +566,7 @@ export async function onRequest(context) {
   }
 }
 
-async function route(request, url, db) {
+async function route(request, url, db, covers) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "GET" && path === "health") {
@@ -832,11 +833,28 @@ async function route(request, url, db) {
     return json({ user: publicUser({ ...user, profile_visibility: visibility }) });
   }
 
+  const snapshotCoverKey = (userId, mangaId) =>
+    `covers/${encodeURIComponent(String(userId))}/${encodeURIComponent(String(mangaId))}`;
+
   if (path === "work-snapshots/cover") {
     const mangaId = safeId(url.searchParams.get("key"));
     if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+    const objectKey = snapshotCoverKey(user.id, mangaId);
 
     if (request.method === "GET") {
+      // R2 is authoritative for new covers. Keep the D1 chunks as a temporary
+      // fallback so already archived covers survive the migration.
+      if (covers) {
+        const object = await covers.get(objectKey);
+        if (object) {
+          const headers = new Headers();
+          object.writeHttpMetadata(headers);
+          headers.set("ETag", object.httpEtag);
+          headers.set("Cache-Control", "private, max-age=31536000, immutable");
+          return new Response(object.body, { status: 200, headers });
+        }
+      }
+
       const meta = await db
         .prepare(
           "SELECT cover_content_type, cover_size FROM work_snapshots WHERE user_id = ? AND manga_id = ? LIMIT 1",
@@ -876,18 +894,28 @@ async function route(request, url, db) {
           "Content-Type": String(meta.cover_content_type || "image/jpeg"),
           "Content-Length": String(total),
           "Cache-Control": "private, max-age=31536000, immutable",
+          "X-Wany-Cover-Storage": "d1-fallback",
         },
       });
     }
 
     if (request.method === "PUT") {
+      if (!covers) {
+        return json(
+          {
+            error: "R2_NOT_CONFIGURED",
+            message: "مخزن أغلفة Wany غير مربوط بالموقع بعد.",
+          },
+          503,
+        );
+      }
+
       const contentType = String(request.headers.get("content-type") || "").toLowerCase();
       if (!contentType.startsWith("image/")) {
         return json({ error: "INVALID_COVER_TYPE" }, 400);
       }
       const bytes = new Uint8Array(await request.arrayBuffer());
       const MAX_COVER_BYTES = 8 * 1024 * 1024;
-      const CHUNK_BYTES = 900 * 1024;
       if (!bytes.byteLength || bytes.byteLength > MAX_COVER_BYTES) {
         return json(
           { error: "INVALID_COVER_SIZE", message: "حجم الغلاف المحفوظ غير مدعوم." },
@@ -901,30 +929,34 @@ async function route(request, url, db) {
         .first();
       if (!existing) return json({ error: "SNAPSHOT_NOT_FOUND" }, 404);
 
-      const statements = [
-        db.prepare(
-          "DELETE FROM work_snapshot_cover_chunks WHERE user_id = ? AND manga_id = ?",
-        ).bind(user.id, mangaId),
-      ];
-      let chunkIndex = 0;
-      for (let offset = 0; offset < bytes.byteLength; offset += CHUNK_BYTES) {
-        const chunk = bytes.slice(offset, Math.min(bytes.byteLength, offset + CHUNK_BYTES));
-        statements.push(
-          db.prepare(
-            `INSERT INTO work_snapshot_cover_chunks (user_id, manga_id, chunk_index, data)
-             VALUES (?, ?, ?, ?)`,
-          ).bind(user.id, mangaId, chunkIndex++, chunk),
-        );
-      }
-      statements.push(
-        db.prepare(
-          `UPDATE work_snapshots
-           SET cover_content_type = ?, cover_size = ?, updated_at = ?
-           WHERE user_id = ? AND manga_id = ?`,
-        ).bind(contentType, bytes.byteLength, Date.now(), user.id, mangaId),
-      );
-      await db.batch(statements);
-      return json({ ok: true, size: bytes.byteLength });
+      await covers.put(objectKey, bytes, {
+        httpMetadata: {
+          contentType,
+          cacheControl: "private, max-age=31536000, immutable",
+        },
+        customMetadata: {
+          mangaId,
+          userId: String(user.id),
+        },
+      });
+
+      // Metadata remains in D1. Once the R2 write succeeds, old D1 image chunks
+      // can be removed to reclaim database space.
+      await db.batch([
+        db
+          .prepare(
+            `UPDATE work_snapshots
+             SET cover_content_type = ?, cover_size = ?, updated_at = ?
+             WHERE user_id = ? AND manga_id = ?`,
+          )
+          .bind(contentType, bytes.byteLength, Date.now(), user.id, mangaId),
+        db
+          .prepare(
+            "DELETE FROM work_snapshot_cover_chunks WHERE user_id = ? AND manga_id = ?",
+          )
+          .bind(user.id, mangaId),
+      ]);
+      return json({ ok: true, size: bytes.byteLength, storage: "r2" });
     }
 
     return json({ error: "METHOD_NOT_ALLOWED" }, 405);
@@ -1038,9 +1070,13 @@ async function route(request, url, db) {
     const coverChanged =
       Boolean(coverSourceUrl) &&
       String(existing?.cover_source_url || "") !== String(coverSourceUrl);
+    let hasR2Cover = false;
+    if (covers) {
+      hasR2Cover = Boolean(await covers.head(snapshotCoverKey(user.id, mangaId)));
+    }
     return json({
       ok: true,
-      needsCover: !existing || Number(existing.cover_size ?? 0) <= 0 || coverChanged,
+      needsCover: !hasR2Cover || coverChanged,
     });
   }
 
