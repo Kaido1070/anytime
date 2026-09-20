@@ -2770,3 +2770,206 @@ button.profile-icon-action {
   .reading-rank-item{min-width:43px}
   .reading-rank-badge{width:28px;height:28px}
 }
+
+/* Reading stats stability pass: keep the page light on mobile Safari */
+.reading-stats-page-v2{
+  gap:10px;
+}
+.reading-journey-hero{
+  gap:9px;
+  padding:11px 12px;
+  border-radius:12px;
+  background:#1f2123;
+  box-shadow:none;
+}
+.reading-journey-hero::after{
+  display:none;
+}
+.reading-journey-copy{
+  gap:5px;
+}
+.reading-journey-rank{
+  gap:8px;
+}
+.reading-journey-rank-mark{
+  width:31px;
+  height:31px;
+  border-radius:8px;
+  box-shadow:none;
+}
+.reading-journey-rank-mark svg{
+  width:17px;
+  height:17px;
+}
+.reading-journey-rank h2{
+  font-size:18px;
+}
+.reading-journey-subtitle{
+  font-size:7.5px;
+}
+.reading-journey-numbers>div{
+  padding:7px 5px;
+}
+.reading-journey-numbers strong{
+  font-size:15px;
+}
+.reading-journey-numbers span{
+  font-size:7px;
+}
+.reading-journey-progress{
+  gap:5px;
+}
+.reading-journey-progress-track{
+  height:5px;
+}
+
+.reading-stats-quick-grid{
+  gap:6px;
+}
+.reading-stats-quick-grid article{
+  gap:7px;
+  padding:8px 9px;
+  border-radius:9px;
+}
+.reading-stats-quick-icon{
+  width:27px;
+  height:27px;
+  border-radius:7px;
+}
+.reading-stats-quick-icon svg{
+  width:15px;
+  height:15px;
+}
+.reading-stats-quick-grid strong{
+  font-size:14px;
+}
+.reading-stats-quick-grid article>div>span{
+  font-size:7px;
+}
+
+.reading-calendar-compact{
+  gap:7px;
+  padding:9px 10px;
+  border-radius:10px;
+}
+.reading-calendar-compact .reading-stats-section-heading h3{
+  font-size:15px;
+}
+.reading-calendar-compact .reading-calendar-grid{
+  gap:3px;
+}
+.reading-calendar-day{
+  border-radius:2px;
+}
+
+.reading-achievements-compact{
+  gap:6px;
+}
+.reading-achievements-heading h3{
+  font-size:17px;
+}
+.reading-achievement-row{
+  gap:6px;
+  padding:8px 9px;
+  border-radius:10px;
+  background:#1f2123;
+  box-shadow:none;
+}
+.reading-achievement-topline{
+  gap:8px;
+}
+.reading-achievement-title{
+  gap:6px;
+}
+.reading-achievement-category-icon{
+  width:26px;
+  height:26px;
+  border-radius:7px;
+}
+.reading-achievement-category-icon svg{
+  width:14px;
+  height:14px;
+}
+.reading-achievement-title h4{
+  font-size:9px;
+}
+.reading-achievement-title small{
+  max-width:160px;
+  font-size:6.5px;
+}
+.reading-achievement-value{
+  font-size:9px;
+}
+.reading-rank-strip{
+  gap:4px;
+  padding:0;
+}
+.reading-rank-item{
+  min-width:39px;
+  gap:1px;
+}
+.reading-rank-badge{
+  width:24px;
+  height:24px;
+  filter:none !important;
+  transition:none;
+  transform:none !important;
+}
+.reading-rank-badge.next,
+.reading-rank-badge.earned{
+  filter:none !important;
+}
+.reading-rank-badge::before,
+.reading-rank-badge::after{
+  opacity:.9;
+}
+.reading-rank-core{
+  font-size:6px;
+  text-shadow:none;
+}
+.reading-rank-item b{
+  max-width:44px;
+  font-size:5.8px;
+}
+.reading-rank-item span{
+  font-size:5.5px;
+}
+.reading-achievement-progress.compact{
+  gap:3px;
+}
+.reading-achievement-progress.compact>div:first-child{
+  font-size:6.5px;
+}
+.reading-achievement-progress-track{
+  height:3px;
+}
+.reading-achievement-progress-track>span,
+.reading-journey-progress-track>span{
+  background:var(--accent);
+}
+
+.reading-stats-details{
+  border-radius:9px;
+}
+.reading-stats-details summary{
+  padding:10px 11px;
+  font-size:8px;
+}
+
+@media(max-width:759px){
+  .reading-stats-page-v2{gap:9px}
+  .reading-stats-quick-grid{gap:6px}
+  .reading-calendar-compact .reading-calendar-grid{
+    grid-template-columns:repeat(10,minmax(0,1fr));
+  }
+  .reading-rank-strip{
+    gap:3px;
+  }
+  .reading-rank-item{
+    min-width:38px;
+  }
+  .reading-rank-badge{
+    width:23px;
+    height:23px;
+  }
+}
