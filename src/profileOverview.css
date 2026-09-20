@@ -2093,3 +2093,13 @@ button.profile-icon-action {
 @media(max-width:759px){
   .reading-calendar-grid{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
 }
+
+.reading-trophy-category{
+  display:grid;
+  gap:8px;
+}
+.reading-trophy-category h4{
+  color:#d7d5cf;
+  font-size:10px;
+  font-weight:600;
+}
