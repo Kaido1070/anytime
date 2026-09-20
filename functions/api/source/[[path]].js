@@ -932,6 +932,29 @@ async function asqLatest(db, page) {
   return asqList(db, { page, order: "latest" });
 }
 
+function asqSafeSeriesTitle(value, fallback = "") {
+  const title = cleanText(value);
+  if (!title) return cleanText(fallback);
+  if (/^AddText[_\s-]/i.test(title)) return cleanText(fallback);
+  if (/^بدون\s*اسم\s*\d*$/i.test(title)) return cleanText(fallback);
+  if (/^(?:الفصل|chapter)\s*\d+(?:\.\d+)?$/i.test(title)) return cleanText(fallback);
+  return title;
+}
+
+function asqLatestItemIsSane(item) {
+  if (!item || item.source !== "3asq" || !item.slug || !item.key) return false;
+  const title = asqSafeSeriesTitle(item.title);
+  if (!title) return false;
+  const chapters = Array.isArray(item.chapters) ? item.chapters : [];
+  return chapters.length > 0 && chapters.every((chapter) => {
+    const number = Number(chapter?.number);
+    const published = Date.parse(chapter?.publishedAt || "");
+    if (!Number.isFinite(number) || !Number.isFinite(published)) return false;
+    if (!chapter?.url || !/^https?:\/\//i.test(chapter.url)) return false;
+    return true;
+  });
+}
+
 function asqLatestItemsFromHtml(html) {
   const source = String(html ?? "");
   const bySlug = new Map();
@@ -1008,7 +1031,8 @@ function asqLatestItemsFromHtml(html) {
       firstImgAttr(seriesAnchor?.inner || block, "alt") ||
       stripTags(seriesAnchor?.inner || ""),
     );
-    const title = seriesTitle || slug.replace(/[-_]+/g, " ");
+    const slugTitle = slug.replace(/[-_]+/g, " ");
+    const title = asqSafeSeriesTitle(seriesTitle, slugTitle);
     const cover = absoluteUrl(ASQ_BASE, asqFirstImage(block));
 
     const key = "aq:" + safeSlugKey(slug);
@@ -1042,19 +1066,23 @@ function asqLatestItemsFromHtml(html) {
     bySlug.set(slug, existing);
   }
 
-  return [...bySlug.values()].map((item) => ({
-    ...item,
-    chapters: item.chapters
-      .filter((chapter, index, list) =>
-        list.findIndex((candidate) => Number(candidate.number) === Number(chapter.number)) === index,
-      )
-      .sort((a, b) => {
-        const byDate = Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || "");
-        return Number.isFinite(byDate) && byDate !== 0
-          ? byDate
-          : Number(b.number) - Number(a.number);
-      }),
-  }));
+  return [...bySlug.values()]
+    .map((item) => ({
+      ...item,
+      chapters: item.chapters
+        .filter((chapter, index, list) =>
+          list.findIndex((candidate) => Number(candidate.number) === Number(chapter.number)) === index,
+        )
+        .sort((a, b) => {
+          const byDate = Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || "");
+          return Number.isFinite(byDate) && byDate !== 0
+            ? byDate
+            : Number(b.number) - Number(a.number);
+        }),
+    }))
+    // Fail closed: malformed latest metadata must disappear rather than be
+    // advertised as a real release. Other Wany source features remain intact.
+    .filter(asqLatestItemIsSane);
 }
 async function asqPopular(db, page) {
   return asqList(db, { page, order: "views" });
@@ -2633,6 +2661,8 @@ export const __test = {
   parseAsqChapters,
   parseAsqPublishedAt,
   asqLatestItemsFromHtml,
+  asqSafeSeriesTitle,
+  asqLatestItemIsSane,
   parseAsqPages,
   asqPostId,
   parseStarzChapters,
