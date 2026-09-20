@@ -174,7 +174,14 @@ function useLibraryState() {
   const markWorkUnread = useCallback(async (mangaId: string) => {
     try {
       setError("");
+
+      // "لم تتم قراءتها" means the work should disappear from the account's
+      // reading state completely, not just lose chapter completion marks.
+      // Clear reading/history state first, then remove the library row as an
+      // explicit second guard so it cannot resurface after the next refresh.
       await service.markWorkUnread(mangaId);
+      await service.removeFromLibrary(mangaId).catch(() => undefined);
+
       setData((current) => {
         if (!current) return current;
         const progress = Object.fromEntries(
