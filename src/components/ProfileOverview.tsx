@@ -238,11 +238,19 @@ function ReadingCard({
       ? getContinueChapter(item.chapters, highest, highestCompleted)
       : null;
 
+  const archived = item.type === "archived";
+
   return (
     <article className="profile-reading-card">
-      <Link className="profile-reading-cover" to={`/source/${encodeURIComponent(item.key)}`} state={returnState}>
-        <SourceCoverImage item={item} alt={`غلاف ${title}`} loading="lazy" />
-      </Link>
+      {archived ? (
+        <div className="profile-reading-cover" aria-label={`غلاف محفوظ لـ ${title}`}>
+          <SourceCoverImage item={item} alt={`غلاف ${title}`} loading="lazy" />
+        </div>
+      ) : (
+        <Link className="profile-reading-cover" to={`/source/${encodeURIComponent(item.key)}`} state={returnState}>
+          <SourceCoverImage item={item} alt={`غلاف ${title}`} loading="lazy" />
+        </Link>
+      )}
       <div className="profile-reading-copy">
         <h3 dir="auto">{title}</h3>
         <p>
@@ -270,7 +278,11 @@ function ReadingCard({
             <small>{Math.round(progress.percent)}% من الفصول المتاحة</small>
           </>
         )}
-        {own && resumeChapter != null ? (
+        {archived ? (
+          <span className="secondary profile-reading-continue is-disabled">
+            المصدر غير متاح · نسخة محفوظة
+          </span>
+        ) : own && resumeChapter != null ? (
           <Link
             className="primary profile-reading-continue"
             to={readerPath(item, resumeChapter)} state={returnState}
