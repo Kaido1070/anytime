@@ -1134,6 +1134,47 @@ async function asqFetchChapters(postId, referer) {
   return response.text();
 }
 
+function parseAsqPublishedAt(block, now = Date.now()) {
+  const dateBlock =
+    firstMatch(block, /<[^>]*class=["'][^"']*\\bchapter-release-date\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i) ||
+    firstMatch(block, /<[^>]*class=["'][^"']*\\bpost-on\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i);
+  const text = cleanText(stripTags(dateBlock));
+  if (!text) return null;
+
+  const normalized = text
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/،/g, ",")
+    .trim();
+
+  const relative = normalized.match(/منذ\\s+(\\d+)\\s*(دقيقة|دقائق|ساعة|ساعات|يوم|أيام)/i);
+  if (relative) {
+    const amount = Number(relative[1]);
+    const unit = relative[2];
+    const milliseconds =
+      unit.startsWith("دقيق") ? 60_000 :
+      unit.startsWith("ساع") ? 3_600_000 :
+      86_400_000;
+    return new Date(now - amount * milliseconds).toISOString();
+  }
+  if (/منذ\\s+دقيقة/i.test(normalized)) return new Date(now - 60_000).toISOString();
+  if (/منذ\\s+ساعة/i.test(normalized)) return new Date(now - 3_600_000).toISOString();
+  if (/منذ\\s+ساعتين/i.test(normalized)) return new Date(now - 2 * 3_600_000).toISOString();
+  if (/منذ\\s+يوم(?:\\s+واحد)?/i.test(normalized)) return new Date(now - 86_400_000).toISOString();
+  if (/منذ\\s+يومين/i.test(normalized)) return new Date(now - 2 * 86_400_000).toISOString();
+
+  const months = {
+    يناير: 0, فبراير: 1, مارس: 2, أبريل: 3, ابريل: 3, مايو: 4, يونيو: 5,
+    يوليو: 6, أغسطس: 7, اغسطس: 7, سبتمبر: 8, أكتوبر: 9, اكتوبر: 9,
+    نوفمبر: 10, ديسمبر: 11,
+  };
+  const absolute = normalized.match(/(\\d{1,2})\\s+([\\u0600-\\u06ff]+)[,\\s]+(\\d{4})/);
+  if (!absolute) return null;
+  const month = months[absolute[2]];
+  if (month == null) return null;
+  const timestamp = Date.UTC(Number(absolute[3]), month, Number(absolute[1]));
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
 function parseAsqChapters(html, seriesUrl) {
   const base = new URL(seriesUrl, ASQ_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
