@@ -16,7 +16,7 @@ const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq"];
 
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
-const VERIFIED_SOURCE_SCAN_PAGES = 5;
+const VERIFIED_SOURCE_SCAN_PAGES = 2;
 
 export interface FeedChapter {
   identity: string;
@@ -213,9 +213,9 @@ function collectReadChecks(groups: SourceGroup[]) {
 
 export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   const safePage = Math.max(1, Math.min(20, Math.trunc(page)));
-  // Scan several title-list pages from each verified source before applying
-  // the strict chapter-level 24-hour cutoff. Madara's latest listing is
-  // title-oriented, so releases from the same day can spill beyond page 1.
+  // Verified adapters expose their latest-chapter stream directly. Scan only
+  // a small continuation window; the backend already returns chapter timestamps
+  // from the source's own latest-updates section.
   const scanStart = (safePage - 1) * VERIFIED_SOURCE_SCAN_PAGES + 1;
   const scanPages = Array.from(
     { length: VERIFIED_SOURCE_SCAN_PAGES },
