@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { formatArabicRelativeTime } from "../services/dateFormat";
@@ -44,7 +44,7 @@ function FeedProgress({ progress }: { progress: NewFeedLoadProgress }) {
     <div className="new-progress-card" role="status" aria-live="polite">
       <div
         className="new-progress-ring"
-        style={{ "--new-progress": progress.percent + "%" } as React.CSSProperties}
+        style={{ "--new-progress": progress.percent + "%" } as CSSProperties}
         aria-label={progress.percent + "% مكتمل"}
       >
         <div className="new-progress-ring-core">
