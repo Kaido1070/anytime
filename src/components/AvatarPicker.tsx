@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { filterAvatarSeries } from "../services/avatars";
 import { userDataService } from "../services/userData";
 import type { Avatar, AvatarSeries } from "../types";
 
@@ -40,7 +39,6 @@ export function AvatarPicker({
 }) {
   const [series, setSeries] = useState<AvatarSeries[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(currentAvatarId);
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -83,20 +81,12 @@ export function AvatarPicker({
     };
   }, [busy, onClose]);
 
-  const filtered = useMemo(
-    () => filterAvatarSeries(series, query),
-    [series, query],
-  );
   const selected = useMemo(
     () =>
       series
         .flatMap((group) => group.avatars)
         .find((avatar) => avatar.id === selectedId) ?? null,
     [series, selectedId],
-  );
-  const resultCount = useMemo(
-    () => filtered.reduce((total, group) => total + group.avatars.length, 0),
-    [filtered],
   );
 
   async function save() {
@@ -161,23 +151,6 @@ export function AvatarPicker({
           )}
         </div>
 
-        <div className="avatar-picker-search-wrap">
-          <label className="avatar-picker-search">
-            <span className="sr-only">البحث في مكتبة الصور الشخصية</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="ابحث عن قصة أو شخصية..."
-              autoFocus
-            />
-          </label>
-          {!loading && (
-            <span className="avatar-picker-result-count">
-              {resultCount} صورة
-            </span>
-          )}
-        </div>
 
         <div className="avatar-picker-content">
           {loading ? (
@@ -189,8 +162,8 @@ export function AvatarPicker({
               <span />
               <span />
             </div>
-          ) : filtered.length ? (
-            filtered.map((group) => (
+          ) : series.length ? (
+            series.map((group) => (
               <section
                 className="avatar-series"
                 key={group.id}
