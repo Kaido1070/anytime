@@ -1025,6 +1025,15 @@ async function teamXLatest(context, db, page) {
 }
 
 
+function teamXLatestSection(html) {
+  const source = String(html ?? "");
+  const latestMarker = source.search(/(?:اخر|آخر)\s+الفصول/i);
+  if (latestMarker >= 0) return source.slice(latestMarker);
+
+  const postBodyMarker = source.search(/class=["'][^"']*post-body[^"']*["']/i);
+  return postBodyMarker >= 0 ? source.slice(postBodyMarker) : source;
+}
+
 async function syncTeamXLatest(db) {
   const html = await teamXFetchText("/");
   // Scope strictly to Team-X's "آخر الفصول" section. The homepage also has
