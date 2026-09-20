@@ -720,35 +720,13 @@ async function teamXLatest(db, page) {
   const html = await teamXFetchText(`/?page=${page}`);
   const marker = html.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
   const scoped = marker >= 0 ? html.slice(marker) : html;
-  const baseItems = (await teamXItemsFromHtml(scoped)).slice(0, 24);
-
-  // Team-X's homepage is the authoritative "latest chapters" list, but it
-  // does not expose trustworthy publication times there. Enrich only those
-  // latest cards from their series pages; never crawl the full catalogue.
-  const results = new Array(baseItems.length);
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(6, baseItems.length) }, async () => {
-    while (true) {
-      const index = cursor++;
-      if (index >= baseItems.length) break;
-      const item = baseItems[index];
-      try {
-        const detailHtml = await teamXFetchText(item.url, false);
-        const chapters = parseTeamXChapters(detailHtml, item.url)
-          .filter((chapter) => !chapter.synthetic && Boolean(chapter.publishedAt));
-        results[index] = chapters.length
-          ? { ...item, latest: chapters[0].number, chapters }
-          : null;
-      } catch {
-        results[index] = null;
-      }
-    }
-  });
-  await Promise.all(workers);
-
-  const items = results.filter(Boolean);
+  const items = await teamXItemsFromHtml(scoped);
   await rememberItems(db, items);
-  return { items, hasMore: teamXHasNext(html), page };
+
+  // Keep the generic Team-X latest endpoint lightweight. Do not fan out into
+  // every series page here; that N+1 pattern can stall any Wany screen that
+  // consumes source latest data. Strict New verification is handled separately.
+  return { items: items.slice(0, 24), hasMore: teamXHasNext(html), page };
 }
 
 async function teamXSearch(db, query) {
