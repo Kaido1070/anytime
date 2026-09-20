@@ -120,6 +120,50 @@ test("3asq latest parser keeps chapter dates attached to the exact chapter row",
   assert.notEqual(items[0].title, "AddText_06-16-01.19.28");
 });
 
+test("3asq latest card parser pairs each chapter with its own date", () => {
+  const now = Date.UTC(2026, 8, 20, 18, 0, 0);
+  const html = `
+    <div>
+      <a href="https://3asq.online/manga/wistoria/chapter-66/">الفصل 66</a>
+      <span class="chapter-release-date">منذ ساعتين</span>
+      <a href="https://3asq.online/manga/wistoria/chapter-65/">الفصل 65</a>
+      <span class="chapter-release-date">10 سبتمبر، 2026</span>
+    </div>
+  `;
+  const chapters = __test.parseAsqLatestCardChapters(
+    html,
+    "https://3asq.online/manga/wistoria/",
+    now,
+  );
+  assert.equal(chapters.length, 2);
+  assert.equal(chapters[0].number, 66);
+  assert.equal(chapters[0].publishedAt, new Date(now - 2 * 60 * 60 * 1000).toISOString());
+  assert.equal(chapters[1].number, 65);
+  assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
+});
+
+test("3asq latest card parser prefers dates inside each chapter li", () => {
+  const now = Date.UTC(2026, 8, 20, 18, 0, 0);
+  const html = `
+    <li class="wp-manga-chapter">
+      <a href="https://3asq.online/manga/kengan-omega/chapter-370/">الفصل 370</a>
+      <span class="chapter-release-date">منذ 3 ساعات</span>
+    </li>
+    <li class="wp-manga-chapter">
+      <a href="https://3asq.online/manga/kengan-omega/chapter-369/">الفصل 369</a>
+      <span class="chapter-release-date">10 سبتمبر، 2026</span>
+    </li>
+  `;
+  const chapters = __test.parseAsqLatestCardChapters(
+    html,
+    "https://3asq.online/manga/kengan-omega/",
+    now,
+  );
+  assert.equal(chapters.length, 2);
+  assert.equal(chapters[0].publishedAt, new Date(now - 3 * 60 * 60 * 1000).toISOString());
+  assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
+});
+
 test("3asq latest metadata guard rejects UI junk and malformed chapters", () => {
   assert.equal(__test.asqSafeSeriesTitle("AddText_06-16-01.19.28", "wistoria"), "wistoria");
   assert.equal(__test.asqSafeSeriesTitle("بدون اسم203", "kengan omega"), "kengan omega");
