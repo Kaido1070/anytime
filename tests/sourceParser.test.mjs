@@ -164,6 +164,71 @@ test("3asq latest card parser prefers dates inside each chapter li", () => {
   assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
 });
 
+test("3asq latest archive parser keeps nested card boundaries intact", () => {
+  const now = Date.UTC(2026, 8, 20, 18, 0, 0);
+  const html = `
+    <div class="c-tabs-item__content">
+      <div class="page-item-detail">
+        <a href="https://3asq.online/manga/wistoria/" title="WISTORIA: WAND AND SWORD">
+          <img src="https://cdn.example.com/wistoria.webp" alt="WISTORIA: WAND AND SWORD">
+        </a>
+        <li class="wp-manga-chapter">
+          <a href="https://3asq.online/manga/wistoria/chapter-64/">الفصل 64</a>
+          <span class="chapter-release-date">منذ 32 دقيقة</span>
+        </li>
+        <li class="wp-manga-chapter">
+          <a href="https://3asq.online/manga/wistoria/chapter-63/">الفصل 63</a>
+          <span class="chapter-release-date">منذ يوم واحد</span>
+        </li>
+      </div>
+      <div class="page-item-detail">
+        <a href="https://3asq.online/manga/one-piece/" title="One Piece">
+          <img src="https://cdn.example.com/one-piece.webp" alt="One Piece">
+        </a>
+        <li class="wp-manga-chapter">
+          <a href="https://3asq.online/manga/one-piece/chapter-1193/">الفصل 1193</a>
+          <span class="chapter-release-date">10 سبتمبر، 2026</span>
+        </li>
+      </div>
+    </div>
+  `;
+  const items = __test.asqLatestItemsFromArchiveHtml(html, now);
+  assert.equal(items.length, 2);
+  const wistoria = items.find((item) => item.sourceId === "wistoria");
+  assert.equal(wistoria.title, "WISTORIA: WAND AND SWORD");
+  assert.equal(wistoria.chapters.length, 1);
+  assert.equal(wistoria.chapters[0].number, 64);
+  assert.equal(
+    wistoria.chapters[0].publishedAt,
+    new Date(now - 32 * 60 * 1000).toISOString(),
+  );
+});
+
+test("3asq strict recent dates reject coarse day-relative labels", () => {
+  const now = Date.UTC(2026, 8, 20, 18, 0, 0);
+  assert.equal(
+    __test.parseAsqRecentPublishedAt(
+      '<span class="chapter-release-date">منذ 3 ساعات</span>',
+      now,
+    ),
+    new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+  );
+  assert.equal(
+    __test.parseAsqRecentPublishedAt(
+      '<span class="chapter-release-date">منذ يوم واحد</span>',
+      now,
+    ),
+    null,
+  );
+  assert.equal(
+    __test.parseAsqRecentPublishedAt(
+      '<span class="chapter-release-date">منذ يومين</span>',
+      now,
+    ),
+    null,
+  );
+});
+
 test("3asq latest metadata guard rejects UI junk and malformed chapters", () => {
   assert.equal(__test.asqSafeSeriesTitle("AddText_06-16-01.19.28", "wistoria"), "wistoria");
   assert.equal(__test.asqSafeSeriesTitle("بدون اسم203", "kengan omega"), "kengan omega");
