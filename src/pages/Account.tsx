@@ -448,7 +448,7 @@ function FullReadingView({
 
       // Render cached metadata immediately. Live source refresh is best-effort
       // and must not blank a user's reading list.
-      setSeries(cached);
+      setSeries((current) => ({ ...cached, ...current }));
       setLoading(false);
 
       const results = await Promise.allSettled(
@@ -456,17 +456,21 @@ function FullReadingView({
       );
       if (!active) return;
 
-      const next = { ...cached };
+      const refreshed = new Map<string, SourceManga>();
       results.forEach((result, index) => {
         if (result.status !== "fulfilled") return;
         const entry = reading[index];
-        next[entry.mangaId] = result.value;
+        refreshed.set(entry.mangaId, result.value);
         void saveWorkSnapshot(
           result.value,
           entry.lastReadChapter ?? entry.highestReachedChapter,
         );
       });
-      setSeries(next);
+      setSeries((current) => {
+        const next = { ...cached, ...current };
+        for (const [key, item] of refreshed) next[key] = item;
+        return next;
+      });
     })().catch(() => {
       if (active) setLoading(false);
     });
@@ -613,26 +617,33 @@ export function Account() {
       // Snapshot/D1 metadata is the display source. Upstream sites only refresh
       // it in the background, so a temporary outage does not become a profile
       // outage.
-      setSeries(cached);
+      setSeries((current) => ({ ...cached, ...current }));
 
       const results = await Promise.allSettled(
         readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
       );
       if (!active) return;
 
-      const next = { ...cached };
+      const refreshed = new Map<string, SourceManga>();
       results.forEach((result, index) => {
         if (result.status !== "fulfilled") return;
         const entry = readingEntries[index];
-        next[entry.mangaId] = result.value;
+        refreshed.set(entry.mangaId, result.value);
         void saveWorkSnapshot(
           result.value,
           entry.lastReadChapter ?? entry.highestReachedChapter,
         );
       });
 
-      setSeries(next);
-      const unresolved = keys.filter((key) => !next[key]);
+      setSeries((current) => {
+        const next = { ...cached, ...current };
+        for (const [key, item] of refreshed) next[key] = item;
+        return next;
+      });
+
+      const unresolved = keys.filter(
+        (key) => !cached[key] && !refreshed.has(key),
+      );
       setReadingError(
         unresolved.length
           ? `تعذر تجهيز ${unresolved.length} من القصص مؤقتًا. سنحاول تحديثها عند فتح الصفحة لاحقًا.`
