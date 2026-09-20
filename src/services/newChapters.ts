@@ -274,7 +274,7 @@ export async function loadNewChapterFeed(
 
   const latestPromise = Promise.allSettled(
     sourceTasks.map(({ source, page: sourcePage }) =>
-      withinSourceBudget(sourceService.latest(source, sourcePage)).finally(() => {
+      withinSourceBudget(sourceService.recent(source, sourcePage)).finally(() => {
         completedSteps += 1;
         report("جاري جمع أحدث الفصول");
       }),
