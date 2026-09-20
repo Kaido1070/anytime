@@ -364,6 +364,42 @@ test("StarzManga extracts Madara post id and chapter list", () => {
   assert.deepEqual(chapters.map((chapter) => chapter.number), [12, 11.5]);
 });
 
+test("StarzManga strict New accepts precise times and rejects date-only labels", () => {
+  const now = Date.UTC(2026, 8, 20, 12, 0, 0);
+  assert.equal(
+    __test.parseStarzPublishedAt('<time datetime="2026-09-20T08:30:00Z">20 سبتمبر، 2026</time>', now),
+    "2026-09-20T08:30:00.000Z",
+  );
+  assert.equal(
+    __test.parseStarzPublishedAt('<span class="chapter-release-date">منذ 3 ساعات</span>', now),
+    "2026-09-20T09:00:00.000Z",
+  );
+  assert.equal(
+    __test.parseStarzPublishedAt('<span class="chapter-release-date">20 سبتمبر، 2026</span>', now),
+    null,
+  );
+});
+
+test("StarzManga latest card keeps chapter timestamps scoped to each row", () => {
+  const now = Date.UTC(2026, 8, 20, 12, 0, 0);
+  const html = `
+    <div class="page-item-detail">
+      <a href="https://starzmanga.com/manga/example-work/" title="Example Work">
+        <img src="https://cdn.example.com/example.webp" alt="Example Work">
+      </a>
+      <a href="https://starzmanga.com/manga/example-work/chapter-12/">12</a>
+      <span>منذ ساعتين</span>
+      <a href="https://starzmanga.com/manga/example-work/chapter-11/">11</a>
+      <span>20 سبتمبر، 2026</span>
+    </div>
+  `;
+  const items = __test.starzLatestItemsFromHtml(html, now);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].chapters.length, 1);
+  assert.equal(items[0].chapters[0].number, 12);
+  assert.equal(items[0].chapters[0].publishedAt, "2026-09-20T10:00:00.000Z");
+});
+
 test("StarzManga page parser keeps chapter images only", () => {
   const html = `
     <div class="reading-content">
