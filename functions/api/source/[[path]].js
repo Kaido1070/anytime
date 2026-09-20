@@ -916,20 +916,23 @@ function teamXHasNext(html) {
 // 3asq / Manga Al-Ashiq ------------------------------------------------------
 
 async function asqLatest(db, page) {
-  // 3asq's homepage/latest stream is the fast path that already proved stable
-  // for chapter discovery. Keep using it; only fix how series metadata is scoped.
+  // Use 3asq's manga archive ordered by latest. It exposes the series card,
+  // chapter rows and source dates together, so no per-series hydration is needed.
   const path = page > 1
-    ? "/page/" + page + "/?m_orderby=latest"
-    : "/?m_orderby=latest";
+    ? "/manga/page/" + page + "/?m_orderby=latest"
+    : "/manga/?m_orderby=latest";
   const html = await asqFetchText(path);
-  const direct = asqLatestItemsFromHtml(html);
+
+  const archiveItems = asqLatestItemsFromArchiveHtml(html);
+  const direct = archiveItems.length ? archiveItems : asqLatestItemsFromHtml(html);
 
   if (direct.length) {
     await rememberItems(db, direct);
     return { items: direct.slice(0, 48), hasMore: asqHasNext(html), page };
   }
 
-  return asqList(db, { page, order: "latest" });
+  // Fail closed for New: a title-only fallback cannot prove chapter timestamps.
+  return { items: [], hasMore: asqHasNext(html), page };
 }
 
 function asqSafeSeriesTitle(value, fallback = "") {
@@ -1002,7 +1005,7 @@ function parseAsqLatestCardChapters(block, seriesUrl, now = Date.now()) {
     const row = source.slice(liStart, liEnd + 5);
     const linksInRow = (row.match(/\/manga\//gi) || []).length;
     if (linksInRow > 2) continue;
-    chapter.publishedAt = parseAsqPublishedAt(row, now);
+    chapter.publishedAt = parseAsqRecentPublishedAt(row, now);
   }
 
   // Homepage/latest widgets sometimes place the date beside the chapter row
@@ -1010,8 +1013,8 @@ function parseAsqLatestCardChapters(block, seriesUrl, now = Date.now()) {
   // then pair each chapter only with the date in its own adjacent interval.
   const first = chapters[0];
   const secondStart = chapters[1]?.start ?? source.length;
-  const firstAfter = parseAsqPublishedAt(source.slice(first.end, secondStart), now);
-  const firstBefore = parseAsqPublishedAt(source.slice(0, first.start), now);
+  const firstAfter = parseAsqRecentPublishedAt(source.slice(first.end, secondStart), now);
+  const firstBefore = parseAsqRecentPublishedAt(source.slice(0, first.start), now);
   const orientation = firstAfter ? "after" : firstBefore ? "before" : null;
 
   for (let index = 0; index < chapters.length; index += 1) {
@@ -1026,12 +1029,53 @@ function parseAsqLatestCardChapters(block, seriesUrl, now = Date.now()) {
         ? source.slice(chapter.end, nextStart)
         : "";
 
-    chapter.publishedAt = interval ? parseAsqPublishedAt(interval, now) : null;
+    chapter.publishedAt = interval ? parseAsqRecentPublishedAt(interval, now) : null;
   }
 
   return chapters
     .filter((chapter) => Boolean(chapter.publishedAt))
     .map(({ start: _start, end: _end, ...chapter }) => chapter);
+}
+
+function asqLatestItemsFromArchiveHtml(html, now = Date.now()) {
+  const source = String(html ?? "");
+  // Important: use page-item-detail alone. Combining it with its parent
+  // c-tabs-item__content creates nested split boundaries and can cut a card
+  // before its chapter rows.
+  let blocks = madaraBlocksByClass(source, ["page-item-detail"]);
+  if (!blocks.length) blocks = madaraBlocksByClass(source, ["c-tabs-item__content"]);
+
+  const items = [];
+  for (const block of blocks) {
+    const item = asqItemsFromHtml(block)[0];
+    if (!item) continue;
+
+    const chapters = parseAsqLatestCardChapters(block, item.url, now);
+    if (!chapters.length) continue;
+
+    const candidate = {
+      ...item,
+      latest: Math.max(...chapters.map((chapter) => Number(chapter.number))),
+      chapters,
+    };
+    if (asqLatestItemIsSane(candidate)) items.push(candidate);
+  }
+
+  const byKey = new Map();
+  for (const item of items) {
+    const existing = byKey.get(item.key);
+    if (!existing) {
+      byKey.set(item.key, item);
+      continue;
+    }
+    existing.chapters = [...existing.chapters, ...item.chapters]
+      .filter((chapter, index, list) =>
+        list.findIndex((candidate) => Number(candidate.number) === Number(chapter.number)) === index,
+      )
+      .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+    existing.latest = Math.max(Number(existing.latest || 0), Number(item.latest || 0));
+  }
+  return [...byKey.values()];
 }
 
 function asqLatestItemsFromHtml(html) {
@@ -1413,6 +1457,19 @@ function parseAsqPublishedAt(block, now = Date.now()) {
   if (month == null) return null;
   const timestamp = Date.UTC(Number(absolute[3]), month, Number(absolute[1]));
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
+function parseAsqRecentPublishedAt(block, now = Date.now()) {
+  const raw =
+    firstMatch(block, /<[^>]*class=["'][^"']*\bchapter-release-date\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i) ||
+    firstMatch(block, /<[^>]*class=["'][^"']*\bpost-on\b[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
+  const text = cleanText(stripTags(raw));
+  if (!text) return null;
+
+  // "منذ يوم/يومين" is intentionally too coarse for a strict 24-hour feed:
+  // "منذ يوم" can represent anything around/over the boundary. Fail closed.
+  if (/منذ\s+(?:يوم|يومين|\d+\s*(?:يوم|أيام))/i.test(text)) return null;
+  return parseAsqPublishedAt(block, now);
 }
 
 function parseAsqChapters(html, seriesUrl) {
@@ -2736,7 +2793,9 @@ export const __test = {
   parseAsqChapters,
   parseAsqPublishedAt,
   asqLatestItemsFromHtml,
+  asqLatestItemsFromArchiveHtml,
   parseAsqLatestCardChapters,
+  parseAsqRecentPublishedAt,
   asqSafeSeriesTitle,
   asqLatestItemIsSane,
   parseAsqPages,
