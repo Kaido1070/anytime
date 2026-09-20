@@ -9,14 +9,10 @@ import { mergeSourceItems, preferredSourceCover, type SourceGroup } from "./sour
 import { sourceService } from "./sources";
 import { userDataService } from "./userData";
 
-const SOURCES: SourceName[] = [
-  "mangatime",
-  "teamx",
-  "3asq",
-  "starzmanga",
-  "xsano",
-  "mangalik",
-];
+// Only sources whose chapter publication timestamps have been explicitly
+// audited may enter the public New feed. Other sources remain available
+// everywhere else in Wany until their date adapters are verified.
+const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq"];
 
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
@@ -218,7 +214,7 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   const safePage = Math.max(1, Math.min(20, Math.trunc(page)));
   const [state, latestSettled] = await Promise.all([
     userDataService.getPersonalizationState(),
-    Promise.allSettled(SOURCES.map((source) => sourceService.latest(source, safePage))),
+    Promise.allSettled(VERIFIED_NEW_FEED_SOURCES.map((source) => sourceService.latest(source, safePage))),
   ]);
 
   const latestItems = latestSettled.flatMap((result) =>
