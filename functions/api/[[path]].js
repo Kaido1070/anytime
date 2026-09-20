@@ -1681,8 +1681,8 @@ async function route(request, url, db, covers) {
     const chaptersJson = JSON.stringify(chapters);
 
     await db.batch([
-      db.prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
-        SELECT ?, ?, CAST(j.value AS REAL), ?
+      db.prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at, entry_type)
+        SELECT ?, ?, CAST(j.value AS REAL), ?, 'bulk'
         FROM json_each(?) AS j
         WHERE NOT EXISTS (
           SELECT 1
@@ -1745,8 +1745,8 @@ async function route(request, url, db, covers) {
 
     await db.batch([
       db
-        .prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at)
-          SELECT ?, ?, ?, ?
+        .prepare(`INSERT INTO reading_history (user_id, manga_id, chapter, read_at, entry_type)
+          SELECT ?, ?, ?, ?, 'organic'
           WHERE ? = 1
             AND NOT EXISTS (
               SELECT 1 FROM reading_history
@@ -2094,7 +2094,7 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version !== "18") {
+      if (version !== "19") {
         await ensureDatabase(db);
         await ensureAdminSchema(db);
 
@@ -2108,6 +2108,7 @@ async function ensureApiRuntime(db) {
         await applyHUsernameV16(db);
         await applyListIconsV17(db);
         await applyWorkSnapshotsV18(db);
+        await applyReadingAnalyticsV19(db);
       }
 
       // Repair canonical account names independently from schema_version.
@@ -2307,6 +2308,45 @@ async function applyWorkSnapshotsV18(db) {
     ),
     db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '18')"),
   ]);
+}
+
+async function applyReadingAnalyticsV19(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "19") return;
+  if (version?.value !== "18") return;
+
+  const columns = await db.prepare("PRAGMA table_info(reading_history)").all();
+  const hasEntryType = (columns.results ?? []).some((column) => column.name === "entry_type");
+  if (!hasEntryType) {
+    await db
+      .prepare("ALTER TABLE reading_history ADD COLUMN entry_type TEXT NOT NULL DEFAULT 'organic'")
+      .run();
+  }
+
+  // Historical bulk imports were written at the exact same millisecond for one
+  // work. Classify those bursts once so they do not inflate daily reading pace
+  // or chapter trophies.
+  await db.prepare(`UPDATE reading_history
+    SET entry_type = 'bulk'
+    WHERE entry_type = 'organic'
+      AND EXISTS (
+        SELECT 1
+        FROM reading_history grouped
+        WHERE grouped.user_id = reading_history.user_id
+          AND grouped.manga_id = reading_history.manga_id
+          AND grouped.read_at = reading_history.read_at
+        GROUP BY grouped.user_id, grouped.manga_id, grouped.read_at
+        HAVING COUNT(*) >= 2
+      )`).run();
+
+  await db
+    .prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_type_time ON reading_history(user_id, entry_type, read_at DESC)")
+    .run();
+  await db
+    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '19')")
+    .run();
 }
 
 async function applyListIconsV17(db) {
