@@ -652,7 +652,9 @@ function priorityRefreshActive(now = Date.now()) {
 }
 
 function sourceRefreshIntervalMs(now = Date.now()) {
-  return priorityRefreshActive(now) ? 2 * 60_000 : 5 * 60_000;
+  // Protect D1 and upstream sources: priority windows are responsive without
+  // turning every page visit into a frequent cache refresh.
+  return priorityRefreshActive(now) ? 5 * 60_000 : 15 * 60_000;
 }
 
 // MangaTime -----------------------------------------------------------------
@@ -2894,7 +2896,7 @@ async function xsanoLatest(context, db, page) {
     .first();
   const lastStartedAt = Number(state?.last_started_at ?? 0);
 
-  if (now - lastStartedAt >= 5 * 60_000) {
+  if (now - lastStartedAt >= 15 * 60_000) {
     await db
       .prepare(`INSERT INTO source_sync_state (source, last_started_at)
         VALUES ('xsano', ?)
