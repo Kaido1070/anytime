@@ -2119,10 +2119,56 @@ async function mangalikLatest(db, page) {
   return { items: [], hasMore: mangalikHasNext(html), page };
 }
 
-function mangalikLatestItemsFromHtml(html) {
+function parseMangalikLatestCardChapters(block, seriesUrl, now = Date.now()) {
+  const base = new URL(seriesUrl, MANGALIK_BASE);
+  const basePath = base.pathname.replace(/\/$/, "");
+
+  const anchors = extractAnchors(block)
+    .map((anchor) => {
+      const href = absoluteUrl(MANGALIK_BASE, anchor.href);
+      if (!href) return null;
+      try {
+        const parsed = new URL(href);
+        if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") {
+          return null;
+        }
+        const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+        const title = cleanText(stripTags(anchor.inner)) || chapterId;
+        const number = asqChapterNumber(title, chapterId);
+        if (!Number.isFinite(number)) return null;
+        return { ...anchor, href, title, number };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.start - b.start);
+
+  const found = new Map();
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
+    const nextStart = anchors[index + 1]?.start ?? block.length;
+    // Date belongs only to the interval after this chapter anchor and before
+    // the next chapter anchor. This prevents sibling chapters sharing dates.
+    const row = block.slice(anchor.start, nextStart);
+    const publishedAt = parseMangalikPublishedAt(row, now);
+    if (!publishedAt) continue;
+
+    found.set(anchor.number, {
+      number: anchor.number,
+      title: anchor.title || "الفصل " + anchor.number,
+      publishedAt,
+      url: anchor.href,
+    });
+  }
+
+  return [...found.values()].sort((a, b) =>
+    Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || "") || b.number - a.number,
+  );
+}
+
+function mangalikLatestItemsFromHtml(html, now = Date.now()) {
   const source = String(html ?? "");
-  // Use one card boundary only. Mixing parent + child classes can cut chapter
-  // rows away from their title/cover metadata.
   let blocks = madaraBlocksByClass(source, ["page-item-detail"]);
   if (!blocks.length) blocks = madaraBlocksByClass(source, ["c-tabs-item__content"]);
 
@@ -2131,8 +2177,12 @@ function mangalikLatestItemsFromHtml(html) {
     const item = mangalikItemsFromHtml(block)[0];
     if (!item) continue;
 
-    const chapters = parseMangalikChapters(block, item.url)
+    let chapters = parseMangalikChapters(block, item.url)
       .filter((chapter) => Boolean(chapter.publishedAt));
+
+    // MangaLik's newest page can render chapter rows without wp-manga-chapter
+    // <li> wrappers. Fall back to exact anchor intervals inside the same card.
+    if (!chapters.length) chapters = parseMangalikLatestCardChapters(block, item.url, now);
     if (!chapters.length) continue;
 
     const candidate = {
@@ -2295,12 +2345,23 @@ async function mangalikSeries(db, item) {
   return updated;
 }
 
-function parseMangalikPublishedAt(block) {
+function parseMangalikPublishedAt(block, now = Date.now()) {
   const text = cleanText(stripTags(block))
     .replace(/،/g, ",")
     .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
     .trim();
   if (!text) return null;
+
+  const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
+  let relative = normalized.match(/(?:منذ\s*)?(\d+)\s*(دقيقة|دقائق|minute|minutes)\s*(?:ago)?/i);
+  if (relative) return new Date(now - Number(relative[1]) * 60_000).toISOString();
+
+  relative = normalized.match(/(?:منذ\s*)?(\d+)\s*(ساعة|ساعات|hour|hours)\s*(?:ago)?/i);
+  if (relative) return new Date(now - Number(relative[1]) * 3_600_000).toISOString();
+
+  // Day/week/month labels are intentionally rejected because they are too
+  // coarse for Wany's strict <24h feed.
+  if (/(?:يوم|ايام|أيام|day|days|week|weeks|month|months)/i.test(normalized)) return null;
 
   const months = {
     يناير: 0, فبراير: 1, مارس: 2, أبريل: 3, ابريل: 3, مايو: 4, يونيو: 5,
@@ -3081,6 +3142,7 @@ export const __test = {
   parseMangalikChapters,
   parseMangalikPublishedAt,
   mangalikLatestItemsFromHtml,
+  parseMangalikLatestCardChapters,
   parseMangalikPages,
   starzPostId,
   parseXsanoPages,
