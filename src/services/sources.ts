@@ -7,6 +7,13 @@ import type {
 
 const coverRequests = new Map<string, Promise<string[]>>();
 const chapterRequests = new Map<string, Promise<SourceChapterPayload>>();
+export interface SourceDiagnostic {
+  source: SourceName;
+  lastSyncAt: number | null;
+  lastVerifiedReleaseAt: string | null;
+  recent24h: number;
+}
+
 const MAX_CHAPTER_REQUESTS = 8;
 
 class SourceRequestError extends Error {
@@ -180,6 +187,11 @@ function coverFallbackCandidates(item: SourceManga) {
 }
 
 export const sourceService = {
+  async status() {
+    const payload = await api<{ sources: SourceDiagnostic[] }>("/api/source/status");
+    return payload.sources ?? [];
+  },
+
   async latest(source: SourceName, page = 1) {
     return api<SourceListResponse>(
       `/api/source/latest?${params({ source, page })}`,
