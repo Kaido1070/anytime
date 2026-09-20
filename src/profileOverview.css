@@ -2973,3 +2973,49 @@ button.profile-icon-action {
     height:23px;
   }
 }
+
+/* Compact latest achievements beneath the account identity */
+.profile-overview-header:has(.profile-header-achievements){
+  flex-wrap:wrap;
+}
+.profile-header-achievements{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  margin-top:2px;
+}
+.profile-header-achievement{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  padding:7px 9px;
+  border:1px solid #343739;
+  border-radius:9px;
+  background:#1d1f20;
+}
+.profile-header-achievement span{
+  flex:0 0 auto;
+  color:var(--muted);
+  font-size:7px;
+  white-space:nowrap;
+}
+.profile-header-achievement b{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#e4c7a3;
+  font-size:8px;
+  font-weight:600;
+}
+@media(max-width:759px){
+  .profile-header-achievements{
+    grid-template-columns:1fr;
+    gap:4px;
+  }
+  .profile-header-achievement{
+    padding:6px 8px;
+  }
+}
