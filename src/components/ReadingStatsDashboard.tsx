@@ -244,21 +244,32 @@ export function ReadingStatsDashboard() {
           </div>
           <span>{unlocked.length} / {trophies.length}</span>
         </div>
-        <div className="reading-trophy-grid">
-          {trophies.map((trophy) => {
-            const earned = trophy.value >= trophy.threshold;
-            return (
-              <article className={`reading-trophy ${earned ? "earned" : "locked"}`} key={trophy.id}>
-                <div className="reading-trophy-medal" aria-hidden="true">{earned ? "◆" : "◇"}</div>
-                <div>
-                  <b>{trophy.label}</b>
-                  <span>{trophy.description}</span>
-                </div>
-                <small>{earned ? "مفتوح" : `${formatNumber(trophy.value)} / ${formatNumber(trophy.threshold)}`}</small>
-              </article>
-            );
-          })}
-        </div>
+        {[
+          ["chapters", "تروفيات الفصول"],
+          ["stories", "تروفيات القصص"],
+          ["streak", "تروفيات الاستمرارية"],
+        ].map(([category, title]) => (
+          <div className="reading-trophy-category" key={category}>
+            <h4>{title}</h4>
+            <div className="reading-trophy-grid">
+              {trophies
+                .filter((trophy) => trophy.category === category)
+                .map((trophy) => {
+                  const earned = trophy.value >= trophy.threshold;
+                  return (
+                    <article className={`reading-trophy ${earned ? "earned" : "locked"}`} key={trophy.id}>
+                      <div className="reading-trophy-medal" aria-hidden="true">{earned ? "◆" : "◇"}</div>
+                      <div>
+                        <b>{trophy.label}</b>
+                        <span>{trophy.description}</span>
+                      </div>
+                      <small>{earned ? "مفتوح" : `${formatNumber(trophy.value)} / ${formatNumber(trophy.threshold)}`}</small>
+                    </article>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
       </section>
     </section>
   );
