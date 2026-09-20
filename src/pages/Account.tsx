@@ -14,7 +14,7 @@ import { ProfileListsManager } from "../components/ProfileListsManager";
 import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
-import { snapshotToSourceManga } from "../services/workSnapshots";
+import { saveWorkSnapshot, snapshotToSourceManga } from "../services/workSnapshots";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
 import type {
   ActivityEvent,
@@ -418,9 +418,14 @@ function FullReadingView({
       .then(async (results) => {
         if (!active) return;
         const mapped = Object.fromEntries(
-          results.flatMap((result, index) =>
-            result.status === "fulfilled" ? [[reading[index].mangaId, result.value]] : [],
-          ),
+          results.flatMap((result, index) => {
+            if (result.status !== "fulfilled") return [];
+            void saveWorkSnapshot(
+              result.value,
+              reading[index].lastReadChapter ?? reading[index].highestReachedChapter,
+            );
+            return [[reading[index].mangaId, result.value]];
+          }),
         );
         const failedKeys = results.flatMap((result, index) =>
           result.status === "rejected" ? [reading[index].mangaId] : [],
@@ -533,6 +538,7 @@ export function Account() {
     resolveWorks(sourceKeys)
       .then((next) => {
         if (!active) return;
+        for (const work of Object.values(next.works)) void saveWorkSnapshot(work);
         setWorks(next.works);
         setWorksError(
           next.partialFailure ? "تعذر تحميل بعض أغلفة القوائم. يمكنك المحاولة مرة أخرى." : "",
@@ -573,11 +579,15 @@ export function Account() {
       .then(async (results) => {
         if (!active) return;
         const mapped = Object.fromEntries(
-          results.flatMap((result, index) =>
-            result.status === "fulfilled"
-              ? [[readingEntries[index].mangaId, result.value]]
-              : [],
-          ),
+          results.flatMap((result, index) => {
+            if (result.status !== "fulfilled") return [];
+            void saveWorkSnapshot(
+              result.value,
+              readingEntries[index].lastReadChapter ??
+                readingEntries[index].highestReachedChapter,
+            );
+            return [[readingEntries[index].mangaId, result.value]];
+          }),
         );
         const failedKeys = results.flatMap((result, index) =>
           result.status === "rejected" ? [readingEntries[index].mangaId] : [],
