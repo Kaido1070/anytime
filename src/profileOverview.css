@@ -1764,3 +1764,18 @@ button.profile-icon-action {
     justify-content:center;
   }
 }
+
+.profile-reading-issue-actions{
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+.profile-reading-issue-actions .secondary{
+  white-space:nowrap;
+}
+@media(max-width:759px){
+  .profile-reading-issue-actions{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+}
