@@ -132,8 +132,20 @@ export function SourceMangaDetails() {
           setBulkProgress({ done, total: chapterNumbers.length });
         }
       } else {
-        await markWorkUnread(sourceKey);
-        setBulkProgress({ done: 1, total: 1 });
+        // A merged work can exist under several source-specific IDs. "لم تتم
+        // قراءتها" is a work-level action for the user, so clear every source
+        // variant currently attached to this merged work, not only the tab
+        // they happened to be viewing.
+        const keysToClear = requestedSourceKeys.length
+          ? requestedSourceKeys
+          : [sourceKey];
+        setBulkProgress({ done: 0, total: keysToClear.length });
+        let done = 0;
+        for (const keyToClear of keysToClear) {
+          await markWorkUnread(keyToClear);
+          done += 1;
+          setBulkProgress({ done, total: keysToClear.length });
+        }
       }
       setBulkConfirm(null);
     } finally {
