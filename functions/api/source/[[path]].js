@@ -717,15 +717,16 @@ async function teamXPopular(db, page) {
 }
 
 async function teamXLatest(db, page) {
+  // Keep Team-X latest lightweight. Do not open every series page here:
+  // source-wide enrichment caused N+1 requests and could stall Wany.
+  // Publication timestamps remain available when a series itself is opened,
+  // but Team-X stays out of the strict New feed until a direct latest-time
+  // source is found.
   const html = await teamXFetchText(`/?page=${page}`);
   const marker = html.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
   const scoped = marker >= 0 ? html.slice(marker) : html;
   const items = await teamXItemsFromHtml(scoped);
   await rememberItems(db, items);
-
-  // Keep the generic Team-X latest endpoint lightweight. Do not fan out into
-  // every series page here; that N+1 pattern can stall any Wany screen that
-  // consumes source latest data. Strict New verification is handled separately.
   return { items: items.slice(0, 24), hasMore: teamXHasNext(html), page };
 }
 
