@@ -328,6 +328,19 @@ test("3asq type classifier distinguishes novels and web novels", () => {
 });
 
 
+test("MangaTime keeps exact publishedAt values from its chapter API", () => {
+  const chapters = __test.mangaTimeChaptersFromPayload({
+    chapters: [
+      { number: "12", title: "Chapter 12", publishedAt: "2026-09-20T08:15:00.000Z" },
+      { number: "11", title: "Chapter 11", publishedAt: "2026-09-19T07:00:00.000Z" },
+      { number: "bad", title: "broken", publishedAt: "2026-09-20T09:00:00.000Z" },
+    ],
+  });
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [12, 11]);
+  assert.equal(chapters[0].publishedAt, "2026-09-20T08:15:00.000Z");
+  assert.equal(chapters[1].publishedAt, "2026-09-19T07:00:00.000Z");
+});
+
 test("MangaTime novel types receive the Arabic novels category", () => {
   assert.deepEqual(__test.mangaTimeTypeGenres("novel"), ["novel", "روايات"]);
   assert.deepEqual(__test.mangaTimeTypeGenres("web_novel"), ["web_novel", "روايات"]);
