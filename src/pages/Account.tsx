@@ -8,6 +8,7 @@ import {
   ProfileOverviewSkeleton,
   ProfileReadingSection,
   ProfileStatsSection,
+  type ProfileReadingIssue,
 } from "../components/ProfileOverview";
 import { Icon } from "../components/UI";
 import { ProfileListsManager } from "../components/ProfileListsManager";
@@ -518,6 +519,7 @@ export function Account() {
   const [series, setSeries] = useState<Record<string, SourceManga>>({});
   const [worksError, setWorksError] = useState("");
   const [readingError, setReadingError] = useState("");
+  const [readingIssues, setReadingIssues] = useState<ProfileReadingIssue[]>([]);
   const [worksRetry, setWorksRetry] = useState(0);
   const [readingRetry, setReadingRetry] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -603,6 +605,7 @@ export function Account() {
   useEffect(() => {
     let active = true;
     setReadingError("");
+    setReadingIssues([]);
 
     if (!readingEntries.length) {
       setSeries({});
@@ -625,14 +628,35 @@ export function Account() {
       if (!active) return;
 
       const refreshed = new Map<string, SourceManga>();
+      const issues: ProfileReadingIssue[] = [];
       results.forEach((result, index) => {
-        if (result.status !== "fulfilled") return;
         const entry = readingEntries[index];
-        refreshed.set(entry.mangaId, result.value);
-        void saveWorkSnapshot(
-          result.value,
-          entry.lastReadChapter ?? entry.highestReachedChapter,
-        );
+        if (result.status === "fulfilled") {
+          refreshed.set(entry.mangaId, result.value);
+          void saveWorkSnapshot(
+            result.value,
+            entry.lastReadChapter ?? entry.highestReachedChapter,
+          );
+          return;
+        }
+
+        const fallback = cached[entry.mangaId];
+        const sourcePart = entry.mangaId.split(":").slice(1).join(":");
+        const fallbackTitle =
+          sourcePart && !/^\d+$/.test(sourcePart)
+            ? decodeURIComponent(sourcePart).replace(/[-_]+/g, " ")
+            : entry.mangaId;
+        const chapter =
+          entry.lastReadChapter ?? entry.highestReachedChapter ?? null;
+        issues.push({
+          mangaId: entry.mangaId,
+          title: fallback ? sourceDisplayTitle(fallback) : fallbackTitle,
+          chapter,
+          to:
+            chapter != null
+              ? `/read-source/${encodeURIComponent(entry.mangaId)}/${chapter}`
+              : `/source/${encodeURIComponent(entry.mangaId)}`,
+        });
       });
 
       setSeries((current) => {
@@ -644,9 +668,10 @@ export function Account() {
       const unresolved = keys.filter(
         (key) => !cached[key] && !refreshed.has(key),
       );
+      setReadingIssues(issues);
       setReadingError(
-        unresolved.length
-          ? `تعذر تجهيز ${unresolved.length} من القصص مؤقتًا. سنحاول تحديثها عند فتح الصفحة لاحقًا.`
+        unresolved.length && !issues.length
+          ? `تعذر تجهيز ${unresolved.length} من القصص مؤقتًا.`
           : "",
       );
     })().catch(() => {
@@ -779,6 +804,7 @@ export function Account() {
                       completed={completed}
                       viewAllTo="/profile?tab=reading"
                       error={readingError}
+                      issues={readingIssues}
                       onRetry={() => setReadingRetry((value) => value + 1)}
                     />
                   );
