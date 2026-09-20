@@ -496,6 +496,27 @@ test("MangaLik latest parser reads newest chapter cards without series hydration
   assert.equal(items[0].chapters[1].publishedAt, "2026-09-15T00:00:00.000Z");
 });
 
+test("MangaLik latest parser supports flat chapter rows and strict relative times", () => {
+  const now = Date.UTC(2026, 8, 20, 12, 0, 0);
+  const html = `
+    <div class="page-item-detail">
+      <a href="https://mangalik.net/manga/magic-emperor/" title="Magic emperor">
+        <img src="https://cdn.example.com/magic.webp" alt="Magic emperor">
+      </a>
+      <a href="https://mangalik.net/manga/magic-emperor/912/">912</a>
+      <span class="chapter-release-date">5 ساعات ago</span>
+      <a href="https://mangalik.net/manga/magic-emperor/911/">911</a>
+      <span class="chapter-release-date">1 يوم ago</span>
+    </div>
+  `;
+  const items = __test.mangalikLatestItemsFromHtml(html, now);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].title, "Magic emperor");
+  assert.equal(items[0].chapters.length, 1);
+  assert.equal(items[0].chapters[0].number, 912);
+  assert.equal(items[0].chapters[0].publishedAt, "2026-09-20T07:00:00.000Z");
+});
+
 test("MangaLik reader parser keeps chapter images from its CDN", () => {
   const html = `
     <div class="reading-content">
