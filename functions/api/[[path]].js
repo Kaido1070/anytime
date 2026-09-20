@@ -3873,6 +3873,23 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
   };
 }
 
+const AVATAR_SERIES_ENGLISH_TITLES = {
+  "one-piece": "One Piece",
+  naruto: "Naruto",
+  bleach: "Bleach",
+  "attack-on-titan": "Attack on Titan",
+  "demon-slayer": "Demon Slayer",
+  "jujutsu-kaisen": "Jujutsu Kaisen",
+  "solo-leveling": "Solo Leveling",
+  "hunter-x-hunter": "Hunter x Hunter",
+  "my-hero-academia": "My Hero Academia",
+  "fullmetal-alchemist": "Fullmetal Alchemist",
+};
+
+function avatarSeriesEnglishTitle(slug, fallback) {
+  return AVATAR_SERIES_ENGLISH_TITLES[String(slug)] ?? String(fallback ?? slug ?? "");
+}
+
 async function getAvatarLibrary(db) {
   const result = await db
     .prepare(`SELECT
@@ -3891,7 +3908,7 @@ async function getAvatarLibrary(db) {
       groups.set(row.series_id, {
         id: row.series_id,
         workId: row.work_id ?? null,
-        name: row.series_name,
+        name: avatarSeriesEnglishTitle(row.slug, row.series_name),
         slug: row.slug,
         position: Number(row.series_position),
         avatars: [],
@@ -3900,7 +3917,7 @@ async function getAvatarLibrary(db) {
     groups.get(row.series_id).avatars.push({
       id: row.avatar_id,
       seriesId: row.series_id,
-      characterName: row.character_name,
+      characterName: avatarSearchName(row.image_path) || row.character_name,
       imageUrl: imageUrls.get(row.avatar_id) ?? null,
       position: Number(row.avatar_position),
     });
