@@ -2632,3 +2632,18 @@ button.profile-icon-action {
   .reading-rank-item{min-width:54px}
   .reading-rank-badge{width:37px;height:37px}
 }
+
+.reading-stats-subview{
+  display:grid;
+  gap:0;
+}
+.reading-stats-back-row{
+  display:flex;
+  justify-content:flex-start;
+  padding:4px 0 2px;
+}
+.reading-stats-back-row .secondary{
+  min-height:34px;
+  padding:7px 10px;
+  font-size:8px;
+}
