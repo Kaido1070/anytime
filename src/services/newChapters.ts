@@ -295,23 +295,10 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
 
 
 export async function loadUnreadFollowedCount() {
-  const state = await userDataService.getPersonalizationState();
-  if (!state.followed.length) return 0;
-
-  const followedItems = await resolveInChunks(state.followed.map((entry) => entry.mangaId));
-  const merged = mergeSourceItems(followedItems);
-  const hydrated = await mapWithConcurrency(merged, 6, hydrateGroup);
-  const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(hydrated));
-  const read = new Set(readPairs.map((entry) => readKey(entry.mangaId, entry.chapter)));
-  const now = Date.now();
-
-  return hydrated.reduce((total, group) => {
-    const feed = groupChapters(group, state, read, now);
-    if (!feed || feed.trackingStartedAt == null) return total;
-    return total + feed.chapters.filter(
-      (chapter) =>
-        chapter.releaseAt > Number(feed.trackingStartedAt) &&
-        !chapter.read,
-    ).length;
-  }, 0);
+  // The nav badge must use the exact same strict source/date rules as the
+  // visible New feed. The old path hydrated every followed series and counted
+  // older unread chapters, which produced misleading values such as +99 even
+  // when the 24-hour feed was empty.
+  const feed = await loadNewChapterFeed(1);
+  return feed.unreadFollowedCount;
 }
