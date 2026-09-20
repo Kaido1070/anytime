@@ -783,25 +783,49 @@ export function Account() {
     );
   }
 
-  const achievementSummary = useMemo<ProfileAchievementSummaryItem[]>(() => {
+  const achievementSummary: ProfileAchievementSummaryItem[] = (() => {
     if (!readingStatsSummary) return [];
 
-    const highestLabel = (
+    const tierNames: ProfileAchievementSummaryItem["tier"][] = [
+      "bronze",
+      "silver",
+      "gold",
+      "platinum",
+      "diamond",
+      "master",
+      "elite",
+      "legend",
+      "mythic",
+    ];
+
+    const highestAchievement = (
       value: number,
       levels: ReadonlyArray<readonly [number, string]>,
-    ) => {
-      let label = "لم يُفتح بعد";
-      for (const [threshold, name] of levels) {
-        if (value < threshold) break;
-        label = name;
+      icon: ProfileAchievementSummaryItem["icon"],
+      category: string,
+    ): ProfileAchievementSummaryItem => {
+      let achievement = "لم يُفتح بعد";
+      let tier: ProfileAchievementSummaryItem["tier"] = "bronze";
+      let unlockedIndex = -1;
+
+      levels.forEach(([threshold, name], index) => {
+        if (value >= threshold) {
+          achievement = name;
+          unlockedIndex = index;
+        }
+      });
+
+      if (unlockedIndex >= 0) {
+        tier = tierNames[Math.min(unlockedIndex, tierNames.length - 1)];
       }
-      return label;
+
+      return { category, achievement, tier, icon };
     };
 
     return [
-      {
-        category: "إنجاز الفصول",
-        achievement: highestLabel(readingStatsSummary.organicCompletedChapters, [
+      highestAchievement(
+        readingStatsSummary.organicCompletedChapters,
+        [
           [10, "البداية"],
           [25, "قارئ منتظم"],
           [50, "خمسون فصلًا"],
@@ -811,30 +835,36 @@ export function Account() {
           [1000, "ألف فصل"],
           [2500, "قارئ استثنائي"],
           [5000, "أسطورة Wany"],
-        ]),
-      },
-      {
-        category: "إنجاز الأعمال",
-        achievement: highestLabel(readingStatsSummary.storiesRead, [
+        ],
+        "book",
+        "إنجاز الفصول",
+      ),
+      highestAchievement(
+        readingStatsSummary.storiesRead,
+        [
           [1, "العمل الأول"],
           [5, "خمسة أعمال"],
           [10, "عشرة أعمال"],
           [25, "قارئ متنوع"],
           [50, "خمسون عملًا"],
           [100, "مئة عمل"],
-        ]),
-      },
-      {
-        category: "إنجاز الاستمرارية",
-        achievement: highestLabel(readingStatsSummary.bestStreak, [
+        ],
+        "lists",
+        "إنجاز الأعمال",
+      ),
+      highestAchievement(
+        readingStatsSummary.bestStreak,
+        [
           [3, "ثلاثة أيام متتالية"],
           [7, "أسبوع متواصل"],
           [14, "أسبوعان متواصلان"],
           [30, "شهر متواصل"],
-        ]),
-      },
+        ],
+        "flame",
+        "إنجاز الاستمرارية",
+      ),
     ];
-  }, [readingStatsSummary]);
+  })();
 
   const stats = profile?.stats;
   const orderedGroups = groups.filter((group) => group.visible);
