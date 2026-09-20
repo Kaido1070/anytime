@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { UserAvatar } from "../components/UserAvatar";
 import { sourceDisplayTitle } from "../services/sourceTitles";
-import { sourceService } from "../services/sources";
+import { sourceService, type SourceDiagnostic } from "../services/sources";
 import { userDataService } from "../services/userData";
 import type {
   ActivityEvent,
@@ -109,6 +109,8 @@ export function AdminDashboard() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sourceDiagnostics, setSourceDiagnostics] = useState<SourceDiagnostic[]>([]);
+  const [sourceDiagnosticsError, setSourceDiagnosticsError] = useState("");
   const query = searchParams.get("q") ?? "";
   const visibility = searchParams.get("visibility") ?? "all";
   const sort = searchParams.get("sort") ?? "activity";
@@ -116,6 +118,26 @@ export function AdminDashboard() {
   const [draft, setDraft] = useState(query);
 
   useEffect(() => setDraft(query), [query]);
+
+  useEffect(() => {
+    let active = true;
+    setSourceDiagnosticsError("");
+    sourceService
+      .status()
+      .then((rows) => {
+        if (active) setSourceDiagnostics(rows);
+      })
+      .catch((cause) => {
+        if (active) {
+          setSourceDiagnosticsError(
+            cause instanceof Error ? cause.message : "تعذر تحميل حالة المصادر.",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -168,6 +190,45 @@ export function AdminDashboard() {
         </div>
         <div className="admin-total"><b>{total}</b><span>حساب</span></div>
       </header>
+
+      <section className="admin-source-health" aria-labelledby="admin-source-health-title">
+        <div className="admin-source-health-heading">
+          <div>
+            <p className="eyebrow">المصادر</p>
+            <h2 id="admin-source-health-title">حالة التحديث</h2>
+          </div>
+          <small>قراءة فقط · بدون عمليات كتابة إضافية على D1</small>
+        </div>
+        {sourceDiagnosticsError ? (
+          <p className="error" role="alert">{sourceDiagnosticsError}</p>
+        ) : sourceDiagnostics.length ? (
+          <div className="admin-source-health-grid">
+            {sourceDiagnostics.map((row) => {
+              const published = row.lastVerifiedReleaseAt
+                ? Date.parse(row.lastVerifiedReleaseAt)
+                : NaN;
+              return (
+                <article key={row.source}>
+                  <header>
+                    <b>{sourceService.sourceLabel(row.source)}</b>
+                    <span>{row.recent24h} خلال 24س</span>
+                  </header>
+                  <p>
+                    <span>آخر إصدار موثق</span>
+                    <b>{Number.isFinite(published) ? formatDate(published) : "—"}</b>
+                  </p>
+                  <p>
+                    <span>آخر مزامنة خلفية</span>
+                    <b>{formatDate(row.lastSyncAt)}</b>
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="empty">جاري تحميل حالة المصادر…</p>
+        )}
+      </section>
 
       <div className="admin-toolbar">
         <form className="admin-search" onSubmit={submitSearch}>
