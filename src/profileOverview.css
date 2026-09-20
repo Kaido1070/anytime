@@ -2065,3 +2065,31 @@ button.profile-icon-action {
     grid-template-columns:1fr;
   }
 }
+
+.reading-calendar{
+  display:grid;
+  gap:12px;
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#1f2123;
+}
+.reading-calendar-grid{
+  display:grid;
+  grid-template-columns:repeat(15,minmax(0,1fr));
+  gap:5px;
+}
+.reading-calendar-day{
+  aspect-ratio:1;
+  min-width:0;
+  border-radius:4px;
+  border:1px solid #343638;
+  background:#26282a;
+}
+.reading-calendar-day.level-1{background:#3a332b;border-color:#504538}
+.reading-calendar-day.level-2{background:#594b3a;border-color:#705d46}
+.reading-calendar-day.level-3{background:#80694e;border-color:#92775a}
+.reading-calendar-day.level-4{background:#b18f68;border-color:#c39f76}
+@media(max-width:759px){
+  .reading-calendar-grid{grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+}
