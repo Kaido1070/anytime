@@ -18,7 +18,6 @@ export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
 const VERIFIED_SOURCE_SCAN_PAGES: Partial<Record<SourceName, number>> = {
   "3asq": 2,
-  teamx: 1,
 };
 
 export interface FeedChapter {
