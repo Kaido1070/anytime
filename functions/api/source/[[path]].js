@@ -48,6 +48,42 @@ export async function onRequest(context) {
 
     if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
+    if (action === "status") {
+      const sources = ["mangatime", "teamx", "3asq", "starzmanga", "xsano", "mangalik"];
+      const cutoffIso = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+      const [syncRows, releaseRows] = await Promise.all([
+        db.prepare("SELECT source, last_started_at FROM source_sync_state").all(),
+        db.prepare(`SELECT
+            i.source AS source,
+            MAX(c.published_at) AS last_published_at,
+            SUM(CASE WHEN c.published_at > ? THEN 1 ELSE 0 END) AS recent_count
+          FROM source_items i
+          LEFT JOIN source_chapter_seen c ON c.source_key = i.source_key
+          GROUP BY i.source`)
+          .bind(cutoffIso)
+          .all(),
+      ]);
+
+      const syncMap = new Map(
+        (syncRows.results ?? []).map((row) => [String(row.source), Number(row.last_started_at ?? 0)]),
+      );
+      const releaseMap = new Map(
+        (releaseRows.results ?? []).map((row) => [String(row.source), row]),
+      );
+
+      return json({
+        sources: sources.map((source) => {
+          const release = releaseMap.get(source);
+          return {
+            source,
+            lastSyncAt: syncMap.get(source) || null,
+            lastVerifiedReleaseAt: release?.last_published_at ?? null,
+            recent24h: Number(release?.recent_count ?? 0),
+          };
+        }),
+      });
+    }
+
     if (action === "latest") {
       const source = sourceFromQuery(url);
       const page = safePage(url.searchParams.get("page"));
