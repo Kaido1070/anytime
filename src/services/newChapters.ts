@@ -18,7 +18,7 @@ const SOURCES: SourceName[] = [
   "mangalik",
 ];
 
-export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
+export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;\nexport const MAX_NEW_CHAPTERS_PER_WORK = 5;
 
 export interface FeedChapter {
   identity: string;
@@ -243,7 +243,12 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   const all = groups
     .map((group) => ({
       ...group,
-      chapters: group.chapters.filter((chapter) => chapter.releaseAt >= cutoff),
+      // A bulk release must not flood the public New feed. The chapter list is
+      // already sorted newest-first after cross-source deduplication, so cap
+      // each work only after applying the strict 24-hour publication window.
+      chapters: group.chapters
+        .filter((chapter) => chapter.releaseAt >= cutoff)
+        .slice(0, MAX_NEW_CHAPTERS_PER_WORK),
     }))
     .filter((group) => group.chapters.length > 0)
     .map((group) => ({
