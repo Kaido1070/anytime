@@ -18,7 +18,8 @@ const SOURCES: SourceName[] = [
   "mangalik",
 ];
 
-export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;\nexport const MAX_NEW_CHAPTERS_PER_WORK = 5;
+export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
+export const MAX_NEW_CHAPTERS_PER_WORK = 5;
 
 export interface FeedChapter {
   identity: string;
