@@ -220,6 +220,7 @@ export function ProfileListsSection({
 export interface ProfileReadingIssue {
   mangaId: string;
   title: string;
+  sourceLabel: string;
   chapter: number | null;
   to: string;
 }
@@ -377,6 +378,7 @@ export function ProfileReadingSection({
               <span>
                 تعذر تحديث <b dir="auto">{issue.title}</b>
                 {issue.chapter != null ? ` عند الفصل ${issue.chapter}` : ""}.
+                <small> المصدر: {issue.sourceLabel}</small>
               </span>
               <Link className="secondary" to={issue.to}>
                 {issue.chapter != null ? `فتح الفصل ${issue.chapter}` : "فتح القصة"}
