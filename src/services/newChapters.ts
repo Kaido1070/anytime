@@ -52,6 +52,13 @@ export interface NewChapterFeed {
   page: number;
 }
 
+export interface NewFeedLoadProgress {
+  completed: number;
+  total: number;
+  percent: number;
+  label: string;
+}
+
 function parsePublished(value?: string | null) {
   if (!value) return null;
   const timestamp = Date.parse(value);
@@ -232,23 +239,51 @@ function collectReadChecks(groups: SourceGroup[]) {
   return pairs;
 }
 
-export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
+export async function loadNewChapterFeed(
+  page = 1,
+  onProgress?: (progress: NewFeedLoadProgress) => void,
+): Promise<NewChapterFeed> {
   const safePage = Math.max(1, Math.min(20, Math.trunc(page)));
-  // Verified adapters expose their latest-chapter stream directly. Scan only
-  // a small continuation window; the backend already returns chapter timestamps
-  // from the source's own latest-updates section.
-  const [state, latestSettled] = await Promise.all([
-    userDataService.getPersonalizationState(),
-    Promise.allSettled(
-      VERIFIED_NEW_FEED_SOURCES.flatMap((source) => {
-        const pagesPerFeedPage = VERIFIED_SOURCE_SCAN_PAGES[source] ?? 1;
-        const scanStart = (safePage - 1) * pagesPerFeedPage + 1;
-        return Array.from(
-          { length: pagesPerFeedPage },
-          (_, index) => withinSourceBudget(sourceService.latest(source, scanStart + index)),
-        );
+  const sourceTasks = VERIFIED_NEW_FEED_SOURCES.flatMap((source) => {
+    const pagesPerFeedPage = VERIFIED_SOURCE_SCAN_PAGES[source] ?? 1;
+    const scanStart = (safePage - 1) * pagesPerFeedPage + 1;
+    return Array.from({ length: pagesPerFeedPage }, (_, index) => ({
+      source,
+      page: scanStart + index,
+    }));
+  });
+
+  // Progress is tied to real completed work: personalization + every source
+  // request + final read-state merge. No timer or fake interpolation.
+  const totalSteps = sourceTasks.length + 2;
+  let completedSteps = 0;
+  const report = (label: string) => {
+    onProgress?.({
+      completed: completedSteps,
+      total: totalSteps,
+      percent: Math.min(100, Math.round((completedSteps / totalSteps) * 100)),
+      label,
+    });
+  };
+  report("بدء فحص المصادر");
+
+  const personalizationPromise = userDataService.getPersonalizationState().finally(() => {
+    completedSteps += 1;
+    report("تم تجهيز حسابك");
+  });
+
+  const latestPromise = Promise.allSettled(
+    sourceTasks.map(({ source, page: sourcePage }) =>
+      withinSourceBudget(sourceService.latest(source, sourcePage)).finally(() => {
+        completedSteps += 1;
+        report("جاري جمع أحدث الفصول");
       }),
     ),
+  );
+
+  const [state, latestSettled] = await Promise.all([
+    personalizationPromise,
+    latestPromise,
   ]);
 
   const latestItemsByKey = new Map<string, SourceManga>();
@@ -266,6 +301,8 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   const latestGroups = mergeSourceItems(latestItems);
   const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(latestGroups));
   const read = new Set(readPairs.map((entry) => readKey(entry.mangaId, entry.chapter)));
+  completedSteps += 1;
+  report("اكتمل التحديث");
   const now = Date.now();
 
   const groups = latestGroups
