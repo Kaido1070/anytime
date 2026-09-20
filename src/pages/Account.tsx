@@ -129,6 +129,32 @@ async function resolveWorks(keys: string[]) {
   };
 }
 
+async function loadCachedSeries(keys: string[]) {
+  const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
+  if (!unique.length) return {} as Record<string, SourceManga>;
+
+  const snapshots = await userDataService.getWorkSnapshots(unique).catch(() => []);
+  const mapped: Record<string, SourceManga> = Object.fromEntries(
+    snapshots.map((snapshot) => [
+      snapshot.mangaId,
+      snapshotToSourceManga(snapshot),
+    ]),
+  );
+
+  const missing = unique.filter((key) => !mapped[key]);
+  if (missing.length) {
+    // resolve() is D1-backed metadata only. It can bootstrap old library rows
+    // without waiting on the external manga site.
+    const resolved = await sourceService.resolve(missing).catch(() => []);
+    for (const item of resolved) {
+      mapped[item.key] = item;
+      void saveWorkSnapshot(item);
+    }
+  }
+
+  return mapped;
+}
+
 function ProfileContentEditor({
   groups,
   busy,
@@ -414,33 +440,37 @@ function FullReadingView({
   useEffect(() => {
     let active = true;
     setLoading(true);
-    Promise.allSettled(reading.map((entry) => sourceService.getSeries(entry.mangaId)))
-      .then(async (results) => {
-        if (!active) return;
-        const mapped = Object.fromEntries(
-          results.flatMap((result, index) => {
-            if (result.status !== "fulfilled") return [];
-            void saveWorkSnapshot(
-              result.value,
-              reading[index].lastReadChapter ?? reading[index].highestReachedChapter,
-            );
-            return [[reading[index].mangaId, result.value]];
-          }),
+
+    void (async () => {
+      const keys = reading.map((entry) => entry.mangaId);
+      const cached = await loadCachedSeries(keys);
+      if (!active) return;
+
+      // Render cached metadata immediately. Live source refresh is best-effort
+      // and must not blank a user's reading list.
+      setSeries(cached);
+      setLoading(false);
+
+      const results = await Promise.allSettled(
+        reading.map((entry) => sourceService.getSeries(entry.mangaId)),
+      );
+      if (!active) return;
+
+      const next = { ...cached };
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        const entry = reading[index];
+        next[entry.mangaId] = result.value;
+        void saveWorkSnapshot(
+          result.value,
+          entry.lastReadChapter ?? entry.highestReachedChapter,
         );
-        const failedKeys = results.flatMap((result, index) =>
-          result.status === "rejected" ? [reading[index].mangaId] : [],
-        );
-        if (failedKeys.length) {
-          const snapshots = await userDataService.getWorkSnapshots(failedKeys).catch(() => []);
-          for (const snapshot of snapshots) {
-            mapped[snapshot.mangaId] = snapshotToSourceManga(snapshot);
-          }
-        }
-        if (active) setSeries(mapped);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
       });
+      setSeries(next);
+    })().catch(() => {
+      if (active) setLoading(false);
+    });
+
     return () => {
       active = false;
     };
@@ -569,47 +599,51 @@ export function Account() {
   useEffect(() => {
     let active = true;
     setReadingError("");
+
     if (!readingEntries.length) {
       setSeries({});
       return;
     }
-    Promise.allSettled(
-      readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
-    )
-      .then(async (results) => {
-        if (!active) return;
-        const mapped = Object.fromEntries(
-          results.flatMap((result, index) => {
-            if (result.status !== "fulfilled") return [];
-            void saveWorkSnapshot(
-              result.value,
-              readingEntries[index].lastReadChapter ??
-                readingEntries[index].highestReachedChapter,
-            );
-            return [[readingEntries[index].mangaId, result.value]];
-          }),
+
+    void (async () => {
+      const keys = readingEntries.map((entry) => entry.mangaId);
+      const cached = await loadCachedSeries(keys);
+      if (!active) return;
+
+      // Snapshot/D1 metadata is the display source. Upstream sites only refresh
+      // it in the background, so a temporary outage does not become a profile
+      // outage.
+      setSeries(cached);
+
+      const results = await Promise.allSettled(
+        readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
+      );
+      if (!active) return;
+
+      const next = { ...cached };
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        const entry = readingEntries[index];
+        next[entry.mangaId] = result.value;
+        void saveWorkSnapshot(
+          result.value,
+          entry.lastReadChapter ?? entry.highestReachedChapter,
         );
-        const failedKeys = results.flatMap((result, index) =>
-          result.status === "rejected" ? [readingEntries[index].mangaId] : [],
-        );
-        if (failedKeys.length) {
-          const snapshots = await userDataService.getWorkSnapshots(failedKeys).catch(() => []);
-          for (const snapshot of snapshots) {
-            mapped[snapshot.mangaId] = snapshotToSourceManga(snapshot);
-          }
-        }
-        if (!active) return;
-        setSeries(mapped);
-        const unresolved = failedKeys.filter((key) => !mapped[key]);
-        setReadingError(
-          unresolved.length
-            ? "تعذر تحميل بعض القصص ولم توجد لها نسخة محفوظة بعد."
-            : "",
-        );
-      })
-      .catch(() => {
-        if (active) setReadingError("تعذر تحميل بيانات القراءة. يمكنك المحاولة مرة أخرى.");
       });
+
+      setSeries(next);
+      const unresolved = keys.filter((key) => !next[key]);
+      setReadingError(
+        unresolved.length
+          ? `تعذر تجهيز ${unresolved.length} من القصص مؤقتًا. سنحاول تحديثها عند فتح الصفحة لاحقًا.`
+          : "",
+      );
+    })().catch(() => {
+      if (active) {
+        setReadingError("تعذر تجهيز بيانات القراءة مؤقتًا. يمكنك المحاولة مرة أخرى.");
+      }
+    });
+
     return () => {
       active = false;
     };
