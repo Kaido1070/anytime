@@ -10,6 +10,7 @@ import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath } from "../services/readerPaths";
 import { formatGregorianDate } from "../services/dateFormat";
 import { sourceService } from "../services/sources";
+import { saveWorkSnapshot } from "../services/workSnapshots";
 import type { LibraryStatus, SourceManga } from "../types";
 
 function statusLabel(status?: string) {
@@ -73,6 +74,11 @@ export function SourceMangaDetails() {
     () => data?.library.find((entry) => entry.mangaId === sourceKey),
     [data?.library, sourceKey],
   );
+
+  useEffect(() => {
+    if (!item) return;
+    void saveWorkSnapshot(item);
+  }, [item]);
 
   if (loading) return <><Back to={returnTo} /><p className="empty">جاري تحميل القصة والفصول من المصدر…</p></>;
   if (!item || error) return <><Back to={returnTo} /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
