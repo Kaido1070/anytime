@@ -12,11 +12,14 @@ import { userDataService } from "./userData";
 // Only sources whose chapter publication timestamps have been explicitly
 // audited may enter the public New feed. Other sources remain available
 // everywhere else in Wany until their date adapters are verified.
-const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq"];
+const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq", "teamx"];
 
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
-const VERIFIED_SOURCE_SCAN_PAGES = 2;
+const VERIFIED_SOURCE_SCAN_PAGES: Partial<Record<SourceName, number>> = {
+  "3asq": 2,
+  teamx: 1,
+};
 
 export interface FeedChapter {
   identity: string;
@@ -216,17 +219,17 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
   // Verified adapters expose their latest-chapter stream directly. Scan only
   // a small continuation window; the backend already returns chapter timestamps
   // from the source's own latest-updates section.
-  const scanStart = (safePage - 1) * VERIFIED_SOURCE_SCAN_PAGES + 1;
-  const scanPages = Array.from(
-    { length: VERIFIED_SOURCE_SCAN_PAGES },
-    (_, index) => scanStart + index,
-  );
   const [state, latestSettled] = await Promise.all([
     userDataService.getPersonalizationState(),
     Promise.allSettled(
-      VERIFIED_NEW_FEED_SOURCES.flatMap((source) =>
-        scanPages.map((sourcePage) => sourceService.latest(source, sourcePage)),
-      ),
+      VERIFIED_NEW_FEED_SOURCES.flatMap((source) => {
+        const pagesPerFeedPage = VERIFIED_SOURCE_SCAN_PAGES[source] ?? 1;
+        const scanStart = (safePage - 1) * pagesPerFeedPage + 1;
+        return Array.from(
+          { length: pagesPerFeedPage },
+          (_, index) => sourceService.latest(source, scanStart + index),
+        );
+      }),
     ),
   ]);
 
