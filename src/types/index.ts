@@ -166,6 +166,19 @@ export interface UserProfileSectionInput {
   isVisible: boolean;
 }
 
+export interface WorkSnapshot {
+  mangaId: string;
+  title: string;
+  source: SourceName | null;
+  sourceUrl: string | null;
+  originalCoverUrl: string | null;
+  coverUrl: string | null;
+  lastReadChapter: number | null;
+  highestReachedChapter: number | null;
+  lastReadAt: number | null;
+  updatedAt: number;
+}
+
 export interface ReadingProgress {
   mangaId: string;
   chapter: number;
