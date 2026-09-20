@@ -2242,6 +2242,42 @@ async function mangalikSeries(db, item) {
   return updated;
 }
 
+function parseMangalikPublishedAt(block) {
+  const text = cleanText(stripTags(block))
+    .replace(/،/g, ",")
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .trim();
+  if (!text) return null;
+
+  const months = {
+    يناير: 0, فبراير: 1, مارس: 2, أبريل: 3, ابريل: 3, مايو: 4, يونيو: 5,
+    يوليو: 6, أغسطس: 7, اغسطس: 7, سبتمبر: 8, أكتوبر: 9, اكتوبر: 9,
+    نوفمبر: 10, ديسمبر: 11,
+  };
+
+  // MangaLik commonly renders dates as "سبتمبر 17, 2026".
+  let match = text.match(/([\u0600-\u06ff]+)\s+(\d{1,2})\s*,?\s*(\d{4})/);
+  if (match) {
+    const month = months[match[1]];
+    if (month != null) {
+      const timestamp = Date.UTC(Number(match[3]), month, Number(match[2]));
+      if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
+    }
+  }
+
+  // Keep support for the alternate Madara order "17 سبتمبر، 2026".
+  match = text.match(/(\d{1,2})\s+([\u0600-\u06ff]+)\s*,?\s*(\d{4})/);
+  if (match) {
+    const month = months[match[2]];
+    if (month != null) {
+      const timestamp = Date.UTC(Number(match[3]), month, Number(match[1]));
+      if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
+    }
+  }
+
+  return null;
+}
+
 function parseMangalikChapters(html, seriesUrl) {
   const base = new URL(seriesUrl, MANGALIK_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
@@ -2275,7 +2311,7 @@ function parseMangalikChapters(html, seriesUrl) {
     found.set(number, {
       number,
       title: title || "الفصل " + number,
-      publishedAt: null,
+      publishedAt: parseMangalikPublishedAt(block),
       url,
     });
   }
@@ -2990,6 +3026,7 @@ export const __test = {
   parseStarzChapters,
   parseStarzPages,
   parseMangalikChapters,
+  parseMangalikPublishedAt,
   parseMangalikPages,
   starzPostId,
   parseXsanoPages,
