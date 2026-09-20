@@ -916,7 +916,117 @@ function teamXHasNext(html) {
 // 3asq / Manga Al-Ashiq ------------------------------------------------------
 
 async function asqLatest(db, page) {
+  // 3asq exposes recent chapter updates directly on its latest/home listing.
+  // Parse those rows first so the New feed does not need to crawl every series.
+  const path = page > 1
+    ? "/page/" + page + "/?m_orderby=latest"
+    : "/?m_orderby=latest";
+  const html = await asqFetchText(path);
+  const direct = asqLatestItemsFromHtml(html);
+
+  if (direct.length) {
+    await rememberItems(db, direct);
+    return { items: direct.slice(0, 48), hasMore: asqHasNext(html), page };
+  }
+
+  // Keep the existing title-list parser as a safe fallback if 3asq changes
+  // the markup of its latest-chapter section.
   return asqList(db, { page, order: "latest" });
+}
+
+function asqLatestItemsFromHtml(html) {
+  const source = String(html ?? "");
+  const bySlug = new Map();
+  const chapterLink = /<a\b([^>]*href=["'][^"']*\/manga\/([^/"']+)\/([^/"']+)\/?[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi;
+  let match;
+
+  while ((match = chapterLink.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    const href = absoluteUrl(ASQ_BASE, attrs.href);
+    if (!href) continue;
+
+    let parsed;
+    try {
+      parsed = new URL(href);
+    } catch {
+      continue;
+    }
+    if (!/^(?:www\.)?3asq\.online$/i.test(parsed.hostname)) continue;
+
+    const slug = decodeURIComponent(match[2]);
+    const chapterId = decodeURIComponent(match[3]);
+    const chapterTitle = cleanText(stripTags(match[4])) || chapterId;
+    const number = asqChapterNumber(chapterTitle, chapterId);
+    if (!slug || !Number.isFinite(number)) continue;
+
+    // Scope metadata to this chapter link's surrounding update row/card only.
+    const start = Math.max(
+      source.lastIndexOf("<li", match.index),
+      source.lastIndexOf('<div class="row', match.index),
+      source.lastIndexOf("<div class='row", match.index),
+      source.lastIndexOf('<div class="page-item-detail', match.index),
+      source.lastIndexOf("<div class='page-item-detail", match.index),
+    );
+    const nextLi = source.indexOf("<li", chapterLink.lastIndex);
+    const nextRow = source.indexOf('<div class="row', chapterLink.lastIndex);
+    const candidates = [nextLi, nextRow].filter((value) => value >= 0);
+    const end = candidates.length ? Math.min(...candidates) : Math.min(source.length, chapterLink.lastIndex + 2500);
+    const block = source.slice(start >= 0 ? start : Math.max(0, match.index - 1200), end);
+
+    const publishedAt = parseAsqPublishedAt(block);
+    if (!publishedAt) continue;
+
+    const seriesAnchor = extractAnchors(block).find((entry) => {
+      const url = absoluteUrl(ASQ_BASE, entry.href);
+      if (!url) return false;
+      try {
+        return new URL(url).pathname.replace(/\/$/, "") === "/manga/" + slug;
+      } catch {
+        return false;
+      }
+    });
+    const title =
+      cleanText(stripTags(seriesAnchor?.inner || "")) ||
+      cleanText(firstImgAttr(block, "alt")) ||
+      slug.replace(/[-_]+/g, " ");
+    const cover = absoluteUrl(ASQ_BASE, asqFirstImage(block));
+
+    const key = "aq:" + safeSlugKey(slug);
+    const existing = bySlug.get(slug) || {
+      key,
+      source: "3asq",
+      sourceId: slug,
+      slug,
+      type: "manga",
+      url: ASQ_BASE + "/manga/" + encodeURIComponent(slug) + "/",
+      title,
+      cover,
+      description: "",
+      status: "",
+      genres: [],
+      latest: number,
+      chapters: [],
+    };
+    existing.latest = Math.max(Number(existing.latest || number), number);
+    existing.chapters.push({
+      number,
+      title: chapterTitle || "الفصل " + number,
+      publishedAt,
+      url: href,
+    });
+    if (!existing.cover && cover) existing.cover = cover;
+    if ((!existing.title || existing.title === slug.replace(/[-_]+/g, " ")) && title) existing.title = title;
+    bySlug.set(slug, existing);
+  }
+
+  return [...bySlug.values()].map((item) => ({
+    ...item,
+    chapters: item.chapters
+      .filter((chapter, index, list) =>
+        list.findIndex((candidate) => Number(candidate.number) === Number(chapter.number)) === index,
+      )
+      .sort((a, b) => Number(b.number) - Number(a.number)),
+  }));
 }
 
 async function asqPopular(db, page) {
@@ -2494,6 +2604,8 @@ export const __test = {
   parseTeamXChapters,
   parseTeamXPages,
   parseAsqChapters,
+  parseAsqPublishedAt,
+  asqLatestItemsFromHtml,
   parseAsqPages,
   asqPostId,
   parseStarzChapters,
