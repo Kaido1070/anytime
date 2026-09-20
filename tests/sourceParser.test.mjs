@@ -120,6 +120,37 @@ test("3asq latest parser keeps chapter dates attached to the exact chapter row",
   assert.notEqual(items[0].title, "AddText_06-16-01.19.28");
 });
 
+test("3asq latest metadata guard rejects UI junk and malformed chapters", () => {
+  assert.equal(__test.asqSafeSeriesTitle("AddText_06-16-01.19.28", "wistoria"), "wistoria");
+  assert.equal(__test.asqSafeSeriesTitle("بدون اسم203", "kengan omega"), "kengan omega");
+  assert.equal(__test.asqSafeSeriesTitle("Chapter 370", "kengan omega"), "kengan omega");
+  assert.equal(__test.asqSafeSeriesTitle("Kengan Omega", "fallback"), "Kengan Omega");
+
+  assert.equal(__test.asqLatestItemIsSane({
+    source: "3asq",
+    key: "aq:kengan-omega",
+    slug: "kengan-omega",
+    title: "Kengan Omega",
+    chapters: [{
+      number: 370,
+      publishedAt: "2026-09-20T18:00:00.000Z",
+      url: "https://3asq.online/manga/kengan-omega/chapter-370/",
+    }],
+  }), true);
+
+  assert.equal(__test.asqLatestItemIsSane({
+    source: "3asq",
+    key: "aq:kengan-omega",
+    slug: "kengan-omega",
+    title: "Kengan Omega",
+    chapters: [{
+      number: 370,
+      publishedAt: null,
+      url: "https://3asq.online/manga/kengan-omega/chapter-370/",
+    }],
+  }), false);
+});
+
 test("3asq page parser prefers lazy Madara page images", () => {
   const html = `
     <div class="reading-content">
