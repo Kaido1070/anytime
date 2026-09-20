@@ -3,7 +3,7 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import { Icon } from "../components/UI";
 
 export function AppLayout() {
-  const [newCount, setNewCount] = useState(0);
+  const newCount = 0;
   const [mobileNavHidden, setMobileNavHidden] = useState(false);
   const lastScrollY = useRef(0);
   const navItems = [
