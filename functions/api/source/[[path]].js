@@ -54,7 +54,7 @@ export async function onRequest(context) {
       const payload = source === "mangatime"
         ? await mangaTimeList(db, { page, sortBy: "recent" })
         : source === "teamx"
-          ? await teamXLatest(db, page)
+          ? await teamXLatest(context, db, page)
           : source === "3asq"
             ? await asqLatest(db, page)
             : source === "starzmanga"
@@ -209,6 +209,7 @@ async function ensureSourceSchema(db) {
         await Promise.all([
           db.prepare("SELECT first_seen_at FROM source_items LIMIT 1").first(),
           db.prepare("SELECT is_baseline FROM source_chapter_seen LIMIT 1").first(),
+          db.prepare("SELECT last_started_at FROM source_sync_state LIMIT 1").first(),
         ]);
         return;
       } catch {
@@ -266,6 +267,13 @@ async function ensureSourceSchema(db) {
       }
       await db
         .prepare("CREATE INDEX IF NOT EXISTS idx_source_chapter_seen_release ON source_chapter_seen(first_seen_at DESC, source_key)")
+        .run();
+
+      await db
+        .prepare(`CREATE TABLE IF NOT EXISTS source_sync_state (
+          source TEXT PRIMARY KEY,
+          last_started_at INTEGER NOT NULL DEFAULT 0
+        )`)
         .run();
     })().catch((error) => {
       sourceSchemaReady.delete(db);
@@ -716,18 +724,139 @@ async function teamXPopular(db, page) {
   return { items, hasMore: teamXHasNext(html), page };
 }
 
-async function teamXLatest(db, page) {
-  // Keep Team-X latest lightweight. Do not open every series page here:
-  // source-wide enrichment caused N+1 requests and could stall Wany.
-  // Publication timestamps remain available when a series itself is opened,
-  // but Team-X stays out of the strict New feed until a direct latest-time
-  // source is found.
-  const html = await teamXFetchText(`/?page=${page}`);
+async function teamXLatest(context, db, page) {
+  const now = Date.now();
+  const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
+
+  // Serve only verified timestamps already cached in D1. This keeps the user
+  // request fast and independent from Team-X series-page latency.
+  const cached = await teamXRecentFromDb(db, cutoffIso);
+
+  // Refresh Team-X in the background at most once every five minutes. The
+  // current request never waits for the N series-page checks.
+  if (page === 1) {
+    const state = await db
+      .prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'teamx' LIMIT 1")
+      .first();
+    const lastStartedAt = Number(state?.last_started_at ?? 0);
+    if (now - lastStartedAt >= 5 * 60_000) {
+      await db
+        .prepare(`INSERT INTO source_sync_state (source, last_started_at)
+          VALUES ('teamx', ?)
+          ON CONFLICT(source) DO UPDATE SET last_started_at = excluded.last_started_at`)
+        .bind(now)
+        .run();
+
+      context.waitUntil(
+        syncTeamXLatest(db).catch((error) => {
+          console.error("Team-X background sync failed", error);
+        }),
+      );
+    }
+  }
+
+  return { items: cached, hasMore: false, page };
+}
+
+async function teamXRecentFromDb(db, cutoffIso) {
+  const result = await db
+    .prepare(`SELECT
+        i.source_key,
+        i.source,
+        i.source_id,
+        i.slug,
+        i.type,
+        i.url,
+        i.title,
+        i.cover_url,
+        i.description,
+        i.status,
+        i.genres_json,
+        c.chapter_number,
+        c.published_at
+      FROM source_chapter_seen c
+      JOIN source_items i ON i.source_key = c.source_key
+      WHERE i.source = 'teamx'
+        AND c.published_at IS NOT NULL
+        AND c.published_at > ?
+      ORDER BY c.published_at DESC
+      LIMIT 180`)
+    .bind(cutoffIso)
+    .all();
+
+  const byKey = new Map();
+  for (const row of result.results ?? []) {
+    const number = Number(row.chapter_number);
+    const publishedAt = String(row.published_at ?? "");
+    if (!Number.isFinite(number) || !Number.isFinite(Date.parse(publishedAt))) continue;
+
+    let item = byKey.get(row.source_key);
+    if (!item) {
+      item = {
+        key: row.source_key,
+        source: row.source,
+        sourceId: row.source_id,
+        slug: row.slug,
+        type: row.type,
+        url: row.url,
+        title: row.title,
+        cover: row.cover_url,
+        description: row.description ?? "",
+        status: row.status ?? "",
+        genres: parseJsonArray(row.genres_json),
+        latest: number,
+        chapters: [],
+      };
+      byKey.set(row.source_key, item);
+    }
+
+    item.latest = Math.max(Number(item.latest || 0), number);
+    item.chapters.push({
+      number,
+      title: `الفصل ${number}`,
+      publishedAt,
+      url: `${String(item.url).replace(/\/$/, "")}/${number}`,
+    });
+  }
+
+  return [...byKey.values()];
+}
+
+async function syncTeamXLatest(db) {
+  const html = await teamXFetchText("/");
   const marker = html.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
   const scoped = marker >= 0 ? html.slice(marker) : html;
-  const items = await teamXItemsFromHtml(scoped);
-  await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: teamXHasNext(html), page };
+  const baseItems = (await teamXItemsFromHtml(scoped)).slice(0, 30);
+
+  // Small bounded concurrency avoids hammering Team-X while still finishing
+  // quickly enough for the next Wany refresh to pick up the cached releases.
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(4, baseItems.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= baseItems.length) break;
+      const item = baseItems[index];
+
+      try {
+        const detailHtml = await teamXFetchText(item.url, false);
+        const chapters = parseTeamXChapters(detailHtml, item.url)
+          .filter((chapter) => !chapter.synthetic && Boolean(chapter.publishedAt));
+        if (!chapters.length) continue;
+
+        const detail = {
+          ...item,
+          latest: chapters[0]?.number ?? null,
+          chapters,
+        };
+        await rememberItems(db, [detail]);
+        await rememberChapterAvailability(db, detail);
+      } catch (error) {
+        console.warn("Team-X series sync skipped", item.key, error);
+      }
+    }
+  });
+
+  await Promise.all(workers);
 }
 
 async function teamXSearch(db, query) {
