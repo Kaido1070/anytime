@@ -955,6 +955,85 @@ function asqLatestItemIsSane(item) {
   });
 }
 
+function parseAsqLatestCardChapters(block, seriesUrl, now = Date.now()) {
+  const source = String(block ?? "");
+  const base = new URL(seriesUrl, ASQ_BASE);
+  const basePath = base.pathname.replace(/\/$/, "");
+  const chapterRegex = /<a\b([^>]*href=["'][^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi;
+  const chapters = [];
+  let match;
+
+  while ((match = chapterRegex.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    const url = absoluteUrl(ASQ_BASE, attrs.href);
+    if (!url) continue;
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      continue;
+    }
+    if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") continue;
+
+    const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+    const title = cleanText(stripTags(match[2])) || chapterId;
+    const number = asqChapterNumber(title, chapterId);
+    if (!Number.isFinite(number)) continue;
+
+    chapters.push({
+      number,
+      title: title || "الفصل " + number,
+      url,
+      start: match.index,
+      end: chapterRegex.lastIndex,
+      publishedAt: null,
+    });
+  }
+
+  if (!chapters.length) return [];
+
+  // First preference: the date that lives inside the same structural <li>.
+  // This is the strongest association and is what normal Madara chapter lists use.
+  for (const chapter of chapters) {
+    const liStart = source.lastIndexOf("<li", chapter.start);
+    const liEnd = source.indexOf("</li>", chapter.end);
+    if (liStart < 0 || liEnd < chapter.end) continue;
+    const row = source.slice(liStart, liEnd + 5);
+    const linksInRow = (row.match(/\/manga\//gi) || []).length;
+    if (linksInRow > 2) continue;
+    chapter.publishedAt = parseAsqPublishedAt(row, now);
+  }
+
+  // Homepage/latest widgets sometimes place the date beside the chapter row
+  // instead of inside <li>. Detect one consistent orientation for the card,
+  // then pair each chapter only with the date in its own adjacent interval.
+  const first = chapters[0];
+  const secondStart = chapters[1]?.start ?? source.length;
+  const firstAfter = parseAsqPublishedAt(source.slice(first.end, secondStart), now);
+  const firstBefore = parseAsqPublishedAt(source.slice(0, first.start), now);
+  const orientation = firstAfter ? "after" : firstBefore ? "before" : null;
+
+  for (let index = 0; index < chapters.length; index += 1) {
+    const chapter = chapters[index];
+    if (chapter.publishedAt) continue;
+
+    const previousEnd = chapters[index - 1]?.end ?? 0;
+    const nextStart = chapters[index + 1]?.start ?? source.length;
+    const interval = orientation === "before"
+      ? source.slice(previousEnd, chapter.start)
+      : orientation === "after"
+        ? source.slice(chapter.end, nextStart)
+        : "";
+
+    chapter.publishedAt = interval ? parseAsqPublishedAt(interval, now) : null;
+  }
+
+  return chapters
+    .filter((chapter) => Boolean(chapter.publishedAt))
+    .map(({ start: _start, end: _end, ...chapter }) => chapter);
+}
+
 function asqLatestItemsFromHtml(html) {
   const source = String(html ?? "");
   const bySlug = new Map();
@@ -1002,17 +1081,13 @@ function asqLatestItemsFromHtml(html) {
       cardEnd,
     );
 
-    // Publication time must be scoped to this exact chapter row, not the
-    // whole series card. A series card can contain several chapters, and using
-    // the first date in the card makes older chapters inherit the newest date.
-    const chapterStart = source.lastIndexOf("<li", match.index);
-    const chapterClose = source.indexOf("</li>", chapterLink.lastIndex);
-    const chapterBlock =
-      chapterStart >= 0 && chapterClose >= chapterLink.lastIndex
-        ? source.slice(chapterStart, chapterClose + 5)
-        : source.slice(Math.max(0, match.index - 400), Math.min(source.length, chapterLink.lastIndex + 700));
-
-    const publishedAt = parseAsqPublishedAt(chapterBlock);
+    const seriesUrl = ASQ_BASE + "/manga/" + encodeURIComponent(slug) + "/";
+    const scopedChapters = parseAsqLatestCardChapters(block, seriesUrl);
+    const scopedChapter = scopedChapters.find((chapter) =>
+      Math.abs(Number(chapter.number) - number) < 0.000001 &&
+      chapter.url === href,
+    );
+    const publishedAt = scopedChapter?.publishedAt ?? null;
     if (!publishedAt) continue;
 
     const seriesAnchor = extractAnchors(block).find((entry) => {
@@ -1042,7 +1117,7 @@ function asqLatestItemsFromHtml(html) {
       sourceId: slug,
       slug,
       type: "manga",
-      url: ASQ_BASE + "/manga/" + encodeURIComponent(slug) + "/",
+      url: seriesUrl,
       title,
       cover,
       description: "",
@@ -2661,6 +2736,7 @@ export const __test = {
   parseAsqChapters,
   parseAsqPublishedAt,
   asqLatestItemsFromHtml,
+  parseAsqLatestCardChapters,
   asqSafeSeriesTitle,
   asqLatestItemIsSane,
   parseAsqPages,
