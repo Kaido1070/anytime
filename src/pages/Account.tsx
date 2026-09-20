@@ -593,14 +593,24 @@ export function Account() {
 
   const readingEntries = useMemo(() => {
     const latestOpenedId = data?.lastOpened?.mangaId ?? null;
-    return (profile?.library ?? [])
+    // This is the signed-in user's own page, so the local synced library is
+    // authoritative. Using profile.library here can briefly resurrect a work
+    // that was just removed while the profile summary is still refreshing.
+    return (data?.library ?? [])
       .filter((entry) => entry.status === "reading")
+      .map((entry) => ({
+        mangaId: entry.mangaId,
+        status: entry.status,
+        highestReachedChapter: entry.highestReachedChapter,
+        lastReadChapter: entry.lastReadChapter,
+        lastReadAt: entry.lastReadAt,
+      }))
       .sort((a, b) => {
         if (a.mangaId === latestOpenedId && b.mangaId !== latestOpenedId) return -1;
         if (b.mangaId === latestOpenedId && a.mangaId !== latestOpenedId) return 1;
         return (b.lastReadAt ?? 0) - (a.lastReadAt ?? 0);
       });
-  }, [data?.lastOpened?.mangaId, profile?.library]);
+  }, [data?.lastOpened?.mangaId, data?.library]);
   const readingSignature = readingEntries.map((entry) => entry.mangaId).join("|");
 
   useEffect(() => {
