@@ -14,6 +14,7 @@ import { Icon } from "../components/UI";
 import { ProfileListsManager } from "../components/ProfileListsManager";
 import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
 import { useLibrary } from "../hooks/useLibrary";
+import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { saveWorkSnapshot, snapshotToSourceManga } from "../services/workSnapshots";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
