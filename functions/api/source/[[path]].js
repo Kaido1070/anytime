@@ -822,10 +822,21 @@ async function teamXRecentFromDb(db, cutoffIso) {
   return [...byKey.values()];
 }
 
+function teamXLatestSection(html) {
+  const source = String(html ?? "");
+  const latestMarker = source.search(/(?:اخر|آخر)\s+الفصول/i);
+  if (latestMarker >= 0) return source.slice(latestMarker);
+
+  const postBodyMarker = source.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
+  return postBodyMarker >= 0 ? source.slice(postBodyMarker) : source;
+}
+
 async function syncTeamXLatest(db) {
   const html = await teamXFetchText("/");
-  const marker = html.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
-  const scoped = marker >= 0 ? html.slice(marker) : html;
+  // Scope strictly to Team-X's "آخر الفصول" section. The homepage also has
+  // popular-series cards before it; including those can consume the bounded
+  // sync slots and make genuinely recent releases disappear from Wany.
+  const scoped = teamXLatestSection(html);
   const baseItems = (await teamXItemsFromHtml(scoped)).slice(0, 30);
 
   // Small bounded concurrency avoids hammering Team-X while still finishing
@@ -3126,6 +3137,7 @@ export const __test = {
   extractImages,
   parseTeamXChapters,
   parseTeamXPublishedAt,
+  teamXLatestSection,
   parseTeamXPages,
   parseAsqChapters,
   parseAsqPublishedAt,
