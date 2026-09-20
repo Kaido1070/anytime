@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { userDataService } from "../services/userData";
 import type { ReadingStats } from "../types";
+import { Icon } from "./UI";
+
+type TrophyCategory = "chapters" | "stories" | "streak";
 
 type Trophy = {
   id: string;
@@ -8,7 +11,7 @@ type Trophy = {
   description: string;
   value: number;
   threshold: number;
-  category: "chapters" | "stories" | "streak";
+  category: TrophyCategory;
 };
 
 const CHAPTER_TROPHIES = [
@@ -37,6 +40,24 @@ const STREAK_TROPHIES = [
   [7, "أسبوع متواصل", "قرأت في 7 أيام متتالية"],
   [14, "أسبوعان متواصلان", "قرأت في 14 يومًا متتاليًا"],
   [30, "شهر متواصل", "قرأت في 30 يومًا متتاليًا"],
+] as const;
+
+const CATEGORY_META: Record<TrophyCategory, { title: string; icon: string; unit: string }> = {
+  chapters: { title: "إنجازات الفصول", icon: "book", unit: "فصل" },
+  stories: { title: "إنجازات الأعمال", icon: "lists", unit: "عمل" },
+  streak: { title: "إنجازات الاستمرارية", icon: "flame", unit: "يوم" },
+};
+
+const RANK_NAMES = [
+  "برونزي",
+  "فضي",
+  "ذهبي",
+  "بلاتيني",
+  "ماسي",
+  "ماستر",
+  "نخبة",
+  "أسطوري",
+  "أسطورة Wany",
 ] as const;
 
 function formatNumber(value: number, maximumFractionDigits = 0) {
@@ -72,10 +93,6 @@ function trophyRows(stats: ReadingStats): Trophy[] {
   ];
 }
 
-function nextChapterGoal(stats: ReadingStats) {
-  return CHAPTER_TROPHIES.find(([threshold]) => stats.organicCompletedChapters < threshold) ?? null;
-}
-
 function recentCalendar(stats: ReadingStats) {
   const values = new Map(stats.recentDays.map((entry) => [entry.day, entry.chapters]));
   const now = Date.now();
@@ -87,6 +104,64 @@ function recentCalendar(stats: ReadingStats) {
   });
 }
 
+function categoryProgress(items: Trophy[]) {
+  const currentValue = items[0]?.value ?? 0;
+  const next = items.find((item) => currentValue < item.threshold) ?? null;
+  const currentIndex = next ? Math.max(0, items.indexOf(next) - 1) : Math.max(0, items.length - 1);
+  const current = items[currentIndex] ?? null;
+  const previousThreshold = next
+    ? items
+        .filter((item) => item.threshold < next.threshold && currentValue >= item.threshold)
+        .at(-1)?.threshold ?? 0
+    : items.at(-1)?.threshold ?? 0;
+  const percent = next
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          ((currentValue - previousThreshold) / Math.max(1, next.threshold - previousThreshold)) * 100,
+        ),
+      )
+    : 100;
+
+  return {
+    currentValue,
+    current,
+    next,
+    percent,
+    remaining: next ? Math.max(0, next.threshold - currentValue) : 0,
+  };
+}
+
+function RankBadge({
+  index,
+  category,
+  earned,
+  next,
+}: {
+  index: number;
+  category: TrophyCategory;
+  earned: boolean;
+  next: boolean;
+}) {
+  return (
+    <span
+      className={[
+        "reading-rank-badge",
+        `rank-${Math.min(index, 8)}`,
+        `category-${category}`,
+        earned ? "earned" : "locked",
+        next ? "next" : "",
+      ].join(" ")}
+      aria-hidden="true"
+    >
+      <span className="reading-rank-core">
+        {category === "chapters" ? "▤" : category === "stories" ? "◆" : "✦"}
+      </span>
+    </span>
+  );
+}
+
 export function ReadingStatsDashboard() {
   const [stats, setStats] = useState<ReadingStats | null>(null);
   const [error, setError] = useState("");
@@ -96,7 +171,12 @@ export function ReadingStatsDashboard() {
     userDataService
       .getReadingStats()
       .then((next) => active && setStats(next))
-      .catch((cause) => active && setError(cause instanceof Error ? cause.message : "تعذر تحميل إحصائيات القراءة."));
+      .catch((cause) =>
+        active &&
+        setError(
+          cause instanceof Error ? cause.message : "تعذر تحميل إحصائيات القراءة.",
+        ),
+      );
     return () => {
       active = false;
     };
@@ -113,117 +193,101 @@ export function ReadingStatsDashboard() {
     return <div className="profile-section-error">{error}</div>;
   }
 
-  const unlocked = trophies.filter((trophy) => trophy.value >= trophy.threshold);
-  const next = nextChapterGoal(stats);
-  const nextPercent = next
-    ? Math.min(100, Math.round((stats.organicCompletedChapters / next[0]) * 100))
-    : 100;
+  const chapterItems = trophies.filter((item) => item.category === "chapters");
+  const chapterProgress = categoryProgress(chapterItems);
+  const currentRankLabel = chapterProgress.current?.label ?? "بداية الرحلة";
+  const unlocked = trophies.filter((trophy) => trophy.value >= trophy.threshold).length;
+
+  const quickStats = [
+    { value: stats.storiesRead, label: "أعمال قرأتها", icon: "book" },
+    { value: formatNumber(stats.dailyAverage, 1), label: "متوسط الفصول يوميًا", icon: "spark" },
+    { value: stats.activeDays, label: "أيام القراءة", icon: "new" },
+    { value: stats.bestStreak, label: "أطول سلسلة قراءة", icon: "flame" },
+  ];
 
   return (
-    <section className="reading-stats-page" aria-labelledby="reading-stats-title">
-      <header className="reading-stats-hero">
-        <div>
-          <p className="eyebrow">رحلتك في Wany</p>
-          <h2 id="reading-stats-title">تقدم القراءة</h2>
-          <p className="muted">
-            من أول يوم في حسابك، مع فصل القراءة الفعلية عن تسجيل الأعمال دفعة واحدة.
+    <section className="reading-stats-page reading-stats-page-v2" aria-labelledby="reading-stats-title">
+      <section className="reading-journey-hero">
+        <div className="reading-journey-copy">
+          <p className="eyebrow">رحلة القراءة</p>
+          <div className="reading-journey-rank">
+            <span className="reading-journey-rank-mark" aria-hidden="true">
+              <Icon name="crown" />
+            </span>
+            <div>
+              <span>رتبتك الحالية</span>
+              <h2 id="reading-stats-title">{currentRankLabel}</h2>
+            </div>
+          </div>
+          <p className="reading-journey-subtitle">
+            كل فصل تقرؤه يقرّبك من الرتبة التالية.
           </p>
         </div>
-        <div className="reading-stats-hero-score">
-          <strong>{formatNumber(stats.organicChapters)}</strong>
-          <span>فصل فعلي</span>
-        </div>
-      </header>
 
-      <div className="reading-stats-summary">
-        <article>
-          <strong>{formatNumber(stats.storiesRead)}</strong>
-          <span>أعمال قرأتها</span>
-          <small>منذ إنشاء حسابك</small>
-        </article>
-        <article>
-          <strong>{formatNumber(stats.dailyAverage, 1)}</strong>
-          <span>متوسط الفصول يوميًا</span>
-          <small>بناءً على القراءة الفعلية فقط</small>
-        </article>
-        <article>
-          <strong>{formatNumber(stats.activeDays)}</strong>
-          <span>أيام القراءة</span>
-          <small>أيام قرأت فيها فصلًا واحدًا على الأقل</small>
-        </article>
-        <article>
-          <strong>{formatNumber(stats.currentStreak)}</strong>
-          <span>سلسلة القراءة الحالية</span>
-          <small>أيام قراءة متتالية حتى الآن</small>
-        </article>
+        <div className="reading-journey-numbers">
+          <div>
+            <strong>{formatNumber(stats.organicCompletedChapters)}</strong>
+            <span>فصل مكتمل</span>
+          </div>
+          <div>
+            <strong>{chapterProgress.next ? formatNumber(chapterProgress.next.threshold) : "✓"}</strong>
+            <span>الهدف التالي</span>
+          </div>
+          <div>
+            <strong>{chapterProgress.next ? formatNumber(chapterProgress.remaining) : "0"}</strong>
+            <span>فصل متبقٍ</span>
+          </div>
+        </div>
+
+        <div className="reading-journey-progress">
+          <div className="reading-journey-progress-meta">
+            <span>{Math.round(chapterProgress.percent)}%</span>
+            <b>
+              {chapterProgress.next
+                ? `${formatNumber(chapterProgress.currentValue)} / ${formatNumber(chapterProgress.next.threshold)}`
+                : "اكتملت الرتب الحالية"}
+            </b>
+          </div>
+          <div className="reading-journey-progress-track">
+            <span style={{ width: `${chapterProgress.percent}%` }} />
+          </div>
+        </div>
+      </section>
+
+      <div className="reading-stats-quick-grid" aria-label="ملخص إحصائيات القراءة">
+        {quickStats.map((item) => (
+          <article key={item.label}>
+            <span className="reading-stats-quick-icon" aria-hidden="true">
+              <Icon name={item.icon} />
+            </span>
+            <div>
+              <strong>{typeof item.value === "number" ? formatNumber(item.value) : item.value}</strong>
+              <span>{item.label}</span>
+            </div>
+          </article>
+        ))}
       </div>
 
-      <section className="reading-stats-split" aria-label="تصنيف القراءة">
-        <article className="reading-stat-panel primary">
-          <div>
-            <p className="eyebrow">الفصول المقروءة فعليًا</p>
-            <h3>{formatNumber(stats.organicChapters)} فصل</h3>
-          </div>
-          <p>
-            الفصول التي قرأتها فصلًا بعد فصل. تُحتسب ضمن متوسط القراءة اليومي وتروفيات الفصول.
-          </p>
-        </article>
-        <article className="reading-stat-panel">
-          <div>
-            <p className="eyebrow">فصول مسجلة دفعة واحدة</p>
-            <h3>{formatNumber(stats.bulkPacks)} عملية تسجيل</h3>
-          </div>
-          <p>
-            {formatNumber(stats.bulkStories)} أعمال · {formatNumber(stats.bulkChapters)} فصلًا سُجلت دفعة واحدة.
-            لا تُحتسب ضمن متوسط القراءة اليومي أو تروفيات الفصول.
-          </p>
-        </article>
-      </section>
-
-      <section className="reading-next-goal">
-        <div className="reading-next-goal-heading">
-          <div>
-            <p className="eyebrow">الإنجاز التالي</p>
-            <h3>{next ? next[1] : "أعلى رتبة حالية"}</h3>
-          </div>
-          <strong>{next ? `${formatNumber(stats.organicCompletedChapters)} / ${formatNumber(next[0])}` : "100%"}</strong>
-        </div>
-        <div className="reading-next-goal-track" aria-label="تقدم الهدف القادم">
-          <span style={{ width: `${nextPercent}%` }} />
-        </div>
-        <small>{next ? next[2] : "وصلت إلى أعلى تروفي فصول حاليًا."}</small>
-      </section>
-
-      <section className="reading-streak-panel">
-        <div>
-          <span>أطول سلسلة قراءة</span>
-          <strong>{formatNumber(stats.bestStreak)} يوم</strong>
-        </div>
-        <div>
-          <span>أكثر يوم قراءة</span>
-          <strong>{formatNumber(stats.bestDay.chapters)} فصل</strong>
-        </div>
-        <div>
-          <span>مدة الحساب</span>
-          <strong>{formatNumber(stats.accountDays)} يومًا</strong>
-        </div>
-      </section>
-
-      <section className="reading-calendar">
+      <section className="reading-calendar reading-calendar-compact">
         <div className="reading-stats-section-heading">
           <div>
             <p className="eyebrow">آخر 30 يومًا</p>
             <h3>نشاط القراءة</h3>
           </div>
-          <span>الفصول المقروءة فعليًا فقط</span>
+          <span>{formatNumber(stats.activeDays)} أيام قراءة</span>
         </div>
         <div className="reading-calendar-grid" aria-label="نشاط القراءة خلال آخر 30 يومًا">
           {calendar.map((day) => {
             const level =
-              day.chapters >= 8 ? 4 :
-              day.chapters >= 4 ? 3 :
-              day.chapters >= 2 ? 2 :
-              day.chapters >= 1 ? 1 : 0;
+              day.chapters >= 8
+                ? 4
+                : day.chapters >= 4
+                  ? 3
+                  : day.chapters >= 2
+                    ? 2
+                    : day.chapters >= 1
+                      ? 1
+                      : 0;
             return (
               <span
                 key={day.day}
@@ -236,96 +300,95 @@ export function ReadingStatsDashboard() {
         </div>
       </section>
 
-      <section className="reading-trophies">
-        <div className="reading-stats-section-heading">
+      <section className="reading-achievements-compact" aria-labelledby="reading-achievements-title">
+        <div className="reading-achievements-heading">
           <div>
             <p className="eyebrow">التروفيات</p>
-            <h3>التروفيات والإنجازات</h3>
+            <h3 id="reading-achievements-title">الإنجازات</h3>
           </div>
-          <span>{unlocked.length} / {trophies.length}</span>
+          <span>{unlocked} / {trophies.length}</span>
         </div>
 
-        {[
-          ["chapters", "إنجازات الفصول"],
-          ["stories", "إنجازات الأعمال"],
-          ["streak", "إنجازات الاستمرارية"],
-        ].map(([category, title]) => {
-          const categoryTrophies = trophies.filter((trophy) => trophy.category === category);
-          const nextLocked = categoryTrophies.find((trophy) => trophy.value < trophy.threshold) ?? null;
-          const currentValue = categoryTrophies[0]?.value ?? 0;
-          const previousThreshold = nextLocked
-            ? [...categoryTrophies]
-                .filter((trophy) => trophy.threshold < nextLocked.threshold && trophy.value >= trophy.threshold)
-                .at(-1)?.threshold ?? 0
-            : categoryTrophies.at(-1)?.threshold ?? 0;
-          const segmentProgress = nextLocked
-            ? Math.max(
-                0,
-                Math.min(
-                  100,
-                  ((currentValue - previousThreshold) /
-                    Math.max(1, nextLocked.threshold - previousThreshold)) *
-                    100,
-                ),
-              )
-            : 100;
-          const remaining = nextLocked ? Math.max(0, nextLocked.threshold - currentValue) : 0;
+        {(["chapters", "stories", "streak"] as TrophyCategory[]).map((category) => {
+          const items = trophies.filter((trophy) => trophy.category === category);
+          const progress = categoryProgress(items);
+          const meta = CATEGORY_META[category];
 
           return (
-            <div className="reading-trophy-category compact" key={category}>
-              <div className="reading-trophy-category-heading">
-                <h4>{title}</h4>
-                <span>
-                  {nextLocked
-                    ? `باقي ${formatNumber(remaining)} للوصول إلى ${nextLocked.label}`
-                    : "اكتملت جميع التروفيات الحالية"}
+            <article className={`reading-achievement-row achievement-${category}`} key={category}>
+              <div className="reading-achievement-summary">
+                <span className="reading-achievement-category-icon" aria-hidden="true">
+                  <Icon name={meta.icon} />
                 </span>
+                <div>
+                  <h4>{meta.title}</h4>
+                  <strong>
+                    {progress.next
+                      ? `${formatNumber(progress.currentValue)} / ${formatNumber(progress.next.threshold)}`
+                      : formatNumber(progress.currentValue)}
+                  </strong>
+                  <small>
+                    {progress.next
+                      ? `باقي ${formatNumber(progress.remaining)} ${meta.unit} للوصول إلى ${progress.next.label}`
+                      : "اكتملت جميع الرتب الحالية"}
+                  </small>
+                </div>
               </div>
 
-              <div className="reading-trophy-ladder" role="list" aria-label={title}>
-                {categoryTrophies.map((trophy, index) => {
+              <div className="reading-rank-strip" role="list" aria-label={meta.title}>
+                {items.map((trophy, index) => {
                   const earned = trophy.value >= trophy.threshold;
-                  const isNext = nextLocked?.id === trophy.id;
-                  const growth = 30 + Math.min(index, 6) * 4;
+                  const isNext = progress.next?.id === trophy.id;
                   return (
-                    <div
-                      className={`reading-trophy-node ${earned ? "earned" : "locked"} ${isNext ? "next" : ""}`}
-                      key={trophy.id}
-                      role="listitem"
-                    >
-                      <div
-                        className="reading-trophy-node-icon"
-                        style={{ width: growth, height: growth }}
-                        aria-hidden="true"
-                      >
-                        <span>{earned ? "◆" : isNext ? "◇" : "·"}</span>
-                      </div>
-                      <b>{trophy.label}</b>
-                      <small>{formatNumber(trophy.threshold)}</small>
+                    <div className="reading-rank-item" key={trophy.id} role="listitem">
+                      <RankBadge
+                        index={index}
+                        category={category}
+                        earned={earned}
+                        next={isNext}
+                      />
+                      <b>{RANK_NAMES[Math.min(index, RANK_NAMES.length - 1)]}</b>
+                      <span>{formatNumber(trophy.threshold)}</span>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="reading-trophy-progress-meta">
-                <span>
-                  {nextLocked
-                    ? `${Math.round(segmentProgress)}% نحو التروفي التالي`
-                    : "100% مكتمل"}
-                </span>
-                <span>
-                  {nextLocked
-                    ? `${formatNumber(currentValue)} / ${formatNumber(nextLocked.threshold)}`
-                    : formatNumber(currentValue)}
-                </span>
+              <div className="reading-achievement-progress">
+                <div>
+                  <span>{Math.round(progress.percent)}% نحو الرتبة التالية</span>
+                  <b>{progress.next?.label ?? "مكتمل"}</b>
+                </div>
+                <div className="reading-achievement-progress-track">
+                  <span style={{ width: `${progress.percent}%` }} />
+                </div>
               </div>
-              <div className="reading-trophy-progress-track" aria-hidden="true">
-                <span style={{ width: `${segmentProgress}%` }} />
-              </div>
-            </div>
+            </article>
           );
         })}
       </section>
+
+      <details className="reading-stats-details">
+        <summary>تفاصيل إضافية</summary>
+        <div className="reading-stats-details-grid">
+          <div>
+            <span>فصول مسجلة دفعة واحدة</span>
+            <strong>{formatNumber(stats.bulkChapters)}</strong>
+          </div>
+          <div>
+            <span>عمليات التسجيل الدفعي</span>
+            <strong>{formatNumber(stats.bulkPacks)}</strong>
+          </div>
+          <div>
+            <span>أكثر يوم قراءة</span>
+            <strong>{formatNumber(stats.bestDay.chapters)} فصل</strong>
+          </div>
+          <div>
+            <span>مدة الحساب</span>
+            <strong>{formatNumber(stats.accountDays)} يومًا</strong>
+          </div>
+        </div>
+      </details>
     </section>
   );
 }
