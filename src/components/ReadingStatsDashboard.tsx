@@ -316,23 +316,25 @@ export function ReadingStatsDashboard() {
 
           return (
             <article className={`reading-achievement-row achievement-${category}`} key={category}>
-              <div className="reading-achievement-summary">
-                <span className="reading-achievement-category-icon" aria-hidden="true">
-                  <Icon name={meta.icon} />
-                </span>
-                <div>
-                  <h4>{meta.title}</h4>
-                  <strong>
-                    {progress.next
-                      ? `${formatNumber(progress.currentValue)} / ${formatNumber(progress.next.threshold)}`
-                      : formatNumber(progress.currentValue)}
-                  </strong>
-                  <small>
-                    {progress.next
-                      ? `باقي ${formatNumber(progress.remaining)} ${meta.unit} للوصول إلى ${progress.next.label}`
-                      : "اكتملت جميع الرتب الحالية"}
-                  </small>
+              <div className="reading-achievement-topline">
+                <div className="reading-achievement-title">
+                  <span className="reading-achievement-category-icon" aria-hidden="true">
+                    <Icon name={meta.icon} />
+                  </span>
+                  <div>
+                    <h4>{meta.title}</h4>
+                    <small>
+                      {progress.next
+                        ? `باقي ${formatNumber(progress.remaining)} ${meta.unit} إلى ${progress.next.label}`
+                        : "اكتملت جميع الرتب الحالية"}
+                    </small>
+                  </div>
                 </div>
+                <strong className="reading-achievement-value">
+                  {progress.next
+                    ? `${formatNumber(progress.currentValue)} / ${formatNumber(progress.next.threshold)}`
+                    : formatNumber(progress.currentValue)}
+                </strong>
               </div>
 
               <div className="reading-rank-strip" role="list" aria-label={meta.title}>
@@ -354,10 +356,10 @@ export function ReadingStatsDashboard() {
                 })}
               </div>
 
-              <div className="reading-achievement-progress">
+              <div className="reading-achievement-progress compact">
                 <div>
-                  <span>{Math.round(progress.percent)}% نحو الرتبة التالية</span>
-                  <b>{progress.next?.label ?? "مكتمل"}</b>
+                  <span>{Math.round(progress.percent)}%</span>
+                  <b>{progress.next ? "إلى الرتبة التالية" : "مكتمل"}</b>
                 </div>
                 <div className="reading-achievement-progress-track">
                   <span style={{ width: `${progress.percent}%` }} />
