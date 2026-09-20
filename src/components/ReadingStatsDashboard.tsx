@@ -76,6 +76,17 @@ function nextChapterGoal(stats: ReadingStats) {
   return CHAPTER_TROPHIES.find(([threshold]) => stats.organicChapters < threshold) ?? null;
 }
 
+function recentCalendar(stats: ReadingStats) {
+  const values = new Map(stats.recentDays.map((entry) => [entry.day, entry.chapters]));
+  const now = Date.now();
+  return Array.from({ length: 30 }, (_, index) => {
+    const offset = 29 - index;
+    const shifted = new Date(now - offset * 86400000 + 3 * 60 * 60_000);
+    const day = shifted.toISOString().slice(0, 10);
+    return { day, chapters: values.get(day) ?? 0 };
+  });
+}
+
 export function ReadingStatsDashboard() {
   const [stats, setStats] = useState<ReadingStats | null>(null);
   const [error, setError] = useState("");
@@ -92,6 +103,7 @@ export function ReadingStatsDashboard() {
   }, []);
 
   const trophies = useMemo(() => (stats ? trophyRows(stats) : []), [stats]);
+  const calendar = useMemo(() => (stats ? recentCalendar(stats) : []), [stats]);
 
   if (!stats && !error) {
     return <div className="reading-stats-loading">جاري تجهيز تقدمك…</div>;
@@ -194,6 +206,33 @@ export function ReadingStatsDashboard() {
         <div>
           <span>عمر الحساب</span>
           <strong>{formatNumber(stats.accountDays)} يوم</strong>
+        </div>
+      </section>
+
+      <section className="reading-calendar">
+        <div className="reading-stats-section-heading">
+          <div>
+            <p className="eyebrow">آخر 30 يوم</p>
+            <h3>إيقاعك</h3>
+          </div>
+          <span>القراءة الفعلية فقط</span>
+        </div>
+        <div className="reading-calendar-grid" aria-label="نشاط القراءة خلال آخر 30 يومًا">
+          {calendar.map((day) => {
+            const level =
+              day.chapters >= 8 ? 4 :
+              day.chapters >= 4 ? 3 :
+              day.chapters >= 2 ? 2 :
+              day.chapters >= 1 ? 1 : 0;
+            return (
+              <span
+                key={day.day}
+                className={`reading-calendar-day level-${level}`}
+                title={`${day.day}: ${day.chapters} فصل`}
+                aria-label={`${day.day}: ${day.chapters} فصل`}
+              />
+            );
+          })}
         </div>
       </section>
 
