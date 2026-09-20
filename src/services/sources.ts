@@ -164,6 +164,7 @@ export const sourceService = {
 
   imageUrl(source: SourceName, url?: string, referer?: string) {
     if (!url) return "";
+    if (url.startsWith("/api/work-snapshots/cover")) return url;
     const original = originalImageUrl(source, url);
     return `/api/source/image?${params({ source, url: original, referer })}`;
   },
