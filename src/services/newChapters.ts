@@ -94,6 +94,20 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+async function withinSourceBudget<T>(promise: Promise<T>, milliseconds = 7500): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("SOURCE_TIMEOUT")), milliseconds);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function resolveInChunks(keys: string[]) {
   const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
   const chunks: string[][] = [];
@@ -231,7 +245,7 @@ export async function loadNewChapterFeed(page = 1): Promise<NewChapterFeed> {
         const scanStart = (safePage - 1) * pagesPerFeedPage + 1;
         return Array.from(
           { length: pagesPerFeedPage },
-          (_, index) => sourceService.latest(source, scanStart + index),
+          (_, index) => withinSourceBudget(sourceService.latest(source, scanStart + index)),
         );
       }),
     ),
