@@ -328,6 +328,29 @@ test("3asq type classifier distinguishes novels and web novels", () => {
 });
 
 
+test("priority windows use Saudi time and stay work-specific", () => {
+  const tuesday20Riyadh = Date.UTC(2026, 8, 22, 17, 0, 0);
+  assert.deepEqual(__test.priorityWindow(tuesday20Riyadh), {
+    eleceed: true,
+    magicEmperor: false,
+  });
+  assert.equal(__test.sourceRefreshIntervalMs(tuesday20Riyadh), 2 * 60_000);
+
+  const friday05Riyadh = Date.UTC(2026, 8, 25, 2, 0, 0);
+  assert.deepEqual(__test.priorityWindow(friday05Riyadh), {
+    eleceed: false,
+    magicEmperor: true,
+  });
+  assert.equal(__test.sourceRefreshIntervalMs(friday05Riyadh), 2 * 60_000);
+
+  const mondayNoonRiyadh = Date.UTC(2026, 8, 21, 9, 0, 0);
+  assert.deepEqual(__test.priorityWindow(mondayNoonRiyadh), {
+    eleceed: false,
+    magicEmperor: false,
+  });
+  assert.equal(__test.sourceRefreshIntervalMs(mondayNoonRiyadh), 5 * 60_000);
+});
+
 test("MangaTime keeps exact publishedAt values from its chapter API", () => {
   const chapters = __test.mangaTimeChaptersFromPayload({
     chapters: [
