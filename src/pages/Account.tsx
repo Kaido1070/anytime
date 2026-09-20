@@ -15,6 +15,7 @@ import { ProfileListsManager } from "../components/ProfileListsManager";
 import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
+import type { SourceName } from "../types";
 import { sourceService } from "../services/sources";
 import { saveWorkSnapshot, snapshotToSourceManga } from "../services/workSnapshots";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
@@ -29,6 +30,17 @@ import type {
 import { Profile } from "./Profile";
 
 type ContentGroupId = "lists" | "reading" | "activity";
+
+function sourceFromKey(key: string): SourceName | null {
+  const prefix = key.split(":", 1)[0];
+  if (prefix === "mt") return "mangatime";
+  if (prefix === "tx") return "teamx";
+  if (prefix === "aq") return "3asq";
+  if (prefix === "sz") return "starzmanga";
+  if (prefix === "xs") return "xsano";
+  if (prefix === "ml") return "mangalik";
+  return null;
+}
 
 type ContentGroup = {
   id: ContentGroupId;
@@ -660,9 +672,11 @@ export function Account() {
             : entry.mangaId;
         const chapter =
           entry.lastReadChapter ?? entry.highestReachedChapter ?? null;
+        const source = fallback?.source ?? sourceFromKey(entry.mangaId);
         issues.push({
           mangaId: entry.mangaId,
           title: fallback ? sourceDisplayTitle(fallback) : fallbackTitle,
+          sourceLabel: source ? sourceService.sourceLabel(source) : "مصدر غير معروف",
           chapter,
           to:
             chapter != null
