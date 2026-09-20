@@ -418,6 +418,44 @@ test("XSano category type recognizes novels", () => {
 });
 
 
+test("MangaLik parses its explicit Arabic chapter dates", () => {
+  assert.equal(
+    __test.parseMangalikPublishedAt('<span class="chapter-release-date">سبتمبر 17, 2026</span>'),
+    "2026-09-17T00:00:00.000Z",
+  );
+  assert.equal(
+    __test.parseMangalikPublishedAt('<span class="chapter-release-date">17 سبتمبر، 2026</span>'),
+    "2026-09-17T00:00:00.000Z",
+  );
+  assert.equal(
+    __test.parseMangalikPublishedAt('<span class="chapter-release-date">بدون تاريخ</span>'),
+    null,
+  );
+});
+
+test("MangaLik keeps each chapter date scoped to its own row", () => {
+  const html = `
+    <ul>
+      <li class="wp-manga-chapter">
+        <a href="https://mangalik.net/manga/nano-machine/chapter-330/">330</a>
+        <span class="chapter-release-date">سبتمبر 17, 2026</span>
+      </li>
+      <li class="wp-manga-chapter">
+        <a href="https://mangalik.net/manga/nano-machine/chapter-329/">329</a>
+        <span class="chapter-release-date">سبتمبر 10, 2026</span>
+      </li>
+    </ul>
+  `;
+  const chapters = __test.parseMangalikChapters(
+    html,
+    "https://mangalik.net/manga/nano-machine/",
+  );
+  assert.equal(chapters[0].number, 330);
+  assert.equal(chapters[0].publishedAt, "2026-09-17T00:00:00.000Z");
+  assert.equal(chapters[1].number, 329);
+  assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
+});
+
 test("MangaLik parses Madara chapter numbers and URLs", () => {
   const html = `
     <ul>
