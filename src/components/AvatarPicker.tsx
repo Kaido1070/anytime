@@ -94,6 +94,10 @@ export function AvatarPicker({
         .find((avatar) => avatar.id === selectedId) ?? null,
     [series, selectedId],
   );
+  const resultCount = useMemo(
+    () => filtered.reduce((total, group) => total + group.avatars.length, 0),
+    [filtered],
+  );
 
   async function save() {
     if (!selectedId || busy) return;
@@ -146,6 +150,9 @@ export function AvatarPicker({
           <div>
             <span className="muted">الصورة المختارة</span>
             <b>{selected?.characterName ?? "اختر شخصية"}</b>
+            <small className="avatar-picker-preview-hint">
+              {selected ? "جاهزة للحفظ" : "اضغط على أي صورة لاختيارها"}
+            </small>
           </div>
           {selected ? (
             <AvatarChoiceImage avatar={selected} />
@@ -154,16 +161,23 @@ export function AvatarPicker({
           )}
         </div>
 
-        <label className="avatar-picker-search">
-          <span className="sr-only">البحث في مكتبة الصور الشخصية</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="ابحث عن قصة أو شخصية..."
-            autoFocus
-          />
-        </label>
+        <div className="avatar-picker-search-wrap">
+          <label className="avatar-picker-search">
+            <span className="sr-only">البحث في مكتبة الصور الشخصية</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="ابحث عن قصة أو شخصية..."
+              autoFocus
+            />
+          </label>
+          {!loading && (
+            <span className="avatar-picker-result-count">
+              {resultCount} صورة
+            </span>
+          )}
+        </div>
 
         <div className="avatar-picker-content">
           {loading ? (
@@ -254,7 +268,7 @@ export function AvatarPicker({
               disabled={!selectedId || selectedId === currentAvatarId || busy}
               onClick={() => void save()}
             >
-              {busy ? "جاري الحفظ…" : "حفظ"}
+              {busy ? "جاري الحفظ…" : "حفظ الصورة"}
             </button>
           </div>
         </footer>
