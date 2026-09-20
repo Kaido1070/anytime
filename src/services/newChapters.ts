@@ -159,7 +159,11 @@ function groupChapters(
     // publication timestamp. Re-scrapes and late source discovery therefore
     // cannot make an old chapter look new again.
     const releaseAt = Math.min(...versions.map((version) => version.timestamp));
+    // Route through the version whose own verified publication time matches
+    // the canonical (earliest) release. This avoids linking a merged feed row
+    // to a late mirror that may list the chapter but cannot actually open it.
     const routeVersion = [...versions].sort((a, b) => {
+      if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
       if (a.item.key === group.primary.key) return -1;
       if (b.item.key === group.primary.key) return 1;
       return a.item.key.localeCompare(b.item.key);
