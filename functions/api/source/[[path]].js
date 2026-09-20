@@ -720,9 +720,35 @@ async function teamXLatest(db, page) {
   const html = await teamXFetchText(`/?page=${page}`);
   const marker = html.search(/class=["\'][^"\']*post-body[^"\']*["\']/i);
   const scoped = marker >= 0 ? html.slice(marker) : html;
-  const items = await teamXItemsFromHtml(scoped);
+  const baseItems = (await teamXItemsFromHtml(scoped)).slice(0, 24);
+
+  // Team-X's homepage is the authoritative "latest chapters" list, but it
+  // does not expose trustworthy publication times there. Enrich only those
+  // latest cards from their series pages; never crawl the full catalogue.
+  const results = new Array(baseItems.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(6, baseItems.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= baseItems.length) break;
+      const item = baseItems[index];
+      try {
+        const detailHtml = await teamXFetchText(item.url, false);
+        const chapters = parseTeamXChapters(detailHtml, item.url)
+          .filter((chapter) => !chapter.synthetic && Boolean(chapter.publishedAt));
+        results[index] = chapters.length
+          ? { ...item, latest: chapters[0].number, chapters }
+          : null;
+      } catch {
+        results[index] = null;
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  const items = results.filter(Boolean);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: teamXHasNext(html), page };
+  return { items, hasMore: teamXHasNext(html), page };
 }
 
 async function teamXSearch(db, query) {
@@ -810,27 +836,79 @@ async function teamXSeries(db, item) {
   return updated;
 }
 
-function parseTeamXChapters(html, seriesUrl) {
+function parseTeamXPublishedAt(block, now = Date.now()) {
+  const text = cleanText(stripTags(block));
+  if (!text) return null;
+
+  const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
+  if (/\bjust now\b/.test(normalized)) return new Date(now - 30_000).toISOString();
+
+  const numeric = normalized.match(/\b(\d+)\s*(minute|minutes|hour|hours)\s+ago\b/i);
+  if (numeric) {
+    const amount = Number(numeric[1]);
+    const unit = numeric[2].toLowerCase();
+    const milliseconds = unit.startsWith("minute") ? 60_000 : 3_600_000;
+    return new Date(now - amount * milliseconds).toISOString();
+  }
+
+  if (/\ba minute ago\b/.test(normalized)) return new Date(now - 60_000).toISOString();
+  if (/\ban? hour ago\b/.test(normalized)) return new Date(now - 3_600_000).toISOString();
+
+  // Day/week/month labels are too coarse for Wany's strict 24-hour feed.
+  return null;
+}
+
+function parseTeamXChapters(html, seriesUrl, now = Date.now()) {
+  const source = String(html ?? "");
   const parsedBase = new URL(seriesUrl, TEAMX_BASE);
   const basePath = parsedBase.pathname.replace(/\/$/, "");
   const found = new Map();
-  for (const anchor of extractAnchors(html)) {
-    const href = absoluteUrl(TEAMX_BASE, anchor.href);
+  const anchors = [];
+  const regex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  let match;
+
+  while ((match = regex.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    const href = absoluteUrl(TEAMX_BASE, attrs.href);
     if (!href) continue;
+
     let parsed;
     try {
       parsed = new URL(href);
     } catch {
       continue;
     }
-    if (parsed.pathname === basePath) continue;
-    if (!parsed.pathname.startsWith(`${basePath}/`)) continue;
+    if (parsed.pathname === basePath || !parsed.pathname.startsWith(basePath + "/")) continue;
+
     const tail = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
     if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
+
     const number = Number(tail);
     if (!Number.isFinite(number)) continue;
-    const title = cleanText(stripTags(anchor.inner)) || `الفصل ${tail}`;
-    found.set(number, { number, title, publishedAt: null, url: href });
+    anchors.push({
+      number,
+      href,
+      inner: match[2],
+      start: match.index,
+      end: regex.lastIndex,
+    });
+  }
+
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
+    const nextStart = anchors[index + 1]?.start ?? source.length;
+    const row = source.slice(anchor.start, Math.min(nextStart, anchor.end + 1400));
+    const rawTitle = cleanText(stripTags(anchor.inner)) || `الفصل ${anchor.number}`;
+    const title = rawTitle
+      .replace(/\b(?:just now|(?:\d+|a|an)\s+(?:minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\s+ago)\b/gi, "")
+      .trim() || `الفصل ${anchor.number}`;
+
+    found.set(anchor.number, {
+      number: anchor.number,
+      title,
+      publishedAt: parseTeamXPublishedAt(row, now),
+      url: anchor.href,
+    });
   }
 
   const numbers = [...found.keys()].sort((a, b) => b - a);
@@ -2789,6 +2867,7 @@ export const __test = {
   extractAnchors,
   extractImages,
   parseTeamXChapters,
+  parseTeamXPublishedAt,
   parseTeamXPages,
   parseAsqChapters,
   parseAsqPublishedAt,
