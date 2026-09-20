@@ -916,12 +916,11 @@ function teamXHasNext(html) {
 // 3asq / Manga Al-Ashiq ------------------------------------------------------
 
 async function asqLatest(db, page) {
-  // 3asq exposes recent chapter updates directly on its latest/home listing.
-  // Parse those rows first so the New feed does not need to crawl every series.
-  // The Madara latest ordering lives on the manga archive. The site root
-  // uses a different layout, so parsing it as archive cards can silently
-  // produce zero items.
-  const path = "/manga/page/" + page + "/?m_orderby=latest";
+  // 3asq's homepage/latest stream is the fast path that already proved stable
+  // for chapter discovery. Keep using it; only fix how series metadata is scoped.
+  const path = page > 1
+    ? "/page/" + page + "/?m_orderby=latest"
+    : "/?m_orderby=latest";
   const html = await asqFetchText(path);
   const direct = asqLatestItemsFromHtml(html);
 
@@ -930,46 +929,107 @@ async function asqLatest(db, page) {
     return { items: direct.slice(0, 48), hasMore: asqHasNext(html), page };
   }
 
-  // Keep the existing title-list parser as a safe fallback if 3asq changes
-  // the markup of its latest-chapter section.
   return asqList(db, { page, order: "latest" });
 }
 
 function asqLatestItemsFromHtml(html) {
   const source = String(html ?? "");
   const bySlug = new Map();
-  // Madara latest pages already group the series title/cover and its recent
-  // chapter rows inside one page-item-detail card. Keep that boundary intact:
-  // using the nearest <li> loses the series metadata and can accidentally use
-  // editor/UI text (for example AddText_...) as the work title.
-  const blocks = madaraBlocksByClass(source, ["page-item-detail", "c-tabs-item__content"]);
-  const candidates = blocks.length ? blocks : [source];
+  const chapterLink = /<a\b([^>]*href=["'][^"']*\/manga\/([^/"']+)\/([^/"']+)\/?[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi;
+  let match;
 
-  for (const block of candidates) {
-    const item = asqItemsFromHtml(block)[0];
-    if (!item) continue;
+  while ((match = chapterLink.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    const href = absoluteUrl(ASQ_BASE, attrs.href);
+    if (!href) continue;
 
-    const chapters = parseAsqChapters(block, item.url)
-      .filter((chapter) => Boolean(chapter.publishedAt));
-    if (!chapters.length) continue;
-
-    const existing = bySlug.get(item.slug);
-    if (existing) {
-      existing.chapters.push(...chapters);
-      existing.latest = Math.max(
-        Number(existing.latest || 0),
-        ...chapters.map((chapter) => Number(chapter.number || 0)),
-      );
-      if (!existing.cover && item.cover) existing.cover = item.cover;
-      if (!existing.title && item.title) existing.title = item.title;
+    let parsed;
+    try {
+      parsed = new URL(href);
+    } catch {
       continue;
     }
+    if (!/^(?:www\.)?3asq\.online$/i.test(parsed.hostname)) continue;
 
-    bySlug.set(item.slug, {
-      ...item,
-      latest: Math.max(...chapters.map((chapter) => Number(chapter.number || 0))),
-      chapters,
+    const slug = decodeURIComponent(match[2]);
+    const chapterId = decodeURIComponent(match[3]);
+    const chapterTitle = cleanText(stripTags(match[4])) || chapterId;
+    const number = asqChapterNumber(chapterTitle, chapterId);
+    if (!slug || !Number.isFinite(number)) continue;
+
+    // Keep the exact fast parser that worked before, but scope title/cover to
+    // the surrounding series card instead of the nearest chapter <li>.
+    const cardStart = Math.max(
+      source.lastIndexOf('<div class="page-item-detail', match.index),
+      source.lastIndexOf("<div class='page-item-detail", match.index),
+      source.lastIndexOf('<div class="c-tabs-item__content', match.index),
+      source.lastIndexOf("<div class='c-tabs-item__content", match.index),
+    );
+    const nextDetailDouble = source.indexOf('<div class="page-item-detail', chapterLink.lastIndex);
+    const nextDetailSingle = source.indexOf("<div class='page-item-detail", chapterLink.lastIndex);
+    const nextTabDouble = source.indexOf('<div class="c-tabs-item__content', chapterLink.lastIndex);
+    const nextTabSingle = source.indexOf("<div class='c-tabs-item__content", chapterLink.lastIndex);
+    const ends = [nextDetailDouble, nextDetailSingle, nextTabDouble, nextTabSingle]
+      .filter((value) => value >= 0);
+    const cardEnd = ends.length
+      ? Math.min(...ends)
+      : Math.min(source.length, chapterLink.lastIndex + 3500);
+    const block = source.slice(
+      cardStart >= 0 ? cardStart : Math.max(0, match.index - 1600),
+      cardEnd,
+    );
+
+    const publishedAt = parseAsqPublishedAt(block);
+    if (!publishedAt) continue;
+
+    const seriesAnchor = extractAnchors(block).find((entry) => {
+      const url = absoluteUrl(ASQ_BASE, entry.href);
+      if (!url) return false;
+      try {
+        return new URL(url).pathname.replace(/\/$/, "") === "/manga/" + slug;
+      } catch {
+        return false;
+      }
     });
+
+    const seriesTitle = cleanText(
+      seriesAnchor?.attrs?.title ||
+      firstMatch(seriesAnchor?.inner || "", /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i) ||
+      firstImgAttr(seriesAnchor?.inner || block, "alt") ||
+      stripTags(seriesAnchor?.inner || ""),
+    );
+    const title = seriesTitle || slug.replace(/[-_]+/g, " ");
+    const cover = absoluteUrl(ASQ_BASE, asqFirstImage(block));
+
+    const key = "aq:" + safeSlugKey(slug);
+    const existing = bySlug.get(slug) || {
+      key,
+      source: "3asq",
+      sourceId: slug,
+      slug,
+      type: "manga",
+      url: ASQ_BASE + "/manga/" + encodeURIComponent(slug) + "/",
+      title,
+      cover,
+      description: "",
+      status: "",
+      genres: [],
+      latest: number,
+      chapters: [],
+    };
+
+    existing.latest = Math.max(Number(existing.latest || number), number);
+    existing.chapters.push({
+      number,
+      title: chapterTitle || "الفصل " + number,
+      publishedAt,
+      url: href,
+    });
+    if (!existing.cover && cover) existing.cover = cover;
+    if ((!existing.title || existing.title === slug.replace(/[-_]+/g, " ")) && title) {
+      existing.title = title;
+    }
+    bySlug.set(slug, existing);
   }
 
   return [...bySlug.values()].map((item) => ({
