@@ -2207,3 +2207,428 @@ button.profile-icon-action {
   .reading-trophy-ladder{gap:8px}
   .reading-trophy-node{min-width:64px}
 }
+
+/* Reading stats v2: compact, motivational dashboard */
+.reading-stats-page-v2{
+  gap:14px;
+  padding-top:10px;
+}
+.reading-journey-hero{
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  gap:16px;
+  padding:18px;
+  border:1px solid #554838;
+  border-radius:16px;
+  background:
+    radial-gradient(circle at 12% 18%, #9b6b2b22 0, transparent 32%),
+    linear-gradient(145deg,#24231f 0%,#1e2022 48%,#1b1d1f 100%);
+}
+.reading-journey-hero::after{
+  content:"";
+  position:absolute;
+  inset:auto -56px -76px auto;
+  width:170px;
+  height:170px;
+  border-radius:50%;
+  border:1px solid #c59d6b18;
+  box-shadow:0 0 70px #d8ad7220 inset;
+  pointer-events:none;
+}
+.reading-journey-copy{
+  position:relative;
+  z-index:1;
+  display:grid;
+  gap:8px;
+}
+.reading-journey-rank{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.reading-journey-rank-mark{
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border:1px solid #7f684d;
+  border-radius:12px;
+  background:#2b261f;
+  color:var(--accent);
+  box-shadow:0 0 24px #c59d6b18;
+}
+.reading-journey-rank>div{
+  display:grid;
+  gap:2px;
+}
+.reading-journey-rank span{
+  color:var(--muted);
+  font-size:8px;
+}
+.reading-journey-rank h2{
+  margin:0;
+  font-size:24px;
+  line-height:1.2;
+}
+.reading-journey-subtitle{
+  color:#a7a39c;
+  font-size:9px;
+}
+.reading-journey-numbers{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  border-top:1px solid #ffffff10;
+  border-bottom:1px solid #ffffff10;
+}
+.reading-journey-numbers>div{
+  display:grid;
+  gap:3px;
+  padding:12px 10px;
+  text-align:center;
+}
+.reading-journey-numbers>div+div{
+  border-inline-start:1px solid #ffffff10;
+}
+.reading-journey-numbers strong{
+  font-size:20px;
+}
+.reading-journey-numbers span{
+  color:var(--muted);
+  font-size:8px;
+}
+.reading-journey-progress{
+  position:relative;
+  z-index:1;
+  display:grid;
+  gap:7px;
+}
+.reading-journey-progress-meta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  font-size:8px;
+  color:var(--muted);
+}
+.reading-journey-progress-meta span{
+  color:var(--accent);
+  font-weight:700;
+}
+.reading-journey-progress-track,
+.reading-achievement-progress-track{
+  height:7px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#343638;
+}
+.reading-journey-progress-track>span,
+.reading-achievement-progress-track>span{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#b78654,#e3bd89);
+}
+.reading-stats-quick-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+.reading-stats-quick-grid article{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:13px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#1f2123;
+}
+.reading-stats-quick-icon{
+  flex:0 0 auto;
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:#2a2926;
+  color:var(--accent);
+}
+.reading-stats-quick-grid article>div{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+.reading-stats-quick-grid strong{
+  font-size:17px;
+  line-height:1;
+}
+.reading-stats-quick-grid article>div>span{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--muted);
+  font-size:8px;
+}
+.reading-calendar-compact{
+  padding:14px;
+  gap:10px;
+}
+.reading-calendar-compact .reading-calendar-grid{
+  grid-template-columns:repeat(15,minmax(0,1fr));
+  gap:4px;
+}
+.reading-calendar-compact .reading-calendar-day{
+  border-radius:3px;
+}
+.reading-achievements-compact{
+  display:grid;
+  gap:10px;
+}
+.reading-achievements-heading{
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:12px;
+  padding:2px 1px;
+}
+.reading-achievements-heading h3{
+  margin-top:2px;
+  font-size:20px;
+}
+.reading-achievements-heading>span{
+  color:var(--muted);
+  font-size:9px;
+}
+.reading-achievement-row{
+  display:grid;
+  gap:11px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:linear-gradient(145deg,#202224,#1d1f21);
+}
+.reading-achievement-summary{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+.reading-achievement-category-icon{
+  flex:0 0 auto;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border:1px solid #4a4035;
+  border-radius:11px;
+  background:#2a2722;
+  color:var(--accent);
+}
+.reading-achievement-summary>div{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+.reading-achievement-summary h4{
+  font-size:12px;
+  color:#eeeae3;
+}
+.reading-achievement-summary strong{
+  font-size:16px;
+}
+.reading-achievement-summary small{
+  color:var(--muted);
+  font-size:8px;
+  line-height:1.45;
+}
+.reading-rank-strip{
+  display:flex;
+  align-items:flex-end;
+  gap:9px;
+  overflow-x:auto;
+  padding:4px 2px 7px;
+  scrollbar-width:none;
+}
+.reading-rank-strip::-webkit-scrollbar{display:none}
+.reading-rank-item{
+  flex:0 0 auto;
+  min-width:58px;
+  display:grid;
+  justify-items:center;
+  gap:4px;
+  text-align:center;
+}
+.reading-rank-item b{
+  max-width:70px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#d8d5cf;
+  font-size:7px;
+}
+.reading-rank-item span{
+  color:var(--muted);
+  font-size:7px;
+}
+.reading-rank-badge{
+  position:relative;
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  filter:saturate(.9);
+  opacity:.42;
+  transition:transform .2s ease,opacity .2s ease,filter .2s ease;
+}
+.reading-rank-badge::before,
+.reading-rank-badge::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:currentColor;
+  opacity:.95;
+}
+.reading-rank-badge::after{
+  inset:4px;
+  background:#1e2022;
+  opacity:.9;
+}
+.reading-rank-core{
+  position:relative;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  width:52%;
+  height:52%;
+  border-radius:50%;
+  color:#f4eadf;
+  font-size:10px;
+  text-shadow:0 1px 5px #000;
+}
+.reading-rank-badge.earned{
+  opacity:1;
+  filter:saturate(1.08);
+}
+.reading-rank-badge.next{
+  opacity:.88;
+  transform:translateY(-2px) scale(1.04);
+  filter:drop-shadow(0 0 8px currentColor);
+}
+/* Tier colors + evolving silhouettes */
+.reading-rank-badge.rank-0{color:#9a623c}
+.reading-rank-badge.rank-0::before,
+.reading-rank-badge.rank-0::after{clip-path:polygon(25% 7%,75% 7%,96% 50%,75% 93%,25% 93%,4% 50%)}
+
+.reading-rank-badge.rank-1{color:#aeb6c0}
+.reading-rank-badge.rank-1::before,
+.reading-rank-badge.rank-1::after{clip-path:polygon(30% 3%,70% 3%,97% 30%,97% 70%,70% 97%,30% 97%,3% 70%,3% 30%)}
+
+.reading-rank-badge.rank-2{color:#d6a84f}
+.reading-rank-badge.rank-2::before,
+.reading-rank-badge.rank-2::after{clip-path:polygon(50% 0,90% 16%,84% 70%,50% 100%,16% 70%,10% 16%)}
+
+.reading-rank-badge.rank-3{color:#7f9fb8}
+.reading-rank-badge.rank-3::before,
+.reading-rank-badge.rank-3::after{clip-path:polygon(50% 0,87% 18%,100% 58%,72% 100%,28% 100%,0 58%,13% 18%)}
+
+.reading-rank-badge.rank-4{color:#5fd0e7}
+.reading-rank-badge.rank-4::before,
+.reading-rank-badge.rank-4::after{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+
+.reading-rank-badge.rank-5{color:#8f68de}
+.reading-rank-badge.rank-5::before,
+.reading-rank-badge.rank-5::after{clip-path:polygon(50% 0,63% 27%,95% 18%,73% 50%,95% 82%,63% 73%,50% 100%,37% 73%,5% 82%,27% 50%,5% 18%,37% 27%)}
+
+.reading-rank-badge.rank-6{color:#c14f6f}
+.reading-rank-badge.rank-6::before,
+.reading-rank-badge.rank-6::after{clip-path:polygon(50% 0,66% 18%,92% 12%,88% 38%,100% 58%,78% 68%,72% 96%,50% 82%,28% 96%,22% 68%,0 58%,12% 38%,8% 12%,34% 18%)}
+
+.reading-rank-badge.rank-7{color:#e4c369}
+.reading-rank-badge.rank-7::before,
+.reading-rank-badge.rank-7::after{clip-path:polygon(50% 0,61% 20%,82% 8%,80% 31%,100% 30%,85% 50%,100% 70%,80% 69%,82% 92%,61% 80%,50% 100%,39% 80%,18% 92%,20% 69%,0 70%,15% 50%,0 30%,20% 31%,18% 8%,39% 20%)}
+
+.reading-rank-badge.rank-8{color:#f2d58b}
+.reading-rank-badge.rank-8::before,
+.reading-rank-badge.rank-8::after{clip-path:polygon(50% 0,62% 17%,80% 4%,81% 25%,100% 21%,90% 43%,100% 58%,82% 62%,88% 87%,63% 79%,50% 100%,37% 79%,12% 87%,18% 62%,0 58%,10% 43%,0 21%,19% 25%,20% 4%,38% 17%)}
+
+/* Category identity: same tier prestige, different core language */
+.achievement-chapters .reading-rank-core{
+  border:1px solid #ffffff18;
+  background:#ffffff08;
+}
+.achievement-stories .reading-rank-badge::after{
+  transform:scale(.92) rotate(6deg);
+}
+.achievement-streak .reading-rank-badge.next,
+.achievement-streak .reading-rank-badge.earned{
+  filter:drop-shadow(0 0 7px currentColor);
+}
+.achievement-streak .reading-rank-core{
+  border-radius:35% 65% 55% 45% / 55% 45% 65% 35%;
+}
+
+.reading-achievement-progress{
+  display:grid;
+  gap:7px;
+}
+.reading-achievement-progress>div:first-child{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  color:var(--muted);
+  font-size:8px;
+}
+.reading-achievement-progress>div:first-child b{
+  color:#d9d4cb;
+  font-size:8px;
+}
+.reading-stats-details{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#1c1e20;
+  overflow:hidden;
+}
+.reading-stats-details summary{
+  cursor:pointer;
+  list-style:none;
+  padding:13px 14px;
+  color:#b8b4ad;
+  font-size:9px;
+}
+.reading-stats-details summary::-webkit-details-marker{display:none}
+.reading-stats-details-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:1px;
+  border-top:1px solid var(--line);
+  background:var(--line);
+}
+.reading-stats-details-grid>div{
+  display:grid;
+  gap:4px;
+  padding:12px;
+  background:#1f2123;
+}
+.reading-stats-details-grid span{
+  color:var(--muted);
+  font-size:8px;
+}
+.reading-stats-details-grid strong{
+  font-size:14px;
+}
+@media(max-width:759px){
+  .reading-stats-page-v2{gap:12px}
+  .reading-journey-hero{padding:15px}
+  .reading-journey-rank h2{font-size:21px}
+  .reading-journey-numbers strong{font-size:18px}
+  .reading-stats-quick-grid{gap:8px}
+  .reading-stats-quick-grid article{padding:11px}
+  .reading-calendar-compact .reading-calendar-grid{grid-template-columns:repeat(10,minmax(0,1fr))}
+  .reading-achievement-row{padding:12px}
+  .reading-rank-strip{gap:7px}
+  .reading-rank-item{min-width:54px}
+  .reading-rank-badge{width:37px;height:37px}
+}
