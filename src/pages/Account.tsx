@@ -9,6 +9,7 @@ import {
   ProfileReadingSection,
   ProfileStatsSection,
   type ProfileReadingIssue,
+  type ProfileAchievementSummaryItem,
 } from "../components/ProfileOverview";
 import { Icon } from "../components/UI";
 import { ProfileListsManager } from "../components/ProfileListsManager";
@@ -27,6 +28,7 @@ import type {
   UserProfileSection,
   UserProfileSectionInput,
   UserProfileView,
+  ReadingStats,
 } from "../types";
 import { Profile } from "./Profile";
 
@@ -529,6 +531,7 @@ export function Account() {
   const statsOpen = tab === "stats";
 
   const [profile, setProfile] = useState<UserProfileView | null>(null);
+  const [readingStatsSummary, setReadingStatsSummary] = useState<ReadingStats | null>(null);
   const [sections, setSections] = useState<UserProfileSection[]>([]);
   const [groups, setGroups] = useState<ContentGroup[]>([]);
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
@@ -546,6 +549,14 @@ export function Account() {
     if (!user) return;
     setLoading(true);
     setError("");
+
+    // Reading achievements are supplemental. Load them independently so a
+    // statistics endpoint issue can never block the profile page itself.
+    void userDataService
+      .getReadingStats()
+      .then((stats) => setReadingStatsSummary(stats))
+      .catch(() => undefined);
+
     try {
       const [nextProfile, nextSections] = await Promise.all([
         userDataService.getUserProfile(user.id, PROFILE_PREVIEW_LIMIT),
@@ -772,6 +783,59 @@ export function Account() {
     );
   }
 
+  const achievementSummary = useMemo<ProfileAchievementSummaryItem[]>(() => {
+    if (!readingStatsSummary) return [];
+
+    const highestLabel = (
+      value: number,
+      levels: ReadonlyArray<readonly [number, string]>,
+    ) => {
+      let label = "لم يُفتح بعد";
+      for (const [threshold, name] of levels) {
+        if (value < threshold) break;
+        label = name;
+      }
+      return label;
+    };
+
+    return [
+      {
+        category: "إنجاز الفصول",
+        achievement: highestLabel(readingStatsSummary.organicCompletedChapters, [
+          [10, "البداية"],
+          [25, "قارئ منتظم"],
+          [50, "خمسون فصلًا"],
+          [100, "مئة فصل"],
+          [250, "قارئ متمرس"],
+          [500, "قارئ مخضرم"],
+          [1000, "ألف فصل"],
+          [2500, "قارئ استثنائي"],
+          [5000, "أسطورة Wany"],
+        ]),
+      },
+      {
+        category: "إنجاز الأعمال",
+        achievement: highestLabel(readingStatsSummary.storiesRead, [
+          [1, "العمل الأول"],
+          [5, "خمسة أعمال"],
+          [10, "عشرة أعمال"],
+          [25, "قارئ متنوع"],
+          [50, "خمسون عملًا"],
+          [100, "مئة عمل"],
+        ]),
+      },
+      {
+        category: "إنجاز الاستمرارية",
+        achievement: highestLabel(readingStatsSummary.bestStreak, [
+          [3, "ثلاثة أيام متتالية"],
+          [7, "أسبوع متواصل"],
+          [14, "أسبوعان متواصلان"],
+          [30, "شهر متواصل"],
+        ]),
+      },
+    ];
+  }, [readingStatsSummary]);
+
   const stats = profile?.stats;
   const orderedGroups = groups.filter((group) => group.visible);
 
@@ -780,6 +844,7 @@ export function Account() {
       <ProfileIdentityHeader
         user={user}
         friends={profile?.stats?.friends}
+        achievements={achievementSummary}
         pendingFriendRequests={profile?.pendingFriendRequests ?? 0}
         actions={
           <Link
