@@ -832,6 +832,218 @@ async function route(request, url, db) {
     return json({ user: publicUser({ ...user, profile_visibility: visibility }) });
   }
 
+  if (path === "work-snapshots/cover") {
+    const mangaId = safeId(url.searchParams.get("key"));
+    if (!mangaId) return json({ error: "INVALID_MANGA" }, 400);
+
+    if (request.method === "GET") {
+      const meta = await db
+        .prepare(
+          "SELECT cover_content_type, cover_size FROM work_snapshots WHERE user_id = ? AND manga_id = ? LIMIT 1",
+        )
+        .bind(user.id, mangaId)
+        .first();
+      if (!meta || Number(meta.cover_size ?? 0) <= 0) {
+        return json({ error: "SNAPSHOT_COVER_NOT_FOUND" }, 404);
+      }
+
+      const result = await db
+        .prepare(
+          "SELECT data FROM work_snapshot_cover_chunks WHERE user_id = ? AND manga_id = ? ORDER BY chunk_index ASC",
+        )
+        .bind(user.id, mangaId)
+        .all();
+      const chunks = (result.results ?? []).map((row) => {
+        const value = row.data;
+        if (value instanceof ArrayBuffer) return new Uint8Array(value);
+        if (ArrayBuffer.isView(value)) {
+          return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+        }
+        return new Uint8Array();
+      });
+      const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+      if (!total) return json({ error: "SNAPSHOT_COVER_NOT_FOUND" }, 404);
+
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          "Content-Type": String(meta.cover_content_type || "image/jpeg"),
+          "Content-Length": String(total),
+          "Cache-Control": "private, max-age=31536000, immutable",
+        },
+      });
+    }
+
+    if (request.method === "PUT") {
+      const contentType = String(request.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.startsWith("image/")) {
+        return json({ error: "INVALID_COVER_TYPE" }, 400);
+      }
+      const bytes = new Uint8Array(await request.arrayBuffer());
+      const MAX_COVER_BYTES = 8 * 1024 * 1024;
+      const CHUNK_BYTES = 900 * 1024;
+      if (!bytes.byteLength || bytes.byteLength > MAX_COVER_BYTES) {
+        return json(
+          { error: "INVALID_COVER_SIZE", message: "حجم الغلاف المحفوظ غير مدعوم." },
+          413,
+        );
+      }
+
+      const existing = await db
+        .prepare("SELECT 1 AS ok FROM work_snapshots WHERE user_id = ? AND manga_id = ? LIMIT 1")
+        .bind(user.id, mangaId)
+        .first();
+      if (!existing) return json({ error: "SNAPSHOT_NOT_FOUND" }, 404);
+
+      const statements = [
+        db.prepare(
+          "DELETE FROM work_snapshot_cover_chunks WHERE user_id = ? AND manga_id = ?",
+        ).bind(user.id, mangaId),
+      ];
+      let chunkIndex = 0;
+      for (let offset = 0; offset < bytes.byteLength; offset += CHUNK_BYTES) {
+        const chunk = bytes.slice(offset, Math.min(bytes.byteLength, offset + CHUNK_BYTES));
+        statements.push(
+          db.prepare(
+            `INSERT INTO work_snapshot_cover_chunks (user_id, manga_id, chunk_index, data)
+             VALUES (?, ?, ?, ?)`,
+          ).bind(user.id, mangaId, chunkIndex++, chunk),
+        );
+      }
+      statements.push(
+        db.prepare(
+          `UPDATE work_snapshots
+           SET cover_content_type = ?, cover_size = ?, updated_at = ?
+           WHERE user_id = ? AND manga_id = ?`,
+        ).bind(contentType, bytes.byteLength, Date.now(), user.id, mangaId),
+      );
+      await db.batch(statements);
+      return json({ ok: true, size: bytes.byteLength });
+    }
+
+    return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+  }
+
+  if (request.method === "GET" && path === "work-snapshots") {
+    const keys = String(url.searchParams.get("keys") || "")
+      .split(",")
+      .map((value) => safeId(value))
+      .filter(Boolean)
+      .slice(0, 100);
+    if (!keys.length) return json({ snapshots: [] });
+
+    const placeholders = keys.map(() => "?").join(",");
+    const result = await db
+      .prepare(`SELECT
+        manga_id, title, source_name, source_url, cover_source_url, cover_size,
+        last_read_chapter, highest_reached_chapter, last_read_at, updated_at
+        FROM work_snapshots
+        WHERE user_id = ? AND manga_id IN (${placeholders})`)
+      .bind(user.id, ...keys)
+      .all();
+
+    return json({
+      snapshots: (result.results ?? []).map((row) => ({
+        mangaId: String(row.manga_id),
+        title: String(row.title || row.manga_id),
+        source: row.source_name == null ? null : String(row.source_name),
+        sourceUrl: row.source_url == null ? null : String(row.source_url),
+        originalCoverUrl:
+          row.cover_source_url == null ? null : String(row.cover_source_url),
+        coverUrl:
+          Number(row.cover_size ?? 0) > 0
+            ? `/api/work-snapshots/cover?key=${encodeURIComponent(String(row.manga_id))}`
+            : null,
+        lastReadChapter:
+          row.last_read_chapter == null ? null : Number(row.last_read_chapter),
+        highestReachedChapter:
+          row.highest_reached_chapter == null
+            ? null
+            : Number(row.highest_reached_chapter),
+        lastReadAt: row.last_read_at == null ? null : Number(row.last_read_at),
+        updatedAt: Number(row.updated_at),
+      })),
+    });
+  }
+
+  if (request.method === "POST" && path === "work-snapshots") {
+    const body = await readJson(request);
+    const mangaId = safeId(body?.mangaId);
+    const title =
+      typeof body?.title === "string" ? body.title.trim().slice(0, 300) : "";
+    const sourceName =
+      typeof body?.source === "string" ? body.source.trim().slice(0, 40) : null;
+    const sourceUrl =
+      typeof body?.sourceUrl === "string" ? body.sourceUrl.trim().slice(0, 2000) : null;
+    const coverSourceUrl =
+      typeof body?.coverUrl === "string" ? body.coverUrl.trim().slice(0, 2000) : null;
+    const chapter = Number(body?.chapter);
+    const hasChapter = Number.isFinite(chapter) && chapter >= 0;
+    if (!mangaId || !title) {
+      return json({ error: "INVALID_WORK_SNAPSHOT" }, 400);
+    }
+
+    const existing = await db
+      .prepare(
+        "SELECT cover_source_url, cover_size, highest_reached_chapter FROM work_snapshots WHERE user_id = ? AND manga_id = ? LIMIT 1",
+      )
+      .bind(user.id, mangaId)
+      .first();
+    const now = Date.now();
+    const highest = hasChapter
+      ? Math.max(Number(existing?.highest_reached_chapter ?? chapter), chapter)
+      : existing?.highest_reached_chapter == null
+        ? null
+        : Number(existing.highest_reached_chapter);
+
+    await db
+      .prepare(`INSERT INTO work_snapshots
+        (user_id, manga_id, title, source_name, source_url, cover_source_url,
+         last_read_chapter, highest_reached_chapter, last_read_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, manga_id) DO UPDATE SET
+          title = excluded.title,
+          source_name = COALESCE(excluded.source_name, work_snapshots.source_name),
+          source_url = COALESCE(excluded.source_url, work_snapshots.source_url),
+          cover_source_url = COALESCE(excluded.cover_source_url, work_snapshots.cover_source_url),
+          last_read_chapter = COALESCE(excluded.last_read_chapter, work_snapshots.last_read_chapter),
+          highest_reached_chapter = CASE
+            WHEN excluded.highest_reached_chapter IS NULL THEN work_snapshots.highest_reached_chapter
+            WHEN work_snapshots.highest_reached_chapter IS NULL THEN excluded.highest_reached_chapter
+            ELSE MAX(work_snapshots.highest_reached_chapter, excluded.highest_reached_chapter)
+          END,
+          last_read_at = COALESCE(excluded.last_read_at, work_snapshots.last_read_at),
+          updated_at = excluded.updated_at`)
+      .bind(
+        user.id,
+        mangaId,
+        title,
+        sourceName,
+        sourceUrl,
+        coverSourceUrl,
+        hasChapter ? chapter : null,
+        highest,
+        hasChapter ? now : null,
+        now,
+        now,
+      )
+      .run();
+
+    const coverChanged =
+      Boolean(coverSourceUrl) &&
+      String(existing?.cover_source_url || "") !== String(coverSourceUrl);
+    return json({
+      ok: true,
+      needsCover: !existing || Number(existing.cover_size ?? 0) <= 0 || coverChanged,
+    });
+  }
+
   const profileMatch = path.match(/^profiles\/([^/]+)$/);
   if (request.method === "GET" && profileMatch) {
     const targetId = safeId(decodeURIComponent(profileMatch[1]));
@@ -1846,7 +2058,7 @@ async function ensureApiRuntime(db) {
         // Fresh databases do not have schema_meta yet; bootstrap below.
       }
 
-      if (version !== "17") {
+      if (version !== "18") {
         await ensureDatabase(db);
         await ensureAdminSchema(db);
 
@@ -1859,6 +2071,7 @@ async function ensureApiRuntime(db) {
         await applyYUsernameV15(db);
         await applyHUsernameV16(db);
         await applyListIconsV17(db);
+        await applyWorkSnapshotsV18(db);
       }
 
       // Repair canonical account names independently from schema_version.
@@ -2016,6 +2229,48 @@ async function ensureCanonicalAccountNames(db) {
     .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, 'done')")
     .bind(repairKey)
     .run();
+}
+
+async function applyWorkSnapshotsV18(db) {
+  const version = await db
+    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+    .first();
+  if (version?.value === "18") return;
+  if (version?.value !== "17") return;
+
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS work_snapshots (
+      user_id TEXT NOT NULL,
+      manga_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      source_name TEXT,
+      source_url TEXT,
+      cover_source_url TEXT,
+      cover_content_type TEXT,
+      cover_size INTEGER NOT NULL DEFAULT 0,
+      last_read_chapter REAL,
+      highest_reached_chapter REAL,
+      last_read_at INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, manga_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS work_snapshot_cover_chunks (
+      user_id TEXT NOT NULL,
+      manga_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      data BLOB NOT NULL,
+      PRIMARY KEY (user_id, manga_id, chunk_index),
+      FOREIGN KEY (user_id, manga_id)
+        REFERENCES work_snapshots(user_id, manga_id)
+        ON DELETE CASCADE
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_work_snapshots_user_updated ON work_snapshots(user_id, updated_at DESC)",
+    ),
+    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '18')"),
+  ]);
 }
 
 async function applyListIconsV17(db) {
