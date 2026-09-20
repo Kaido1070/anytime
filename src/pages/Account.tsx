@@ -14,6 +14,7 @@ import { ProfileListsManager } from "../components/ProfileListsManager";
 import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
 import { useLibrary } from "../hooks/useLibrary";
 import { sourceService } from "../services/sources";
+import { snapshotToSourceManga } from "../services/workSnapshots";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
 import type {
   ActivityEvent,
@@ -414,14 +415,23 @@ function FullReadingView({
     let active = true;
     setLoading(true);
     Promise.allSettled(reading.map((entry) => sourceService.getSeries(entry.mangaId)))
-      .then((results) => {
+      .then(async (results) => {
         if (!active) return;
         const mapped = Object.fromEntries(
           results.flatMap((result, index) =>
             result.status === "fulfilled" ? [[reading[index].mangaId, result.value]] : [],
           ),
         );
-        setSeries(mapped);
+        const failedKeys = results.flatMap((result, index) =>
+          result.status === "rejected" ? [reading[index].mangaId] : [],
+        );
+        if (failedKeys.length) {
+          const snapshots = await userDataService.getWorkSnapshots(failedKeys).catch(() => []);
+          for (const snapshot of snapshots) {
+            mapped[snapshot.mangaId] = snapshotToSourceManga(snapshot);
+          }
+        }
+        if (active) setSeries(mapped);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -560,20 +570,32 @@ export function Account() {
     Promise.allSettled(
       readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
     )
-      .then((results) => {
+      .then(async (results) => {
         if (!active) return;
-        setSeries(
-          Object.fromEntries(
-            results.flatMap((result, index) =>
-              result.status === "fulfilled"
-                ? [[readingEntries[index].mangaId, result.value]]
-                : [],
-            ),
+        const mapped = Object.fromEntries(
+          results.flatMap((result, index) =>
+            result.status === "fulfilled"
+              ? [[readingEntries[index].mangaId, result.value]]
+              : [],
           ),
         );
-        if (results.some((result) => result.status === "rejected")) {
-          setReadingError("تعذر تحميل تقدم بعض القصص. يمكنك المحاولة مرة أخرى.");
+        const failedKeys = results.flatMap((result, index) =>
+          result.status === "rejected" ? [readingEntries[index].mangaId] : [],
+        );
+        if (failedKeys.length) {
+          const snapshots = await userDataService.getWorkSnapshots(failedKeys).catch(() => []);
+          for (const snapshot of snapshots) {
+            mapped[snapshot.mangaId] = snapshotToSourceManga(snapshot);
+          }
         }
+        if (!active) return;
+        setSeries(mapped);
+        const unresolved = failedKeys.filter((key) => !mapped[key]);
+        setReadingError(
+          unresolved.length
+            ? "تعذر تحميل بعض القصص ولم توجد لها نسخة محفوظة بعد."
+            : "",
+        );
       })
       .catch(() => {
         if (active) setReadingError("تعذر تحميل بيانات القراءة. يمكنك المحاولة مرة أخرى.");
