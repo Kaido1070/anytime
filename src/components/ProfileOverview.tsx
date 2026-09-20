@@ -21,6 +21,11 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Number(value) || 0));
 }
 
+export interface ProfileAchievementSummaryItem {
+  category: string;
+  achievement: string;
+}
+
 export function ProfileIdentityHeader({
   user,
   actions,
@@ -28,6 +33,7 @@ export function ProfileIdentityHeader({
   friends,
   friendsTo = "/friends",
   pendingFriendRequests = 0,
+  achievements = [],
 }: {
   user: User | null;
   actions?: ReactNode;
@@ -35,6 +41,7 @@ export function ProfileIdentityHeader({
   friends?: number;
   friendsTo?: string;
   pendingFriendRequests?: number;
+  achievements?: ProfileAchievementSummaryItem[];
 }) {
   return (
     <header className="profile-overview-header">
@@ -67,6 +74,16 @@ export function ProfileIdentityHeader({
           {actions && <div className="profile-overview-actions">{actions}</div>}
         </div>
       </div>
+      {achievements.length > 0 && (
+        <div className="profile-header-achievements" aria-label="أحدث إنجازاتك">
+          {achievements.map((item) => (
+            <div className="profile-header-achievement" key={item.category}>
+              <span>{item.category}</span>
+              <b>{item.achievement}</b>
+            </div>
+          ))}
+        </div>
+      )}
     </header>
   );
 }
