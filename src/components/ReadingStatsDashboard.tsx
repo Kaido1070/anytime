@@ -244,32 +244,87 @@ export function ReadingStatsDashboard() {
           </div>
           <span>{unlocked.length} / {trophies.length}</span>
         </div>
+
         {[
           ["chapters", "إنجازات الفصول"],
           ["stories", "إنجازات الأعمال"],
           ["streak", "إنجازات الاستمرارية"],
-        ].map(([category, title]) => (
-          <div className="reading-trophy-category" key={category}>
-            <h4>{title}</h4>
-            <div className="reading-trophy-grid">
-              {trophies
-                .filter((trophy) => trophy.category === category)
-                .map((trophy) => {
+        ].map(([category, title]) => {
+          const categoryTrophies = trophies.filter((trophy) => trophy.category === category);
+          const nextLocked = categoryTrophies.find((trophy) => trophy.value < trophy.threshold) ?? null;
+          const currentValue = categoryTrophies[0]?.value ?? 0;
+          const previousThreshold = nextLocked
+            ? [...categoryTrophies]
+                .filter((trophy) => trophy.threshold < nextLocked.threshold && trophy.value >= trophy.threshold)
+                .at(-1)?.threshold ?? 0
+            : categoryTrophies.at(-1)?.threshold ?? 0;
+          const segmentProgress = nextLocked
+            ? Math.max(
+                0,
+                Math.min(
+                  100,
+                  ((currentValue - previousThreshold) /
+                    Math.max(1, nextLocked.threshold - previousThreshold)) *
+                    100,
+                ),
+              )
+            : 100;
+          const remaining = nextLocked ? Math.max(0, nextLocked.threshold - currentValue) : 0;
+
+          return (
+            <div className="reading-trophy-category compact" key={category}>
+              <div className="reading-trophy-category-heading">
+                <h4>{title}</h4>
+                <span>
+                  {nextLocked
+                    ? `باقي ${formatNumber(remaining)} للوصول إلى ${nextLocked.label}`
+                    : "اكتملت جميع التروفيات الحالية"}
+                </span>
+              </div>
+
+              <div className="reading-trophy-ladder" role="list" aria-label={title}>
+                {categoryTrophies.map((trophy, index) => {
                   const earned = trophy.value >= trophy.threshold;
+                  const isNext = nextLocked?.id === trophy.id;
+                  const growth = 30 + Math.min(index, 6) * 4;
                   return (
-                    <article className={`reading-trophy ${earned ? "earned" : "locked"}`} key={trophy.id}>
-                      <div className="reading-trophy-medal" aria-hidden="true">{earned ? "◆" : "◇"}</div>
-                      <div>
-                        <b>{trophy.label}</b>
-                        <span>{trophy.description}</span>
+                    <div
+                      className={`reading-trophy-node ${earned ? "earned" : "locked"} ${isNext ? "next" : ""}`}
+                      key={trophy.id}
+                      role="listitem"
+                    >
+                      <div
+                        className="reading-trophy-node-icon"
+                        style={{ width: growth, height: growth }}
+                        aria-hidden="true"
+                      >
+                        <span>{earned ? "◆" : isNext ? "◇" : "·"}</span>
                       </div>
-                      <small>{earned ? "مفتوح" : `${formatNumber(trophy.value)} / ${formatNumber(trophy.threshold)}`}</small>
-                    </article>
+                      <b>{trophy.label}</b>
+                      <small>{formatNumber(trophy.threshold)}</small>
+                    </div>
                   );
                 })}
+              </div>
+
+              <div className="reading-trophy-progress-meta">
+                <span>
+                  {nextLocked
+                    ? `${Math.round(segmentProgress)}% نحو التروفي التالي`
+                    : "100% مكتمل"}
+                </span>
+                <span>
+                  {nextLocked
+                    ? `${formatNumber(currentValue)} / ${formatNumber(nextLocked.threshold)}`
+                    : formatNumber(currentValue)}
+                </span>
+              </div>
+              <div className="reading-trophy-progress-track" aria-hidden="true">
+                <span style={{ width: `${segmentProgress}%` }} />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
     </section>
   );
