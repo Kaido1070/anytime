@@ -155,9 +155,11 @@ function RankBadge({
       ].join(" ")}
       aria-hidden="true"
     >
-      <span className="reading-rank-core">
-        {category === "chapters" ? "▤" : category === "stories" ? "◆" : "✦"}
-      </span>
+      <img
+        className="reading-rank-image"
+        src={`/ranks/${["bronze", "silver", "gold", "platinum", "diamond", "master", "elite", "legendary", "wany-legend"][Math.min(index, 8)]}.svg`}
+        alt=""
+      />
     </span>
   );
 }
