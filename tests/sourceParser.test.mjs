@@ -57,6 +57,41 @@ test("3asq parser reads Madara chapter numbers and URLs", () => {
   assert.ok(chapters[0].url.includes("/manga/one-piece/chapter-1193/"));
 });
 
+test("3asq parser extracts relative and absolute chapter publication dates", () => {
+  const now = Date.UTC(2026, 8, 20, 12, 0, 0);
+  assert.equal(
+    __test.parseAsqPublishedAt('<span class="chapter-release-date">منذ 15 ساعة</span>', now),
+    new Date(now - 15 * 60 * 60 * 1000).toISOString(),
+  );
+  assert.equal(
+    __test.parseAsqPublishedAt('<span class="chapter-release-date">10 سبتمبر، 2026</span>', now),
+    "2026-09-10T00:00:00.000Z",
+  );
+  assert.equal(
+    __test.parseAsqPublishedAt('<span class="chapter-release-date">منذ ساعتين</span>', now),
+    new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+  );
+});
+
+test("3asq chapter dates stay attached to their own chapter block", () => {
+  const html = `
+    <ul>
+      <li class="wp-manga-chapter">
+        <a href="https://3asq.online/manga/wistoria/chapter-66/">الفصل 66</a>
+        <span class="chapter-release-date">منذ 15 ساعة</span>
+      </li>
+      <li class="wp-manga-chapter">
+        <a href="https://3asq.online/manga/wistoria/chapter-65/">الفصل 65</a>
+        <span class="chapter-release-date">10 سبتمبر، 2026</span>
+      </li>
+    </ul>
+  `;
+  const chapters = __test.parseAsqChapters(html, "https://3asq.online/manga/wistoria/");
+  assert.equal(chapters[0].number, 66);
+  assert.ok(Date.parse(chapters[0].publishedAt) > Date.parse(chapters[1].publishedAt));
+  assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
+});
+
 test("3asq page parser prefers lazy Madara page images", () => {
   const html = `
     <div class="reading-content">
