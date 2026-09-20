@@ -7,6 +7,7 @@ import {
   type ChapterFeedGroup,
   type FeedChapter,
   type NewChapterFeed,
+  type NewFeedLoadProgress,
 } from "../services/newChapters";
 
 interface FlatChapterEntry {
@@ -38,19 +39,27 @@ function mergeChapters(pages: NewChapterFeed[]) {
   );
 }
 
-function FeedSkeleton() {
+function FeedProgress({ progress }: { progress: NewFeedLoadProgress }) {
   return (
-    <div className="new-feed-skeleton" aria-label="جاري تحميل الفصول">
-      {Array.from({ length: 7 }, (_, index) => (
-        <div className="new-skeleton-row" key={index}>
-          <span className="skeleton-cover" />
-          <span className="skeleton-lines">
-            <i />
-            <i />
-            <i />
-          </span>
+    <div className="new-progress-card" role="status" aria-live="polite">
+      <div
+        className="new-progress-ring"
+        style={{ "--new-progress": progress.percent + "%" } as React.CSSProperties}
+        aria-label={progress.percent + "% مكتمل"}
+      >
+        <div className="new-progress-ring-core">
+          <strong>{progress.percent}%</strong>
+          <span>مكتمل</span>
         </div>
-      ))}
+      </div>
+
+      <div className="new-progress-copy">
+        <b>{progress.label}</b>
+        <span>
+          {progress.completed} من {progress.total} خطوات
+        </span>
+        <small>ستظهر النتائج فور اكتمال الفحص.</small>
+      </div>
     </div>
   );
 }
@@ -60,6 +69,12 @@ export function NewChapters() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<NewFeedLoadProgress>({
+    completed: 0,
+    total: 1,
+    percent: 0,
+    label: "بدء فحص المصادر",
+  });
 
   const chapters = useMemo(() => mergeChapters(pages), [pages]);
   const hasMore = pages.at(-1)?.hasMore ?? false;
@@ -71,7 +86,9 @@ export function NewChapters() {
     setLoading(true);
     setError("");
 
-    loadNewChapterFeed(1)
+    loadNewChapterFeed(1, (nextProgress) => {
+      if (active) setProgress(nextProgress);
+    })
       .then((feed) => {
         if (!active) return;
         setPages([feed]);
@@ -95,7 +112,13 @@ export function NewChapters() {
     setLoading(true);
     setError("");
     try {
-      setPages([await loadNewChapterFeed(1)]);
+      setProgress({
+        completed: 0,
+        total: 1,
+        percent: 0,
+        label: "بدء فحص المصادر",
+      });
+      setPages([await loadNewChapterFeed(1, setProgress)]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تحميل الفصول الجديدة.");
     } finally {
@@ -127,7 +150,7 @@ export function NewChapters() {
       </div>
 
       {loading ? (
-        <FeedSkeleton />
+        <FeedProgress progress={progress} />
       ) : error && !pages.length ? (
         <div className="new-error" role="alert">
           <p>{error}</p>
