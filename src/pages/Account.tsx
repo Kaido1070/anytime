@@ -374,8 +374,6 @@ function FullActivityView() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-  const [settingsAvatarOpen, setSettingsAvatarOpen] = useState(false);
-
   const load = useCallback(async (offset = 0) => {
     const feed = await userDataService.getMyActivity(20, offset);
     setEvents((current) => (offset ? [...current, ...feed.events] : feed.events));
@@ -546,6 +544,7 @@ export function Account() {
   const [loading, setLoading] = useState(true);
   const [customizingLists, setCustomizingLists] = useState(false);
   const [error, setError] = useState("");
+  const [settingsAvatarOpen, setSettingsAvatarOpen] = useState(false);
 
   const loadOverview = useCallback(async () => {
     if (!user) return;
