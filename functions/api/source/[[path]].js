@@ -979,7 +979,17 @@ function asqLatestItemsFromHtml(html) {
       cardEnd,
     );
 
-    const publishedAt = parseAsqPublishedAt(block);
+    // Publication time must be scoped to this exact chapter row, not the
+    // whole series card. A series card can contain several chapters, and using
+    // the first date in the card makes older chapters inherit the newest date.
+    const chapterStart = source.lastIndexOf("<li", match.index);
+    const chapterClose = source.indexOf("</li>", chapterLink.lastIndex);
+    const chapterBlock =
+      chapterStart >= 0 && chapterClose >= chapterLink.lastIndex
+        ? source.slice(chapterStart, chapterClose + 5)
+        : source.slice(Math.max(0, match.index - 400), Math.min(source.length, chapterLink.lastIndex + 700));
+
+    const publishedAt = parseAsqPublishedAt(chapterBlock);
     if (!publishedAt) continue;
 
     const seriesAnchor = extractAnchors(block).find((entry) => {
