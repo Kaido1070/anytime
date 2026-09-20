@@ -92,6 +92,32 @@ test("3asq chapter dates stay attached to their own chapter block", () => {
   assert.equal(chapters[1].publishedAt, "2026-09-10T00:00:00.000Z");
 });
 
+test("3asq latest parser reads chapter updates without crawling series pages", () => {
+  const html = `
+    <div class="page-item-detail">
+      <a href="https://3asq.online/manga/wistoria/"><img src="https://cdn.example.com/wistoria.webp" alt="WISTORIA: WAND AND SWORD">WISTORIA: WAND AND SWORD</a>
+      <li class="wp-manga-chapter">
+        <a href="https://3asq.online/manga/wistoria/chapter-66/">الفصل 66</a>
+        <span class="chapter-release-date">منذ 15 ساعة</span>
+      </li>
+    </div>
+    <div class="page-item-detail">
+      <a href="https://3asq.online/manga/kengan-omega/">Kengan Omega</a>
+      <li class="wp-manga-chapter">
+        <a href="https://3asq.online/manga/kengan-omega/chapter-369/">الفصل 369</a>
+        <span class="chapter-release-date">10 سبتمبر، 2026</span>
+      </li>
+    </div>
+  `;
+  const items = __test.asqLatestItemsFromHtml(html);
+  assert.equal(items.length, 2);
+  assert.equal(items[0].sourceId, "wistoria");
+  assert.equal(items[0].chapters[0].number, 66);
+  assert.ok(items[0].chapters[0].publishedAt);
+  assert.equal(items[1].chapters[0].number, 369);
+  assert.equal(items[1].chapters[0].publishedAt, "2026-09-10T00:00:00.000Z");
+});
+
 test("3asq page parser prefers lazy Madara page images", () => {
   const html = `
     <div class="reading-content">
