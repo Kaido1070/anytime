@@ -20,7 +20,13 @@ function normalizeDisplayName(value: string) {
   return trimmed;
 }
 
-export function Profile({ embedded = false }: { embedded?: boolean }) {
+export function Profile({
+  embedded = false,
+  hideIdentityEditor = false,
+}: {
+  embedded?: boolean;
+  hideIdentityEditor?: boolean;
+}) {
   const {
     user,
     signOut,
@@ -178,96 +184,101 @@ export function Profile({ embedded = false }: { embedded?: boolean }) {
           <p className="muted">عدّل بيانات حسابك مباشرة من نفس الخانة.</p>
         </header>
 
-        <section className="settings-profile-card" aria-label="بيانات الحساب">
-          <button
-            className="settings-avatar-edit"
-            type="button"
-            aria-label="تغيير الصورة الشخصية"
-            onClick={() => {
-              setAvatarMessage("");
-              setAvatarPickerOpen(true);
-            }}
-          >
-            <UserAvatar
-              user={user}
-              className="settings-avatar-preview settings-avatar-preview-v2"
-              loading="eager"
-            />
-            <span className="settings-avatar-pencil" aria-hidden="true">
-              <Icon name="edit" />
-            </span>
-          </button>
-
-          <div className="settings-profile-main">
-            <form className="settings-inline-form" onSubmit={submitDisplayName}>
-              <div className="settings-inline-label">
-                <span>اسم العرض</span>
-                {!nameEditing && (
-                  <button
-                    className="settings-edit-trigger"
-                    type="button"
-                    aria-label="تعديل اسم العرض"
-                    onClick={() => {
-                      setNameMessage("");
-                      setNameError("");
-                      setNameEditing(true);
-                    }}
-                  >
-                    <Icon name="edit" />
-                  </button>
-                )}
-              </div>
-
-              {nameEditing ? (
-                <div className="settings-inline-editor">
-                  <input
-                    name="displayName"
-                    type="text"
-                    value={displayName}
-                    maxLength={DISPLAY_NAME_MAX_LENGTH}
-                    autoComplete="name"
-                    disabled={nameBusy}
-                    onChange={(event) => setDisplayNameValue(event.target.value)}
-                    autoFocus
-                    required
-                  />
-                  <button className="primary" type="submit" disabled={nameBusy}>
-                    {nameBusy ? "حفظ…" : "حفظ"}
-                  </button>
-                  <button
-                    className="secondary"
-                    type="button"
-                    disabled={nameBusy}
-                    onClick={() => {
-                      setDisplayNameValue(user?.name ?? "");
-                      setNameError("");
-                      setNameEditing(false);
-                    }}
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              ) : (
-                <strong className="settings-inline-value" dir="auto">
-                  {user?.name ?? "—"}
-                </strong>
-              )}
-
-              {nameError && <p className="settings-feedback error" role="alert">{nameError}</p>}
-              {nameMessage && <p className="settings-feedback" role="status">{nameMessage}</p>}
-            </form>
-
-            <div className="settings-username-row">
-              <span>اسم المستخدم</span>
-              <b dir="ltr">@{user?.username ?? "—"}</b>
-            </div>
-          </div>
-        </section>
-
-        {avatarMessage && (
-          <p className="settings-feedback settings-standalone-feedback" role="status">
-            {avatarMessage}
-          </p>
+        {!hideIdentityEditor && (
+          <>
+                    <section className="settings-profile-card" aria-label="بيانات الحساب">
+                      <button
+                        className="settings-avatar-edit"
+                        type="button"
+                        aria-label="تغيير الصورة الشخصية"
+                        onClick={() => {
+                          setAvatarMessage("");
+                          setAvatarPickerOpen(true);
+                        }}
+                      >
+                        <UserAvatar
+                          user={user}
+                          className="settings-avatar-preview settings-avatar-preview-v2"
+                          loading="eager"
+                        />
+                        <span className="settings-avatar-pencil" aria-hidden="true">
+                          <Icon name="edit" />
+                        </span>
+                      </button>
+            
+                      <div className="settings-profile-main">
+                        <form className="settings-inline-form" onSubmit={submitDisplayName}>
+                          <div className="settings-inline-label">
+                            <span>اسم العرض</span>
+                            {!nameEditing && (
+                              <button
+                                className="settings-edit-trigger"
+                                type="button"
+                                aria-label="تعديل اسم العرض"
+                                onClick={() => {
+                                  setNameMessage("");
+                                  setNameError("");
+                                  setNameEditing(true);
+                                }}
+                              >
+                                <Icon name="edit" />
+                              </button>
+                            )}
+                          </div>
+            
+                          {nameEditing ? (
+                            <div className="settings-inline-editor">
+                              <input
+                                name="displayName"
+                                type="text"
+                                value={displayName}
+                                maxLength={DISPLAY_NAME_MAX_LENGTH}
+                                autoComplete="name"
+                                disabled={nameBusy}
+                                onChange={(event) => setDisplayNameValue(event.target.value)}
+                                autoFocus
+                                required
+                              />
+                              <button className="primary" type="submit" disabled={nameBusy}>
+                                {nameBusy ? "حفظ…" : "حفظ"}
+                              </button>
+                              <button
+                                className="secondary"
+                                type="button"
+                                disabled={nameBusy}
+                                onClick={() => {
+                                  setDisplayNameValue(user?.name ?? "");
+                                  setNameError("");
+                                  setNameEditing(false);
+                                }}
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          ) : (
+                            <strong className="settings-inline-value" dir="auto">
+                              {user?.name ?? "—"}
+                            </strong>
+                          )}
+            
+                          {nameError && <p className="settings-feedback error" role="alert">{nameError}</p>}
+                          {nameMessage && <p className="settings-feedback" role="status">{nameMessage}</p>}
+                        </form>
+            
+                        <div className="settings-username-row">
+                          <span>اسم المستخدم</span>
+                          <b dir="ltr">@{user?.username ?? "—"}</b>
+                        </div>
+                      </div>
+                    </section>
+            
+                    {avatarMessage && (
+                      <p className="settings-feedback settings-standalone-feedback" role="status">
+                        {avatarMessage}
+                      </p>
+                    )}
+            
+          </>
         )}
 
         <section className="settings-compact-card" aria-labelledby="settings-privacy-title">
