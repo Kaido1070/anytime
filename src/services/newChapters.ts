@@ -25,7 +25,7 @@ export interface FeedChapter {
   number: number;
   title: string;
   releaseAt: number;
-  releaseKind: "published" | "first_seen";
+  releaseKind: "published";
   read: boolean;
   sourceKey: string;
 }
@@ -54,16 +54,12 @@ function parsePublished(value?: string | null) {
 }
 
 function releaseFor(chapter: SourceChapter) {
+  // The public "New" feed is intentionally strict: discovery time is not a
+  // publication time. A chapter without a trustworthy upstream timestamp may
+  // still be readable elsewhere in Wany, but it must not be advertised as a
+  // release from the last 24 hours.
   const published = parsePublished(chapter.publishedAt);
-  if (published != null) {
-    return { timestamp: published, kind: "published" as const };
-  }
-  if (chapter.baselineObserved) return null;
-  const firstSeen = Number(chapter.firstSeenAt);
-  if (Number.isFinite(firstSeen) && firstSeen > 0) {
-    return { timestamp: firstSeen, kind: "first_seen" as const };
-  }
-  return null;
+  return published == null ? null : { timestamp: published, kind: "published" as const };
 }
 
 function readKey(mangaId: string, chapter: number) {
@@ -135,7 +131,7 @@ function groupChapters(
 
   const byIdentity = new Map<
     string,
-    Array<{ item: SourceManga; chapter: SourceChapter; timestamp: number; kind: "published" | "first_seen" }>
+    Array<{ item: SourceManga; chapter: SourceChapter; timestamp: number; kind: "published" }>
   >();
 
   for (const item of group.items) {
@@ -158,9 +154,10 @@ function groupChapters(
 
   const chapters: FeedChapter[] = [];
   for (const [identity, versions] of byIdentity) {
-    const realPublished = versions.filter((version) => version.kind === "published");
-    const timingPool = realPublished.length ? realPublished : versions;
-    const releaseAt = Math.min(...timingPool.map((version) => version.timestamp));
+    // When several sources carry the same chapter, use the earliest verified
+    // publication timestamp. Re-scrapes and late source discovery therefore
+    // cannot make an old chapter look new again.
+    const releaseAt = Math.min(...versions.map((version) => version.timestamp));
     const routeVersion = [...versions].sort((a, b) => {
       if (a.item.key === group.primary.key) return -1;
       if (b.item.key === group.primary.key) return 1;
@@ -174,7 +171,7 @@ function groupChapters(
       number,
       title: routeVersion.chapter.title || `الفصل ${number}`,
       releaseAt,
-      releaseKind: realPublished.length ? "published" : "first_seen",
+      releaseKind: "published",
       read: isRead,
       sourceKey: routeVersion.item.key,
     });
