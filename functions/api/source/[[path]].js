@@ -2102,7 +2102,60 @@ function starzHasNext(html) {
 // MangaLik / Madara ----------------------------------------------------------
 
 async function mangalikLatest(db, page) {
-  return mangalikList(db, { page, order: "latest" });
+  // MangaLik exposes a dedicated newest-chapters stream. Parse that directly
+  // so Wany never has to open every series page just to build New.
+  const path = page > 1
+    ? "/mangasid/page/" + page + "/"
+    : "/mangasid/";
+  const html = await mangalikFetchText(path);
+  const items = mangalikLatestItemsFromHtml(html);
+
+  if (items.length) {
+    await rememberItems(db, items);
+    return { items: items.slice(0, 48), hasMore: mangalikHasNext(html), page };
+  }
+
+  // Fail closed for strict New if the dedicated latest layout changes.
+  return { items: [], hasMore: mangalikHasNext(html), page };
+}
+
+function mangalikLatestItemsFromHtml(html) {
+  const source = String(html ?? "");
+  // Use one card boundary only. Mixing parent + child classes can cut chapter
+  // rows away from their title/cover metadata.
+  let blocks = madaraBlocksByClass(source, ["page-item-detail"]);
+  if (!blocks.length) blocks = madaraBlocksByClass(source, ["c-tabs-item__content"]);
+
+  const byKey = new Map();
+  for (const block of blocks) {
+    const item = mangalikItemsFromHtml(block)[0];
+    if (!item) continue;
+
+    const chapters = parseMangalikChapters(block, item.url)
+      .filter((chapter) => Boolean(chapter.publishedAt));
+    if (!chapters.length) continue;
+
+    const candidate = {
+      ...item,
+      latest: Math.max(...chapters.map((chapter) => Number(chapter.number))),
+      chapters,
+    };
+
+    const existing = byKey.get(candidate.key);
+    if (!existing) {
+      byKey.set(candidate.key, candidate);
+      continue;
+    }
+
+    existing.chapters = [...existing.chapters, ...candidate.chapters]
+      .filter((chapter, index, list) =>
+        list.findIndex((entry) => Number(entry.number) === Number(chapter.number)) === index,
+      )
+      .sort((a, b) => Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || ""));
+    existing.latest = Math.max(Number(existing.latest || 0), Number(candidate.latest || 0));
+  }
+
+  return [...byKey.values()];
 }
 
 async function mangalikPopular(db, page) {
@@ -3027,6 +3080,7 @@ export const __test = {
   parseStarzPages,
   parseMangalikChapters,
   parseMangalikPublishedAt,
+  mangalikLatestItemsFromHtml,
   parseMangalikPages,
   starzPostId,
   parseXsanoPages,
