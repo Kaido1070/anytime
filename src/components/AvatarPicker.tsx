@@ -139,7 +139,7 @@ export function AvatarPicker({
         <div className="avatar-picker-preview">
           <div>
             <span className="muted">الصورة المختارة</span>
-            <b>{selected?.characterName ?? "اختر شخصية"}</b>
+            <b dir="ltr">{selected?.characterName ?? "اختر شخصية"}</b>
             <small className="avatar-picker-preview-hint">
               {selected ? "جاهزة للحفظ" : "اضغط على أي صورة لاختيارها"}
             </small>
@@ -170,7 +170,7 @@ export function AvatarPicker({
                 aria-labelledby={`avatar-series-${group.id}`}
               >
                 <div className="avatar-series-heading">
-                  <h3 id={`avatar-series-${group.id}`}>{group.name}</h3>
+                  <h3 id={`avatar-series-${group.id}`} dir="ltr">{group.name}</h3>
                   <span>{group.avatars.length}</span>
                 </div>
                 <div className="avatar-row" role="list">
@@ -202,7 +202,7 @@ export function AvatarPicker({
                             </span>
                           )}
                         </span>
-                        <span className="avatar-option-name">
+                        <span className="avatar-option-name" dir="ltr">
                           {avatar.characterName}
                         </span>
                         {currentState && <small>محدد حاليًا</small>}
