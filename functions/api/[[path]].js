@@ -1613,6 +1613,111 @@ async function route(request, url, db, covers) {
     });
   }
 
+  if (request.method === "GET" && path === "reading/stats") {
+    const [account, totals, bulkPacks, daily] = await Promise.all([
+      db.prepare("SELECT created_at FROM users WHERE id = ? LIMIT 1")
+        .bind(user.id)
+        .first(),
+      db.prepare(`SELECT
+          COUNT(DISTINCT manga_id) AS stories_read,
+          COUNT(DISTINCT CASE WHEN entry_type = 'organic' THEN manga_id END) AS organic_stories,
+          COUNT(DISTINCT CASE WHEN entry_type = 'bulk' THEN manga_id END) AS bulk_stories,
+          SUM(CASE WHEN entry_type = 'organic' THEN 1 ELSE 0 END) AS organic_chapters,
+          SUM(CASE WHEN entry_type = 'bulk' THEN 1 ELSE 0 END) AS bulk_chapters,
+          COUNT(DISTINCT CASE
+            WHEN entry_type = 'organic'
+            THEN date(read_at / 1000, 'unixepoch', '+3 hours')
+          END) AS active_days
+        FROM reading_history
+        WHERE user_id = ?`)
+        .bind(user.id)
+        .first(),
+      db.prepare(`SELECT COUNT(*) AS total
+        FROM (
+          SELECT manga_id, read_at
+          FROM reading_history
+          WHERE user_id = ? AND entry_type = 'bulk'
+          GROUP BY manga_id, read_at
+        )`)
+        .bind(user.id)
+        .first(),
+      db.prepare(`SELECT
+          date(read_at / 1000, 'unixepoch', '+3 hours') AS day,
+          COUNT(*) AS chapters
+        FROM reading_history
+        WHERE user_id = ? AND entry_type = 'organic'
+        GROUP BY day
+        ORDER BY day DESC
+        LIMIT 120`)
+        .bind(user.id)
+        .all(),
+    ]);
+
+    const createdAt = Number(account?.created_at ?? Date.now());
+    const now = Date.now();
+    const accountDays = Math.max(1, Math.floor((now - createdAt) / 86400000) + 1);
+    const organicChapters = Number(totals?.organic_chapters ?? 0);
+    const rows = (daily.results ?? []).map((row) => ({
+      day: String(row.day),
+      chapters: Number(row.chapters ?? 0),
+    }));
+    const dailyMap = new Map(rows.map((row) => [row.day, row.chapters]));
+    const riyadhDay = (timestamp) => {
+      const shifted = new Date(timestamp + 3 * 60 * 60_000);
+      return shifted.toISOString().slice(0, 10);
+    };
+
+    let currentStreak = 0;
+    for (let offset = 0; offset < 3660; offset += 1) {
+      const day = riyadhDay(now - offset * 86400000);
+      if (!dailyMap.has(day)) {
+        if (offset === 0) continue;
+        break;
+      }
+      currentStreak += 1;
+    }
+
+    let bestStreak = 0;
+    let running = 0;
+    let previousDay = null;
+    const chronological = [...rows].sort((a, b) => a.day.localeCompare(b.day));
+    for (const row of chronological) {
+      if (!previousDay) {
+        running = 1;
+      } else {
+        const previousTime = Date.parse(previousDay + "T00:00:00Z");
+        const currentTime = Date.parse(row.day + "T00:00:00Z");
+        running = currentTime - previousTime === 86400000 ? running + 1 : 1;
+      }
+      bestStreak = Math.max(bestStreak, running);
+      previousDay = row.day;
+    }
+
+    const bestDay = rows.reduce(
+      (best, row) => row.chapters > best.chapters ? row : best,
+      { day: null, chapters: 0 },
+    );
+
+    return json({
+      stats: {
+        accountCreatedAt: createdAt,
+        accountDays,
+        storiesRead: Number(totals?.stories_read ?? 0),
+        organicStories: Number(totals?.organic_stories ?? 0),
+        bulkStories: Number(totals?.bulk_stories ?? 0),
+        organicChapters,
+        bulkChapters: Number(totals?.bulk_chapters ?? 0),
+        bulkPacks: Number(bulkPacks?.total ?? 0),
+        activeDays: Number(totals?.active_days ?? 0),
+        dailyAverage: organicChapters / accountDays,
+        currentStreak,
+        bestStreak,
+        bestDay,
+        recentDays: rows.slice(0, 30),
+      },
+    });
+  }
+
   if (request.method === "GET" && path === "reading/history") {
     const requestedLimit = Number(url.searchParams.get("limit") ?? 100);
     const limit = Number.isFinite(requestedLimit)
