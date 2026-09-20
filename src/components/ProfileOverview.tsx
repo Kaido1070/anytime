@@ -71,7 +71,13 @@ export function ProfileIdentityHeader({
   );
 }
 
-export function ProfileStatsSection({ stats }: { stats: ProfileStats }) {
+export function ProfileStatsSection({
+  stats,
+  viewAllTo,
+}: {
+  stats: ProfileStats;
+  viewAllTo?: string;
+}) {
   const metrics = [
     { value: stats.chaptersRead, label: "فصول مقروءة" },
     { value: stats.completed, label: "قصص مكتملة" },
@@ -80,6 +86,12 @@ export function ProfileStatsSection({ stats }: { stats: ProfileStats }) {
 
   return (
     <section className="profile-overview-section profile-stats-section" aria-label="إحصائيات القراءة">
+      {viewAllTo && (
+        <div className="profile-stats-heading">
+          <span>إحصائياتك</span>
+          <Link to={viewAllTo}>تتبع التقدم</Link>
+        </div>
+      )}
       <div className="profile-stats-grid">
         {metrics.map((metric) => (
           <div className="profile-stat" key={metric.label}>
