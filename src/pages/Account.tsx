@@ -762,13 +762,9 @@ export function Account() {
     return (
       <>
         <ProfileIdentityHeader user={user} />
-        <section className="profile-subview">
-          <div className="profile-subview-heading">
-            <div>
-              <p className="eyebrow">الإحصائيات</p>
-              <h2>رحلة القراءة</h2>
-            </div>
-            <Link className="secondary" to="/profile">العودة</Link>
+        <section className="profile-subview reading-stats-subview">
+          <div className="reading-stats-back-row">
+            <Link className="secondary" to="/profile">العودة إلى الحساب</Link>
           </div>
           <ReadingStatsDashboard />
         </section>
