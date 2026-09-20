@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ActivityFeed } from "../components/ActivityFeed";
+import { AvatarPicker } from "../components/AvatarPicker";
 import {
   ProfileActivitySection,
   ProfileIdentityHeader,
@@ -373,6 +374,7 @@ function FullActivityView() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [settingsAvatarOpen, setSettingsAvatarOpen] = useState(false);
 
   const load = useCallback(async (offset = 0) => {
     const feed = await userDataService.getMyActivity(20, offset);
@@ -522,7 +524,7 @@ function FullReadingView({
 }
 
 export function Account() {
-  const { user, data, markWorkUnread } = useLibrary();
+  const { user, data, markWorkUnread, setAvatar, setDisplayName } = useLibrary();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab");
   const settingsOpen = tab === "settings";
@@ -731,13 +733,27 @@ export function Account() {
       <>
         <ProfileIdentityHeader
           user={user}
+          editableIdentity
+          onEditAvatar={() => setSettingsAvatarOpen(true)}
+          onSaveDisplayName={async (name) => {
+            await setDisplayName(name);
+          }}
           actions={
             <Link className="profile-icon-action" to="/profile" aria-label="العودة إلى الحساب">
               <Icon name="back" />
             </Link>
           }
         />
-        <Profile embedded />
+        <Profile embedded hideIdentityEditor />
+        {settingsAvatarOpen && (
+          <AvatarPicker
+            currentAvatarId={user?.avatarId ?? null}
+            onSave={async (avatarId) => {
+              await setAvatar(avatarId);
+            }}
+            onClose={() => setSettingsAvatarOpen(false)}
+          />
+        )}
       </>
     );
   }
