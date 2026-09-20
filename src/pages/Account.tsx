@@ -519,7 +519,7 @@ function FullReadingView({
 }
 
 export function Account() {
-  const { user, data } = useLibrary();
+  const { user, data, markWorkUnread } = useLibrary();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab");
   const settingsOpen = tab === "settings";
@@ -832,6 +832,7 @@ export function Account() {
                       error={readingError}
                       issues={readingIssues}
                       onRetry={() => setReadingRetry((value) => value + 1)}
+                      onRemoveIssue={(mangaId) => void markWorkUnread(mangaId)}
                     />
                   );
                 }
