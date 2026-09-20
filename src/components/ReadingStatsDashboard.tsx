@@ -12,31 +12,31 @@ type Trophy = {
 };
 
 const CHAPTER_TROPHIES = [
-  [10, "البداية", "10 فصول فعلية"],
-  [25, "قارئ ثابت", "25 فصلًا فعليًا"],
-  [50, "نصف المئة", "50 فصلًا فعليًا"],
-  [100, "المئوية", "100 فصل فعلي"],
-  [250, "رحلة طويلة", "250 فصلًا فعليًا"],
-  [500, "مخضرم", "500 فصل فعلي"],
-  [1000, "ألفية", "1000 فصل فعلي"],
-  [2500, "التيتان", "2500 فصل فعلي"],
-  [5000, "أسطورة Wany", "5000 فصل فعلي"],
+  [10, "البداية", "أكملت 10 فصول بقراءة فعلية"],
+  [25, "قارئ منتظم", "أكملت 25 فصلًا بقراءة فعلية"],
+  [50, "خمسون فصلًا", "أكملت 50 فصلًا بقراءة فعلية"],
+  [100, "مئة فصل", "أكملت 100 فصل بقراءة فعلية"],
+  [250, "قارئ متمرس", "أكملت 250 فصلًا بقراءة فعلية"],
+  [500, "قارئ مخضرم", "أكملت 500 فصل بقراءة فعلية"],
+  [1000, "ألف فصل", "أكملت 1,000 فصل بقراءة فعلية"],
+  [2500, "قارئ استثنائي", "أكملت 2,500 فصل بقراءة فعلية"],
+  [5000, "أسطورة Wany", "أكملت 5,000 فصل بقراءة فعلية"],
 ] as const;
 
 const STORY_TROPHIES = [
-  [1, "القصة الأولى", "أنهيت أو تابعت أول قصة"],
-  [5, "جامع القصص", "5 قصص مقروءة"],
-  [10, "عشرة عوالم", "10 قصص مقروءة"],
-  [25, "مستكشف", "25 قصة مقروءة"],
-  [50, "موسوعة", "50 قصة مقروءة"],
-  [100, "مئة قصة", "100 قصة مقروءة"],
+  [1, "العمل الأول", "بدأت قراءة أول عمل"],
+  [5, "خمسة أعمال", "قرأت من 5 أعمال مختلفة"],
+  [10, "عشرة أعمال", "قرأت من 10 أعمال مختلفة"],
+  [25, "قارئ متنوع", "قرأت من 25 عملًا مختلفًا"],
+  [50, "خمسون عملًا", "قرأت من 50 عملًا مختلفًا"],
+  [100, "مئة عمل", "قرأت من 100 عمل مختلف"],
 ] as const;
 
 const STREAK_TROPHIES = [
-  [3, "ثلاثية", "3 أيام قراءة متتالية"],
-  [7, "أسبوع كامل", "7 أيام متتالية"],
-  [14, "أسبوعان", "14 يومًا متتاليًا"],
-  [30, "شهر القراءة", "30 يومًا متتاليًا"],
+  [3, "ثلاثة أيام متتالية", "قرأت في 3 أيام متتالية"],
+  [7, "أسبوع متواصل", "قرأت في 7 أيام متتالية"],
+  [14, "أسبوعان متواصلان", "قرأت في 14 يومًا متتاليًا"],
+  [30, "شهر متواصل", "قرأت في 30 يومًا متتاليًا"],
 ] as const;
 
 function formatNumber(value: number, maximumFractionDigits = 0) {
@@ -138,44 +138,44 @@ export function ReadingStatsDashboard() {
       <div className="reading-stats-summary">
         <article>
           <strong>{formatNumber(stats.storiesRead)}</strong>
-          <span>قصص قرأتها</span>
-          <small>منذ إنشاء الحساب</small>
+          <span>أعمال قرأتها</span>
+          <small>منذ إنشاء حسابك</small>
         </article>
         <article>
           <strong>{formatNumber(stats.dailyAverage, 1)}</strong>
-          <span>فصل / يوم</span>
-          <small>قراءة فعلية فقط</small>
+          <span>متوسط الفصول يوميًا</span>
+          <small>بناءً على القراءة الفعلية فقط</small>
         </article>
         <article>
           <strong>{formatNumber(stats.activeDays)}</strong>
-          <span>أيام نشطة</span>
-          <small>أيام فتحت فيها فصولًا</small>
+          <span>أيام القراءة</span>
+          <small>أيام قرأت فيها فصلًا واحدًا على الأقل</small>
         </article>
         <article>
           <strong>{formatNumber(stats.currentStreak)}</strong>
-          <span>السلسلة الحالية</span>
-          <small>يوم متتالٍ</small>
+          <span>سلسلة القراءة الحالية</span>
+          <small>أيام قراءة متتالية حتى الآن</small>
         </article>
       </div>
 
       <section className="reading-stats-split" aria-label="تصنيف القراءة">
         <article className="reading-stat-panel primary">
           <div>
-            <p className="eyebrow">قراءة فعلية</p>
+            <p className="eyebrow">الفصول المقروءة فعليًا</p>
             <h3>{formatNumber(stats.organicChapters)} فصل</h3>
           </div>
           <p>
-            الفصول التي فتحتها وقرأتها واحدًا واحدًا. هذه هي التي تدخل في المعدل اليومي وتروفيات الفصول.
+            الفصول التي قرأتها فصلًا بعد فصل. تُحتسب ضمن متوسط القراءة اليومي وتروفيات الفصول.
           </p>
         </article>
         <article className="reading-stat-panel">
           <div>
-            <p className="eyebrow">بكجات مسجلة</p>
-            <h3>{formatNumber(stats.bulkPacks)} بكج</h3>
+            <p className="eyebrow">فصول مسجلة دفعة واحدة</p>
+            <h3>{formatNumber(stats.bulkPacks)} عملية تسجيل</h3>
           </div>
           <p>
-            {formatNumber(stats.bulkStories)} أعمال · {formatNumber(stats.bulkChapters)} فصل مسجل دفعة واحدة.
-            لا تدخل في معدل القراءة اليومي أو تروفيات الفصول.
+            {formatNumber(stats.bulkStories)} أعمال · {formatNumber(stats.bulkChapters)} فصلًا سُجلت دفعة واحدة.
+            لا تُحتسب ضمن متوسط القراءة اليومي أو تروفيات الفصول.
           </p>
         </article>
       </section>
@@ -183,7 +183,7 @@ export function ReadingStatsDashboard() {
       <section className="reading-next-goal">
         <div className="reading-next-goal-heading">
           <div>
-            <p className="eyebrow">الهدف القادم</p>
+            <p className="eyebrow">الإنجاز التالي</p>
             <h3>{next ? next[1] : "أعلى رتبة حالية"}</h3>
           </div>
           <strong>{next ? `${formatNumber(stats.organicCompletedChapters)} / ${formatNumber(next[0])}` : "100%"}</strong>
@@ -196,26 +196,26 @@ export function ReadingStatsDashboard() {
 
       <section className="reading-streak-panel">
         <div>
-          <span>أفضل سلسلة</span>
+          <span>أطول سلسلة قراءة</span>
           <strong>{formatNumber(stats.bestStreak)} يوم</strong>
         </div>
         <div>
-          <span>أفضل يوم</span>
+          <span>أكثر يوم قراءة</span>
           <strong>{formatNumber(stats.bestDay.chapters)} فصل</strong>
         </div>
         <div>
-          <span>عمر الحساب</span>
-          <strong>{formatNumber(stats.accountDays)} يوم</strong>
+          <span>مدة الحساب</span>
+          <strong>{formatNumber(stats.accountDays)} يومًا</strong>
         </div>
       </section>
 
       <section className="reading-calendar">
         <div className="reading-stats-section-heading">
           <div>
-            <p className="eyebrow">آخر 30 يوم</p>
-            <h3>إيقاعك</h3>
+            <p className="eyebrow">آخر 30 يومًا</p>
+            <h3>نشاط القراءة</h3>
           </div>
-          <span>القراءة الفعلية فقط</span>
+          <span>الفصول المقروءة فعليًا فقط</span>
         </div>
         <div className="reading-calendar-grid" aria-label="نشاط القراءة خلال آخر 30 يومًا">
           {calendar.map((day) => {
@@ -240,14 +240,14 @@ export function ReadingStatsDashboard() {
         <div className="reading-stats-section-heading">
           <div>
             <p className="eyebrow">التروفيات</p>
-            <h3>إنجازاتك</h3>
+            <h3>التروفيات والإنجازات</h3>
           </div>
           <span>{unlocked.length} / {trophies.length}</span>
         </div>
         {[
-          ["chapters", "تروفيات الفصول"],
-          ["stories", "تروفيات القصص"],
-          ["streak", "تروفيات الاستمرارية"],
+          ["chapters", "إنجازات الفصول"],
+          ["stories", "إنجازات الأعمال"],
+          ["streak", "إنجازات الاستمرارية"],
         ].map(([category, title]) => (
           <div className="reading-trophy-category" key={category}>
             <h4>{title}</h4>
