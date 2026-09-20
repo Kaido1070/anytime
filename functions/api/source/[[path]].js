@@ -622,6 +622,33 @@ async function rememberRecentVerifiedChapters(db, item, now = Date.now()) {
   if (writes.length) await db.batch(writes);
 }
 
+const PRIORITY_WORKS = {
+  eleceed: {
+    aliases: ["Eleceed"],
+    mangatimeQueries: ["Eleceed"],
+  },
+  magicEmperor: {
+    aliases: ["Magic Emperor", "Demonic Emperor", "إمبراطور السحر"],
+    mangatimeQueries: ["Magic Emperor", "Demonic Emperor"],
+    teamxSlug: "demonic-emperor",
+  },
+};
+
+function priorityRefreshActive(now = Date.now()) {
+  // Saudi Arabia is UTC+3 year-round.
+  const date = new Date(now + 3 * 60 * 60_000);
+  const day = date.getUTCDay(); // 0 Sun .. 6 Sat
+  const hour = date.getUTCHours();
+
+  const eleceedWindow = day === 2 && hour >= 19 && hour <= 23;
+  const magicWindow = (day === 5 || day === 6 || day === 0) && hour >= 4 && hour <= 7;
+  return eleceedWindow || magicWindow;
+}
+
+function sourceRefreshIntervalMs(now = Date.now()) {
+  return priorityRefreshActive(now) ? 2 * 60_000 : 5 * 60_000;
+}
+
 // MangaTime -----------------------------------------------------------------
 
 async function mangaTimeLatest(context, db, page) {
@@ -636,7 +663,7 @@ async function mangaTimeLatest(context, db, page) {
     .first();
   const lastStartedAt = Number(state?.last_started_at ?? 0);
 
-  if (now - lastStartedAt >= 5 * 60_000) {
+  if (now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
     await db
       .prepare(`INSERT INTO source_sync_state (source, last_started_at)
         VALUES ('mangatime', ?)
@@ -660,8 +687,34 @@ async function syncMangaTimeLatest(db) {
     mangaTimeSearchInput({ page: 1, sortBy: "recent", query: null }),
   );
 
+  const priorityRows = [];
+  if (priorityRefreshActive()) {
+    for (const query of [
+      ...PRIORITY_WORKS.eleceed.mangatimeQueries,
+      ...PRIORITY_WORKS.magicEmperor.mangatimeQueries,
+    ]) {
+      try {
+        const priorityResult = await mangaTimeTrpc(
+          "search.searchSeries",
+          mangaTimeSearchInput({ page: 1, sortBy: "recent", query }),
+        );
+        const row = (priorityResult?.results ?? [])[0];
+        if (row && !priorityRows.some((entry) => String(entry.id) === String(row.id))) {
+          priorityRows.push(row);
+        }
+      } catch (error) {
+        console.warn("MangaTime priority search skipped", query, error);
+      }
+    }
+  }
+
   const items = await Promise.all(
-    (result?.results ?? []).slice(0, 24).map(async (row) => ({
+    [...priorityRows, ...(result?.results ?? [])]
+      .filter((row, index, rows) =>
+        rows.findIndex((entry) => String(entry.id) === String(row.id)) === index,
+      )
+      .slice(0, 26)
+      .map(async (row) => ({
       key: await makeSourceKey("mt", String(row.id)),
       source: "mangatime",
       sourceId: String(row.id),
@@ -944,7 +997,7 @@ async function teamXLatest(context, db, page) {
       .prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'teamx' LIMIT 1")
       .first();
     const lastStartedAt = Number(state?.last_started_at ?? 0);
-    if (now - lastStartedAt >= 5 * 60_000) {
+    if (now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
       await db
         .prepare(`INSERT INTO source_sync_state (source, last_started_at)
           VALUES ('teamx', ?)
@@ -970,7 +1023,23 @@ async function syncTeamXLatest(db) {
   // popular-series cards before it; including those can consume the bounded
   // sync slots and make genuinely recent releases disappear from Wany.
   const scoped = teamXLatestSection(html);
-  const baseItems = (await teamXItemsFromHtml(scoped)).slice(0, 30);
+  const parsedItems = (await teamXItemsFromHtml(scoped)).slice(0, 30);
+  const priorityItem = {
+    key: "tx:" + safeSlugKey(PRIORITY_WORKS.magicEmperor.teamxSlug),
+    source: "teamx",
+    sourceId: PRIORITY_WORKS.magicEmperor.teamxSlug,
+    slug: PRIORITY_WORKS.magicEmperor.teamxSlug,
+    type: "series",
+    url: TEAMX_BASE + "/series/" + encodeURIComponent(PRIORITY_WORKS.magicEmperor.teamxSlug),
+    title: "Demonic Emperor",
+    cover: "",
+    description: "",
+    status: "",
+    genres: [],
+  };
+  const baseItems = priorityRefreshActive()
+    ? [priorityItem, ...parsedItems.filter((item) => item.key !== priorityItem.key)].slice(0, 30)
+    : parsedItems;
 
   // Small bounded concurrency avoids hammering Team-X while still finishing
   // quickly enough for the next Wany refresh to pick up the cached releases.
@@ -3538,6 +3607,8 @@ export const __test = {
   xsanoTypeFromCategories,
   asqChapterNumber,
   normalizeAsqType,
+  priorityRefreshActive,
+  sourceRefreshIntervalMs,
   mangaTimeChaptersFromPayload,
   mangaTimeTypeGenres,
   mangaTimeSeriesGenres,
