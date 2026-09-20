@@ -20,6 +20,7 @@ import type {
   UserProfileSection,
   UserProfileSectionInput,
   UserProfileView,
+  WorkSnapshot,
 } from "../types";
 
 export interface UserDataService {
@@ -68,6 +69,16 @@ export interface UserDataService {
   getReadChapterPairs(chapters: ReadChapterPair[]): Promise<ReadChapterPair[]>;
   getReadingProgress(): Promise<Record<string, ReadingProgress>>;
   saveReadingProgress(progress: ReadingProgress): Promise<void>;
+  getWorkSnapshots(keys: string[]): Promise<WorkSnapshot[]>;
+  saveWorkSnapshot(input: {
+    mangaId: string;
+    title: string;
+    source?: string | null;
+    sourceUrl?: string | null;
+    coverUrl?: string | null;
+    chapter?: number | null;
+  }): Promise<{ needsCover: boolean }>;
+  saveWorkSnapshotCover(mangaId: string, blob: Blob): Promise<void>;
   getFriends(): Promise<Friend[]>;
   getFriendRequests(): Promise<FriendRequests>;
   searchUsers(query: string): Promise<FriendSearchResult[]>;
@@ -678,6 +689,63 @@ class ApiUserDataService implements UserDataService {
       }
     }
     return [...unique.values()];
+  }
+
+  async getWorkSnapshots(keys: string[]) {
+    const normalized = [...new Set(keys.filter((key) => isLiveKey(key)))].slice(0, 100);
+    if (!normalized.length) return [];
+    const result = await this.request<{ snapshots: WorkSnapshot[] }>(
+      `work-snapshots?keys=${encodeURIComponent(normalized.join(","))}`,
+    );
+    return (result.snapshots ?? []).filter((snapshot) => isLiveKey(snapshot.mangaId));
+  }
+
+  async saveWorkSnapshot(input: {
+    mangaId: string;
+    title: string;
+    source?: string | null;
+    sourceUrl?: string | null;
+    coverUrl?: string | null;
+    chapter?: number | null;
+  }) {
+    if (!isLiveKey(input.mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
+    return await this.request<{ ok: boolean; needsCover: boolean }>("work-snapshots", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  async saveWorkSnapshotCover(mangaId: string, blob: Blob) {
+    if (!isLiveKey(mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
+    let response: Response;
+    try {
+      response = await fetch(
+        `/api/work-snapshots/cover?key=${encodeURIComponent(mangaId)}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type": blob.type || "image/jpeg",
+          },
+          body: blob,
+        },
+      );
+    } catch {
+      throw new ApiError(
+        "تعذر حفظ نسخة الغلاف الاحتياطية.",
+        0,
+        "NETWORK_ERROR",
+      );
+    }
+    const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    if (!response.ok) {
+      throw new ApiError(
+        payload.message || "تعذر حفظ نسخة الغلاف الاحتياطية.",
+        response.status,
+        payload.error,
+      );
+    }
   }
 
   async getReadingProgress() {
