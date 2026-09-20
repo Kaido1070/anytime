@@ -60,7 +60,7 @@ export async function onRequest(context) {
             : source === "starzmanga"
               ? await starzLatest(db, page)
               : source === "xsano"
-                ? await xsanoLatest(db, page)
+                ? await xsanoLatest(context, db, page)
                 : await mangalikLatest(db, page);
       return json(payload, 200, shortCache());
     }
@@ -2644,8 +2644,138 @@ function mangalikHasNext(html) {
 
 // XSano Manga / ZeistManga ---------------------------------------------------
 
-async function xsanoLatest(db, page) {
-  return xsanoFeedList(db, { page });
+async function xsanoLatest(context, db, page) {
+  if (page > 1) return { items: [], hasMore: false, page };
+
+  const now = Date.now();
+  const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
+  const cached = await recentVerifiedReleasesFromDb(db, "xsano", cutoffIso);
+
+  const state = await db
+    .prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'xsano' LIMIT 1")
+    .first();
+  const lastStartedAt = Number(state?.last_started_at ?? 0);
+
+  if (now - lastStartedAt >= 5 * 60_000) {
+    await db
+      .prepare(`INSERT INTO source_sync_state (source, last_started_at)
+        VALUES ('xsano', ?)
+        ON CONFLICT(source) DO UPDATE SET last_started_at = excluded.last_started_at`)
+      .bind(now)
+      .run();
+
+    context.waitUntil(
+      syncXsanoLatest(db).catch((error) => {
+        console.error("XSano background sync failed", error);
+      }),
+    );
+  }
+
+  return { items: cached, hasMore: false, page };
+}
+
+async function xsanoSeriesItemFromEntry(entry) {
+  const categories = xsanoCategories(entry);
+  if (!categories.includes("Series") || categories.includes("Anime")) return null;
+
+  const title = xsanoText(entry?.title);
+  const href = xsanoAlternateLink(entry);
+  if (!title || !href) return null;
+
+  const parsedUrl = new URL(href, XSANO_BASE);
+  const sourceId = parsedUrl.pathname;
+  const key = await makeSourceKey("xs", sourceId);
+  const type = xsanoTypeFromCategories(categories);
+  const genres = xsanoGenresFromCategories(categories, type);
+
+  return {
+    key,
+    source: "xsano",
+    sourceId,
+    slug: parsedUrl.pathname.replace(/^\/+|\/+$/g, ""),
+    type,
+    url: parsedUrl.toString(),
+    title,
+    cover: xsanoEntryCover(entry),
+    description: "",
+    status: xsanoStatusFromCategories(categories),
+    genres,
+  };
+}
+
+async function xsanoResolveSeriesByLabels(labels) {
+  for (const label of labels) {
+    const url = new URL(
+      "/feeds/posts/default/-/Series/" + encodeURIComponent(label),
+      XSANO_BASE,
+    );
+    url.searchParams.set("alt", "json");
+    url.searchParams.set("max-results", "2");
+
+    try {
+      const payload = await xsanoFetchJson(url.toString());
+      const entries = Array.isArray(payload?.feed?.entry) ? payload.feed.entry : [];
+      for (const entry of entries) {
+        const item = await xsanoSeriesItemFromEntry(entry);
+        if (item) return item;
+      }
+    } catch {
+      // A category can be a genre rather than the series label. Try the next.
+    }
+  }
+  return null;
+}
+
+async function syncXsanoLatest(db) {
+  const url = new URL("/feeds/posts/default/-/Chapter", XSANO_BASE);
+  url.searchParams.set("alt", "json");
+  url.searchParams.set("orderby", "published");
+  url.searchParams.set("max-results", "100");
+
+  const payload = await xsanoFetchJson(url.toString());
+  const entries = Array.isArray(payload?.feed?.entry) ? payload.feed.entry : [];
+  const cutoff = Date.now() - 48 * 60 * 60_000;
+
+  const recentEntries = entries.filter((entry) => {
+    const publishedAt = xsanoText(entry?.published);
+    const timestamp = Date.parse(publishedAt);
+    return Number.isFinite(timestamp) && timestamp > cutoff &&
+      xsanoCategories(entry).includes("Chapter");
+  });
+
+  // Resolve one series label per recent chapter group in the background.
+  // Blogger's /Chapter/<series-label> convention guarantees a source-owned
+  // label; genre labels are rejected unless they resolve to a Series entry.
+  const groups = new Map();
+  for (const entry of recentEntries) {
+    const categories = xsanoCategories(entry).filter((value) => value !== "Chapter");
+    const signature = categories.slice().sort().join("\u0001");
+    if (!signature) continue;
+    const group = groups.get(signature) ?? { labels: categories, entries: [] };
+    group.entries.push(entry);
+    groups.set(signature, group);
+  }
+
+  const values = [...groups.values()].slice(0, 40);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(4, values.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= values.length) break;
+      const group = values[index];
+
+      const item = await xsanoResolveSeriesByLabels(group.labels);
+      if (!item) continue;
+
+      const chapters = xsanoChaptersFromEntries(group.entries);
+      if (!chapters.length) continue;
+
+      await rememberItems(db, [item]);
+      await rememberRecentVerifiedChapters(db, { ...item, chapters });
+    }
+  });
+
+  await Promise.all(workers);
 }
 
 async function xsanoPopular(db, page) {
@@ -2671,31 +2801,8 @@ async function xsanoFeedList(db, { page, query = "" }) {
   const parsed = [];
 
   for (const entry of entries) {
-    const categories = xsanoCategories(entry);
-    if (!categories.includes("Series") || categories.includes("Anime")) continue;
-
-    const title = xsanoText(entry?.title);
-    const href = xsanoAlternateLink(entry);
-    if (!title || !href) continue;
-
-    const parsedUrl = new URL(href, XSANO_BASE);
-    const sourceId = parsedUrl.pathname;
-    const key = await makeSourceKey("xs", sourceId);
-    const type = xsanoTypeFromCategories(categories);
-    const genres = xsanoGenresFromCategories(categories, type);
-    parsed.push({
-      key,
-      source: "xsano",
-      sourceId,
-      slug: parsedUrl.pathname.replace(/^\/+|\/+$/g, ""),
-      type,
-      url: parsedUrl.toString(),
-      title,
-      cover: xsanoEntryCover(entry),
-      description: "",
-      status: xsanoStatusFromCategories(categories),
-      genres,
-    });
+    const item = await xsanoSeriesItemFromEntry(entry);
+    if (item) parsed.push(item);
   }
 
   const hasMore = parsed.length > 20;
