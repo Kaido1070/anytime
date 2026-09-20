@@ -918,9 +918,10 @@ function teamXHasNext(html) {
 async function asqLatest(db, page) {
   // 3asq exposes recent chapter updates directly on its latest/home listing.
   // Parse those rows first so the New feed does not need to crawl every series.
-  const path = page > 1
-    ? "/page/" + page + "/?m_orderby=latest"
-    : "/?m_orderby=latest";
+  // The Madara latest ordering lives on the manga archive. The site root
+  // uses a different layout, so parsing it as archive cards can silently
+  // produce zero items.
+  const path = "/manga/page/" + page + "/?m_orderby=latest";
   const html = await asqFetchText(path);
   const direct = asqLatestItemsFromHtml(html);
 
