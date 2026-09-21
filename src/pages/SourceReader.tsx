@@ -10,7 +10,8 @@ import { saveWorkSnapshot } from "../services/workSnapshots";
 import type { SourceChapterPayload } from "../types";
 
 const INITIAL_READER_PAGES = 2;
-const READER_PRELOAD_MARGIN = "1400px 0px";
+const READER_PRELOAD_MARGIN_FAST = "1600px 0px";
+const READER_PRELOAD_MARGIN_SLOW = "700px 0px";
 const PROGRESS_SAVE_DELAY_MS = 60 * 1000;
 const PROGRESS_MIN_DELTA = 3;
 const PROGRESS_NOOP_DELTA = 0.25;
@@ -21,18 +22,28 @@ type NavigatorWithConnection = Navigator & {
   };
 };
 
-function readerConcurrency() {
-  if (typeof navigator === "undefined") return 2;
-  const connection = (navigator as NavigatorWithConnection).connection;
-  if (
+function readerConnection() {
+  if (typeof navigator === "undefined") return undefined;
+  return (navigator as NavigatorWithConnection).connection;
+}
+
+function readerIsSlowConnection() {
+  const connection = readerConnection();
+  return Boolean(
     connection?.saveData ||
     connection?.effectiveType === "slow-2g" ||
     connection?.effectiveType === "2g" ||
     connection?.effectiveType === "3g"
-  ) {
-    return 2;
-  }
-  return connection?.effectiveType === "4g" ? 3 : 2;
+  );
+}
+
+function readerConcurrency() {
+  if (readerIsSlowConnection()) return 2;
+  return readerConnection()?.effectiveType === "4g" ? 4 : 3;
+}
+
+function readerPreloadMargin() {
+  return readerIsSlowConnection() ? READER_PRELOAD_MARGIN_SLOW : READER_PRELOAD_MARGIN_FAST;
 }
 
 export function SourceReader() {
@@ -148,6 +159,7 @@ function ReaderChapter({
     () => new Set(initialPageIndexes),
   );
   const prefetchedNextRef = useRef<number | null>(null);
+  const nextPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markedUnreadRef = useRef(false);
   saveRef.current = saveProgress;
 
@@ -291,13 +303,27 @@ function ReaderChapter({
   }, [sourceKey, chapter, payload.pages.length]);
 
   useEffect(() => {
-    if (percent < 75 || payload.next == null || prefetchedNextRef.current === payload.next) {
-      return;
-    }
-    prefetchedNextRef.current = payload.next;
-    void sourceService.getChapter(sourceKey, payload.next).catch(() => {
-      if (prefetchedNextRef.current === payload.next) prefetchedNextRef.current = null;
-    });
+    if (payload.next == null || prefetchedNextRef.current === payload.next) return;
+
+    // Keep D1/source traffic conservative: prefetch only one adjacent chapter,
+    // and only when the reader is likely to need it. Slow/data-saver links wait
+    // until the reader is near the end; fast links can warm it a little earlier.
+    const threshold = readerIsSlowConnection() ? 90 : 65;
+    if (percent < threshold) return;
+
+    const next = payload.next;
+    prefetchedNextRef.current = next;
+    const run = () => {
+      void sourceService.getChapter(sourceKey, next).catch(() => {
+        if (prefetchedNextRef.current === next) prefetchedNextRef.current = null;
+      });
+    };
+
+    nextPrefetchTimerRef.current = setTimeout(run, readerIsSlowConnection() ? 350 : 80);
+    return () => {
+      if (nextPrefetchTimerRef.current) clearTimeout(nextPrefetchTimerRef.current);
+      nextPrefetchTimerRef.current = null;
+    };
   }, [percent, payload.next, sourceKey]);
 
   return (
@@ -416,7 +442,7 @@ function ProgressiveReaderPage({
         onNear(index);
         observer.disconnect();
       },
-      { rootMargin: READER_PRELOAD_MARGIN },
+      { rootMargin: readerPreloadMargin() },
     );
 
     observer.observe(image);
@@ -428,9 +454,9 @@ function ProgressiveReaderPage({
       ref={imageRef}
       src={shouldLoad ? src : undefined}
       alt={alt}
-      loading="eager"
+      loading={index < INITIAL_READER_PAGES ? "eager" : "lazy"}
       decoding="async"
-      fetchPriority={index === 0 ? "high" : "auto"}
+      fetchPriority={index === 0 ? "high" : index === 1 ? "auto" : "low"}
       onLoad={() => onSettled(index, true)}
       onError={() => onSettled(index, false)}
     />
