@@ -899,7 +899,6 @@ export function Account() {
           <ProfileStatsSection
             stats={stats}
             viewAllTo="/profile?tab=stats"
-            achievements={achievementSummary}
           />
 
           {customizingLists ? (
