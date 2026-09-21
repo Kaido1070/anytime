@@ -377,7 +377,7 @@ export function ReadingStatsDashboard() {
             <strong>{formatNumber(stats.bulkChapters)}</strong>
           </div>
           <div>
-            <span>عمليات التسجيل الدفعي</span>
+            <span>جلسات القراءة</span>
             <strong>{formatNumber(stats.bulkPacks)}</strong>
           </div>
           <div>
