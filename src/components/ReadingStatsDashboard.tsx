@@ -42,10 +42,10 @@ const STREAK_TROPHIES = [
   [30, "بلاتيني", "قرأت في 30 يومًا متتاليًا"],
 ] as const;
 
-const CATEGORY_META: Record<TrophyCategory, { title: string; icon: string; unit: string }> = {
-  chapters: { title: "إنجازات الفصول", icon: "book", unit: "فصل" },
-  stories: { title: "إنجازات الأعمال", icon: "lists", unit: "عمل" },
-  streak: { title: "إنجازات الاستمرارية", icon: "flame", unit: "يوم" },
+const CATEGORY_META: Record<TrophyCategory, { title: string; unit: string }> = {
+  chapters: { title: "إنجازات الفصول", unit: "فصل" },
+  stories: { title: "إنجازات الأعمال", unit: "عمل" },
+  streak: { title: "إنجازات الاستمرارية", unit: "يوم" },
 };
 
 const RANK_NAMES = [
@@ -320,9 +320,6 @@ export function ReadingStatsDashboard() {
             <article className={`reading-achievement-row achievement-${category}`} key={category}>
               <div className="reading-achievement-topline">
                 <div className="reading-achievement-title">
-                  <span className="reading-achievement-category-icon" aria-hidden="true">
-                    <Icon name={meta.icon} />
-                  </span>
                   <div>
                     <h4>{meta.title}</h4>
                     <small>
