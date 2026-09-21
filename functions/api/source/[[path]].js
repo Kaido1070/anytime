@@ -913,25 +913,90 @@ function isNovelLabel(value) {
     /رواي(?:ة|ات)/.test(normalized);
 }
 
+function mangaTimePagesFromPayload(payload) {
+  const candidates = [
+    payload?.pages,
+    payload?.images,
+    payload?.pageUrls,
+    payload?.chapterPages,
+    payload?.data?.pages,
+    payload?.chapter?.pages,
+  ].find(Array.isArray) ?? [];
+
+  return [...new Set(
+    candidates
+      .map((page) => {
+        if (typeof page === "string") return page;
+        if (!page || typeof page !== "object") return "";
+        return page.url ?? page.src ?? page.imageUrl ?? page.image_url ?? page.path ?? "";
+      })
+      .map((page) => absoluteUrl(MANGATIME_BASE, page))
+      .filter(Boolean),
+  )];
+}
+
+async function mangaTimeChapterPages(item, number) {
+  let primaryPayload = null;
+  let primaryError = null;
+
+  try {
+    primaryPayload = await mangaTimeTrpc("content.getChapterPages", {
+      seriesSlug: item.slug,
+      chapterNumber: number,
+    });
+    if (primaryPayload?.isUnlocked === false || primaryPayload?.locked === true) {
+      throw new SourceError("CHAPTER_LOCKED", "هذا الفصل مقفل في المصدر.", 423);
+    }
+    const primaryPages = mangaTimePagesFromPayload(primaryPayload);
+    if (primaryPages.length) return { payload: primaryPayload, pages: primaryPages };
+  } catch (error) {
+    if (error instanceof SourceError && error.code === "CHAPTER_LOCKED") throw error;
+    primaryError = error;
+  }
+
+  // MangaTime has changed the reader payload shape before. Resolve the exact
+  // chapter id only when the normal reader call fails, then try the source's
+  // id-based input shapes without slowing down healthy reads.
+  try {
+    const chapterPayload = await mangaTimeTrpc("content.getChapters", {
+      seriesId: item.sourceId,
+      limit: -1,
+    });
+    const chapter = (chapterPayload?.chapters ?? []).find(
+      (entry) => Math.abs(Number(entry?.number) - Number(number)) < 0.000001,
+    );
+    const chapterId = chapter?.id ?? chapter?.chapterId ?? null;
+    const fallbackInputs = [
+      chapterId ? { chapterId } : null,
+      chapterId ? { id: chapterId } : null,
+      { seriesId: item.sourceId, chapterNumber: number },
+    ].filter(Boolean);
+
+    for (const input of fallbackInputs) {
+      try {
+        const payload = await mangaTimeTrpc("content.getChapterPages", input);
+        if (payload?.isUnlocked === false || payload?.locked === true) continue;
+        const pages = mangaTimePagesFromPayload(payload);
+        if (pages.length) return { payload, pages };
+      } catch {
+        // Try the next compatibility shape.
+      }
+    }
+  } catch {
+    // Keep the original reader failure below. Chapter-list refresh is only a
+    // compatibility fallback and must not hide the useful source error.
+  }
+
+  if (primaryError instanceof SourceError) throw primaryError;
+  throw new SourceError("NO_PAGES", "MangaTime لم يرجع صور الفصل.", 502);
+}
+
 async function mangaTimeChapter(context, db, item, number) {
-  if (!Number.isInteger(number)) {
-    throw new SourceError("UNSUPPORTED_CHAPTER", "هذا المصدر يتطلب رقم فصل صحيح.", 400);
+  if (!Number.isFinite(number) || number < 0) {
+    throw new SourceError("UNSUPPORTED_CHAPTER", "رقم الفصل غير صالح.", 400);
   }
 
-  const result = await mangaTimeTrpc("content.getChapterPages", {
-    seriesSlug: item.slug,
-    chapterNumber: number,
-  });
-  if (!result?.isUnlocked) {
-    throw new SourceError("CHAPTER_LOCKED", "هذا الفصل مقفل في المصدر.", 423);
-  }
-
-  const pages = (result?.pages ?? [])
-    .map((page) => absoluteUrl(MANGATIME_BASE, page))
-    .filter(Boolean);
-  if (!pages.length) {
-    throw new SourceError("NO_PAGES", "المصدر لم يرجع صور الفصل.", 502);
-  }
+  const { payload: result, pages } = await mangaTimeChapterPages(item, number);
 
   // The pages endpoint is the critical path. Series metadata/chapter-list
   // refresh is useful for navigation, but it must never make an otherwise
@@ -959,8 +1024,9 @@ async function mangaTimeChapter(context, db, item, number) {
     item: series,
     number,
     title:
-      series.chapters?.find((chapter) => chapter.number === number)?.title ??
-      `الفصل ${number}`,
+      series.chapters?.find(
+        (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+      )?.title ?? `الفصل ${number}`,
     pages,
     ...navigation,
   };
@@ -2895,10 +2961,19 @@ async function mangalikChapter(db, item, number) {
     throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في MangaLik.", 404);
   }
 
+  // Prefer Madara's list reader, but do not depend on it. MangaLik sometimes
+  // serves a different renderer for ?style=list while the normal chapter URL
+  // still contains the real pages.
   const chapterUrl = new URL(selected.url, MANGALIK_BASE);
   chapterUrl.searchParams.set("style", "list");
-  const html = await mangalikFetchText(chapterUrl.toString(), false);
-  const pages = parseMangalikPages(html);
+  let html = await mangalikFetchText(chapterUrl.toString(), false);
+  let pages = parseMangalikPages(html);
+
+  if (!pages.length) {
+    html = await mangalikFetchText(selected.url, false);
+    pages = parseMangalikPages(html);
+  }
+
   if (!pages.length) {
     throw new SourceError("NO_PAGES", "MangaLik لم يرجع صور الفصل.", 502);
   }
@@ -2918,7 +2993,8 @@ function parseMangalikPages(html) {
   const pages = [];
 
   for (const block of pageBlocks) {
-    const raw = asqFirstImage(block);
+    const image = extractImages(block)[0];
+    const raw = image?.src || asqFirstImage(block);
     const url = absoluteUrl(MANGALIK_BASE, raw);
     if (url && !isMangalikUiImage(url)) pages.push(url);
   }
@@ -2930,11 +3006,24 @@ function parseMangalikPages(html) {
   const footer = tail.search(/(?:id=["'](?:comments|manga-discussion)["']|<footer\b)/i);
   const scoped = footer >= 0 ? tail.slice(0, footer) : tail;
 
-  return [...new Set(
-    extractImages(scoped)
-      .map((image) => absoluteUrl(MANGALIK_BASE, image.src))
-      .filter((url) => url && !isMangalikUiImage(url)),
-  )];
+  const imagePages = extractImages(scoped)
+    .map((image) => absoluteUrl(MANGALIK_BASE, image.src))
+    .filter((url) => url && !isMangalikUiImage(url));
+  if (imagePages.length) return [...new Set(imagePages)];
+
+  // Some Madara optimizers inject chapter image URLs into inline JSON/script
+  // instead of <img> tags. Accept only obvious image URLs inside the reader
+  // scope and keep the same UI-image filter.
+  const inlinePages = [];
+  const normalized = scoped.replace(/\\\//g, "/").replace(/&amp;/g, "&");
+  const urlRegex = /https?:\/\/[^"'<>\s]+?\.(?:jpe?g|png|webp|avif)(?:\?[^"'<>\s]*)?/gi;
+  let match;
+  while ((match = urlRegex.exec(normalized))) {
+    const url = absoluteUrl(MANGALIK_BASE, match[0]);
+    if (url && !isMangalikUiImage(url)) inlinePages.push(url);
+  }
+
+  return [...new Set(inlinePages)];
 }
 
 function isMangalikUiImage(url) {
@@ -3563,7 +3652,16 @@ function extractImages(html) {
   let match;
   while ((match = regex.exec(html))) {
     const attrs = parseAttrs(match[1]);
-    const src = attrs.src || attrs["data-src"] || attrs["data-lazy-src"] || bestSrcset(attrs.srcset);
+    const src =
+      attrs["data-src"] ||
+      attrs["data-lazy-src"] ||
+      attrs["data-original"] ||
+      attrs["data-url"] ||
+      attrs["data-lazy"] ||
+      bestSrcset(attrs["data-srcset"]) ||
+      bestSrcset(attrs["data-lazy-srcset"]) ||
+      bestSrcset(attrs.srcset) ||
+      attrs.src;
     if (src) out.push({ src, attrs });
   }
   return out;
@@ -3723,6 +3821,7 @@ export const __test = {
   priorityRefreshActive,
   sourceRefreshIntervalMs,
   mangaTimeChaptersFromPayload,
+  mangaTimePagesFromPayload,
   mangaTimeTypeGenres,
   mangaTimeSeriesGenres,
   mangaTimeSearchInput,
