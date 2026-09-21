@@ -872,7 +872,6 @@ export function Account() {
       <ProfileIdentityHeader
         user={user}
         friends={profile?.stats?.friends}
-        achievements={achievementSummary}
         pendingFriendRequests={profile?.pendingFriendRequests ?? 0}
         actions={
           <Link
@@ -897,7 +896,11 @@ export function Account() {
         </div>
       ) : profile && stats ? (
         <>
-          <ProfileStatsSection stats={stats} viewAllTo="/profile?tab=stats" />
+          <ProfileStatsSection
+            stats={stats}
+            viewAllTo="/profile?tab=stats"
+            achievements={achievementSummary}
+          />
 
           {customizingLists ? (
             <SectionErrorBoundary
