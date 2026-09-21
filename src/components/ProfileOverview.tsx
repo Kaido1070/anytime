@@ -195,9 +195,11 @@ export function ProfileIdentityHeader({
 export function ProfileStatsSection({
   stats,
   viewAllTo,
+  achievements = [],
 }: {
   stats: ProfileStats;
   viewAllTo?: string;
+  achievements?: ProfileAchievementSummaryItem[];
 }) {
   const metrics = [
     { value: stats.chaptersRead, label: "فصول مقروءة" },
@@ -221,6 +223,19 @@ export function ProfileStatsSection({
           </div>
         ))}
       </div>
+      {achievements.length > 0 && (
+        <div className="profile-header-achievements profile-stats-achievements" aria-label="أحدث إنجازاتك">
+          {achievements.map((item) => (
+            <div className="profile-header-achievement" key={item.category}>
+              <span className={`profile-header-achievement-badge reading-rank-badge rank-${item.tierIndex} category-${item.kind} earned`} aria-hidden="true">
+                <img className="reading-rank-image" src={`/ranks/${["bronze", "silver", "gold", "platinum", "diamond", "master", "elite", "legendary", "wany-legend"][Math.min(item.tierIndex, 8)]}.svg`} alt="" />
+              </span>
+              <b>{item.achievement}</b>
+              <small>{item.category}</small>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
