@@ -196,14 +196,16 @@ export function ProfileStatsSection({
   stats,
   viewAllTo,
   achievements = [],
+  readingDays,
 }: {
   stats: ProfileStats;
   viewAllTo?: string;
   achievements?: ProfileAchievementSummaryItem[];
+  readingDays?: number;
 }) {
   const metrics = [
     { value: stats.chaptersRead, label: "فصول مقروءة" },
-    { value: stats.completed, label: "قصص مكتملة" },
+    { value: readingDays ?? 0, label: "أيام قراءة" },
     { value: stats.reading, label: "أقرأ الآن" },
   ];
 
