@@ -899,6 +899,7 @@ export function Account() {
           <ProfileStatsSection
             stats={stats}
             viewAllTo="/profile?tab=stats"
+            readingDays={readingStatsSummary?.recentDays.filter((day) => day.chapters > 0).length}
           />
 
           {customizingLists ? (
