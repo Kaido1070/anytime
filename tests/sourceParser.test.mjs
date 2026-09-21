@@ -364,6 +364,38 @@ test("MangaTime keeps exact publishedAt values from its chapter API", () => {
   assert.equal(chapters[1].publishedAt, "2026-09-19T07:00:00.000Z");
 });
 
+test("MangaTime reader accepts current page payload variants", () => {
+  assert.deepEqual(
+    __test.mangaTimePagesFromPayload({
+      pages: [
+        "https://cdn.mangatime.org/ch/001.webp",
+        { url: "https://cdn.mangatime.org/ch/002.webp" },
+        { imageUrl: "https://cdn.mangatime.org/ch/003.webp" },
+      ],
+    }),
+    [
+      "https://cdn.mangatime.org/ch/001.webp",
+      "https://cdn.mangatime.org/ch/002.webp",
+      "https://cdn.mangatime.org/ch/003.webp",
+    ],
+  );
+
+  assert.deepEqual(
+    __test.mangaTimePagesFromPayload({
+      data: {
+        pages: [
+          { src: "https://cdn.mangatime.org/ch/004.webp" },
+          { path: "/reader/ch/005.webp" },
+        ],
+      },
+    }),
+    [
+      "https://cdn.mangatime.org/ch/004.webp",
+      "https://mangatime.org/reader/ch/005.webp",
+    ],
+  );
+});
+
 test("MangaTime novel types receive the Arabic novels category", () => {
   assert.deepEqual(__test.mangaTimeTypeGenres("novel"), ["novel", "روايات"]);
   assert.deepEqual(__test.mangaTimeTypeGenres("web_novel"), ["web_novel", "روايات"]);
@@ -600,6 +632,36 @@ test("MangaLik reader parser keeps chapter images from its CDN", () => {
   assert.deepEqual(__test.parseMangalikPages(html), [
     "https://s2solo.mangalik.net/manga/a/chapter/image-01.jpg",
     "https://s2solo.mangalik.net/manga/a/chapter/image-02.jpg",
+  ]);
+});
+
+test("MangaLik reader parser supports lazy srcset and inline reader URLs", () => {
+  const lazyHtml = `
+    <div class="reading-content">
+      <div class="page-break">
+        <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+             data-srcset="https://cdn.mangalik.net/ch/001.webp 1x, https://cdn.mangalik.net/ch/001@2x.webp 2x">
+      </div>
+      <div class="page-break">
+        <img data-original="https://cdn.mangalik.net/ch/002.webp">
+      </div>
+    </div>
+  `;
+  assert.deepEqual(__test.parseMangalikPages(lazyHtml), [
+    "https://cdn.mangalik.net/ch/001@2x.webp",
+    "https://cdn.mangalik.net/ch/002.webp",
+  ]);
+
+  const inlineHtml = `
+    <div class="reading-content">
+      <script>
+        window.readerPages = ["https:\\/\\/cdn.mangalik.net\\/ch\\/003.webp"];
+      </script>
+    </div>
+    <footer><img src="https://mangalik.net/logo.png"></footer>
+  `;
+  assert.deepEqual(__test.parseMangalikPages(inlineHtml), [
+    "https://cdn.mangalik.net/ch/003.webp",
   ]);
 });
 
