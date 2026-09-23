@@ -396,6 +396,27 @@ test("MangaTime reader accepts current page payload variants", () => {
   );
 });
 
+test("MangaTime reader can recover pages from chapter HTML", () => {
+  const html = `
+    <main id="chapter-reader">
+      <img src="https://mangatime.org/assets/logo.webp">
+      <img data-src="https://cdn.mangatime.org/chapters/a/001.webp">
+      <script>
+        window.__reader = {"pages":["https:\\/\\/cdn.mangatime.org\\/chapters\\/a\\/002.webp"]};
+      </script>
+    </main>
+    <footer><img src="https://mangatime.org/assets/footer.webp"></footer>
+  `;
+  assert.deepEqual(__test.parseMangaTimePages(html), [
+    "https://cdn.mangatime.org/chapters/a/001.webp",
+    "https://cdn.mangatime.org/chapters/a/002.webp",
+  ]);
+  assert.equal(
+    __test.mangaTimeChapterUrl({ type: "manhwa", slug: "academys-genius-swordmaster" }, 119),
+    "https://mangatime.org/manhwa/academys-genius-swordmaster/chapter/119",
+  );
+});
+
 test("MangaTime novel types receive the Arabic novels category", () => {
   assert.deepEqual(__test.mangaTimeTypeGenres("novel"), ["novel", "روايات"]);
   assert.deepEqual(__test.mangaTimeTypeGenres("web_novel"), ["web_novel", "روايات"]);
