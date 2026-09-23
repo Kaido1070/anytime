@@ -913,6 +913,103 @@ function isNovelLabel(value) {
     /رواي(?:ة|ات)/.test(normalized);
 }
 
+function mangaTimeChapterUrl(item, number) {
+  const type = String(item?.type || "manhwa").trim().replace(/^\/+|\/+$/g, "") || "manhwa";
+  const slug = encodeURIComponent(String(item?.slug || "").trim());
+  return `${MANGATIME_BASE}/${encodeURIComponent(type)}/${slug}/chapter/${encodeURIComponent(String(number))}`;
+}
+
+function isMangaTimeUiImage(url) {
+  return /(?:logo|favicon|avatar|profile|banner|icon|emoji|badge|placeholder|cover)(?:[\/_-]|\.)/i.test(String(url));
+}
+
+function parseMangaTimePages(html) {
+  const source = String(html ?? "");
+  if (!source) return [];
+
+  const markers = [
+    /id=["'][^"']*(?:reader|chapter)[^"']*["']/i,
+    /class=["'][^"']*(?:reader|chapter-(?:content|pages|images)|reading-content)[^"']*["']/i,
+  ];
+  let scoped = source;
+  for (const marker of markers) {
+    const index = source.search(marker);
+    if (index >= 0) {
+      scoped = source.slice(index);
+      break;
+    }
+  }
+
+  const footer = scoped.search(/(?:<footer\b|id=["']comments["']|class=["'][^"']*recommend)/i);
+  if (footer >= 0) scoped = scoped.slice(0, footer);
+
+  const imagePages = extractImages(scoped)
+    .map((image) => absoluteUrl(MANGATIME_BASE, image.src))
+    .filter((url) => {
+      if (!url || isMangaTimeUiImage(url)) return false;
+      try {
+        const parsed = new URL(url);
+        return /\.(?:jpe?g|png|webp|avif)(?:$|\?)/i.test(parsed.pathname + parsed.search);
+      } catch {
+        return false;
+      }
+    });
+  if (imagePages.length >= 2) return [...new Set(imagePages)];
+
+  const normalized = scoped
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;/g, "&");
+  const inline = [];
+  const urlRegex = /https?:\/\/[^"'<>\s\\]+?\.(?:jpe?g|png|webp|avif)(?:\?[^"'<>\s\\]*)?/gi;
+  let match;
+  while ((match = urlRegex.exec(normalized))) {
+    const url = absoluteUrl(MANGATIME_BASE, match[0]);
+    if (url && !isMangaTimeUiImage(url)) inline.push(url);
+  }
+
+  return [...new Set([...imagePages, ...inline])];
+}
+
+async function mangaTimeFetchChapterHtml(item, number) {
+  const urls = [
+    mangaTimeChapterUrl(item, number),
+    `${MANGATIME_BASE}/manga/${encodeURIComponent(String(item?.slug || ""))}/chapter-${encodeURIComponent(String(number))}/`,
+  ];
+
+  let lastError = null;
+  for (const target of urls) {
+    try {
+      const response = await fetch(target, {
+        headers: sourceHeaders(
+          MANGATIME_BASE,
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        ),
+        redirect: "follow",
+        cf: { cacheTtl: 20, cacheEverything: true },
+      });
+      if (!response.ok) {
+        lastError = new Error(`HTTP ${response.status}`);
+        continue;
+      }
+      const html = await response.text();
+      const pages = parseMangaTimePages(html);
+      if (pages.length) return { pages, url: response.url || target };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    console.warn("MangaTime HTML reader fallback failed", {
+      key: item?.key,
+      chapter: number,
+      error: lastError instanceof Error ? lastError.message : String(lastError),
+    });
+  }
+  return { pages: [], url: mangaTimeChapterUrl(item, number) };
+}
+
 function mangaTimePagesFromPayload(payload) {
   const candidates = [
     payload?.pages,
@@ -985,6 +1082,18 @@ async function mangaTimeChapterPages(item, number) {
   } catch {
     // Keep the original reader failure below. Chapter-list refresh is only a
     // compatibility fallback and must not hide the useful source error.
+  }
+
+  const htmlFallback = await mangaTimeFetchChapterHtml(item, number);
+  if (htmlFallback.pages.length) {
+    return {
+      payload: {
+        id: null,
+        seriesId: item.sourceId,
+        readerUrl: htmlFallback.url,
+      },
+      pages: htmlFallback.pages,
+    };
   }
 
   if (primaryError instanceof SourceError) throw primaryError;
@@ -3822,6 +3931,8 @@ export const __test = {
   sourceRefreshIntervalMs,
   mangaTimeChaptersFromPayload,
   mangaTimePagesFromPayload,
+  parseMangaTimePages,
+  mangaTimeChapterUrl,
   mangaTimeTypeGenres,
   mangaTimeSeriesGenres,
   mangaTimeSearchInput,
