@@ -1,8 +1,9 @@
 // Production reader deploy marker: Team-X images use the chapter referer path.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
+import { parseSourceGroupKeys } from "../services/sourceMerge";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath, sourceKeyFromReaderPath } from "../services/readerPaths";
 import { sourceService } from "../services/sources";
@@ -48,7 +49,10 @@ function readerPreloadMargin() {
 
 export function SourceReader() {
   const { key = "", source = "", work = "", chapter = "" } = useParams();
+  const [searchParams] = useSearchParams();
   const sourceKey = key ? decodeURIComponent(key) : sourceKeyFromReaderPath(source, work);
+  const sourceKeys = parseSourceGroupKeys(searchParams.get("sources"), sourceKey);
+  const sourceGroupSignature = sourceKeys.join("|");
   const number = Number(chapter);
   const [payload, setPayload] = useState<SourceChapterPayload | null>(null);
   const [error, setError] = useState("");
@@ -56,18 +60,56 @@ export function SourceReader() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
-    setPayload(null);
-    sourceService
-      .getChapter(sourceKey, number)
-      .then((result) => active && setPayload(result))
-      .catch((cause) => active && setError(cause instanceof Error ? cause.message : "تعذر تحميل الفصل."))
-      .finally(() => active && setLoading(false));
+
+    const loadChapter = async () => {
+      setLoading(true);
+      setError("");
+      setPayload(null);
+
+      try {
+        const result = await sourceService.getChapter(sourceKey, number);
+        if (active) setPayload(result);
+        return;
+      } catch (primaryCause) {
+        const candidates = sourceKeys.length ? sourceKeys : [sourceKey];
+
+        for (const fallbackKey of candidates) {
+          if (!fallbackKey || fallbackKey === sourceKey) continue;
+
+          try {
+            const fallback = await sourceService.getChapter(fallbackKey, number);
+            if (!active) return;
+
+            // Switch the URL to the source that actually served the chapter.
+            // This keeps progress, navigation and image referers tied to the
+            // working source instead of silently mixing source identities.
+            navigate(readerPath(fallback.item, fallback.number, candidates), {
+              replace: true,
+            });
+            return;
+          } catch {
+            // The next merged source gets its own chance.
+          }
+        }
+
+        if (active) {
+          setError(
+            primaryCause instanceof Error
+              ? primaryCause.message
+              : "تعذر تحميل الفصل.",
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadChapter();
+
     return () => {
       active = false;
     };
-  }, [sourceKey, number]);
+  }, [sourceKey, number, navigate, sourceGroupSignature]);
 
   if (!Number.isFinite(number)) {
     return (
@@ -94,15 +136,25 @@ export function SourceReader() {
       </main>
     );
 
-  return <ReaderChapter key={`${sourceKey}:${number}`} sourceKey={sourceKey} payload={payload} legacyPath={Boolean(key)} />;
+  return (
+    <ReaderChapter
+      key={`${sourceKey}:${number}`}
+      sourceKey={sourceKey}
+      sourceKeys={sourceKeys}
+      payload={payload}
+      legacyPath={Boolean(key)}
+    />
+  );
 }
 
 function ReaderChapter({
   sourceKey,
+  sourceKeys,
   payload,
   legacyPath,
 }: {
   sourceKey: string;
+  sourceKeys: string[];
   payload: SourceChapterPayload;
   legacyPath: boolean;
 }) {
@@ -336,7 +388,7 @@ function ReaderChapter({
           <small dir="auto">{displayTitle}</small>
           <div className="reader-chapter-controls">
             {payload.previous != null ? (
-              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.previous)}>السابق</Link>
+              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.previous, sourceKeys)}>السابق</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">السابق</span>
             )}
@@ -355,7 +407,7 @@ function ReaderChapter({
               )) : <option value={chapter}>الفصل {chapter}</option>}
             </select>
             {payload.next != null ? (
-              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.next)}>التالي</Link>
+              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.next, sourceKeys)}>التالي</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">التالي</span>
             )}
@@ -383,7 +435,7 @@ function ReaderChapter({
           {payload.previous != null ? (
             <Link
               className="secondary"
-              to={readerPath(payload.item, payload.previous)}
+              to={readerPath(payload.item, payload.previous, sourceKeys)}
             >
               الفصل السابق →
             </Link>
@@ -393,7 +445,7 @@ function ReaderChapter({
           {payload.next != null ? (
             <Link
               className="primary"
-              to={readerPath(payload.item, payload.next)}
+              to={readerPath(payload.item, payload.next, sourceKeys)}
             >
               ← الفصل التالي
             </Link>
