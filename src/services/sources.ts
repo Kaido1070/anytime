@@ -247,12 +247,25 @@ export const sourceService = {
       return cached;
     }
 
-    const request = api<{ chapter: SourceChapterPayload }>(
+    if (!circuitAllows(key)) {
+      throw new SourceRequestError(
+        "المصدر متعثر مؤقتًا ويجري الانتظار قبل المحاولة التالية.",
+        503,
+        "SOURCE_CIRCUIT_OPEN",
+      );
+    }
+
+    const request = apiWithRetry<{ chapter: SourceChapterPayload }>(
       `/api/source/chapter?${params({ key, number: chapter })}`,
+      2,
     )
-      .then((payload) => payload.chapter)
+      .then((payload) => {
+        recordSourceSuccess(key);
+        return payload.chapter;
+      })
       .catch((cause) => {
         chapterRequests.delete(requestKey);
+        recordSourceFailure(key, cause);
         throw cause;
       });
 
