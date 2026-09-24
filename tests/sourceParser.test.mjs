@@ -772,6 +772,19 @@ test("MangaDar parser keeps the full chapter range and clean description", () =>
   assert.equal(__test.mangadarDescription(html), "ملخص Overgeared النظيف");
 });
 
+test("MangaDar description ignores raw HTML and chapter URLs survive escaped JSON", () => {
+  const html = `
+    <meta name="description" content="وصف نظيف للعمل">
+    <div class="description"><link rel="canonical" href="https://mangadar.com/manga/overgeared/"></div>
+    <script>const chapters = ["\\/manga\\/overgeared\\/340\\/", "\\/manga\\/overgeared\\/339\\/"];</script>
+  `;
+  assert.equal(__test.mangadarDescription(html, "<div><link rel=\"canonical\" href=\"bad\"></div>"), "وصف نظيف للعمل");
+  assert.deepEqual(
+    __test.parseMangadarChapters(html, "https://mangadar.com/manga/overgeared/").map((chapter) => chapter.number),
+    [340, 339],
+  );
+});
+
 test("MangaDar page parser reads lazy reader images and excludes UI images", () => {
   const html = `
     <div class="reading-content">
