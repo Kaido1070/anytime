@@ -33,7 +33,9 @@ export async function onRequest(context) {
           ? XSANO_BASE
           : source === "mangalik"
             ? MANGALIK_BASE
-             : MANGATIME_BASE;
+            : source === "mangadar"
+              ? MANGADAR_BASE
+              : MANGATIME_BASE;
   const raw = String(url.searchParams.get("url") ?? "");
   const target = absoluteUrl(base, raw);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
@@ -53,7 +55,9 @@ export async function onRequest(context) {
           ? safeXsanoReferer(url.searchParams.get("referer"))
           : source === "mangalik"
             ? safeMangalikReferer(url.searchParams.get("referer"))
-            : `${MANGATIME_BASE}/`;
+            : source === "mangadar"
+              ? safeMangadarReferer(url.searchParams.get("referer"))
+              : `${MANGATIME_BASE}/`;
 
   const response = await fetch(target, {
     headers: {
