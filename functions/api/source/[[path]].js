@@ -2810,8 +2810,11 @@ async function mangadarSeries(db, item) {
   );
   const summaryBlock =
     firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_image|series-image|manga-thumb|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
-    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_content|summary-content|description-summary|manga-summary|description)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-  const cover = absoluteUrl(MANGADAR_BASE, firstImgUrl(summaryBlock || html)) || item.cover;
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_content|summary-content|description-summary|manga-summary)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+  const cover =
+    absoluteUrl(MANGADAR_BASE, mangadarMetaImage(html)) ||
+    absoluteUrl(MANGADAR_BASE, firstImgUrl(summaryBlock || "")) ||
+    item.cover;
   const plain = cleanText(stripTags(html));
   const status = normalizeStatus(
     firstMatch(plain, /الحالة\s*:?\s*(مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك|ملغية|ملغي)/i) ||
@@ -2824,7 +2827,15 @@ async function mangadarSeries(db, item) {
     item.type,
   );
   const description = mangadarDescription(html, summaryBlock);
-  const chapters = parseMangadarChapters(html, seriesUrl);
+  let chapters = parseMangadarChapters(html, seriesUrl);
+  if (chapters.length < 3) {
+    const archiveChapters = await mangadarChapterArchiveChapters(item.slug, seriesUrl);
+    const merged = new Map(chapters.map((chapter) => [Number(chapter.number), chapter]));
+    for (const chapter of archiveChapters) {
+      merged.set(Number(chapter.number), chapter);
+    }
+    chapters = [...merged.values()].sort((a, b) => Number(b.number) - Number(a.number));
+  }
   const updated = {
     ...item,
     type,
@@ -2839,12 +2850,32 @@ async function mangadarSeries(db, item) {
   await rememberItems(db, [updated]);
   return updated;
 }
+function mangadarMetaContent(html, names) {
+  const source = String(html ?? "");
+  const wanted = new Set(names.map((name) => String(name).toLowerCase()));
+  for (const tag of source.match(/<meta\b[^>]*>/gi) ?? []) {
+    const attrs = {};
+    for (const match of tag.matchAll(/([:\w-]+)\s*=\s*["']([^"']*)["']/g)) {
+      attrs[String(match[1]).toLowerCase()] = match[2];
+    }
+    const key = String(attrs.property || attrs.name || "").toLowerCase();
+    if (wanted.has(key) && attrs.content) return attrs.content;
+  }
+  return "";
+}
+
+function mangadarMetaImage(html) {
+  return mangadarMetaContent(html, ["og:image", "twitter:image", "twitter:image:src"]);
+}
+
 function mangadarDescription(html, summaryBlock = "") {
-  const meta =
-    firstMatch(html, /<meta\b[^>]*(?:property=["']og:description["']|name=["']description["'])[^>]*content=["']([^"']*)["'][^>]*>/i) ||
-    firstMatch(html, /<meta\b[^>]*content=["']([^"']*)["'][^>]*(?:property=["']og:description["']|name=["']description["'])[^>]*>/i);
+  const meta = mangadarMetaContent(html, ["og:description", "description"]);
   const summary = cleanText(stripTags(summaryBlock || ""));
-  return cleanText(meta || summary).replace(/^(?:وصف|ملخص القصة)\s*[:：]?\s*/i, "").trim();
+  const value = cleanText(meta || summary)
+    .replace(/^(?:وصف|ملخص القصة)\s*[:：]?\s*/i, "")
+    .trim();
+  if (!value || /<\/?(?:html|head|body|script|style|link|meta|svg)\b/i.test(value)) return "";
+  return value;
 }
 function mangadarGenreCandidates(html) {
   const source = String(html ?? "");
@@ -2899,12 +2930,13 @@ function parseMangadarChapters(html, seriesUrl) {
   // is not represented as normal <a> nodes. Scan the raw HTML as a second
   // source of truth so we do not collapse a 300+ chapter work to two links.
   const escapedBasePath = basePath.replace(/[.*+?^()|[\]\\]/g, "\\$&");
+  const normalizedSource = source.replace(/\\\//g, "/");
   const chapterUrlPattern = new RegExp(
     escapedBasePath.replace(/\//g, "\\/") + "\\/(\\d+(?:\\.\\d+)?)\\/?",
     "gi",
   );
   let match;
-  while ((match = chapterUrlPattern.exec(source))) {
+  while ((match = chapterUrlPattern.exec(normalizedSource))) {
     const number = Number(match[1]);
     const startNearby = Math.max(0, match.index - 350);
     const endNearby = Math.min(source.length, chapterUrlPattern.lastIndex + 450);
@@ -2921,11 +2953,72 @@ async function mangadarChapter(db, item, number) {
   const selected = series.chapters?.find(chapter => Math.abs(Number(chapter.number) - Number(number)) < 0.000001);
   const baseUrl = String(series.url || item.url || "").replace(/\/$/, "");
   const directUrl = baseUrl + "/" + encodeURIComponent(String(number)) + "/";
-  const html = await mangadarFetchText(selected?.url || directUrl);
-  const pages = parseMangadarPages(html);
-  if (!pages.length) throw new SourceError("NO_PAGES", "MangaDar لم يرجع صور الفصل.", 502);
+  const candidates = [selected?.url, directUrl].filter(Boolean);
+  let pages = [];
+  let lastError = null;
+
+  for (const chapterUrl of [...new Set(candidates)]) {
+    try {
+      const html = await mangadarFetchText(chapterUrl);
+      const parsed = parseMangadarPages(html);
+      if (parsed.length > pages.length) pages = parsed;
+      if (pages.length >= 2) break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!pages.length) {
+    if (lastError instanceof SourceError) throw lastError;
+    throw new SourceError("NO_PAGES", "MangaDar لم يرجع صور الفصل.", 502);
+  }
+
   return { item: series, number, title: selected?.title || "الفصل " + number, pages, ...chapterNavigation(series.chapters ?? [], number) };
 }
+async function mangadarChapterArchiveChapters(slug, seriesUrl) {
+  const base = new URL(seriesUrl, MANGADAR_BASE);
+  const basePath = base.pathname.replace(/\/$/, "");
+  const query = encodeURIComponent(String(slug ?? "").replace(/[-_]+/g, " ").trim());
+  const found = new Map();
+
+  for (let page = 1; page <= 50; page += 1) {
+    const path = page === 1
+      ? "/?post_type=chapter&s=" + query
+      : "/page/" + page + "/?post_type=chapter&s=" + query;
+    let html;
+    try {
+      html = await mangadarFetchText(path);
+    } catch {
+      break;
+    }
+
+    let matched = 0;
+    for (const anchor of extractAnchors(html)) {
+      const href = absoluteUrl(MANGADAR_BASE, anchor.href);
+      if (!href) continue;
+      try {
+        const parsed = new URL(href);
+        if (parsed.origin !== base.origin || !parsed.pathname.startsWith(basePath + "/")) continue;
+        const tail = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+        if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
+        const number = Number(tail);
+        if (!Number.isFinite(number)) continue;
+        found.set(number, {
+          number,
+          title: cleanText(stripTags(anchor.inner)) || "الفصل " + number,
+          publishedAt: null,
+          url: href,
+        });
+        matched += 1;
+      } catch {}
+    }
+
+    if (!mangadarHasNext(html, page, "chapter") || matched === 0) break;
+  }
+
+  return [...found.values()].sort((a, b) => Number(b.number) - Number(a.number));
+}
+
 function parseMangadarPages(html) {
   const source = String(html ?? "");
   const markers = [/class=["'][^"']*\b(?:reading-content|reader-content|chapter-content|chapter-images|reader)\b[^"']*["']/i, /id=["'][^"']*\b(?:reader|chapter-content|chapter-images)\b[^"']*["']/i];
