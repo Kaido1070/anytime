@@ -118,8 +118,9 @@ export async function onRequest(context) {
               ? await starzList(db, { page, order: "latest" })
               : source === "xsano"
                 ? await xsanoCatalogLatest(db, page)
-                : await mangalikLatest(db, page)
-                : await mangadarLatest(db, page);
+                : source === "mangalik"
+                  ? await mangalikLatest(db, page)
+                  : await mangadarLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
