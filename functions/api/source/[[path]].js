@@ -2953,9 +2953,26 @@ async function mangadarChapter(db, item, number) {
   const selected = series.chapters?.find(chapter => Math.abs(Number(chapter.number) - Number(number)) < 0.000001);
   const baseUrl = String(series.url || item.url || "").replace(/\/$/, "");
   const directUrl = baseUrl + "/" + encodeURIComponent(String(number)) + "/";
-  const html = await mangadarFetchText(selected?.url || directUrl);
-  const pages = parseMangadarPages(html);
-  if (!pages.length) throw new SourceError("NO_PAGES", "MangaDar لم يرجع صور الفصل.", 502);
+  const candidates = [selected?.url, directUrl].filter(Boolean);
+  let pages = [];
+  let lastError = null;
+
+  for (const chapterUrl of [...new Set(candidates)]) {
+    try {
+      const html = await mangadarFetchText(chapterUrl);
+      const parsed = parseMangadarPages(html);
+      if (parsed.length > pages.length) pages = parsed;
+      if (pages.length >= 2) break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!pages.length) {
+    if (lastError instanceof SourceError) throw lastError;
+    throw new SourceError("NO_PAGES", "MangaDar لم يرجع صور الفصل.", 502);
+  }
+
   return { item: series, number, title: selected?.title || "الفصل " + number, pages, ...chapterNavigation(series.chapters ?? [], number) };
 }
 async function mangadarChapterArchiveChapters(slug, seriesUrl) {
