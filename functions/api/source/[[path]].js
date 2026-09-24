@@ -2761,7 +2761,7 @@ async function mangadarLatest(db, page) {
   const html = await mangadarFetchText(path);
   const items = await mangadarItemsFromHtml(html);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html), page };
+  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html, page, "manga"), page };
 }
 async function mangadarPopular(db, page) { return mangadarList(db, page); }
 async function mangadarList(db, page) {
@@ -2769,14 +2769,14 @@ async function mangadarList(db, page) {
   const html = await mangadarFetchText(path);
   const items = await mangadarItemsFromHtml(html);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html), page };
+  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html, page, "manga"), page };
 }
 async function mangadarSearch(db, query, page) {
   const prefix = page > 1 ? "/page/" + page + "/" : "/";
   const html = await mangadarFetchText(prefix + "?s=" + encodeURIComponent(query) + "&post_type=manga");
   const items = await mangadarItemsFromHtml(html);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html), page };
+  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html, page, "search"), page };
 }
 function mangadarItemsFromHtml(html) {
   const source = String(html ?? "");
@@ -2954,7 +2954,13 @@ async function mangadarFetchText(pathOrUrl) {
   }
   return response.text();
 }
-function mangadarHasNext(html) { return /<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html); }
+function mangadarHasNext(html, page = 1, mode = "manga") {
+  if (/<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html)) return true;
+  const nextPath = mode === "manga"
+    ? "/manga/page/" + (page + 1) + "/"
+    : "/page/" + (page + 1) + "/";
+  return html.includes(nextPath);
+}
 
 // MangaLik / Madara ----------------------------------------------------------
 
