@@ -12,6 +12,7 @@ const SOURCES: { id: SourceName; label: string }[] = [
   { id: "starzmanga", label: "StarzManga" },
   { id: "xsano", label: "XSano Manga" },
   { id: "mangalik", label: "MangaLik" },
+  { id: "mangadar", label: "MangaDar" },
 ];
 
 type SourceFilter = "all" | SourceName;
@@ -70,6 +71,7 @@ const EMPTY_HAS_MORE: HasMoreBySource = {
   starzmanga: false,
   xsano: false,
   mangalik: false,
+  mangadar: false,
 };
 
 const WORK_TYPES: { id: Exclude<WorkTypeFilter, "all">; label: string }[] = [

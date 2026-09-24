@@ -14,6 +14,7 @@ const SOURCE_PRIORITY: Partial<Record<SourceName, number>> = {
   starzmanga: 3,
   xsano: 4,
   mangalik: 5,
+  mangadar: 6,
 };
 
 const COVER_PRIORITY: Partial<Record<SourceName, number>> = {
@@ -22,6 +23,7 @@ const COVER_PRIORITY: Partial<Record<SourceName, number>> = {
   starzmanga: 2,
   xsano: 3,
   mangalik: 4,
+  mangadar: 5,
   mangatime: 5,
 };
 
@@ -378,5 +380,5 @@ export function sourceDetailsPath(key: string, values: Array<SourceManga | strin
 }
 
 function isSourceKey(value: string) {
-  return /^(?:mt|tx|aq|sz|xs|ml):[A-Za-z0-9_-]{1,110}$/.test(value);
+  return /^(?:mt|tx|aq|sz|xs|ml|md):[A-Za-z0-9_-]{1,110}$/.test(value);
 }

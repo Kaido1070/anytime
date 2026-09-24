@@ -178,7 +178,7 @@ function uniqueCovers(values: Array<string | undefined>) {
 }
 
 function coverFallbackCandidates(item: SourceManga) {
-  if (item.source === "3asq" || item.source === "starzmanga" || item.source === "mangalik") {
+  if (item.source === "3asq" || item.source === "starzmanga" || item.source === "mangalik" || item.source === "mangadar") {
     return uniqueCovers([wordpressOriginalCover(item.cover), item.cover]);
   }
   if (item.source === "xsano") {
@@ -287,7 +287,7 @@ export const sourceService = {
 
   async coverCandidates(item: SourceManga) {
     const fallback = coverFallbackCandidates(item);
-    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga" && item.source !== "xsano" && item.source !== "mangalik") return fallback;
+    if (item.source !== "mangatime" && item.source !== "3asq" && item.source !== "starzmanga" && item.source !== "xsano" && item.source !== "mangalik" && item.source !== "mangadar") return fallback;
 
     const cached = coverRequests.get(item.key);
     if (cached) return cached;
@@ -310,7 +310,7 @@ export const sourceService = {
   },
 
   isSourceKey(key?: string | null) {
-    return Boolean(key && /^(mt|tx|aq|sz|xs|ml):/.test(key));
+    return Boolean(key && /^(mt|tx|aq|sz|xs|ml|md):/.test(key));
   },
 
   sourceLabel(source: SourceName) {
