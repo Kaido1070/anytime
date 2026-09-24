@@ -49,6 +49,7 @@ function readerPreloadMargin() {
 
 export function SourceReader() {
   const { key = "", source = "", work = "", chapter = "" } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sourceKey = key ? decodeURIComponent(key) : sourceKeyFromReaderPath(source, work);
   const sourceKeys = parseSourceGroupKeys(searchParams.get("sources"), sourceKey);
