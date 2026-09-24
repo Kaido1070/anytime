@@ -2804,23 +2804,23 @@ async function mangadarSeries(db, item) {
   const seriesUrl = item.url || MANGADAR_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
   const html = await mangadarFetchText(seriesUrl);
   const title = cleanText(
-    firstMatch(html, /<h1[^>]*>([\\s\\S]*?)<\\/h1>/i) ||
-    firstMatch(html, /<title[^>]*>([\\s\\S]*?)<\\/title>/i) ||
+    firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+    firstMatch(html, /<title[^>]*>([\s\S]*?)<\/title>/i) ||
     item.title,
   );
   const summaryBlock =
-    firstMatch(html, /<div\\b[^>]*class=["'][^"']*(?:summary_image|series-image|manga-thumb|thumbnail)[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i) ||
-    firstMatch(html, /<div\\b[^>]*class=["'][^"']*(?:summary_content|summary-content|description-summary|manga-summary|description)[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i);
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_image|series-image|manga-thumb|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_content|summary-content|description-summary|manga-summary|description)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
   const cover = absoluteUrl(MANGADAR_BASE, firstImgUrl(summaryBlock || html)) || item.cover;
   const plain = cleanText(stripTags(html));
   const status = normalizeStatus(
-    firstMatch(plain, /الحالة\\s*:?[\\s]*(مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك|ملغية|ملغي)/i) ||
-    firstMatch(plain, /status\\s*:?[\\s]*(ongoing|completed|hiatus|cancelled|canceled|dropped)/i) ||
+    firstMatch(plain, /الحالة\s*:?\s*(مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك|ملغية|ملغي)/i) ||
+    firstMatch(plain, /status\s*:?\s*(ongoing|completed|hiatus|cancelled|canceled|dropped)/i) ||
     "",
   );
   const type = normalizeAsqType(
-    firstMatch(plain, /النوع\\s*:?[\\s]*(رواية ويب|رواية|مانجا ويب|مانهوا|مانها|مانجا|كوميك)/i) ||
-    firstMatch(plain, /type\\s*:?[\\s]*(web novel|light novel|novel|webtoon|manhwa|manhua|manga|comic)/i) ||
+    firstMatch(plain, /النوع\s*:?\s*(رواية ويب|رواية|مانجا ويب|مانهوا|مانها|مانجا|كوميك)/i) ||
+    firstMatch(plain, /type\s*:?\s*(web novel|light novel|novel|webtoon|manhwa|manhua|manga|comic)/i) ||
     item.type,
   );
   const description = mangadarDescription(html, summaryBlock);
@@ -2841,36 +2841,30 @@ async function mangadarSeries(db, item) {
 }
 function mangadarDescription(html, summaryBlock = "") {
   const meta =
-    firstMatch(html, /<meta\\b[^>]*(?:property=["']og:description["']|name=["']description["'])[^>]*content=["']([^"']*)["'][^>]*>/i) ||
-    firstMatch(html, /<meta\\b[^>]*content=["']([^"']*)["'][^>]*(?:property=["']og:description["']|name=["']description["'])[^>]*>/i);
+    firstMatch(html, /<meta\b[^>]*(?:property=["']og:description["']|name=["']description["'])[^>]*content=["']([^"']*)["'][^>]*>/i) ||
+    firstMatch(html, /<meta\b[^>]*content=["']([^"']*)["'][^>]*(?:property=["']og:description["']|name=["']description["'])[^>]*>/i);
   const summary = cleanText(stripTags(summaryBlock || ""));
-  const value = cleanText(meta || summary);
-  return value.replace(/^(?:وصف|ملخص القصة)\\s*[:：]?\\s*/i, "").trim();
+  return cleanText(meta || summary).replace(/^(?:وصف|ملخص القصة)\s*[:：]?\s*/i, "").trim();
 }
 function mangadarGenreCandidates(html) {
   const source = String(html ?? "");
-  const heading = source.match(/<h[2-4]\\b[^>]*>\\s*الأنواع\\s*<\\/h[2-4]>/i);
+  const heading = source.match(/<h[2-4]\b[^>]*>\s*الأنواع\s*<\/h[2-4]>/i);
   if (heading) {
     const start = heading.index + heading[0].length;
     const rest = source.slice(start);
-    const end = rest.search(/<h[2-4]\\b/i);
+    const end = rest.search(/<h[2-4]\b/i);
     const block = end >= 0 ? rest.slice(0, end) : rest.slice(0, 6000);
     const genres = extractAnchors(block)
       .map((anchor) => cleanText(stripTags(anchor.inner)))
-      .filter((text) => text && text.length <= 40 && !/^الفصل\\s+/i.test(text));
+      .filter((text) => text && text.length <= 40 && !/^الفصل\s+/i.test(text));
     if (genres.length) return [...new Set(genres)];
   }
-  const block = firstMatch(source, /<[^>]*class=["'][^"']*genres?[^"']*["'][^>]*>([\\s\\S]*?)<\\/[^>]+>/i);
-  return [...new Set(
-    extractAnchors(block)
-      .map((anchor) => cleanText(stripTags(anchor.inner)))
-      .filter((text) => text && text.length <= 40),
-  )];
+  return [];
 }
 function parseMangadarChapters(html, seriesUrl) {
   const source = String(html ?? "");
   const base = new URL(seriesUrl, MANGADAR_BASE);
-  const basePath = base.pathname.replace(/\\/$/, "");
+  const basePath = base.pathname.replace(/\/$/, "");
   const found = new Map();
 
   const addChapter = (number, href, title = "") => {
@@ -2883,7 +2877,7 @@ function parseMangadarChapters(html, seriesUrl) {
     const finalTitle = cleanText(title) || "الفصل " + number;
     found.set(number, {
       number,
-      title: /^الفصل\\s+\\d+(?:\\.\\d+)?$/i.test(finalTitle) ? "الفصل " + number : finalTitle,
+      title: /^الفصل\s+\d+(?:\.\d+)?$/i.test(finalTitle) ? "الفصل " + number : finalTitle,
       publishedAt: null,
       url: normalizedHref,
     });
@@ -2895,26 +2889,27 @@ function parseMangadarChapters(html, seriesUrl) {
     try {
       const parsed = new URL(href);
       if (parsed.origin !== base.origin || !parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") continue;
-      const tail = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\\/$/, "");
-      if (!/^\\d+(?:\\.\\d+)?$/.test(tail)) continue;
+      const tail = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
+      if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
       addChapter(Number(tail), href, stripTags(anchor.inner));
-    } catch {
-      // The raw URL scan below handles embedded chapter links too.
-    }
+    } catch {}
   }
 
-  const escapedBasePath = basePath.replace(/[.*+?^$()|[\\]\\]/g, "\\\\$&");
+  // MangaDar can render the full chapter selector through markup/JSON that
+  // is not represented as normal <a> nodes. Scan the raw HTML as a second
+  // source of truth so we do not collapse a 300+ chapter work to two links.
+  const escapedBasePath = basePath.replace(/[.*+?^()|[\]\\]/g, "\\$&");
   const chapterUrlPattern = new RegExp(
-    escapedBasePath.replace(/\\//g, "\\\\/") + "\\\\/(\\\\d+(?:\\\\.\\\\d+)?)\\\\/?",
+    escapedBasePath.replace(/\//g, "\\/") + "\\/(\\d+(?:\\.\\d+)?)\\/?",
     "gi",
   );
   let match;
   while ((match = chapterUrlPattern.exec(source))) {
     const number = Number(match[1]);
-    const startNearby = Math.max(0, match.index - 300);
-    const endNearby = Math.min(source.length, chapterUrlPattern.lastIndex + 500);
+    const startNearby = Math.max(0, match.index - 350);
+    const endNearby = Math.min(source.length, chapterUrlPattern.lastIndex + 450);
     const nearby = cleanText(stripTags(source.slice(startNearby, endNearby)));
-    const title = firstMatch(nearby, /(الفصل\\s+\\d+(?:\\.\\d+)?(?:\\s+[^\\n|#]+)?)/i) || "";
+    const title = firstMatch(nearby, /(الفصل\s+\d+(?:\.\d+)?(?:\s+[^\n|#]+)?)/i) || "";
     addChapter(number, basePath + "/" + match[1] + "/", title);
   }
 
