@@ -135,6 +135,18 @@ function safeXsanoReferer(value) {
   }
 }
 
+function safeMangadarReferer(value) {
+  if (!value) return `${MANGADAR_BASE}/`;
+  try {
+    const parsed = new URL(String(value), MANGADAR_BASE);
+    if (!/^(?:www\.)?mangadar\.com$/i.test(parsed.hostname)) return `${MANGADAR_BASE}/`;
+    if (!/^\/manga\//i.test(parsed.pathname)) return `${MANGADAR_BASE}/`;
+    return parsed.toString();
+  } catch {
+    return `${MANGADAR_BASE}/`;
+  }
+}
+
 function safeMangalikReferer(value) {
   if (!value) return `${MANGALIK_BASE}/`;
   try {
