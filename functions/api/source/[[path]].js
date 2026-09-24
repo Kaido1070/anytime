@@ -2659,19 +2659,31 @@ async function starzChapter(db, item, number) {
   const selected = series.chapters?.find(
     (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
   );
-  if (!selected?.url) {
-    throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في StarzManga.", 404);
-  }
-  const chapterUrl = new URL(selected.url, STARZ_BASE);
+
+  // Some Madara series expose the chapter link in a different HTML block,
+  // even though the chapter itself follows the normal /<series>/<number>/
+  // route. Do not make the reader depend on the series-page parser finding
+  // that row first.
+  const chapterUrl = selected?.url
+    ? new URL(selected.url, STARZ_BASE)
+    : new URL(
+        String(series.url || item.url).replace(/\/$/, "") + "/" + encodeURIComponent(String(number)) + "/",
+        STARZ_BASE,
+      );
   chapterUrl.searchParams.set("style", "list");
-  const html = await starzFetchText(chapterUrl.toString(), false);
-  const pages = parseStarzPages(html);
+
+  let html = await starzFetchText(chapterUrl.toString(), false);
+  let pages = parseStarzPages(html);
+  if (!pages.length && selected?.url) {
+    html = await starzFetchText(selected.url, false);
+    pages = parseStarzPages(html);
+  }
   if (!pages.length) throw new SourceError("NO_PAGES", "StarzManga لم يرجع صور الفصل.", 502);
 
   return {
     item: series,
     number,
-    title: selected.title || "الفصل " + number,
+    title: selected?.title || "الفصل " + number,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
@@ -3066,20 +3078,34 @@ async function mangalikChapter(db, item, number) {
   const selected = series.chapters?.find(
     (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
   );
-  if (!selected?.url) {
-    throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في MangaLik.", 404);
-  }
+
+  // MangaLik's Overgeared page is a concrete case where the series page can
+  // list the chapter while the chapter row is not always captured by the
+  // wp-manga-chapter parser. The source itself uses the stable
+  // /manga/<slug>/<chapter>/ route, so the reader must be able to address that
+  // route directly instead of treating a parser miss as "chapter unavailable".
+  const baseUrl = String(series.url || item.url || "").replace(/\/$/, "");
+  const directUrl = baseUrl
+    ? baseUrl + "/" + encodeURIComponent(String(number)) + "/"
+    : "";
+  const chapterUrl = selected?.url
+    ? new URL(selected.url, MANGALIK_BASE)
+    : new URL(directUrl || MANGALIK_BASE, MANGALIK_BASE);
 
   // Prefer Madara's list reader, but do not depend on it. MangaLik sometimes
   // serves a different renderer for ?style=list while the normal chapter URL
   // still contains the real pages.
-  const chapterUrl = new URL(selected.url, MANGALIK_BASE);
   chapterUrl.searchParams.set("style", "list");
   let html = await mangalikFetchText(chapterUrl.toString(), false);
   let pages = parseMangalikPages(html);
 
-  if (!pages.length) {
+  if (!pages.length && selected?.url) {
     html = await mangalikFetchText(selected.url, false);
+    pages = parseMangalikPages(html);
+  }
+
+  if (!pages.length && directUrl && selected?.url !== directUrl) {
+    html = await mangalikFetchText(directUrl, false);
     pages = parseMangalikPages(html);
   }
 
@@ -3090,7 +3116,7 @@ async function mangalikChapter(db, item, number) {
   return {
     item: series,
     number,
-    title: selected.title || "الفصل " + number,
+    title: selected?.title || "الفصل " + number,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
