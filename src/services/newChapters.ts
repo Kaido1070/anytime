@@ -12,7 +12,7 @@ import { userDataService } from "./userData";
 // Only sources whose chapter publication timestamps have been explicitly
 // audited may enter the public New feed. Other sources remain available
 // everywhere else in Wany until their date adapters are verified.
-const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq", "teamx", "mangalik", "mangatime", "xsano", "starzmanga", "mangadar"];
+const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq", "teamx", "mangalik", "mangatime", "xsano", "starzmanga"];
 
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
@@ -23,7 +23,6 @@ const VERIFIED_SOURCE_SCAN_PAGES: Partial<Record<SourceName, number>> = {
   mangatime: 1,
   xsano: 1,
   starzmanga: 1,
-  mangadar: 1,
 };
 
 export interface FeedChapter {

@@ -748,3 +748,41 @@ test("MangaTime list input omits null query but keeps real searches", () => {
     },
   );
 });
+
+
+test("MangaDar parser keeps the full chapter range and clean description", () => {
+  const html = `
+    <meta property="og:description" content="ملخص Overgeared النظيف">
+    <h2>الأنواع</h2>
+    <a href="/genre/action/">أكشن</a>
+    <a href="/genre/fantasy/">خيال</a>
+    <h2>الفصول (340)</h2>
+    <a href="https://mangadar.com/manga/overgeared/340/">الفصل 340</a>
+    <a href="/manga/overgeared/339/">الفصل 339</a>
+    <a href="/manga/overgeared/338/">الفصل 338</a>
+    <script>const chapter = "/manga/overgeared/337/";</script>
+    <a href="/manga/overgeared/1/">الفصل 1</a>
+  `;
+  const chapters = __test.parseMangadarChapters(
+    html,
+    "https://mangadar.com/manga/overgeared/",
+  );
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [340, 339, 338, 337, 1]);
+  assert.deepEqual(__test.mangadarGenreCandidates(html), ["أكشن", "خيال"]);
+  assert.equal(__test.mangadarDescription(html), "ملخص Overgeared النظيف");
+});
+
+test("MangaDar page parser reads lazy reader images and excludes UI images", () => {
+  const html = `
+    <div class="reading-content">
+      <div class="page-break"><img class="wp-manga-chapter-img" data-src="https://cdn.example.com/overgeared/001.webp"></div>
+      <div class="page-break"><img class="wp-manga-chapter-img" data-src="https://cdn.example.com/overgeared/002.webp"></div>
+      <img src="https://mangadar.com/wp-content/uploads/logo.webp">
+    </div>
+    <footer><img src="https://mangadar.com/wp-content/uploads/avatar.webp"></footer>
+  `;
+  assert.deepEqual(__test.parseMangadarPages(html), [
+    "https://cdn.example.com/overgeared/001.webp",
+    "https://cdn.example.com/overgeared/002.webp",
+  ]);
+});
