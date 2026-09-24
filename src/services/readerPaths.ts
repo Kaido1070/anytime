@@ -7,6 +7,7 @@ const SOURCE_SEGMENTS: Record<SourceName, string> = {
   starzmanga: "starzmanga",
   xsano: "xsano",
   mangalik: "mangalik",
+  mangadar: "mangadar",
 };
 
 const SOURCE_PREFIXES: Record<string, string> = {
@@ -16,6 +17,7 @@ const SOURCE_PREFIXES: Record<string, string> = {
   starzmanga: "sz",
   xsano: "xs",
   mangalik: "ml",
+  mangadar: "md",
 };
 
 export function readerPath(
@@ -24,7 +26,7 @@ export function readerPath(
   sourceKeys: string[] = [],
 ) {
   const keys = [...new Set([item.key, ...sourceKeys])]
-    .filter((key) => /^(mt|tx|aq|sz|xs|ml):[A-Za-z0-9_-]{1,110}$/.test(key));
+    .filter((key) => /^(mt|tx|aq|sz|xs|ml|md):[A-Za-z0-9_-]{1,110}$/.test(key));
 
   const path = `/read/${SOURCE_SEGMENTS[item.source]}/${encodeURIComponent(item.slug)}/${encodeURIComponent(String(chapter))}`;
   if (keys.length <= 1) return path;
