@@ -4,6 +4,7 @@ const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
 const XSANO_BASE = "https://www.xsano-manga.com";
 const MANGALIK_BASE = "https://mangalik.net";
+const MANGADAR_BASE = "https://mangadar.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -17,7 +18,7 @@ export async function onRequestGet({ request, env }) {
 
   const url = new URL(request.url);
   const key = String(url.searchParams.get("key") ?? "").trim();
-  if (!/^(?:mt|aq|sz|xs|ml):[A-Za-z0-9_-]{1,110}$/.test(key)) {
+  if (!/^(?:mt|aq|sz|xs|ml|md):[A-Za-z0-9_-]{1,110}$/.test(key)) {
     return json({ error: "INVALID_SOURCE_KEY" }, 400);
   }
 
@@ -26,12 +27,12 @@ export async function onRequestGet({ request, env }) {
     .bind(key)
     .first();
 
-  if (!item || !["mangatime", "3asq", "starzmanga", "xsano", "mangalik"].includes(String(item.source))) {
+  if (!item || !["mangatime", "3asq", "starzmanga", "xsano", "mangalik", "mangadar"].includes(String(item.source))) {
     return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
   }
 
   const source = String(item.source);
-  const base = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : source === "xsano" ? XSANO_BASE : source === "mangalik" ? MANGALIK_BASE : MANGATIME_BASE;
+  const base = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : source === "xsano" ? XSANO_BASE : source === "mangalik" ? MANGALIK_BASE  : MANGATIME_BASE;
   const storedCover = absoluteUrl(base, item.cover_url);
 
   try {
@@ -51,8 +52,8 @@ export async function onRequestGet({ request, env }) {
       return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
     }
 
-    if (source === "3asq" || source === "starzmanga" || source === "mangalik") {
-      const detailBase = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : MANGALIK_BASE;
+    if (source === "3asq" || source === "starzmanga" || source === "mangalik" || source === "mangadar") {
+      const detailBase = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : source === "mangalik" ? MANGALIK_BASE : MANGADAR_BASE;
       const detailCovers = await madaraDetailCovers(detailBase, String(item.slug || ""));
       const stableCover = detailCovers[0] || storedCover;
       const covers = buildCoverCandidates(...detailCovers, storedCover);
