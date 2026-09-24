@@ -167,7 +167,7 @@ function ReaderChapter({
 
   useEffect(() => {
     if (!legacyPath) return;
-    navigate(readerPath(payload.item, chapter), { replace: true });
+    navigate(readerPath(payload.item, chapter, sourceKeys), { replace: true });
   }, [chapter, legacyPath, navigate, payload.item]);
 
   useEffect(() => {
@@ -399,7 +399,7 @@ function ReaderChapter({
               onChange={(event) => {
                 const target = event.currentTarget;
                 target.blur();
-                navigate(readerPath(payload.item, target.value));
+                navigate(readerPath(payload.item, target.value, sourceKeys));
               }}
             >
               {chapterOptions.length ? chapterOptions.map((entry) => (
