@@ -5,6 +5,7 @@ const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
 const XSANO_BASE = "https://www.xsano-manga.com";
 const MANGALIK_BASE = "https://mangalik.net";
+const MANGADAR_BASE = "https://mangadar.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -18,7 +19,7 @@ export async function onRequest(context) {
 
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") ?? "").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik" && source !== "mangadar") {
     return json({ error: "UNKNOWN_SOURCE" }, 400);
   }
 
@@ -32,7 +33,7 @@ export async function onRequest(context) {
           ? XSANO_BASE
           : source === "mangalik"
             ? MANGALIK_BASE
-            : MANGATIME_BASE;
+             : MANGATIME_BASE;
   const raw = String(url.searchParams.get("url") ?? "");
   const target = absoluteUrl(base, raw);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
