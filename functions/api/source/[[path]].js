@@ -99,8 +99,9 @@ export async function onRequest(context) {
               ? await starzLatest(db, page)
               : source === "xsano"
                 ? await xsanoLatest(context, db, page)
-                : await mangalikLatest(db, page)
-                : await mangadarLatest(db, page);
+                : source === "mangalik"
+                  ? await mangalikLatest(db, page)
+                  : await mangadarLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -135,8 +136,9 @@ export async function onRequest(context) {
               ? await starzPopular(db, page)
               : source === "xsano"
                 ? await xsanoPopular(db, page)
-                : await mangalikPopular(db, page)
-                : await mangadarPopular(db, page);
+                : source === "mangalik"
+                  ? await mangalikPopular(db, page)
+                  : await mangadarPopular(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -155,8 +157,9 @@ export async function onRequest(context) {
               ? await starzSearch(db, query, page)
               : source === "xsano"
                 ? await xsanoSearch(db, query, page)
-                : await mangalikSearch(db, query, page)
-                : await mangadarSearch(db, query, page);
+                : source === "mangalik"
+                  ? await mangalikSearch(db, query, page)
+                  : await mangadarSearch(db, query, page);
       return json(payload, 200, shortCache());
     }
 
@@ -184,8 +187,9 @@ export async function onRequest(context) {
               ? await starzSeries(db, item)
               : item.source === "xsano"
                 ? await xsanoSeries(db, item)
-                : await mangalikSeries(db, item)
-          : await mangadarSeries(db, item);
+                : item.source === "mangalik"
+                  ? await mangalikSeries(db, item)
+                  : await mangadarSeries(db, item);
       const observedDetail = await rememberChapterAvailability(db, detail);
       return json({ item: observedDetail }, 200, shortCache());
     }
@@ -208,8 +212,9 @@ export async function onRequest(context) {
               ? await starzChapter(db, item, number)
               : item.source === "xsano"
                 ? await xsanoChapter(db, item, number)
-                : await mangalikChapter(db, item, number)
-          : await mangadarChapter(db, item, number);
+                : item.source === "mangalik"
+                  ? await mangalikChapter(db, item, number)
+                  : await mangadarChapter(db, item, number);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
