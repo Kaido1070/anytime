@@ -319,6 +319,7 @@ export const sourceService = {
     if (source === "3asq") return "3asq";
     if (source === "starzmanga") return "StarzManga";
     if (source === "xsano") return "XSano Manga";
-    return "MangaLik";
+    if (source === "mangalik") return "MangaLik";
+    return "MangaDar";
   },
 };
