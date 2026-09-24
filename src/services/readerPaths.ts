@@ -18,8 +18,19 @@ const SOURCE_PREFIXES: Record<string, string> = {
   mangalik: "ml",
 };
 
-export function readerPath(item: Pick<SourceManga, "source" | "slug">, chapter: number | string) {
-  return `/read/${SOURCE_SEGMENTS[item.source]}/${encodeURIComponent(item.slug)}/${encodeURIComponent(String(chapter))}`;
+export function readerPath(
+  item: Pick<SourceManga, "key" | "source" | "slug">,
+  chapter: number | string,
+  sourceKeys: string[] = [],
+) {
+  const keys = [...new Set([item.key, ...sourceKeys])]
+    .filter((key) => /^(mt|tx|aq|sz|xs|ml):[A-Za-z0-9_-]{1,110}$/.test(key));
+
+  const path = `/read/${SOURCE_SEGMENTS[item.source]}/${encodeURIComponent(item.slug)}/${encodeURIComponent(String(chapter))}`;
+  if (keys.length <= 1) return path;
+
+  const search = new URLSearchParams({ sources: keys.join(",") });
+  return `${path}?${search.toString()}`;
 }
 
 export function sourceKeyFromReaderPath(source?: string, work?: string) {
