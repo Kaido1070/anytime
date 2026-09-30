@@ -222,7 +222,8 @@ export async function onRequest(context) {
     if (action === "image") {
       const source = sourceFromQuery(url);
       const raw = String(url.searchParams.get("url") ?? "");
-      return proxyImage(source, raw);
+      const referer = String(url.searchParams.get("referer") ?? "");
+      return proxyImage(source, raw, referer);
     }
 
     return json({ error: "NOT_FOUND" }, 404);
@@ -4109,7 +4110,7 @@ function chapterNavigation(chapters, number) {
   };
 }
 
-async function proxyImage(source, rawUrl) {
+async function proxyImage(source, rawUrl, rawReferer = "") {
   const base = source === "teamx"
     ? TEAMX_BASE
     : source === "3asq"
@@ -4132,17 +4133,31 @@ async function proxyImage(source, rawUrl) {
   }
 
   const imageAccept = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
+  let requestedReferer = base;
+  if (rawReferer) {
+    try {
+      const parsedReferer = new URL(rawReferer, base);
+      const sourceOrigin = new URL(base).origin;
+      if (
+        ["http:", "https:"].includes(parsedReferer.protocol) &&
+        parsedReferer.origin === sourceOrigin
+      ) {
+        requestedReferer = parsedReferer.toString();
+      }
+    } catch {}
+  }
+
   const fetchImage = (refererBase) => fetch(target, {
     headers: sourceHeaders(refererBase, imageAccept),
     redirect: "follow",
     cf: { cacheTtl: 86400, cacheEverything: true },
   });
 
-  // MangaTime cover URLs can live on a separate image/CDN origin. Some of
-  // those hosts validate the Referer against their own origin instead of
-  // mangatime.org, so retry with the image origin when the normal request is
-  // rejected or returns HTML.
-  let response = await fetchImage(base);
+  // Reader images can require the exact chapter URL as Referer. The client
+  // already sends it; preserve it here instead of collapsing every request to
+  // the source homepage. If the CDN rejects that, retry against the image
+  // origin below.
+  let response = await fetchImage(requestedReferer);
   let type = response.headers.get("Content-Type") ?? "";
   // Chapter pages on MangaDar commonly serve images from external storage/CDN
   // hosts. Those hosts may reject a mangadar.com Referer even though the image
