@@ -772,6 +772,38 @@ test("MangaDar parser keeps the full chapter range and clean description", () =>
   assert.equal(__test.mangadarDescription(html), "ملخص Overgeared النظيف");
 });
 
+test("MangaDar declared chapter count detects truncated series markup", () => {
+  const html = `
+    <div class="series-stats">1٬171 الفصول</div>
+    <h2>الفصول (1٬171)</h2>
+    <a href="/manga/one-piece/1194/">الفصل 1194</a>
+    <a href="/manga/one-piece/1193/">الفصل 1193</a>
+  `;
+  assert.equal(__test.mangadarDeclaredChapterCount(html), 1171);
+  assert.equal(
+    __test.parseMangadarChapters(html, "https://mangadar.com/manga/one-piece/").length,
+    2,
+  );
+});
+
+test("MangaDar declared chapter count supports ordinary and missing counts", () => {
+  assert.equal(__test.mangadarDeclaredChapterCount("<h2>الفصول (374)</h2>"), 374);
+  assert.equal(__test.mangadarDeclaredChapterCount("<main>لا توجد فصول معلنة</main>"), null);
+});
+
+test("MangaDar parser preserves decimal chapter numbers", () => {
+  const html = `
+    <h2>الفصول (3)</h2>
+    <a href="/manga/us-after/27.5/">الفصل 27.5</a>
+    <a href="/manga/us-after/27/">الفصل 27</a>
+    <a href="/manga/us-after/26/">الفصل 26</a>
+  `;
+  assert.deepEqual(
+    __test.parseMangadarChapters(html, "https://mangadar.com/manga/us-after/").map((chapter) => chapter.number),
+    [27.5, 27, 26],
+  );
+});
+
 test("MangaDar description ignores raw HTML and chapter URLs survive escaped JSON", () => {
   const html = `
     <meta name="description" content="وصف نظيف للعمل">
