@@ -2828,13 +2828,30 @@ async function mangadarSeries(db, item) {
   );
   const description = mangadarDescription(html, summaryBlock);
   let chapters = parseMangadarChapters(html, seriesUrl);
-  if (chapters.length < 3) {
+  const declaredChapterCount = mangadarDeclaredChapterCount(html);
+
+  // MangaDar often renders only the newest chapter rows in the initial HTML
+  // while the page itself declares a much larger total. Treat that declared
+  // count as a completeness signal instead of assuming "3+ chapters" means
+  // the list is complete. The archive fallback is generic for every title.
+  if (
+    chapters.length < 3 ||
+    (declaredChapterCount != null && chapters.length < declaredChapterCount)
+  ) {
     const archiveChapters = await mangadarChapterArchiveChapters(item.slug, seriesUrl);
     const merged = new Map(chapters.map((chapter) => [Number(chapter.number), chapter]));
     for (const chapter of archiveChapters) {
       merged.set(Number(chapter.number), chapter);
     }
     chapters = [...merged.values()].sort((a, b) => Number(b.number) - Number(a.number));
+  }
+
+  if (!chapters.length && declaredChapterCount && declaredChapterCount > 0) {
+    throw new SourceError(
+      "SERIES_PARSE_FAILED",
+      "تعذر قراءة قائمة فصول MangaDar رغم أن صفحة العمل تعلن وجود فصول.",
+      502,
+    );
   }
   const updated = {
     ...item,
@@ -2892,6 +2909,19 @@ function mangadarGenreCandidates(html) {
   }
   return [];
 }
+function mangadarDeclaredChapterCount(html) {
+  const source = cleanText(stripTags(String(html ?? "")));
+  const raw =
+    firstMatch(source, /الفصول\s*\(([\d\s,٬،.]+)\)/i) ||
+    firstMatch(source, /([\d\s,٬،.]+)\s+الفصول\b/i) ||
+    "";
+  if (!raw) return null;
+  const digits = String(raw).replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const count = Number(digits);
+  return Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
 function parseMangadarChapters(html, seriesUrl) {
   const source = String(html ?? "");
   const base = new URL(seriesUrl, MANGADAR_BASE);
@@ -2970,7 +3000,7 @@ async function mangadarChapter(db, item, number) {
 
   if (!pages.length) {
     if (lastError instanceof SourceError) throw lastError;
-    throw new SourceError("NO_PAGES", "MangaDar لم يرجع صور الفصل.", 502);
+    throw new SourceError("CHAPTER_IMAGES_EMPTY", "MangaDar لم يرجع صور الفصل.", 502);
   }
 
   return { item: series, number, title: selected?.title || "الفصل " + number, pages, ...chapterNavigation(series.chapters ?? [], number) };
@@ -3040,10 +3070,38 @@ function isMangadarUiImage(url) {
 }
 async function mangadarFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, MANGADAR_BASE).toString();
-  const response = await fetch(target, { headers: sourceHeaders(MANGADAR_BASE, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"), redirect: "follow", cf: { cacheTtl: 30, cacheEverything: true } });
+  let response;
+  try {
+    response = await fetch(target, {
+      headers: sourceHeaders(
+        MANGADAR_BASE,
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      ),
+      redirect: "follow",
+      signal: AbortSignal.timeout(12_000),
+      cf: { cacheTtl: 30, cacheEverything: true },
+    });
+  } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw new SourceError("SOURCE_TIMEOUT", "MangaDar تأخر عن مهلة الاتصال.", 504);
+    }
+    throw new SourceError("SOURCE_NETWORK_ERROR", "تعذر الاتصال بـMangaDar.", 502);
+  }
+
   if (!response.ok) {
-    if (response.status === 403 || response.status === 503) throw new SourceError("MANGADAR_BLOCKED", "MangaDar رفض الطلب مؤقتًا.", 502);
-    throw new SourceError("MANGADAR_UPSTREAM", "MangaDar رجع HTTP " + response.status + ".", 502);
+    if (response.status === 429) {
+      throw new SourceError("SOURCE_RATE_LIMITED", "MangaDar حدّ الطلبات مؤقتًا.", 429);
+    }
+    if (response.status === 403) {
+      throw new SourceError("SOURCE_RATE_LIMITED", "MangaDar رفض الطلب مؤقتًا.", 503);
+    }
+    if (response.status >= 500) {
+      throw new SourceError("SOURCE_UPSTREAM_5XX", "MangaDar متعطل مؤقتًا.", 502);
+    }
+    if (response.status === 404) {
+      throw new SourceError("SOURCE_NOT_FOUND", "المحتوى لم يعد موجودًا في MangaDar.", 404);
+    }
+    throw new SourceError("SOURCE_UPSTREAM_ERROR", "MangaDar رجع HTTP " + response.status + ".", 502);
   }
   return response.text();
 }
@@ -4266,6 +4324,7 @@ export const __test = {
   mangadarItemsFromHtml,
   mangadarDescription,
   mangadarGenreCandidates,
+  mangadarDeclaredChapterCount,
   parseMangadarChapters,
   parseMangadarPages,
   starzPostId,
