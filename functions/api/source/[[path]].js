@@ -4080,7 +4080,12 @@ async function proxyImage(source, rawUrl) {
   // rejected or returns HTML.
   let response = await fetchImage(base);
   let type = response.headers.get("Content-Type") ?? "";
-  if (source === "mangatime" && parsed.origin !== new URL(MANGATIME_BASE).origin &&
+  // Chapter pages on MangaDar commonly serve images from external storage/CDN
+  // hosts. Those hosts may reject a mangadar.com Referer even though the image
+  // URL itself is valid. Retry against the image origin, just as MangaTime
+  // already does for its CDN covers, without transforming the image bytes.
+  if ((source === "mangatime" || source === "mangadar") &&
+      parsed.origin !== new URL(base).origin &&
       (!response.ok || !type.toLowerCase().startsWith("image/"))) {
     response = await fetchImage(parsed.origin);
     type = response.headers.get("Content-Type") ?? "";
