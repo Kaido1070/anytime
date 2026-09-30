@@ -111,7 +111,7 @@ class ApiError extends Error {
   }
 }
 
-const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|ml):/.test(value));
+const isLiveKey = (value?: string | null) => Boolean(value && /^(mt|tx|aq|sz|xs|ml|md):/.test(value));
 const isListId = (value?: string | null) =>
   Boolean(value && /^[a-zA-Z0-9_-]{1,128}$/.test(value));
 const isAvatarId = (value?: string | null) =>
@@ -151,7 +151,7 @@ function normalizeData(data: UserData): UserData {
   );
   const completed = (data.completed ?? []).filter((key) => {
     const item = progress[key];
-    return item ? isLiveKey(item.mangaId) : /^(mt|tx|aq|sz|xs|ml):/.test(key);
+    return item ? isLiveKey(item.mangaId) : /^(mt|tx|aq|sz|xs|ml|md):/.test(key);
   });
   const lastOpened = data.lastOpened && isLiveKey(data.lastOpened.mangaId) ? data.lastOpened : null;
   return { ...data, version: 3, favorites, library, progress, completed, lastOpened };
