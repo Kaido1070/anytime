@@ -2889,7 +2889,7 @@ function mangadarDescription(html, summaryBlock = "") {
   const meta = mangadarMetaContent(html, ["og:description", "description"]);
   const summary = cleanText(stripTags(summaryBlock || ""));
   const value = cleanText(meta || summary)
-    .replace(/^(?:وصف|ملخص القصة)\s*[:：]?\s*/i, "")
+    .replace(/^(?:وصف|ملخص القصة)\s*[:：]\s*/i, "")
     .trim();
   if (!value || /<\/?(?:html|head|body|script|style|link|meta|svg)\b/i.test(value)) return "";
   return value;
