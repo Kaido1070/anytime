@@ -3,52 +3,145 @@ name: Audit Source Chapter Completeness
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - "scripts/audit-source-chapters.mjs"
-      - ".github/workflows/source-audit.yml"
-      - "functions/api/source/[[path]].js"
+      - scripts/audit-source-chapters.mjs
+      - .github/workflows/source-audit.yml
+      - functions/api/source/**
 
 permissions:
   contents: read
 
 jobs:
-  audit:
-    name: Audit ${{ matrix.source }}
+  mangatime:
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        source:
-          - mangatime
-          - 3asq
-          - starzmanga
-          - xsano
-          - mangalik
-          - azora
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22.18.0
-
-      - name: Audit complete chapter lists
+      - name: Audit MangaTime
         env:
-          AUDIT_SOURCE: ${{ matrix.source }}
+          AUDIT_SOURCE: mangatime
           AUDIT_DELAY_MS: "450"
           AUDIT_CATALOG_MAX_PAGES: "250"
           AUDIT_FAIL_ON_ISSUES: "1"
         run: node scripts/audit-source-chapters.mjs
-
-      - name: Upload audit report
-        if: always()
+      - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: source-audit-${{ matrix.source }}
-          path: audit-results/${{ matrix.source }}.json
+          name: source-audit-mangatime
+          path: audit-results/mangatime.json
+          if-no-files-found: ignore
+
+  asq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Audit 3asq
+        env:
+          AUDIT_SOURCE: 3asq
+          AUDIT_DELAY_MS: "450"
+          AUDIT_CATALOG_MAX_PAGES: "250"
+          AUDIT_FAIL_ON_ISSUES: "1"
+        run: node scripts/audit-source-chapters.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-audit-3asq
+          path: audit-results/3asq.json
+          if-no-files-found: ignore
+
+  starzmanga:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Audit StarzManga
+        env:
+          AUDIT_SOURCE: starzmanga
+          AUDIT_DELAY_MS: "450"
+          AUDIT_CATALOG_MAX_PAGES: "250"
+          AUDIT_FAIL_ON_ISSUES: "1"
+        run: node scripts/audit-source-chapters.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-audit-starzmanga
+          path: audit-results/starzmanga.json
+          if-no-files-found: ignore
+
+  xsano:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Audit XSano
+        env:
+          AUDIT_SOURCE: xsano
+          AUDIT_DELAY_MS: "450"
+          AUDIT_CATALOG_MAX_PAGES: "250"
+          AUDIT_FAIL_ON_ISSUES: "1"
+        run: node scripts/audit-source-chapters.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-audit-xsano
+          path: audit-results/xsano.json
+          if-no-files-found: ignore
+
+  mangalik:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Audit MangaLik
+        env:
+          AUDIT_SOURCE: mangalik
+          AUDIT_DELAY_MS: "450"
+          AUDIT_CATALOG_MAX_PAGES: "250"
+          AUDIT_FAIL_ON_ISSUES: "1"
+        run: node scripts/audit-source-chapters.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-audit-mangalik
+          path: audit-results/mangalik.json
+          if-no-files-found: ignore
+
+  azora:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Audit Azora
+        env:
+          AUDIT_SOURCE: azora
+          AUDIT_DELAY_MS: "450"
+          AUDIT_CATALOG_MAX_PAGES: "250"
+          AUDIT_FAIL_ON_ISSUES: "1"
+        run: node scripts/audit-source-chapters.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-audit-azora
+          path: audit-results/azora.json
           if-no-files-found: ignore
