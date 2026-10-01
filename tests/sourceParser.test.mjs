@@ -456,6 +456,26 @@ test("StarzManga strict New accepts precise times and rejects date-only labels",
   );
 });
 
+test("StarzManga parses Arabic singular and dual relative times", () => {
+  const now = Date.UTC(2026, 8, 20, 12, 0, 0);
+  assert.equal(
+    __test.parseStarzPublishedAt("<span>منذ دقيقة</span>", now),
+    "2026-09-20T11:59:00.000Z",
+  );
+  assert.equal(
+    __test.parseStarzPublishedAt("<span>منذ دقيقتين</span>", now),
+    "2026-09-20T11:58:00.000Z",
+  );
+  assert.equal(
+    __test.parseStarzPublishedAt("<span>منذ ساعة</span>", now),
+    "2026-09-20T11:00:00.000Z",
+  );
+  assert.equal(
+    __test.parseStarzPublishedAt("<span>منذ ساعتين</span>", now),
+    "2026-09-20T10:00:00.000Z",
+  );
+});
+
 test("StarzManga latest card keeps chapter timestamps scoped to each row", () => {
   const now = Date.UTC(2026, 8, 20, 12, 0, 0);
   const html = `
