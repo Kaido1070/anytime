@@ -239,8 +239,8 @@ export const sourceService = {
     }
   },
 
-  async getChapter(key: string, chapter: number) {
-    const requestKey = `${key}:${chapter}`;
+  async getChapter(key: string, chapter: number, chapterUrl?: string) {
+    const requestKey = `${key}:${chapter}:${chapterUrl ?? ""}`;
     const cached = chapterRequests.get(requestKey);
     if (cached) {
       rememberChapterRequest(requestKey, cached);
@@ -256,7 +256,7 @@ export const sourceService = {
     }
 
     const request = apiWithRetry<{ chapter: SourceChapterPayload }>(
-      `/api/source/chapter?${params({ key, number: chapter })}`,
+      `/api/source/chapter?${params({ key, number: chapter, chapterUrl })}`,
       2,
     )
       .then((payload) => {
