@@ -2382,7 +2382,7 @@ async function starzSearch(db, query, page) {
   return { items: items.slice(0, 24), hasMore: starzHasNext(html), page };
 }
 
-async function starzItemsFromHtml(html) {
+function starzItemsFromHtml(html) {
   const bySlug = new Map();
   const blocks = madaraBlocksByClass(html, ["c-tabs-item__content", "page-item-detail"]);
   const candidates = blocks.length ? blocks : [String(html ?? "")];
@@ -2539,20 +2539,20 @@ function parseStarzPublishedAt(block, now = Date.now()) {
     .trim();
   if (!text) return null;
 
-  if (/(?:منذ\s*)?(?:دقيقة واحدة|دقيقة)\b/i.test(text)) {
+  if (/(?:منذ\s*)?(?:دقيقة واحدة|دقيقة)/i.test(text)) {
     return new Date(now - 60_000).toISOString();
   }
-  if (/(?:منذ\s*)?دقيقتين\b/i.test(text)) {
+  if (/(?:منذ\s*)?دقيقتين/i.test(text)) {
     return new Date(now - 2 * 60_000).toISOString();
   }
 
   let relative = text.match(/(?:منذ\s*)?(\d+)\s*(?:دقيقة|دقائق|minute|minutes)\s*(?:ago)?/i);
   if (relative) return new Date(now - Number(relative[1]) * 60_000).toISOString();
 
-  if (/(?:منذ\s*)?(?:ساعة واحدة|ساعة)\b/i.test(text)) {
+  if (/(?:منذ\s*)?(?:ساعة واحدة|ساعة)/i.test(text)) {
     return new Date(now - 3_600_000).toISOString();
   }
-  if (/(?:منذ\s*)?ساعتين\b/i.test(text)) {
+  if (/(?:منذ\s*)?ساعتين/i.test(text)) {
     return new Date(now - 2 * 3_600_000).toISOString();
   }
 
@@ -2602,32 +2602,51 @@ function parseStarzChapters(html, seriesUrl, now = Date.now()) {
 }
 
 function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now()) {
+  const source = String(block ?? "");
   const base = new URL(seriesUrl, STARZ_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
-  const anchors = extractAnchors(block)
-    .map((anchor) => {
-      const href = absoluteUrl(STARZ_BASE, anchor.href);
-      if (!href) return null;
-      try {
-        const parsed = new URL(href);
-        if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") return null;
-        const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
-        const title = cleanText(stripTags(anchor.inner)) || chapterId;
-        const number = asqChapterNumber(title, chapterId);
-        if (!Number.isFinite(number)) return null;
-        return { ...anchor, href, title, number };
-      } catch {
-        return null;
+  const anchors = [];
+  const anchorRegex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  let match;
+
+  while ((match = anchorRegex.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    if (!attrs.href) continue;
+
+    const href = absoluteUrl(STARZ_BASE, attrs.href);
+    if (!href) continue;
+
+    try {
+      const parsed = new URL(href);
+      if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") {
+        continue;
       }
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.start - b.start);
+
+      const chapterId = decodeURIComponent(
+        parsed.pathname.slice(basePath.length + 1),
+      ).replace(/\/$/, "");
+      const title = cleanText(stripTags(match[2])) || chapterId;
+      const number = asqChapterNumber(title, chapterId);
+      if (!Number.isFinite(number)) continue;
+
+      anchors.push({
+        start: match.index,
+        href,
+        title,
+        number,
+      });
+    } catch {
+      // Ignore malformed chapter links and keep parsing the same card.
+    }
+  }
+
+  anchors.sort((a, b) => a.start - b.start);
 
   const found = new Map();
   for (let index = 0; index < anchors.length; index += 1) {
     const anchor = anchors[index];
-    const nextStart = anchors[index + 1]?.start ?? block.length;
-    const row = block.slice(anchor.start, nextStart);
+    const nextStart = anchors[index + 1]?.start ?? source.length;
+    const row = source.slice(anchor.start, nextStart);
     const publishedAt = parseStarzPublishedAt(row, now);
     if (!publishedAt) continue;
 
@@ -2638,6 +2657,7 @@ function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now()) {
       url: anchor.href,
     });
   }
+
   return [...found.values()].sort((a, b) =>
     Date.parse(b.publishedAt || "") - Date.parse(a.publishedAt || "") || b.number - a.number,
   );
