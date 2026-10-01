@@ -34,7 +34,7 @@ export function SourceCard({
   return (
     <Link className="manga-card source-card" to={sourceDetailsPath(linkedItem.key, groupedItems)} state={{ returnTo }}>
       <div className="cover-wrap">
-        {coverItem.cover ? (
+        {coverItem.cover || coverItem.source === "mangadar" ? (
           <SourceCoverImage
             item={coverItem}
             alt={`غلاف ${displayTitle}`}
