@@ -292,6 +292,38 @@ function preferredChapterUrlForSeries(value, seriesUrl, baseUrl) {
   }
 }
 
+function selectChapterRow(chapters, number, preferredUrl, seriesUrl, baseUrl) {
+  const exactUrl = preferredChapterUrlForSeries(
+    preferredUrl,
+    seriesUrl,
+    baseUrl,
+  );
+
+  if (exactUrl) {
+    const exact = (chapters ?? []).find((chapter) => {
+      const candidate = safePreferredChapterUrl(chapter?.url, baseUrl);
+      return candidate === exactUrl;
+    });
+    return {
+      selected: exact ?? {
+        number,
+        title: "الفصل " + number,
+        publishedAt: null,
+        url: exactUrl,
+      },
+      exactUrl,
+    };
+  }
+
+  return {
+    selected: (chapters ?? []).find(
+      (chapter) =>
+        Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+    ),
+    exactUrl: "",
+  };
+}
+
 function shortCache() {
   return { "Cache-Control": "private, max-age=45" };
 }
@@ -2513,16 +2545,21 @@ function asqChapterNumber(title, chapterId) {
   return Number.NaN;
 }
 
-async function asqChapter(db, item, number) {
+async function asqChapter(db, item, number, preferredUrl = "") {
   const series = await asqSeries(db, item);
-  const selected = series.chapters?.find(
-    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  const { selected } = selectChapterRow(
+    series.chapters,
+    number,
+    preferredUrl,
+    series.url || item.url,
+    ASQ_BASE,
   );
   if (!selected?.url) {
     throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في العاشق.", 404);
   }
 
-  const chapterUrl = new URL(selected.url, ASQ_BASE);
+  const sourceChapterUrl = new URL(selected.url, ASQ_BASE).toString();
+  const chapterUrl = new URL(sourceChapterUrl);
   chapterUrl.searchParams.set("style", "list");
   const html = await asqFetchText(chapterUrl.toString(), false);
   const pages = parseAsqPages(html);
@@ -2534,6 +2571,7 @@ async function asqChapter(db, item, number) {
     item: series,
     number,
     title: selected.title || "الفصل " + number,
+    chapterUrl: sourceChapterUrl,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
@@ -3001,28 +3039,31 @@ function starzLatestItemsFromHtml(html, now = Date.now()) {
   return [...byKey.values()];
 }
 
-async function starzChapter(db, item, number) {
+async function starzChapter(db, item, number, preferredUrl = "") {
   const series = await starzSeries(db, item);
-  const selected = series.chapters?.find(
-    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  const { selected } = selectChapterRow(
+    series.chapters,
+    number,
+    preferredUrl,
+    series.url || item.url,
+    STARZ_BASE,
   );
 
-  // Some Madara series expose the chapter link in a different HTML block,
-  // even though the chapter itself follows the normal /<series>/<number>/
-  // route. Do not make the reader depend on the series-page parser finding
-  // that row first.
-  const chapterUrl = selected?.url
-    ? new URL(selected.url, STARZ_BASE)
-    : new URL(
-        String(series.url || item.url).replace(/\/$/, "") + "/" + encodeURIComponent(String(number)) + "/",
-        STARZ_BASE,
-      );
+  const directUrl =
+    String(series.url || item.url).replace(/\/$/, "") +
+    "/" +
+    encodeURIComponent(String(number)) +
+    "/";
+  const sourceChapterUrl = selected?.url
+    ? new URL(selected.url, STARZ_BASE).toString()
+    : new URL(directUrl, STARZ_BASE).toString();
+  const chapterUrl = new URL(sourceChapterUrl);
   chapterUrl.searchParams.set("style", "list");
 
   let html = await starzFetchText(chapterUrl.toString(), false);
   let pages = parseStarzPages(html);
-  if (!pages.length && selected?.url) {
-    html = await starzFetchText(selected.url, false);
+  if (!pages.length && sourceChapterUrl) {
+    html = await starzFetchText(sourceChapterUrl, false);
     pages = parseStarzPages(html);
   }
   if (!pages.length) throw new SourceError("NO_PAGES", "StarzManga لم يرجع صور الفصل.", 502);
@@ -3031,6 +3072,7 @@ async function starzChapter(db, item, number) {
     item: series,
     number,
     title: selected?.title || "الفصل " + number,
+    chapterUrl: sourceChapterUrl,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
@@ -3783,10 +3825,7 @@ function parseAzoraPages(html) {
   return [...new Set(loose)];
 }
 
-async function azoraChapter(db, item, number) {
-  // Opening a readable chapter must not depend on successfully hydrating the
-  // series page first. Azora chapter URLs are stable, while the series page
-  // can fail independently because of metadata/parser/D1 issues.
+async function azoraChapter(db, item, number, preferredUrl = "") {
   let series = item;
   try {
     series = await azoraSeries(db, item);
@@ -3794,22 +3833,25 @@ async function azoraChapter(db, item, number) {
     console.warn("Azora series hydration skipped for reader", item?.key, error);
   }
 
-  const selected = series.chapters?.find(
-    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
-  );
   const seriesBase =
     String(series.url || item.url || "").replace(/\/$/, "") ||
     AZORA_BASE + "/series/" + encodeURIComponent(String(item.slug || ""));
+  const { selected } = selectChapterRow(
+    series.chapters,
+    number,
+    preferredUrl,
+    seriesBase,
+    AZORA_BASE,
+  );
+
   const directChapterUrl =
     seriesBase + "/chapter-" + encodeURIComponent(String(number));
-  const chapterUrl = selected?.url || directChapterUrl;
+  const sourceChapterUrl = selected?.url || directChapterUrl;
 
-  let html = await azoraFetchText(chapterUrl);
+  let html = await azoraFetchText(sourceChapterUrl);
   let pages = parseAzoraPages(html);
 
-  // If a stale chapter URL came from cached series metadata, retry Azora's
-  // canonical direct route before declaring the chapter unreadable.
-  if (!pages.length && chapterUrl !== directChapterUrl) {
+  if (!pages.length && sourceChapterUrl !== directChapterUrl) {
     html = await azoraFetchText(directChapterUrl);
     pages = parseAzoraPages(html);
   }
@@ -3822,6 +3864,7 @@ async function azoraChapter(db, item, number) {
     item: series,
     number,
     title: selected?.title || "الفصل " + number,
+    chapterUrl: sourceChapterUrl,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
@@ -4227,38 +4270,35 @@ function parseMangalikChapters(html, seriesUrl) {
   return [...found.values()].sort((a, b) => b.number - a.number);
 }
 
-async function mangalikChapter(db, item, number) {
+async function mangalikChapter(db, item, number, preferredUrl = "") {
   const series = await mangalikSeries(db, item);
-  const selected = series.chapters?.find(
-    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  const { selected } = selectChapterRow(
+    series.chapters,
+    number,
+    preferredUrl,
+    series.url || item.url,
+    MANGALIK_BASE,
   );
 
-  // MangaLik's Overgeared page is a concrete case where the series page can
-  // list the chapter while the chapter row is not always captured by the
-  // wp-manga-chapter parser. The source itself uses the stable
-  // /manga/<slug>/<chapter>/ route, so the reader must be able to address that
-  // route directly instead of treating a parser miss as "chapter unavailable".
   const baseUrl = String(series.url || item.url || "").replace(/\/$/, "");
   const directUrl = baseUrl
     ? baseUrl + "/" + encodeURIComponent(String(number)) + "/"
     : "";
-  const chapterUrl = selected?.url
-    ? new URL(selected.url, MANGALIK_BASE)
-    : new URL(directUrl || MANGALIK_BASE, MANGALIK_BASE);
+  const sourceChapterUrl = selected?.url
+    ? new URL(selected.url, MANGALIK_BASE).toString()
+    : new URL(directUrl || MANGALIK_BASE, MANGALIK_BASE).toString();
+  const chapterUrl = new URL(sourceChapterUrl);
 
-  // Prefer Madara's list reader, but do not depend on it. MangaLik sometimes
-  // serves a different renderer for ?style=list while the normal chapter URL
-  // still contains the real pages.
   chapterUrl.searchParams.set("style", "list");
   let html = await mangalikFetchText(chapterUrl.toString(), false);
   let pages = parseMangalikPages(html);
 
-  if (!pages.length && selected?.url) {
-    html = await mangalikFetchText(selected.url, false);
+  if (!pages.length && sourceChapterUrl) {
+    html = await mangalikFetchText(sourceChapterUrl, false);
     pages = parseMangalikPages(html);
   }
 
-  if (!pages.length && directUrl && selected?.url !== directUrl) {
+  if (!pages.length && directUrl && sourceChapterUrl !== directUrl) {
     html = await mangalikFetchText(directUrl, false);
     pages = parseMangalikPages(html);
   }
@@ -4271,6 +4311,7 @@ async function mangalikChapter(db, item, number) {
     item: series,
     number,
     title: selected?.title || "الفصل " + number,
+    chapterUrl: sourceChapterUrl,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
@@ -4692,16 +4733,21 @@ function xsanoChaptersFromEntries(entries) {
   return chapters.sort((a, b) => b.number - a.number);
 }
 
-async function xsanoChapter(db, item, number) {
+async function xsanoChapter(db, item, number, preferredUrl = "") {
   const series = await xsanoSeries(db, item);
-  const selected = series.chapters?.find(
-    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  const { selected } = selectChapterRow(
+    series.chapters,
+    number,
+    preferredUrl,
+    series.url || item.url,
+    XSANO_BASE,
   );
   if (!selected?.url) {
     throw new SourceError("CHAPTER_NOT_FOUND", "الفصل غير موجود في XSano.", 404);
   }
 
-  const html = await xsanoFetchText(selected.url);
+  const sourceChapterUrl = new URL(selected.url, XSANO_BASE).toString();
+  const html = await xsanoFetchText(sourceChapterUrl);
   const pages = parseXsanoPages(html);
   if (!pages.length) throw new SourceError("NO_PAGES", "XSano لم يرجع صور الفصل.", 502);
 
@@ -4709,6 +4755,7 @@ async function xsanoChapter(db, item, number) {
     item: series,
     number,
     title: selected.title || "الفصل " + number,
+    chapterUrl: sourceChapterUrl,
     pages,
     ...chapterNavigation(series.chapters ?? [], number),
   };
@@ -5166,6 +5213,9 @@ export const __test = {
   azoraCompleteChapterList,
   moreCompleteChapters,
   mergeChapterLists,
+  safePreferredChapterUrl,
+  preferredChapterUrlForSeries,
+  selectChapterRow,
   parseAzoraPages,
   parseAzoraRecentRelativeAt,
   parseAzoraChapterPublishedAt,
