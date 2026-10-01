@@ -207,6 +207,7 @@ function ReaderChapter({
   const initialPageCount = Math.min(INITIAL_READER_PAGES, payload.pages.length);
   const initialPageIndexes = Array.from({ length: initialPageCount }, (_, index) => index);
   const requestedRef = useRef<Set<number>>(new Set(initialPageIndexes));
+  const loadedRef = useRef<Set<number>>(new Set());
   const activeRef = useRef<Set<number>>(new Set(initialPageIndexes));
   const queueRef = useRef<number[]>([]);
   const retryCountRef = useRef<Map<number, number>>(new Map());
@@ -215,6 +216,9 @@ function ReaderChapter({
   const maxConcurrentRef = useRef(readerConcurrency());
   const [requestedPages, setRequestedPages] = useState<Set<number>>(
     () => new Set(initialPageIndexes),
+  );
+  const [retryVersions, setRetryVersions] = useState<Map<number, number>>(
+    () => new Map(),
   );
   const prefetchedNextRef = useRef<number | null>(null);
   const nextPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -271,6 +275,11 @@ function ReaderChapter({
 
       retryPendingRef.current.delete(index);
       retryCountRef.current.set(index, retryCount + 1);
+      setRetryVersions((current) => {
+        const next = new Map(current);
+        next.set(index, (next.get(index) ?? 0) + 1);
+        return next;
+      });
       requestPage(index);
     },
     [requestPage],
@@ -308,6 +317,7 @@ function ReaderChapter({
       activeRef.current.delete(index);
 
       if (loaded) {
+        loadedRef.current.add(index);
         retryPendingRef.current.delete(index);
         retryCountRef.current.delete(index);
         const timer = retryTimersRef.current.get(index);
@@ -332,25 +342,50 @@ function ReaderChapter({
   );
 
   useEffect(() => {
-    const retryPendingPages = () => {
-      for (const index of [...retryPendingRef.current]) {
+    const retryUnsettledPages = () => {
+      const candidates = new Set([
+        ...retryPendingRef.current,
+        ...requestedRef.current,
+      ]);
+
+      for (const index of candidates) {
+        if (loadedRef.current.has(index)) continue;
+
         const timer = retryTimersRef.current.get(index);
         if (timer) {
           clearTimeout(timer);
           retryTimersRef.current.delete(index);
         }
+
+        retryPendingRef.current.delete(index);
+        activeRef.current.delete(index);
+        requestedRef.current.delete(index);
+        queueRef.current = queueRef.current.filter((queued) => queued !== index);
         retryPage(index);
+      }
+
+      setRequestedPages(new Set(requestedRef.current));
+      pumpImageQueue();
+    };
+
+    const retryWhenVisible = () => {
+      if (document.visibilityState === "visible" && navigator.onLine !== false) {
+        retryUnsettledPages();
       }
     };
 
-    window.addEventListener("online", retryPendingPages);
+    window.addEventListener("online", retryUnsettledPages);
+    window.addEventListener("focus", retryUnsettledPages);
+    document.addEventListener("visibilitychange", retryWhenVisible);
     return () => {
-      window.removeEventListener("online", retryPendingPages);
+      window.removeEventListener("online", retryUnsettledPages);
+      window.removeEventListener("focus", retryUnsettledPages);
+      document.removeEventListener("visibilitychange", retryWhenVisible);
       for (const timer of retryTimersRef.current.values()) clearTimeout(timer);
       retryTimersRef.current.clear();
       retryPendingRef.current.clear();
     };
-  }, [retryPage]);
+  }, [pumpImageQueue, retryPage]);
 
   const selectedChapter = payload.item.chapters?.find(
     (entry) => Number(entry.number) === Number(chapter),
@@ -583,6 +618,7 @@ function ReaderChapter({
             key={`${index}:${page}`}
             index={index}
             src={sourceService.imageUrl(payload.item.source, page, imageReferer)}
+            retryVersion={retryVersions.get(index) ?? 0}
             alt={`${displayTitle} - الفصل ${chapter} - صفحة ${index + 1}`}
             shouldLoad={requestedPages.has(index)}
             onNear={requestPage}
@@ -629,6 +665,7 @@ function ProgressiveReaderPage({
   index,
   src,
   alt,
+  retryVersion,
   shouldLoad,
   onNear,
   onSettled,
@@ -636,11 +673,15 @@ function ProgressiveReaderPage({
   index: number;
   src: string;
   alt: string;
+  retryVersion: number;
   shouldLoad: boolean;
   onNear: (index: number) => void;
   onSettled: (index: number, loaded: boolean) => void;
 }) {
   const imageRef = useRef<HTMLImageElement>(null);
+  const retrySrc = retryVersion > 0
+    ? `${src}${src.includes("?") ? "&" : "?"}wany_retry=${retryVersion}`
+    : src;
 
   useEffect(() => {
     if (shouldLoad) return;
@@ -668,7 +709,7 @@ function ProgressiveReaderPage({
   return (
     <img
       ref={imageRef}
-      src={shouldLoad ? src : undefined}
+      src={shouldLoad ? retrySrc : undefined}
       alt={alt}
       loading={index < INITIAL_READER_PAGES ? "eager" : "lazy"}
       decoding="async"
