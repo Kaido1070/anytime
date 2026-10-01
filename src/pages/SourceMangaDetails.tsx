@@ -280,8 +280,23 @@ export function SourceMangaDetails() {
 
       <div className="section-title chapter-heading">
         <h2>الفصول</h2>
-        <span className="muted">{chapters.length} فصل</span>
+        <span className="muted">
+          {item.chapterListComplete === false &&
+          item.declaredChapterCount != null &&
+          item.declaredChapterCount > chapters.length
+            ? `${chapters.length} من ${item.declaredChapterCount} فصل`
+            : `${chapters.length} فصل`}
+        </span>
       </div>
+
+      {item.chapterListComplete === false &&
+        item.declaredChapterCount != null &&
+        item.declaredChapterCount > chapters.length && (
+          <p className="chapter-list-warning" role="status">
+            المصدر يعلن {item.declaredChapterCount} فصل، وتم التحقق من {chapters.length} فقط.
+            Wany لن يعتبر القائمة كاملة حتى يجلب بقية صفحات المصدر.
+          </p>
+        )}
 
       {!!chapters.length && (
         <div className="chapter-tools">
