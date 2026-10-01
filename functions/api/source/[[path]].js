@@ -884,13 +884,38 @@ function mangaTimeSearchInput({ page, sortBy, query = null }) {
   };
 }
 
-async function mangaTimeSeries(db, item) {
-  const [detail, chapterPayload] = await Promise.all([
-    mangaTimeTrpc("content.getSeriesBySlug", { slug: item.slug }),
-    mangaTimeTrpc("content.getChapters", { seriesId: item.sourceId, limit: -1 }),
-  ]);
+async function mangaTimeAllChapters(seriesId) {
+  const attempts = [
+    { seriesId, limit: -1 },
+    { seriesId, limit: 5000 },
+    { seriesId, limit: 20000 },
+  ];
 
-  const chapters = mangaTimeChaptersFromPayload(chapterPayload);
+  let chapters = [];
+  let lastError = null;
+
+  for (const input of attempts) {
+    try {
+      const payload = await mangaTimeTrpc("content.getChapters", input);
+      chapters = moreCompleteChapters(
+        chapters,
+        mangaTimeChaptersFromPayload(payload),
+      );
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (chapters.length) return chapters;
+  if (lastError) throw lastError;
+  return [];
+}
+
+async function mangaTimeSeries(db, item) {
+  const [detail, chapters] = await Promise.all([
+    mangaTimeTrpc("content.getSeriesBySlug", { slug: item.slug }),
+    mangaTimeAllChapters(item.sourceId),
+  ]);
 
   const updated = {
     ...item,
@@ -1076,11 +1101,8 @@ async function mangaTimeChapterPages(item, number) {
   // chapter id only when the normal reader call fails, then try the source's
   // id-based input shapes without slowing down healthy reads.
   try {
-    const chapterPayload = await mangaTimeTrpc("content.getChapters", {
-      seriesId: item.sourceId,
-      limit: -1,
-    });
-    const chapter = (chapterPayload?.chapters ?? []).find(
+    const allChapters = await mangaTimeAllChapters(item.sourceId);
+    const chapter = allChapters.find(
       (entry) => Math.abs(Number(entry?.number) - Number(number)) < 0.000001,
     );
     const chapterId = chapter?.id ?? chapter?.chapterId ?? null;
@@ -4205,10 +4227,11 @@ function xsanoChapterFeedUrl(html) {
 
 async function xsanoFetchChapters(feedUrl) {
   const all = [];
+  const seenEntries = new Set();
   let start = 1;
   let total = Number.POSITIVE_INFINITY;
 
-  for (let requestIndex = 0; requestIndex < 8 && start <= total; requestIndex += 1) {
+  while (start <= total) {
     const url = new URL(feedUrl, XSANO_BASE);
     url.searchParams.set("alt", "json");
     url.searchParams.set("start-index", String(start));
@@ -4221,9 +4244,25 @@ async function xsanoFetchChapters(feedUrl) {
     if (Number.isFinite(reportedTotal) && reportedTotal >= 0) total = reportedTotal;
 
     if (!entries.length) break;
-    all.push(...entries);
+
+    let newEntries = 0;
+    for (const entry of entries) {
+      const identity =
+        xsanoText(entry?.id) ||
+        xsanoAlternateLink(entry) ||
+        xsanoText(entry?.title) + "|" + xsanoText(entry?.published);
+      if (!identity || seenEntries.has(identity)) continue;
+      seenEntries.add(identity);
+      all.push(entry);
+      newEntries += 1;
+    }
+
+    // If Blogger ignored start-index and repeated the same page, stop instead
+    // of looping forever. Otherwise continue until the source-reported end.
+    if (!newEntries) break;
+
     start += entries.length;
-    if (entries.length < 500 && !Number.isFinite(reportedTotal)) break;
+    if (!Number.isFinite(reportedTotal) && entries.length < 500) break;
   }
 
   return xsanoChaptersFromEntries(all);
@@ -4736,6 +4775,7 @@ export const __test = {
   priorityRefreshActive,
   sourceRefreshIntervalMs,
   mangaTimeChaptersFromPayload,
+  mangaTimeAllChapters,
   mangaTimePagesFromPayload,
   parseMangaTimePages,
   mangaTimeChapterUrl,
