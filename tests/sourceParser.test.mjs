@@ -943,6 +943,23 @@ test("chapter list recovery prefers the more complete source response", () => {
   assert.equal(__test.moreCompleteChapters(full, preview).length, 324);
 });
 
+test("chapter list recovery deduplicates the same chapter when only its title changes", () => {
+  const merged = __test.mergeChapterLists(
+    [{ number: 12, title: "الفصل 12" }],
+    [{ number: 12, title: "Chapter 12" }],
+  );
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].number, 12);
+});
+
+test("chapter list recovery preserves distinct same-number rows when source URLs differ", () => {
+  const merged = __test.mergeChapterLists(
+    [{ number: 8, title: "الفصل 8", url: "https://example.com/series/a/chapter-8" }],
+    [{ number: 8, title: "الفصل 8 تكملة", url: "https://example.com/series/a/chapter-8-continuation" }],
+  );
+  assert.equal(merged.length, 2);
+});
+
 test("chapter list recovery unions disjoint preview and archive rows", () => {
   const preview = [
     { number: 10, title: "10", url: "https://example.com/chapter-10" },
