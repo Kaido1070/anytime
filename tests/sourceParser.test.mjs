@@ -817,6 +817,26 @@ test("Azora page parser unwraps Next image URLs in page order", () => {
 });
 
 
+test("Azora parses Arabic singular and dual minute/hour ages", () => {
+  const now = Date.UTC(2026, 9, 1, 10, 0, 0);
+  assert.equal(
+    __test.parseAzoraRecentRelativeAt("منذ دقيقة", now),
+    new Date(now - 60_000).toISOString(),
+  );
+  assert.equal(
+    __test.parseAzoraRecentRelativeAt("منذ دقيقتين تقريباً", now),
+    new Date(now - 2 * 60_000).toISOString(),
+  );
+  assert.equal(
+    __test.parseAzoraRecentRelativeAt("منذ ساعة", now),
+    new Date(now - 3_600_000).toISOString(),
+  );
+  assert.equal(
+    __test.parseAzoraRecentRelativeAt("منذ ساعتين تقريباً", now),
+    new Date(now - 2 * 3_600_000).toISOString(),
+  );
+});
+
 test("Azora recent date parser accepts only strict minute/hour ages", () => {
   const now = Date.UTC(2026, 9, 1, 10, 0, 0);
   assert.equal(
