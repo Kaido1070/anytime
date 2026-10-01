@@ -3066,6 +3066,7 @@ function parseMangadarPages(html) {
     return absoluteUrl(MANGADAR_BASE, raw);
   };
   const valid = (url) => url && !isMangadarUiImage(url);
+  const direct = (url) => resolveMangadarMediaUrl(url);
   const numbered = new Map();
 
   // MangaDar's reader is not a Madara reader. Prefer its own numbered page
@@ -3077,7 +3078,7 @@ function parseMangadarPages(html) {
     );
     const match = label.match(/(?:صفحة|page)\s*(\d+)/i);
     if (!match) continue;
-    const url = decodeEmbeddedUrl(image.src);
+    const url = direct(decodeEmbeddedUrl(image.src));
     if (valid(url)) numbered.set(Number(match[1]), url);
   }
   if (numbered.size >= 2) {
@@ -3103,7 +3104,7 @@ function parseMangadarPages(html) {
   for (const pattern of patterns) {
     let match;
     while ((match = pattern.exec(normalized))) {
-      const url = decodeEmbeddedUrl(match[1] || match[0]);
+      const url = direct(decodeEmbeddedUrl(match[1] || match[0]));
       if (valid(url)) embedded.push(url);
     }
   }
@@ -3126,10 +3127,40 @@ function parseMangadarPages(html) {
   if (footer >= 0) scoped = scoped.slice(0, footer);
   return [...new Set(
     extractImages(scoped)
-      .map((image) => decodeEmbeddedUrl(image.src))
+      .map((image) => direct(decodeEmbeddedUrl(image.src)))
       .filter(valid),
   )];
 }
+function resolveMangadarMediaUrl(value) {
+  let current = absoluteUrl(MANGADAR_BASE, value);
+  if (!current) return "";
+
+  for (let depth = 0; depth < 4; depth += 1) {
+    try {
+      const parsed = new URL(current);
+      const nested =
+        parsed.searchParams.get("url") ||
+        parsed.searchParams.get("src") ||
+        parsed.searchParams.get("image") ||
+        parsed.searchParams.get("imageUrl") ||
+        parsed.searchParams.get("image_url") ||
+        parsed.searchParams.get("pageUrl") ||
+        parsed.searchParams.get("page_url");
+      if (!nested) break;
+
+      let decoded = nested;
+      try { decoded = decodeURIComponent(nested); } catch {}
+      const next = absoluteUrl(parsed.origin, decoded);
+      if (!next || next === current) break;
+      current = next;
+    } catch {
+      break;
+    }
+  }
+
+  return current;
+}
+
 function isMangadarUiImage(url) {
   return /(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(String(url));
 }
