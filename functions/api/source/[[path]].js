@@ -628,11 +628,25 @@ function parseJsonArray(value) {
 }
 
 function chapterListIdentity(chapter) {
-  const url = String(chapter?.url || "").trim();
-  if (url) return "url:" + url;
+  const sourceChapterId = String(chapter?.sourceChapterId || "").trim();
+  if (sourceChapterId) return "id:" + sourceChapterId;
+
+  const rawUrl = String(chapter?.url || "").trim();
+  if (rawUrl) {
+    try {
+      const parsed = new URL(rawUrl);
+      parsed.hash = "";
+      parsed.pathname = parsed.pathname.replace(/\/$/, "");
+      return "url:" + parsed.toString();
+    } catch {
+      return "url:" + rawUrl.replace(/\/$/, "");
+    }
+  }
+
   const number = Number(chapter?.number);
-  const title = cleanText(chapter?.title || "");
-  return "fallback:" + (Number.isFinite(number) ? number : "") + "|" + title;
+  if (Number.isFinite(number)) return "number:" + number;
+
+  return "fallback:" + cleanText(chapter?.title || "");
 }
 
 function mergeChapterLists(...lists) {
