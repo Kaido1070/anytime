@@ -1071,6 +1071,50 @@ test("Azora follows chapter load-more pages when the first HTML is incomplete", 
   }
 });
 
+test("Azora follows load-more pages even when the source omits a total count", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    const page = Number(
+      parsed.searchParams.get("chapterPage") ??
+      parsed.searchParams.get("chaptersPage") ??
+      parsed.searchParams.get("chapter_page") ??
+      parsed.searchParams.get("chapters_page") ??
+      parsed.searchParams.get("page") ??
+      1,
+    );
+
+    const html =
+      page === 2
+        ? '<a href="/series/example/chapter-2">الفصل 2</a>'
+        : page === 3
+          ? '<a href="/series/example/chapter-1">الفصل 1</a>'
+          : '<a href="/series/example/chapter-1">الفصل 1</a>';
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  };
+
+  try {
+    const firstHtml = `
+      <button>عرض المزيد</button>
+      <a href="/series/example/chapter-3">الفصل 3</a>
+    `;
+    const result = await __test.azoraCompleteChapterList(
+      firstHtml,
+      "https://azorafly.com/series/example",
+    );
+    assert.deepEqual(
+      result.chapters.map((chapter) => chapter.number),
+      [3, 2, 1],
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Azora recovers chapters embedded in Next payloads beyond the visible preview", () => {
   const html = `
     <a href="/series/example/chapter-323">الفصل 323</a>
