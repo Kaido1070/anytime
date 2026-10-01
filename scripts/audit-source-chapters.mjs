@@ -26,29 +26,43 @@ for (const source of selectedSources) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function fetchSource(url, accept) {
+  const parsed = new URL(url);
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: __test.sourceHeaders(parsed.origin, accept),
+        redirect: "follow",
+        signal: AbortSignal.timeout(20000),
+      });
+
+      if (response.ok) return response;
+
+      lastError = new Error("HTTP " + response.status + " for " + url);
+      if (response.status !== 429 && response.status !== 503) throw lastError;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) break;
+    }
+
+    await sleep(1500 * (attempt + 1));
+  }
+
+  throw lastError || new Error("Source request failed for " + url);
+}
+
 async function fetchText(url) {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; WanySourceAudit/1.0; +https://wany.site)",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
+  const response = await fetchSource(
+    url,
+    "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  );
   return response.text();
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; WanySourceAudit/1.0; +https://wany.site)",
-      Accept: "application/json,text/plain,*/*",
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
+  const response = await fetchSource(url, "application/json,text/plain,*/*");
   return response.json();
 }
 
