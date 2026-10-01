@@ -29,3 +29,30 @@ test("reader path deduplicates the active source key", () => {
     "/read/mangalik/overgeared/120?sources=ml%3Aovergeared%2Csz%3Aovergeared",
   );
 });
+
+
+test("MangaTime reader path preserves the canonical source key instead of rebuilding it from the slug", () => {
+  const mangaTimeItem = {
+    key: "mt:1842",
+    source: "mangatime",
+    slug: "solo-leveling",
+  };
+
+  assert.equal(
+    readerPath(mangaTimeItem, 201),
+    "/read-source/mt%3A1842/201",
+  );
+});
+
+test("MangaTime canonical reader path keeps merged source context for fallback", () => {
+  const mangaTimeItem = {
+    key: "mt:1842",
+    source: "mangatime",
+    slug: "solo-leveling",
+  };
+
+  assert.equal(
+    readerPath(mangaTimeItem, 201, ["ml:solo-leveling", "mt:1842"]),
+    "/read-source/mt%3A1842/201?sources=mt%3A1842%2Cml%3Asolo-leveling",
+  );
+});
