@@ -346,7 +346,7 @@ export function SourceMangaDetails() {
           const progressKey = `${sourceKey}:${chapter.number}`;
           const progress = data?.progress[progressKey];
           const done = data?.completed.includes(progressKey);
-          return <div key={`${chapter.number}:${chapter.title}`} className={`chapter-row ${progress && !done ? "reading" : ""}`}>
+          return <div key={chapter.url || `${chapter.number}:${chapter.title}`} className={`chapter-row ${progress && !done ? "reading" : ""}`}>
             <Link className="chapter-row-link" to={readerPath(item, chapter.number, requestedSourceKeys, chapter.url)}>
               <span className="chapter-number">{chapter.number}</span>
               <div><h3 dir="auto">{chapter.title || `الفصل ${chapter.number}`}</h3><small>{done ? "مقروء" : progress ? `قيد القراءة · ${Math.round(progress.percent)}%` : chapter.publishedAt ? formatGregorianDate(chapter.publishedAt) : "غير مقروء"}</small></div>
