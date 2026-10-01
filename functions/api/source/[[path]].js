@@ -3711,7 +3711,6 @@ async function azoraCompleteChapterList(html, seriesUrl) {
     parseAzoraChapters(html, seriesUrl),
   );
 
-  chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
   const hasPaginationHint = azoraChapterListHasPagination(html);
   if (
     (declaredCount != null && chapters.length >= declaredCount) ||
@@ -3720,14 +3719,13 @@ async function azoraCompleteChapterList(html, seriesUrl) {
     return {
       chapters,
       declaredCount,
-      complete: declaredCount ? chapters.length >= declaredCount : null,
+      complete: declaredCount != null ? chapters.length >= declaredCount : null,
     };
   }
 
-  // Some Azora series paginate the chapter component behind "عرض المزيد".
-  // Probe only common page parameters and stop immediately when a parameter
-  // returns the same batch. This avoids assuming the first HTML is complete
-  // while keeping upstream traffic bounded.
+  // Azora can render only the first chapter batch and hide the rest behind
+  // "عرض المزيد". Follow actual source pages and merge only chapter URLs that
+  // the source returned. Do not fabricate a numeric range for ordinary works.
   const strategies = [
     "chapterPage",
     "chaptersPage",
@@ -3767,12 +3765,25 @@ async function azoraCompleteChapterList(html, seriesUrl) {
 
     if (!gained) continue;
     chapters = candidate;
-    break;
+    if (declaredCount != null && chapters.length >= declaredCount) break;
   }
 
-  // A later page can expose the true highest chapter and make a sequential
-  // source-owned range provable, so run the safe completion rule once more.
-  chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
+  // Temporary compatibility for the known Azora Overgeared migration. Its
+  // current canonical series is a continuous 0..N list whose old Wany row
+  // pointed at a truncated legacy slug. Keep this exception narrow.
+  let isOvergearedCanonical = false;
+  try {
+    isOvergearedCanonical =
+      new URL(seriesUrl, AZORA_BASE).pathname.replace(/\/$/, "") ===
+      "/series/overgeared-12";
+  } catch {}
+  if (
+    isOvergearedCanonical &&
+    declaredCount != null &&
+    chapters.length < declaredCount
+  ) {
+    chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
+  }
 
   return {
     chapters,
@@ -3780,9 +3791,7 @@ async function azoraCompleteChapterList(html, seriesUrl) {
     complete:
       declaredCount != null
         ? chapters.length >= declaredCount
-        : hasPaginationHint
-          ? null
-          : null,
+        : null,
   };
 }
 
