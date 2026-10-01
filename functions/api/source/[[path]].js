@@ -2805,12 +2805,20 @@ function parseAzoraRecentRelativeAt(value, now = Date.now()) {
     .trim();
   if (!text) return null;
   if (/(?:الآن|just now)/i.test(text)) return new Date(now).toISOString();
-  if (/(?:منذ\s*)?(?:دقيقة واحدة|دقيقة)\b/i.test(text)) return new Date(now - 60_000).toISOString();
-  if (/(?:منذ\s*)?دقيقتين\b/i.test(text)) return new Date(now - 2 * 60_000).toISOString();
+  if (/(?:منذ\s*)?دقيقتين(?=\s|$|[^\u0600-\u06ffA-Za-z0-9_])/i.test(text)) {
+    return new Date(now - 2 * 60_000).toISOString();
+  }
+  if (/(?:منذ\s*)?(?:دقيقة واحدة|دقيقة)(?=\s|$|[^\u0600-\u06ffA-Za-z0-9_])/i.test(text)) {
+    return new Date(now - 60_000).toISOString();
+  }
   let match = text.match(/(?:منذ\s*)?(\d+)\s*(?:دقيقة|دقائق|minute|minutes)\s*(?:تقريباً|تقريبا|ago)?/i);
   if (match) return new Date(now - Number(match[1]) * 60_000).toISOString();
-  if (/(?:منذ\s*)?(?:ساعة واحدة|ساعة)\b/i.test(text)) return new Date(now - 3_600_000).toISOString();
-  if (/(?:منذ\s*)?ساعتين\b/i.test(text)) return new Date(now - 2 * 3_600_000).toISOString();
+  if (/(?:منذ\s*)?ساعتين(?=\s|$|[^\u0600-\u06ffA-Za-z0-9_])/i.test(text)) {
+    return new Date(now - 2 * 3_600_000).toISOString();
+  }
+  if (/(?:منذ\s*)?(?:ساعة واحدة|ساعة)(?=\s|$|[^\u0600-\u06ffA-Za-z0-9_])/i.test(text)) {
+    return new Date(now - 3_600_000).toISOString();
+  }
   match = text.match(/(?:منذ\s*)?(\d+)\s*(?:ساعة|ساعات|hour|hours)\s*(?:تقريباً|تقريبا|ago)?/i);
   if (match) return new Date(now - Number(match[1]) * 3_600_000).toISOString();
   return null;
