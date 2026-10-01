@@ -86,15 +86,9 @@ export function SourceReader() {
             // Switch the URL to the source that actually served the chapter.
             // This keeps progress, navigation and image referers tied to the
             // working source instead of silently mixing source identities.
-            navigate(
-              readerPath(
-                fallback.item,
-                fallback.number,
-                candidates,
-                fallback.chapterUrl ?? undefined,
-              ),
-              { replace: true },
-            );
+            navigate(readerPath(fallback.item, fallback.number, candidates), {
+              replace: true,
+            });
             return;
           } catch {
             // The next merged source gets its own chance.
