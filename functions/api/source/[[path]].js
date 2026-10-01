@@ -3450,7 +3450,7 @@ async function mangalikSearch(db, query, page) {
   return { items: items.slice(0, 24), hasMore: mangalikHasNext(html), page };
 }
 
-async function mangalikItemsFromHtml(html) {
+function mangalikItemsFromHtml(html) {
   const bySlug = new Map();
   const blocks = madaraBlocksByClass(html, ["c-tabs-item__content", "page-item-detail"]);
   const candidates = blocks.length ? blocks : [String(html ?? "")];
