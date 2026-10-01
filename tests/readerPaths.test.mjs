@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readerPath } from "../src/services/readerPaths.ts";
 
 const item = {
-  key: "ml:overgeared",
-  source: "mangalik",
+  key: "sz:overgeared",
+  source: "starzmanga",
   slug: "overgeared",
 };
 
@@ -13,20 +13,20 @@ test("reader path carries merged source keys for fallback", () => {
 
   assert.equal(
     path,
-    "/read/mangalik/overgeared/120?sources=ml%3Aovergeared%2Csz%3Aovergeared",
+    "/read/starzmanga/overgeared/120?sources=sz%3Aovergeared%2Cml%3Aovergeared",
   );
 });
 
 test("reader path does not add source context for a single source", () => {
-  assert.equal(readerPath(item, 120), "/read/mangalik/overgeared/120");
+  assert.equal(readerPath(item, 120), "/read/starzmanga/overgeared/120");
 });
 
 test("reader path deduplicates the active source key", () => {
-  const path = readerPath(item, 120, ["ml:overgeared", "sz:overgeared"]);
+  const path = readerPath(item, 120, ["sz:overgeared", "ml:overgeared"]);
 
   assert.equal(
     path,
-    "/read/mangalik/overgeared/120?sources=ml%3Aovergeared%2Csz%3Aovergeared",
+    "/read/starzmanga/overgeared/120?sources=sz%3Aovergeared%2Cml%3Aovergeared",
   );
 });
 
@@ -81,5 +81,32 @@ test("XSano canonical reader path keeps merged source context for fallback", () 
   assert.equal(
     readerPath(xsanoItem, 77, ["ml:the-player-hides-his-past", "xs:8f3d19a2"]),
     "/read-source/xs%3A8f3d19a2/77?sources=xs%3A8f3d19a2%2Cml%3Athe-player-hides-his-past",
+  );
+});
+
+
+test("MangaLik reader path preserves the canonical source key instead of rebuilding it from a normalized slug", () => {
+  const mangaLikItem = {
+    key: "ml:ready_action",
+    source: "mangalik",
+    slug: "ready.action",
+  };
+
+  assert.equal(
+    readerPath(mangaLikItem, 1),
+    "/read-source/ml%3Aready_action/1",
+  );
+});
+
+test("MangaLik canonical reader path keeps merged source context", () => {
+  const mangaLikItem = {
+    key: "ml:overgeared",
+    source: "mangalik",
+    slug: "overgeared",
+  };
+
+  assert.equal(
+    readerPath(mangaLikItem, 120, ["sz:overgeared", "ml:overgeared"]),
+    "/read-source/ml%3Aovergeared/120?sources=ml%3Aovergeared%2Csz%3Aovergeared",
   );
 });
