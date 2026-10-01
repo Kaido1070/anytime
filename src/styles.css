@@ -326,6 +326,20 @@ small {
   border-radius: 8px;
   display: block;
 }
+
+/* Azora sometimes exposes a generated landscape SEO card instead of the
+   standalone poster URL. Its actual portrait cover occupies the right edge.
+   Keep this as a display fallback while the source adapter prefers the real
+   background/poster asset whenever Azora exposes it. */
+.manga-card img.azora-source-cover {
+  object-position: right center;
+}
+.detail-cover.azora-source-cover {
+  aspect-ratio: 5/7;
+  object-fit: cover;
+  object-position: right center;
+  display: block;
+}
 .manga-card h3 {
   margin: 12px 0 5px;
 }
