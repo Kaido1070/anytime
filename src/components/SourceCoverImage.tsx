@@ -6,7 +6,7 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
   item: SourceManga;
 };
 
-export function SourceCoverImage({ item, onError, ...props }: Props) {
+export function SourceCoverImage({ item, onError, className, ...props }: Props) {
   const initialCovers = sourceService.coverFallbackCandidates(item);
   const [covers, setCovers] = useState<string[]>(initialCovers);
   const [index, setIndex] = useState(0);
@@ -34,6 +34,7 @@ export function SourceCoverImage({ item, onError, ...props }: Props) {
   return (
     <img
       {...props}
+      className={[className, item.source === "azora" ? "azora-source-cover" : ""].filter(Boolean).join(" ")}
       src={sourceService.imageUrl(item.source, cover)}
       onError={(event) => {
         if (index + 1 < covers.length) {
