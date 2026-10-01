@@ -936,6 +936,22 @@ test("MangaTime list input omits null query but keeps real searches", () => {
 });
 
 
+test("Madara source pages expose declared chapter totals for completeness checks", () => {
+  assert.equal(
+    __test.madaraDeclaredChapterCount("<div><span>Chapters</span><strong>568</strong></div>"),
+    568,
+  );
+  assert.equal(
+    __test.madaraDeclaredChapterCount("<div>عدد الفصول: 392</div>"),
+    392,
+  );
+  assert.equal(
+    __test.madaraDeclaredChapterCount('<div data-total-chapters="20322"></div>'),
+    20322,
+  );
+  assert.equal(__test.madaraDeclaredChapterCount("<div>بدون عداد</div>"), null);
+});
+
 test("chapter list recovery prefers the more complete source response", () => {
   const preview = [{ number: 323 }, { number: 322 }, { number: 0 }];
   const full = Array.from({ length: 324 }, (_, number) => ({ number }));
