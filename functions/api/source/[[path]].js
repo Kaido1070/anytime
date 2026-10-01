@@ -4768,6 +4768,7 @@ export const __test = {
   parseXsanoPages,
   xsanoChapterFeedUrl,
   xsanoChaptersFromEntries,
+  xsanoFetchChapters,
   xsanoTypeFromCategories,
   asqChapterNumber,
   normalizeAsqType,
