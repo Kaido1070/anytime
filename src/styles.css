@@ -878,6 +878,61 @@ body.reader-edge-to-edge {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
+.reader-catchup-confirm {
+  position: fixed;
+  z-index: 29;
+  top: calc(72px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  width: min(620px, calc(100% - 24px));
+  margin-inline: auto;
+  padding: 12px 14px;
+  border: 1px solid #5b4c3b;
+  border-radius: 14px;
+  background: #1d1c19f2;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.reader-catchup-confirm > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.reader-catchup-confirm strong {
+  font-size: 13px;
+  color: var(--accent);
+}
+.reader-catchup-confirm span {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.reader-catchup-actions {
+  display: flex;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+.reader-catchup-actions button {
+  min-height: 34px;
+  padding: 6px 11px;
+}
+@media (max-width: 759px) {
+  .reader-catchup-confirm {
+    top: calc(68px + env(safe-area-inset-top));
+    align-items: stretch;
+    flex-direction: column;
+    gap: 9px;
+    padding: 10px 11px;
+  }
+  .reader-catchup-actions {
+    justify-content: flex-end;
+  }
+}
+
 .reader-panels {
   max-width: 800px;
   margin: auto;

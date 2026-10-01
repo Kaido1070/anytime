@@ -1,6 +1,6 @@
 // Production reader deploy marker: Team-X images use the chapter referer path.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { parseSourceGroupKeys } from "../services/sourceMerge";
@@ -159,8 +159,9 @@ function ReaderChapter({
   payload: SourceChapterPayload;
   legacyPath: boolean;
 }) {
-  const { data, saveProgress, recordChapterOpen } = useLibrary();
+  const { data, saveProgress, recordChapterOpen, markChaptersRead } = useLibrary();
   const navigate = useNavigate();
+  const location = useLocation();
   const chapter = payload.number;
   const saved = data?.progress[`${sourceKey}:${chapter}`]?.percent ?? 0;
   const [percent, setPercent] = useState(saved);
@@ -279,6 +280,45 @@ function ReaderChapter({
   const chapterOptions = [...(payload.item.chapters ?? [])]
     .filter((entry) => Number.isFinite(Number(entry.number)))
     .sort((a, b) => Number(b.number) - Number(a.number));
+  const enteredFromReader = Boolean(
+    (location.state as { readerNavigation?: boolean } | null)?.readerNavigation,
+  );
+  const previousUnreadChapters = data
+    ? chapterOptions
+        .map((entry) => Number(entry.number))
+        .filter(
+          (entryNumber) =>
+            entryNumber < chapter &&
+            !data.completed.includes(`${sourceKey}:${entryNumber}`),
+        )
+        .sort((a, b) => a - b)
+    : [];
+  const [catchupDismissed, setCatchupDismissed] = useState(false);
+  const [catchupBusy, setCatchupBusy] = useState(false);
+  const showCatchupPrompt =
+    Boolean(data) &&
+    !enteredFromReader &&
+    !catchupDismissed &&
+    previousUnreadChapters.length > 0;
+
+  const acceptCatchup = async () => {
+    if (catchupBusy || !previousUnreadChapters.length) return;
+    setCatchupBusy(true);
+    try {
+      // Keep requests bounded while still supporting long-running series.
+      for (let index = 0; index < previousUnreadChapters.length; index += 500) {
+        await markChaptersRead(
+          sourceKey,
+          previousUnreadChapters.slice(index, index + 500),
+        );
+      }
+      setCatchupDismissed(true);
+    } finally {
+      setCatchupBusy(false);
+    }
+  };
+
+  const readerNavigationState = { readerNavigation: true };
 
   useLayoutEffect(() => {
     const previousRestoration = history.scrollRestoration;
@@ -389,7 +429,7 @@ function ReaderChapter({
           <small dir="auto">{displayTitle}</small>
           <div className="reader-chapter-controls">
             {payload.previous != null ? (
-              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.previous, sourceKeys)}>السابق</Link>
+              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.previous, sourceKeys)} state={readerNavigationState}>السابق</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">السابق</span>
             )}
@@ -400,7 +440,9 @@ function ReaderChapter({
               onChange={(event) => {
                 const target = event.currentTarget;
                 target.blur();
-                navigate(readerPath(payload.item, target.value, sourceKeys));
+                navigate(readerPath(payload.item, target.value, sourceKeys), {
+                  state: readerNavigationState,
+                });
               }}
             >
               {chapterOptions.length ? chapterOptions.map((entry) => (
@@ -408,13 +450,47 @@ function ReaderChapter({
               )) : <option value={chapter}>الفصل {chapter}</option>}
             </select>
             {payload.next != null ? (
-              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.next, sourceKeys)}>التالي</Link>
+              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.next, sourceKeys)} state={readerNavigationState}>التالي</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">التالي</span>
             )}
           </div>
         </div>
       </header>
+
+      {showCatchupPrompt && (
+        <div
+          className="reader-catchup-confirm"
+          role="alertdialog"
+          aria-label="تعليم الفصول السابقة كمقروءة"
+        >
+          <div>
+            <strong>هل قرأت الفصول السابقة؟</strong>
+            <span>
+              هل تريد اعتبار جميع الفصول قبل الفصل {chapter} مقروءة؟
+              {" "}({previousUnreadChapters.length} فصل)
+            </span>
+          </div>
+          <div className="reader-catchup-actions">
+            <button
+              className="secondary"
+              type="button"
+              disabled={catchupBusy}
+              onClick={() => setCatchupDismissed(true)}
+            >
+              رفض
+            </button>
+            <button
+              className="primary"
+              type="button"
+              disabled={catchupBusy}
+              onClick={() => void acceptCatchup()}
+            >
+              {catchupBusy ? "جاري التحديث…" : "موافقة"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="reader-panels source-pages">
         {payload.pages.map((page, index) => (
@@ -437,6 +513,7 @@ function ReaderChapter({
             <Link
               className="secondary"
               to={readerPath(payload.item, payload.previous, sourceKeys)}
+              state={readerNavigationState}
             >
               الفصل السابق →
             </Link>
@@ -447,6 +524,7 @@ function ReaderChapter({
             <Link
               className="primary"
               to={readerPath(payload.item, payload.next, sourceKeys)}
+              state={readerNavigationState}
             >
               ← الفصل التالي
             </Link>
