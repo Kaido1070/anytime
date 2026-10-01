@@ -351,19 +351,46 @@ test("priority windows use Saudi time and stay work-specific", () => {
   assert.equal(__test.sourceRefreshIntervalMs(mondayNoonRiyadh), 5 * 60_000);
 });
 
-test("MangaTime keeps the most complete chapter list across source limit variants", async () => {
+test("MangaTime follows paginated chapter responses until the real end", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const parsed = new URL(String(url));
     const rawInput = JSON.parse(parsed.searchParams.get("input"));
     const input = rawInput.json ?? rawInput["0"]?.json ?? {};
-    const count = input.limit === 20000 ? 1200 : input.limit === 5000 ? 500 : 12;
-    const chapters = Array.from({ length: count }, (_, index) => ({
-      number: count - index,
-      title: "Chapter " + (count - index),
-    }));
+
+    let chapters = [];
+    let hasMore = true;
+    if (input.limit === -1) {
+      chapters = Array.from({ length: 20 }, (_, index) => ({
+        number: 1200 - index,
+        title: "Chapter " + (1200 - index),
+      }));
+    } else {
+      const page = Number(input.page ?? 1);
+      const start = (page - 1) * 500 + 1;
+      const end = Math.min(1200, start + 499);
+      chapters = Array.from(
+        { length: Math.max(0, end - start + 1) },
+        (_, index) => ({
+          number: start + index,
+          title: "Chapter " + (start + index),
+        }),
+      );
+      hasMore = end < 1200;
+    }
+
     return new Response(
-      JSON.stringify({ result: { data: { json: { chapters } } } }),
+      JSON.stringify({
+        result: {
+          data: {
+            json: {
+              chapters,
+              total: 1200,
+              hasMore,
+            },
+          },
+        },
+      }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   };
@@ -850,6 +877,63 @@ test("chapter list recovery prefers the more complete source response", () => {
   assert.equal(__test.moreCompleteChapters(full, preview).length, 324);
 });
 
+test("chapter list recovery unions disjoint preview and archive rows", () => {
+  const preview = [
+    { number: 10, title: "10", url: "https://example.com/chapter-10" },
+    { number: 1, title: "1", url: "https://example.com/chapter-1" },
+  ];
+  const archive = [
+    { number: 9, title: "9", url: "https://example.com/chapter-9" },
+    { number: 8, title: "8", url: "https://example.com/chapter-8" },
+  ];
+  assert.deepEqual(
+    __test.mergeChapterLists(preview, archive).map((chapter) => chapter.number),
+    [10, 9, 8, 1],
+  );
+});
+
+test("Madara chapter archive follows an explicit load-more page", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    calls += 1;
+    const body = String(options.body ?? "");
+    const page = Number(new URLSearchParams(body).get("page") ?? 1);
+    const html = page === 1
+      ? `
+          <ul>
+            <li class="wp-manga-chapter"><a href="/manga/example/chapter-3/">3</a></li>
+            <li class="wp-manga-chapter"><a href="/manga/example/chapter-2/">2</a></li>
+          </ul>
+          <button class="chapter-load-more" data-page="2">عرض المزيد</button>
+        `
+      : `
+          <ul>
+            <li class="wp-manga-chapter"><a href="/manga/example/chapter-1/">1</a></li>
+          </ul>
+        `;
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  };
+
+  try {
+    const html = await __test.fetchMadaraCompleteChapterHtml(
+      "https://example.com",
+      "https://example.com/manga/example/",
+      "TEST",
+      "failed",
+    );
+    assert.match(html, /chapter-3/);
+    assert.match(html, /chapter-1/);
+    assert.ok(calls >= 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Azora Overgeared uses the current canonical series slug", () => {
   assert.equal(
     __test.azoraCanonicalSeriesUrl({
@@ -861,7 +945,7 @@ test("Azora Overgeared uses the current canonical series slug", () => {
   );
 });
 
-test("Azora Overgeared restores omitted chapter rows from the source-declared count", () => {
+test("Azora restores any provably sequential load-more list from the source count", () => {
   const html = `
     <div>الفصول ( 342 )</div>
     <a href="/series/overgeared-12/chapter-341">الفصل 341</a>
@@ -872,7 +956,7 @@ test("Azora Overgeared restores omitted chapter rows from the source-declared co
     html,
     "https://azorafly.com/series/overgeared-12",
   );
-  const chapters = __test.azoraCompleteOvergearedChapters(
+  const chapters = __test.azoraCompleteSequentialChapters(
     html,
     "https://azorafly.com/series/overgeared-12",
     parsed,
@@ -886,6 +970,67 @@ test("Azora Overgeared restores omitted chapter rows from the source-declared co
     chapters.find((chapter) => chapter.number === 292)?.url,
     "https://azorafly.com/series/overgeared-12/chapter-292",
   );
+});
+
+test("Azora keeps distinct same-number chapter rows instead of collapsing them", () => {
+  const html = `
+    <a href="/series/youth-set-menu/chapter-8">الفصل 8 قائمه طعام اليوم</a>
+    <a href="/series/youth-set-menu/chapter-8-continuation">الفصل 8 تكملة الفصل 8</a>
+    <a href="/series/youth-set-menu/chapter-7">الفصل 7</a>
+  `;
+  const chapters = __test.parseAzoraChapters(
+    html,
+    "https://azorafly.com/series/youth-set-menu",
+  );
+  assert.equal(chapters.length, 3);
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [8, 8, 7]);
+  assert.notEqual(chapters[0].url, chapters[1].url);
+});
+
+test("Azora follows chapter load-more pages when the first HTML is incomplete", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    const page = Number(
+      parsed.searchParams.get("chapterPage") ??
+      parsed.searchParams.get("chaptersPage") ??
+      parsed.searchParams.get("chapter_page") ??
+      parsed.searchParams.get("chapters_page") ??
+      parsed.searchParams.get("page") ??
+      1,
+    );
+
+    const html = page === 2
+      ? `
+          <a href="/series/example/chapter-8">الفصل 8</a>
+          <a href="/series/example/chapter-7">الفصل 7</a>
+          <a href="/series/example/chapter-6">الفصل 6</a>
+        `
+      : "";
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  };
+
+  try {
+    const firstHtml = `
+      <div>الفصول ( 5 )</div>
+      <button>عرض المزيد</button>
+      <a href="/series/example/chapter-10">الفصل 10</a>
+      <a href="/series/example/chapter-9">الفصل 9</a>
+    `;
+    const result = await __test.azoraCompleteChapterList(
+      firstHtml,
+      "https://azorafly.com/series/example",
+    );
+    assert.equal(result.complete, true);
+    assert.equal(result.chapters.length, 5);
+    assert.deepEqual(result.chapters.map((chapter) => chapter.number), [10, 9, 8, 7, 6]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("Azora recovers chapters embedded in Next payloads beyond the visible preview", () => {
