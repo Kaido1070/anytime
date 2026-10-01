@@ -55,6 +55,7 @@ export function SourceReader() {
   const sourceKey = key ? decodeURIComponent(key) : sourceKeyFromReaderPath(source, work);
   const sourceKeys = parseSourceGroupKeys(searchParams.get("sources"), sourceKey);
   const sourceGroupSignature = sourceKeys.join("|");
+  const exactChapterUrl = searchParams.get("chapterUrl")?.trim() || undefined;
   const number = Number(chapter);
   const [payload, setPayload] = useState<SourceChapterPayload | null>(null);
   const [error, setError] = useState("");
@@ -69,7 +70,7 @@ export function SourceReader() {
       setPayload(null);
 
       try {
-        const result = await sourceService.getChapter(sourceKey, number);
+        const result = await sourceService.getChapter(sourceKey, number, exactChapterUrl);
         if (active) setPayload(result);
         return;
       } catch (primaryCause) {
@@ -85,9 +86,15 @@ export function SourceReader() {
             // Switch the URL to the source that actually served the chapter.
             // This keeps progress, navigation and image referers tied to the
             // working source instead of silently mixing source identities.
-            navigate(readerPath(fallback.item, fallback.number, candidates), {
-              replace: true,
-            });
+            navigate(
+              readerPath(
+                fallback.item,
+                fallback.number,
+                candidates,
+                fallback.chapterUrl ?? undefined,
+              ),
+              { replace: true },
+            );
             return;
           } catch {
             // The next merged source gets its own chance.
@@ -111,7 +118,7 @@ export function SourceReader() {
     return () => {
       active = false;
     };
-  }, [sourceKey, number, navigate, sourceGroupSignature]);
+  }, [sourceKey, number, exactChapterUrl, navigate, sourceGroupSignature]);
 
   if (!Number.isFinite(number)) {
     return (
@@ -170,7 +177,15 @@ function ReaderChapter({
 
   useEffect(() => {
     if (!legacyPath) return;
-    navigate(readerPath(payload.item, chapter, sourceKeys), { replace: true });
+    navigate(
+      readerPath(
+        payload.item,
+        chapter,
+        sourceKeys,
+        payload.chapterUrl ?? undefined,
+      ),
+      { replace: true },
+    );
   }, [chapter, legacyPath, navigate, payload.item]);
 
   useEffect(() => {
@@ -387,19 +402,40 @@ function ReaderChapter({
     };
   }, [pumpImageQueue, retryPage]);
 
-  const selectedChapter = payload.item.chapters?.find(
-    (entry) => Number(entry.number) === Number(chapter),
+  const chapterOptions = [...(payload.item.chapters ?? [])]
+    .filter((entry) => Number.isFinite(Number(entry.number)))
+    .sort((a, b) =>
+      Number(b.number) - Number(a.number) ||
+      String(a.url || "").localeCompare(String(b.url || "")),
+    );
+  const normalizeChapterUrl = (value?: string | null) => {
+    if (!value) return "";
+    try {
+      return new URL(value, payload.item.url || window.location.origin).toString();
+    } catch {
+      return value;
+    }
+  };
+  const currentChapterUrl = normalizeChapterUrl(payload.chapterUrl);
+  const selectedChapter =
+    (currentChapterUrl
+      ? chapterOptions.find(
+          (entry) => normalizeChapterUrl(entry.url) === currentChapterUrl,
+        )
+      : undefined) ??
+    chapterOptions.find(
+      (entry) => Number(entry.number) === Number(chapter),
+    );
+  const selectedChapterIndex = chapterOptions.findIndex(
+    (entry) => entry === selectedChapter,
   );
   const imageReferer =
     payload.item.source === "teamx"
       ? selectedChapter?.url || `${payload.item.url.replace(/\/$/, "")}/${chapter}`
       : payload.item.source === "3asq" || payload.item.source === "starzmanga" || payload.item.source === "xsano" || payload.item.source === "mangalik" || payload.item.source === "azora"
-        ? selectedChapter?.url || payload.item.url
+        ? payload.chapterUrl || selectedChapter?.url || payload.item.url
         : undefined;
   const displayTitle = sourceDisplayTitle(payload.item);
-  const chapterOptions = [...(payload.item.chapters ?? [])]
-    .filter((entry) => Number.isFinite(Number(entry.number)))
-    .sort((a, b) => Number(b.number) - Number(a.number));
   const enteredFromReader = Boolean(
     (location.state as { readerNavigation?: boolean } | null)?.readerNavigation,
   );
@@ -549,28 +585,51 @@ function ReaderChapter({
           <small dir="auto">{displayTitle}</small>
           <div className="reader-chapter-controls">
             {payload.previous != null ? (
-              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.previous, sourceKeys)} state={readerNavigationState}>السابق</Link>
+              <Link className="reader-chapter-step" to={readerPath(
+                payload.item,
+                payload.previous,
+                sourceKeys,
+                chapterOptions.find((entry) => Number(entry.number) === Number(payload.previous))?.url,
+              )} state={readerNavigationState}>السابق</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">السابق</span>
             )}
             <select
               className="reader-chapter-select"
-              value={String(chapter)}
+              value={selectedChapterIndex >= 0 ? String(selectedChapterIndex) : "current"}
               aria-label="اختيار الفصل"
               onChange={(event) => {
                 const target = event.currentTarget;
+                const entry = chapterOptions[Number(target.value)];
                 target.blur();
-                navigate(readerPath(payload.item, target.value, sourceKeys), {
-                  state: readerNavigationState,
-                });
+                if (!entry) return;
+                navigate(
+                  readerPath(
+                    payload.item,
+                    entry.number,
+                    sourceKeys,
+                    entry.url,
+                  ),
+                  { state: readerNavigationState },
+                );
               }}
             >
-              {chapterOptions.length ? chapterOptions.map((entry) => (
-                <option key={entry.number} value={entry.number}>الفصل {entry.number}</option>
-              )) : <option value={chapter}>الفصل {chapter}</option>}
+              {chapterOptions.length ? chapterOptions.map((entry, index) => (
+                <option
+                  key={entry.url || `${entry.number}:${entry.title}:${index}`}
+                  value={index}
+                >
+                  {entry.title || `الفصل ${entry.number}`}
+                </option>
+              )) : <option value="current">الفصل {chapter}</option>}
             </select>
             {payload.next != null ? (
-              <Link className="reader-chapter-step" to={readerPath(payload.item, payload.next, sourceKeys)} state={readerNavigationState}>التالي</Link>
+              <Link className="reader-chapter-step" to={readerPath(
+                payload.item,
+                payload.next,
+                sourceKeys,
+                chapterOptions.find((entry) => Number(entry.number) === Number(payload.next))?.url,
+              )} state={readerNavigationState}>التالي</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">التالي</span>
             )}
@@ -633,7 +692,12 @@ function ReaderChapter({
           {payload.previous != null ? (
             <Link
               className="secondary"
-              to={readerPath(payload.item, payload.previous, sourceKeys)}
+              to={readerPath(
+                payload.item,
+                payload.previous,
+                sourceKeys,
+                chapterOptions.find((entry) => Number(entry.number) === Number(payload.previous))?.url,
+              )}
               state={readerNavigationState}
             >
               الفصل السابق →
@@ -644,7 +708,12 @@ function ReaderChapter({
           {payload.next != null ? (
             <Link
               className="primary"
-              to={readerPath(payload.item, payload.next, sourceKeys)}
+              to={readerPath(
+                payload.item,
+                payload.next,
+                sourceKeys,
+                chapterOptions.find((entry) => Number(entry.number) === Number(payload.next))?.url,
+              )}
               state={readerNavigationState}
             >
               ← الفصل التالي
