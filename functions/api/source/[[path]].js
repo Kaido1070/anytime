@@ -1922,7 +1922,7 @@ async function asqSearch(db, query, page) {
   return { items: items.slice(0, 24), hasMore: asqHasNext(html), page };
 }
 
-async function asqItemsFromHtml(html) {
+function asqItemsFromHtml(html) {
   const bySlug = new Map();
   const blocks = madaraBlocksByClass(html, ["c-tabs-item__content", "page-item-detail"]);
   const candidates = blocks.length ? blocks : [String(html ?? "")];
