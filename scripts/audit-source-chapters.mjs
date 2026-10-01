@@ -275,8 +275,26 @@ async function auditItem(source, item) {
 }
 
 async function auditSource(source) {
-  console.log("\\n=== " + source + " catalog ===");
-  const items = await catalog(source);
+  console.log("\n=== " + source + " catalog ===");
+
+  let items;
+  try {
+    items = await catalog(source);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const transportBlocked = /HTTP (?:403|429|503)\b/.test(message);
+    console.log(
+      source + ": catalog unavailable (" +
+      (transportBlocked ? "transport-blocked" : "catalog-error") +
+      "): " + message,
+    );
+    return {
+      rows: [],
+      transportBlocked,
+      catalogError: message,
+    };
+  }
+
   console.log(source + ": discovered " + items.length + " series");
 
   const rows = [];
@@ -309,33 +327,47 @@ async function auditSource(source) {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const transportBlocked = /HTTP (?:403|429|503)\b/.test(message);
       rows.push({
         source,
         title: label,
         slug: item.slug || "",
         url: item.url || "",
-        issue: true,
+        issue: !transportBlocked,
+        transportBlocked,
         error: message,
       });
-      console.log("[" + (index + 1) + "/" + items.length + "] ERROR " + label + ": " + message);
+      console.log(
+        "[" + (index + 1) + "/" + items.length + "] " +
+        (transportBlocked ? "BLOCKED " : "ERROR ") +
+        label + ": " + message,
+      );
     }
 
     await sleep(delayMs);
   }
 
-  return rows;
+  return {
+    rows,
+    transportBlocked: false,
+    catalogError: null,
+  };
 }
 
 await mkdir("audit-results", { recursive: true });
 
 let issueCount = 0;
+let transportBlockedCount = 0;
 let auditedCount = 0;
 
 for (const source of selectedSources) {
-  const rows = await auditSource(source);
+  const result = await auditSource(source);
+  const rows = result.rows;
   const sourceIssues = rows.filter((row) => row.issue).length;
+  const rowTransportBlocks = rows.filter((row) => row.transportBlocked).length;
   auditedCount += rows.length;
   issueCount += sourceIssues;
+  transportBlockedCount += (result.transportBlocked ? 1 : 0) + rowTransportBlocks;
 
   await writeFile(
     "audit-results/" + source + ".json",
@@ -343,15 +375,31 @@ for (const source of selectedSources) {
       {
         source,
         auditedAt: new Date().toISOString(),
+        status: result.transportBlocked
+          ? "transport-blocked"
+          : result.catalogError
+            ? "catalog-error"
+            : sourceIssues
+              ? "chapter-issues"
+              : rowTransportBlocks
+                ? "partial-transport-block"
+                : "ok",
         seriesCount: rows.length,
         issueCount: sourceIssues,
+        transportBlocked: result.transportBlocked,
+        transportBlockedRows: rowTransportBlocks,
+        catalogError: result.catalogError,
         rows,
       },
       null,
       2,
-    ) + "\\n",
+    ) + "\n",
   );
 }
 
-console.log("\\nAudited " + auditedCount + " series; issues=" + issueCount);
+console.log(
+  "\nAudited " + auditedCount +
+  " series; chapterIssues=" + issueCount +
+  "; transportBlocked=" + transportBlockedCount,
+);
 if (issueCount && failOnIssues) process.exitCode = 1;
