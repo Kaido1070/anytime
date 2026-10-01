@@ -13,12 +13,12 @@ test("reader path carries merged source keys for fallback", () => {
 
   assert.equal(
     path,
-    "/read/starzmanga/overgeared/120?sources=sz%3Aovergeared%2Cml%3Aovergeared",
+    "/read-source/sz%3Aovergeared/120?sources=sz%3Aovergeared%2Cml%3Aovergeared",
   );
 });
 
 test("reader path does not add source context for a single source", () => {
-  assert.equal(readerPath(item, 120), "/read/starzmanga/overgeared/120");
+  assert.equal(readerPath(item, 120), "/read-source/sz%3Aovergeared/120");
 });
 
 test("reader path deduplicates the active source key", () => {
@@ -26,7 +26,7 @@ test("reader path deduplicates the active source key", () => {
 
   assert.equal(
     path,
-    "/read/starzmanga/overgeared/120?sources=sz%3Aovergeared%2Cml%3Aovergeared",
+    "/read-source/sz%3Aovergeared/120?sources=sz%3Aovergeared%2Cml%3Aovergeared",
   );
 });
 
@@ -108,5 +108,45 @@ test("MangaLik canonical reader path keeps merged source context", () => {
   assert.equal(
     readerPath(mangaLikItem, 120, ["sz:overgeared", "ml:overgeared"]),
     "/read-source/ml%3Aovergeared/120?sources=ml%3Aovergeared%2Csz%3Aovergeared",
+  );
+});
+
+
+test("StarzManga reader path preserves a normalized canonical key", () => {
+  const starzItem = {
+    key: "sz:series_name",
+    source: "starzmanga",
+    slug: "series.name",
+  };
+
+  assert.equal(
+    readerPath(starzItem, 12),
+    "/read-source/sz%3Aseries_name/12",
+  );
+});
+
+test("3asq reader path preserves a normalized canonical key", () => {
+  const asqItem = {
+    key: "aq:series_name",
+    source: "3asq",
+    slug: "series.name",
+  };
+
+  assert.equal(
+    readerPath(asqItem, 12),
+    "/read-source/aq%3Aseries_name/12",
+  );
+});
+
+test("Azora reader path preserves a normalized canonical key", () => {
+  const azoraItem = {
+    key: "az:series_name",
+    source: "azora",
+    slug: "series.name",
+  };
+
+  assert.equal(
+    readerPath(azoraItem, 12),
+    "/read-source/az%3Aseries_name/12",
   );
 });
