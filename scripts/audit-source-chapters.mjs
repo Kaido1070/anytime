@@ -83,6 +83,29 @@ function uniqueBy(items, keyFn) {
   return out;
 }
 
+function declaredCatalogCountFromHtml(html) {
+  const text = String(html || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/,/g, "")
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const patterns = [
+    /(?:النتائج|results?)\s*[:：]?\s*(\d{1,7})/i,
+    /(?:تم\s+العثور\s+على)\s*(\d{1,7})\s*(?:سلسلة|عمل)/i,
+    /(\d{1,7})\s*(?:results?|نتيجة|سلسلة)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const count = Number(match?.[1]);
+    if (Number.isInteger(count) && count >= 0) return count;
+  }
+  return null;
+}
+
 function recordCatalogDiagnostic(source, value) {
   catalogDiagnostics.set(source, value);
 }
@@ -92,6 +115,7 @@ async function catalogMangaTime() {
   const seen = new Set();
   let exhausted = false;
   let pages = 0;
+  let declaredTotal = null;
 
   for (let page = 1; page <= maxCatalogPages; page += 1) {
     pages = page;
@@ -100,6 +124,17 @@ async function catalogMangaTime() {
       __test.mangaTimeSearchInput({ page, sortBy: "recent", query: null }),
     );
     const rows = Array.isArray(payload && payload.results) ? payload.results : [];
+    const possibleTotal = Number(
+      payload && (
+        payload.total ??
+        payload.totalCount ??
+        payload.count ??
+        payload.pagination?.total
+      ),
+    );
+    if (Number.isInteger(possibleTotal) && possibleTotal >= 0) {
+      declaredTotal = possibleTotal;
+    }
     if (!rows.length) {
       exhausted = true;
       break;
@@ -134,6 +169,8 @@ async function catalogMangaTime() {
   recordCatalogDiagnostic("mangatime", {
     pages,
     exhausted,
+    declaredTotal,
+    discovered: items.length,
     stopReason: exhausted ? "empty-or-repeated-page" : "page-cap",
   });
   return limited(items);
@@ -155,6 +192,7 @@ async function catalogMadara(source) {
   let stopReason = "page-cap";
   let errorMessage = null;
   let transportBlocked = false;
+  let declaredTotal = null;
 
   for (let page = 1; page <= maxCatalogPages; page += 1) {
     pages = page;
@@ -179,6 +217,7 @@ async function catalogMadara(source) {
       throw error;
     }
 
+    if (page === 1) declaredTotal = declaredCatalogCountFromHtml(html);
     const rows = parser(html);
     if (!rows.length) {
       exhausted = true;
@@ -209,6 +248,8 @@ async function catalogMadara(source) {
   recordCatalogDiagnostic(source, {
     pages,
     exhausted,
+    declaredTotal,
+    discovered: items.length,
     stopReason,
     error: errorMessage,
     transportBlocked,
@@ -280,7 +321,8 @@ async function catalogXsano() {
   recordCatalogDiagnostic("xsano", {
     pages,
     exhausted,
-    reportedTotal: Number.isFinite(total) ? total : null,
+    declaredTotal: Number.isFinite(total) ? total : null,
+    discovered: items.length,
     stopReason: exhausted ? "source-end" : "page-cap",
   });
   return limited(uniqueBy(items, (item) => item.url || item.sourceId));
@@ -294,6 +336,7 @@ async function catalogAzora() {
   let stopReason = "page-cap";
   let errorMessage = null;
   let transportBlocked = false;
+  let declaredTotal = null;
 
   for (let page = 1; page <= maxCatalogPages; page += 1) {
     pages = page;
@@ -319,6 +362,7 @@ async function catalogAzora() {
       throw error;
     }
 
+    if (page === 1) declaredTotal = declaredCatalogCountFromHtml(html);
     const rows = __test.azoraItemsFromHtml(html);
     if (!rows.length) {
       exhausted = true;
@@ -347,6 +391,8 @@ async function catalogAzora() {
   recordCatalogDiagnostic("azora", {
     pages,
     exhausted,
+    declaredTotal,
+    discovered: items.length,
     stopReason,
     error: errorMessage,
     transportBlocked,
@@ -634,7 +680,16 @@ for (const source of selectedSources) {
   auditedCount += rows.length;
   issueCount += sourceIssues;
   transportBlockedCount += (result.transportBlocked ? 1 : 0) + rowTransportBlocks;
-  if (result.catalogDiagnostic && result.catalogDiagnostic.exhausted === false) {
+  if (
+    result.catalogDiagnostic &&
+    (
+      result.catalogDiagnostic.exhausted === false ||
+      (
+        result.catalogDiagnostic.declaredTotal != null &&
+        result.catalogDiagnostic.discovered < result.catalogDiagnostic.declaredTotal
+      )
+    )
+  ) {
     catalogIncompleteCount += 1;
   }
 
