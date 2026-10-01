@@ -24,6 +24,7 @@ export function readerPath(
   item: Pick<SourceManga, "key" | "source" | "slug">,
   chapter: number | string,
   sourceKeys: string[] = [],
+  chapterUrl?: string,
 ) {
   const keys = [...new Set([item.key, ...sourceKeys])]
     .filter((key) => /^(mt|tx|aq|sz|xs|ml|az):[A-Za-z0-9_-]{1,110}$/.test(key));
@@ -41,10 +42,11 @@ export function readerPath(
     ? `/read-source/${encodeURIComponent(item.key)}/${encodeURIComponent(String(chapter))}`
     : `/read/${SOURCE_SEGMENTS[item.source]}/${encodeURIComponent(item.slug)}/${encodeURIComponent(String(chapter))}`;
 
-  if (keys.length <= 1) return path;
+  const search = new URLSearchParams();
+  if (keys.length > 1) search.set("sources", keys.join(","));
+  if (chapterUrl) search.set("chapterUrl", chapterUrl);
 
-  const search = new URLSearchParams({ sources: keys.join(",") });
-  return `${path}?${search.toString()}`;
+  return search.size ? `${path}?${search.toString()}` : path;
 }
 
 export function sourceKeyFromReaderPath(source?: string, work?: string) {
