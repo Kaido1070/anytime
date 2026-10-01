@@ -568,10 +568,45 @@ function parseJsonArray(value) {
   }
 }
 
+function chapterListIdentity(chapter) {
+  const url = String(chapter?.url || "").trim();
+  if (url) return "url:" + url;
+  const number = Number(chapter?.number);
+  const title = cleanText(chapter?.title || "");
+  return "fallback:" + (Number.isFinite(number) ? number : "") + "|" + title;
+}
+
+function mergeChapterLists(...lists) {
+  const byIdentity = new Map();
+
+  for (const list of lists) {
+    for (const chapter of Array.isArray(list) ? list : []) {
+      const identity = chapterListIdentity(chapter);
+      const existing = byIdentity.get(identity);
+      if (!existing) {
+        byIdentity.set(identity, chapter);
+        continue;
+      }
+
+      byIdentity.set(identity, {
+        ...existing,
+        ...chapter,
+        title: cleanText(chapter?.title || existing?.title || ""),
+        publishedAt: chapter?.publishedAt ?? existing?.publishedAt ?? null,
+        url: chapter?.url || existing?.url,
+      });
+    }
+  }
+
+  return [...byIdentity.values()].sort((a, b) =>
+    Number(b?.number ?? Number.NEGATIVE_INFINITY) -
+      Number(a?.number ?? Number.NEGATIVE_INFINITY) ||
+    String(a?.title || "").localeCompare(String(b?.title || "")),
+  );
+}
+
 function moreCompleteChapters(current, candidate) {
-  const first = Array.isArray(current) ? current : [];
-  const second = Array.isArray(candidate) ? candidate : [];
-  return second.length > first.length ? second : first;
+  return mergeChapterLists(current, candidate);
 }
 
 async function recentVerifiedReleasesFromDb(db, source, cutoffIso) {
