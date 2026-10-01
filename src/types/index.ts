@@ -75,6 +75,7 @@ export interface SourceChapterPayload {
   item: SourceManga;
   number: number;
   title: string;
+  chapterUrl?: string | null;
   pages: string[];
   pageMeta?: SourcePageMeta[];
   previous: number | null;
