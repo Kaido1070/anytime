@@ -2867,15 +2867,47 @@ function azoraCoverFromHtml(html, title = "") {
     if (/(?:cover|poster|thumbnail|thumb|series|manga)/i.test(className)) score += 6;
     if (/(?:cover|poster|thumbnail|thumb)/i.test(url)) score += 4;
     if (/\.(?:jpe?g|png|webp|avif)(?:\?|$)/i.test(url)) score += 1;
+
+    // Azora's SEO/social card is a wide image that embeds title, author,
+    // branding and the real poster. It can have the same alt text as the
+    // series, so dimensions must be a hard rejection instead of a score.
     if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
-      if (height > width * 1.15) score += 8;
-      else if (width > height * 1.2) score -= 12;
+      if (width >= height * 1.15) continue;
+      if (height > width * 1.15) score += 10;
     }
 
     if (!best || score > best.score) best = { url, score };
   }
 
-  return best && best.score >= 0 ? best.url : "";
+  return best && best.score >= 1 ? best.url : "";
+}
+
+function azoraPosterFromJsonLd(html, title = "") {
+  const wanted = cleanText(title).toLowerCase();
+  for (const match of String(html ?? "").matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    let payload;
+    try { payload = JSON.parse(decodeEntities(match[1])); } catch { continue; }
+    const nodes = Array.isArray(payload) ? payload : [payload, ...(Array.isArray(payload?.["@graph"]) ? payload["@graph"] : [])];
+    for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      const name = cleanText(node.name || node.headline || "").toLowerCase();
+      if (wanted && name && name !== wanted && !name.includes(wanted) && !wanted.includes(name)) continue;
+      const candidates = [
+        node.image,
+        node.thumbnailUrl,
+        node.thumbnail,
+        node.primaryImageOfPage?.url,
+        node.image?.url,
+        ...(Array.isArray(node.image) ? node.image : []),
+      ];
+      for (const candidate of candidates) {
+        const raw = typeof candidate === "string" ? candidate : candidate?.url || candidate?.contentUrl;
+        const url = resolveAzoraMediaUrl(raw);
+        if (url && !isAzoraUiImage(url) && !isAzoraSocialPreview(url)) return url;
+      }
+    }
+  }
+  return "";
 }
 
 function azoraItemsFromHtml(html) {
@@ -2984,17 +3016,10 @@ async function azoraSeries(db, item) {
     item.title,
   );
   const pageCover = azoraCoverFromHtml(html, title);
-  const metaCover = resolveAzoraMediaUrl(
-    azoraMetaContent(html, ["og:image", "twitter:image", "twitter:image:src"]),
-  );
-  const safeMetaCover =
-    metaCover && !isAzoraUiImage(metaCover) && !isAzoraSocialPreview(metaCover)
-      ? metaCover
-      : "";
-  // Azora's og:image can be a landscape social card containing the title,
-  // branding and only a slice of the real cover. Prefer the actual poster
-  // found in the page, then the listing cover, and use metadata only last.
-  const cover = pageCover || item.cover || safeMetaCover;
+  const structuredCover = azoraPosterFromJsonLd(html, title);
+  // Never fall back to og:image/twitter:image for Azora. Those endpoints
+  // intentionally return a branded landscape SEO card, not the manga poster.
+  const cover = pageCover || item.cover || structuredCover;
   const plain = cleanText(stripTags(html));
   const status = normalizeStatus(
     firstMatch(plain, /الحالة\s*:?\s*(مستمر|مستمرة|مكتمل|مكتملة|متوقف|ملغي|ملغية|توقف مؤقت)/i) ||
