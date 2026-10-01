@@ -164,6 +164,10 @@ export function SourceMangaDetails() {
     highestChapter != null
       ? getContinueChapter(chapters, highestChapter, highestCompleted)
       : firstChapter;
+  const startChapterEntry =
+    startChapter != null
+      ? chapters.find((entry) => Math.abs(Number(entry.number) - Number(startChapter)) < 0.000001)
+      : undefined;
   const isFavorite = data?.favorites.includes(sourceKey);
   const displayTitle = sourceDisplayTitle(item);
   const coverItem = preferredSourceCover(sourceChoices.length ? sourceChoices : [item]) ?? item;
@@ -228,7 +232,7 @@ export function SourceMangaDetails() {
       return;
     }
     setJumpError("");
-    navigate(readerPath(item, chapter.number, requestedSourceKeys));
+    navigate(readerPath(item, chapter.number, requestedSourceKeys, chapter.url));
   };
 
   const goToChapterPage = (nextPage: number) => {
@@ -271,7 +275,7 @@ export function SourceMangaDetails() {
           <div className="genres">{(item.genres ?? []).slice(0, 10).map((genre) => <span key={genre}>{genre}</span>)}</div>
           {item.description && <p className="description" dir="auto">{item.description}</p>}
           <div className="detail-actions">
-            {startChapter != null && <Link className="primary" to={readerPath(item, startChapter, requestedSourceKeys)}>{highestChapter != null ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
+            {startChapter != null && <Link className="primary" to={readerPath(item, startChapter, requestedSourceKeys, startChapterEntry?.url)}>{highestChapter != null ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
             <ListManager mangaId={sourceKey} />
             <button className="secondary" aria-pressed={isFavorite} onClick={() => void favorite(sourceKey)}><Icon name={isFavorite ? "check" : "favorites"} />{isFavorite ? "في المفضلة" : "إضافة للمفضلة"}</button>
           </div>
@@ -343,7 +347,7 @@ export function SourceMangaDetails() {
           const progress = data?.progress[progressKey];
           const done = data?.completed.includes(progressKey);
           return <div key={`${chapter.number}:${chapter.title}`} className={`chapter-row ${progress && !done ? "reading" : ""}`}>
-            <Link className="chapter-row-link" to={readerPath(item, chapter.number, requestedSourceKeys)}>
+            <Link className="chapter-row-link" to={readerPath(item, chapter.number, requestedSourceKeys, chapter.url)}>
               <span className="chapter-number">{chapter.number}</span>
               <div><h3 dir="auto">{chapter.title || `الفصل ${chapter.number}`}</h3><small>{done ? "مقروء" : progress ? `قيد القراءة · ${Math.round(progress.percent)}%` : chapter.publishedAt ? formatGregorianDate(chapter.publishedAt) : "غير مقروء"}</small></div>
               <Icon name="arrow" />
