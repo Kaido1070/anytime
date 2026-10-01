@@ -2819,12 +2819,41 @@ function isAzoraSocialPreview(url) {
     /(?:api|generate)[\/_-]?(?:og|image|card)/i.test(value);
 }
 
+function azoraImageCandidates(html) {
+  const out = [];
+  const seen = new Set();
+  const source = String(html ?? "");
+
+  for (const match of source.matchAll(/<img\b([^>]*)>/gi)) {
+    const attrs = parseAttrs(match[1]);
+    const values = [
+      attrs["data-src"],
+      attrs["data-lazy-src"],
+      attrs["data-original"],
+      attrs["data-url"],
+      attrs["data-lazy"],
+      bestSrcset(attrs["data-srcset"]),
+      bestSrcset(attrs["data-lazy-srcset"]),
+      bestSrcset(attrs.srcset),
+      attrs.src,
+    ].filter(Boolean);
+
+    for (const value of values) {
+      const url = resolveAzoraMediaUrl(value);
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      out.push({ url, attrs });
+    }
+  }
+  return out;
+}
+
 function azoraCoverFromHtml(html, title = "") {
   const wanted = cleanText(title).toLowerCase();
   let best = null;
 
-  for (const image of extractImages(String(html ?? ""))) {
-    const url = resolveAzoraMediaUrl(image.src);
+  for (const image of azoraImageCandidates(html)) {
+    const url = image.url;
     if (!url || isAzoraUiImage(url) || isAzoraSocialPreview(url)) continue;
 
     const label = cleanText(image.attrs.alt || image.attrs.title || "").toLowerCase();
@@ -2833,13 +2862,14 @@ function azoraCoverFromHtml(html, title = "") {
     const height = Number.parseFloat(image.attrs.height || "");
     let score = 0;
 
-    if (wanted && label === wanted) score += 12;
-    else if (wanted && label && (label.includes(wanted) || wanted.includes(label))) score += 7;
-    if (/(?:cover|poster|thumbnail|thumb|series|manga)/i.test(className)) score += 5;
-    if (/(?:cover|poster|thumbnail|thumb)/i.test(url)) score += 3;
+    if (wanted && label === wanted) score += 14;
+    else if (wanted && label && (label.includes(wanted) || wanted.includes(label))) score += 8;
+    if (/(?:cover|poster|thumbnail|thumb|series|manga)/i.test(className)) score += 6;
+    if (/(?:cover|poster|thumbnail|thumb)/i.test(url)) score += 4;
+    if (/\.(?:jpe?g|png|webp|avif)(?:\?|$)/i.test(url)) score += 1;
     if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
-      if (height > width * 1.15) score += 6;
-      else if (width > height * 1.2) score -= 8;
+      if (height > width * 1.15) score += 8;
+      else if (width > height * 1.2) score -= 12;
     }
 
     if (!best || score > best.score) best = { url, score };
