@@ -150,3 +150,36 @@ test("Azora reader keeps the direct slug route used by its chapter URLs", () => 
     "/read/azora/shadow-slave/12",
   );
 });
+
+
+test("reader path carries the exact non-Team-X chapter URL", () => {
+  const azoraItem = {
+    key: "az:youth-set-menu",
+    source: "azora",
+    slug: "youth-set-menu",
+  };
+  const chapterUrl = "https://azorafly.com/series/youth-set-menu/chapter-8-continuation";
+
+  assert.equal(
+    readerPath(azoraItem, 8, [], chapterUrl),
+    "/read/azora/youth-set-menu/8?chapterUrl=" + encodeURIComponent(chapterUrl),
+  );
+});
+
+test("Team-X reader path ignores exact chapter URL metadata", () => {
+  const teamXItem = {
+    key: "tx:example",
+    source: "teamx",
+    slug: "example",
+  };
+
+  assert.equal(
+    readerPath(
+      teamXItem,
+      8,
+      [],
+      "https://olympustaff.com/series/example/chapter-8",
+    ),
+    "/read/teamx/example/8",
+  );
+});
