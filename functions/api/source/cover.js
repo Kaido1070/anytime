@@ -220,18 +220,26 @@ async function mangadarDetailCovers(slug) {
       .replace(/\\u0026/gi, "&")
       .replace(/\\\//g, "/");
     const absolute = absoluteUrl(MANGADAR_BASE, decoded);
-    if (absolute && !rawCandidates.includes(absolute) && !absolute.startsWith("data:")) {
-      rawCandidates.push(absolute);
-    }
+    if (!absolute || absolute.startsWith("data:")) return;
+    if (/(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(absolute)) return;
+    if (!rawCandidates.includes(absolute)) rawCandidates.push(absolute);
   };
 
+  // Strongest source: explicit social metadata for the series page.
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
     const attrs = parseAttrs(tag);
     const key = String(attrs.property || attrs.name || "").toLowerCase();
     if (["og:image", "twitter:image", "twitter:image:src"].includes(key)) addRaw(attrs.content);
   }
 
-  for (const match of html.matchAll(/<img\b([^>]*)>/gi)) {
+  // MangaDar is not treated as generic Madara here. Only inspect the series
+  // cover/summary area; scanning every <img> can select the site logo or UI.
+  const coverScope =
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_image|series-image|manga-thumb|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+    firstMatch(html, /<figure\b[^>]*class=["'][^"']*(?:cover|poster|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/figure>/i) ||
+    "";
+
+  for (const match of coverScope.matchAll(/<img\b([^>]*)>/gi)) {
     const attrs = parseAttrs(match[1]);
     addRaw(attrs["data-src"]);
     addRaw(attrs["data-lazy-src"]);
@@ -251,7 +259,8 @@ async function mangadarDetailCovers(slug) {
           parsed.searchParams.get("imageUrl") ||
           parsed.searchParams.get("image_url");
         if (!nested) break;
-        const decoded = decodeURIComponent(nested);
+        let decoded = nested;
+        try { decoded = decodeURIComponent(nested); } catch {}
         const next = absoluteUrl(parsed.origin, decoded);
         if (!next || next === current) break;
         current = next;
@@ -266,6 +275,7 @@ async function mangadarDetailCovers(slug) {
   for (const candidate of rawCandidates) {
     const direct = unwrap(candidate);
     if (!/^https?:\/\//i.test(direct)) continue;
+    if (/(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(direct)) continue;
 
     let imageResponse;
     try {
