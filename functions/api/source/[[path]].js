@@ -873,15 +873,67 @@ async function syncMangaTimeLatest(db) {
   await Promise.all(workers);
 }
 
+function mangaTimeChapterRows(chapterPayload) {
+  const candidates = [
+    chapterPayload?.chapters,
+    chapterPayload?.items,
+    chapterPayload?.data?.chapters,
+    chapterPayload?.data?.items,
+    chapterPayload?.results,
+  ];
+  return candidates.find(Array.isArray) ?? [];
+}
+
 function mangaTimeChaptersFromPayload(chapterPayload) {
-  return (chapterPayload?.chapters ?? [])
+  return mangaTimeChapterRows(chapterPayload)
     .map((chapter) => ({
-      number: Number(chapter.number),
-      title: String(chapter.title ?? `الفصل ${chapter.number}`),
-      publishedAt: chapter.publishedAt ?? null,
+      number: Number(chapter.number ?? chapter.chapterNumber),
+      title: String(
+        chapter.title ??
+        chapter.name ??
+        `الفصل ${chapter.number ?? chapter.chapterNumber}`,
+      ),
+      publishedAt:
+        chapter.publishedAt ??
+        chapter.published_at ??
+        chapter.createdAt ??
+        null,
+      ...(chapter.id != null || chapter.chapterId != null
+        ? { sourceChapterId: String(chapter.id ?? chapter.chapterId) }
+        : {}),
     }))
     .filter((chapter) => Number.isFinite(chapter.number))
     .sort((a, b) => b.number - a.number);
+}
+
+function mangaTimeChapterTotal(chapterPayload) {
+  const candidates = [
+    chapterPayload?.total,
+    chapterPayload?.totalCount,
+    chapterPayload?.count,
+    chapterPayload?.pagination?.total,
+    chapterPayload?.pagination?.totalCount,
+    chapterPayload?.meta?.total,
+  ];
+  for (const value of candidates) {
+    const total = Number(value);
+    if (Number.isInteger(total) && total >= 0) return total;
+  }
+  return null;
+}
+
+function mangaTimeChapterHasMore(chapterPayload) {
+  const candidates = [
+    chapterPayload?.hasMore,
+    chapterPayload?.has_more,
+    chapterPayload?.pagination?.hasMore,
+    chapterPayload?.pagination?.has_more,
+    chapterPayload?.meta?.hasMore,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "boolean") return value;
+  }
+  return null;
 }
 
 async function mangaTimeList(db, { page, sortBy, query = null }) {
@@ -920,24 +972,83 @@ function mangaTimeSearchInput({ page, sortBy, query = null }) {
 }
 
 async function mangaTimeAllChapters(seriesId) {
-  const attempts = [
-    { seriesId, limit: -1 },
-    { seriesId, limit: 5000 },
-    { seriesId, limit: 20000 },
-  ];
-
   let chapters = [];
   let lastError = null;
+  let declaredTotal = null;
 
-  for (const input of attempts) {
+  // Keep MangaTime's native "all" request first because it is the cheapest
+  // path when the API honors it.
+  try {
+    const payload = await mangaTimeTrpc("content.getChapters", {
+      seriesId,
+      limit: -1,
+    });
+    chapters = mergeChapterLists(
+      chapters,
+      mangaTimeChaptersFromPayload(payload),
+    );
+    declaredTotal = mangaTimeChapterTotal(payload);
+    const hasMore = mangaTimeChapterHasMore(payload);
+    if (
+      (declaredTotal != null && chapters.length >= declaredTotal) ||
+      (hasMore === false && declaredTotal == null)
+    ) {
+      return chapters;
+    }
+  } catch (error) {
+    lastError = error;
+  }
+
+  // Some deployments cap limit=-1 and paginate anyway. Probe the real pages
+  // and merge them until the source reports the end or starts repeating data.
+  const pageSize = 500;
+  for (let page = 1; page <= 100; page += 1) {
+    let payload;
     try {
-      const payload = await mangaTimeTrpc("content.getChapters", input);
-      chapters = moreCompleteChapters(
-        chapters,
-        mangaTimeChaptersFromPayload(payload),
-      );
+      payload = await mangaTimeTrpc("content.getChapters", {
+        seriesId,
+        page,
+        limit: pageSize,
+      });
     } catch (error) {
       lastError = error;
+      break;
+    }
+
+    const pageChapters = mangaTimeChaptersFromPayload(payload);
+    const before = chapters.length;
+    chapters = mergeChapterLists(chapters, pageChapters);
+
+    const total = mangaTimeChapterTotal(payload);
+    if (total != null) declaredTotal = Math.max(declaredTotal ?? 0, total);
+    const hasMore = mangaTimeChapterHasMore(payload);
+
+    if (declaredTotal != null && chapters.length >= declaredTotal) break;
+    if (hasMore === false) break;
+    if (!pageChapters.length || chapters.length === before) break;
+    if (hasMore == null && pageChapters.length < pageSize) break;
+  }
+
+  // Last compatibility pass: if page-based pagination was ignored while the
+  // API still hints at more rows, try offset pagination and stop on repeats.
+  if (declaredTotal != null && chapters.length < declaredTotal) {
+    for (let offset = chapters.length; offset < declaredTotal && offset < 50_000; offset += pageSize) {
+      let payload;
+      try {
+        payload = await mangaTimeTrpc("content.getChapters", {
+          seriesId,
+          offset,
+          limit: pageSize,
+        });
+      } catch (error) {
+        lastError = error;
+        break;
+      }
+
+      const pageChapters = mangaTimeChaptersFromPayload(payload);
+      const before = chapters.length;
+      chapters = mergeChapterLists(chapters, pageChapters);
+      if (!pageChapters.length || chapters.length === before) break;
     }
   }
 
@@ -4972,6 +5083,9 @@ export const __test = {
   priorityRefreshActive,
   sourceRefreshIntervalMs,
   mangaTimeChaptersFromPayload,
+  mangaTimeChapterRows,
+  mangaTimeChapterTotal,
+  mangaTimeChapterHasMore,
   mangaTimeAllChapters,
   mangaTimePagesFromPayload,
   parseMangaTimePages,
