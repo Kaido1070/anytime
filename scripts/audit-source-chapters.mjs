@@ -152,14 +152,37 @@ async function catalogMadara(source) {
   const seen = new Set();
   let exhausted = false;
   let pages = 0;
+  let stopReason = "page-cap";
+  let errorMessage = null;
+  let transportBlocked = false;
 
   for (let page = 1; page <= maxCatalogPages; page += 1) {
     pages = page;
     const url = base + "/manga/page/" + page + "/?m_orderby=latest";
-    const html = await fetchText(url);
+
+    let html;
+    try {
+      html = await fetchText(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (page > 1 && /HTTP 404\b/.test(message)) {
+        exhausted = true;
+        stopReason = "404-end";
+        break;
+      }
+      if (page > 1) {
+        errorMessage = message;
+        transportBlocked = /HTTP (?:403|429|503)\b/.test(message);
+        stopReason = transportBlocked ? "transport-blocked" : "page-error";
+        break;
+      }
+      throw error;
+    }
+
     const rows = parser(html);
     if (!rows.length) {
       exhausted = true;
+      stopReason = "empty-page";
       break;
     }
 
@@ -176,6 +199,7 @@ async function catalogMadara(source) {
     // controls are absent. Stop only when the source returns no new series.
     if (!newRows) {
       exhausted = true;
+      stopReason = "repeated-page";
       break;
     }
 
@@ -185,7 +209,9 @@ async function catalogMadara(source) {
   recordCatalogDiagnostic(source, {
     pages,
     exhausted,
-    stopReason: exhausted ? "empty-or-repeated-page" : "page-cap",
+    stopReason,
+    error: errorMessage,
+    transportBlocked,
   });
   return limited(items);
 }
@@ -265,15 +291,38 @@ async function catalogAzora() {
   const seen = new Set();
   let exhausted = false;
   let pages = 0;
+  let stopReason = "page-cap";
+  let errorMessage = null;
+  let transportBlocked = false;
 
   for (let page = 1; page <= maxCatalogPages; page += 1) {
     pages = page;
     const url = new URL("/series/", BASES.azora);
     if (page > 1) url.searchParams.set("page", String(page));
-    const html = await fetchText(url.toString());
+
+    let html;
+    try {
+      html = await fetchText(url.toString());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (page > 1 && /HTTP 404\b/.test(message)) {
+        exhausted = true;
+        stopReason = "404-end";
+        break;
+      }
+      if (page > 1) {
+        errorMessage = message;
+        transportBlocked = /HTTP (?:403|429|503)\b/.test(message);
+        stopReason = transportBlocked ? "transport-blocked" : "page-error";
+        break;
+      }
+      throw error;
+    }
+
     const rows = __test.azoraItemsFromHtml(html);
     if (!rows.length) {
       exhausted = true;
+      stopReason = "empty-page";
       break;
     }
 
@@ -288,6 +337,7 @@ async function catalogAzora() {
 
     if (!newRows) {
       exhausted = true;
+      stopReason = "repeated-page";
       break;
     }
 
@@ -297,7 +347,9 @@ async function catalogAzora() {
   recordCatalogDiagnostic("azora", {
     pages,
     exhausted,
-    stopReason: exhausted ? "empty-or-repeated-page" : "page-cap",
+    stopReason,
+    error: errorMessage,
+    transportBlocked,
   });
   return limited(items);
 }
