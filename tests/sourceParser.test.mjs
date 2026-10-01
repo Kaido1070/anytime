@@ -795,3 +795,39 @@ test("Azora page parser unwraps Next image URLs in page order", () => {
     "https://cdn.example.com/shadow-slave/002.webp",
   ]);
 });
+
+
+test("Azora recent date parser accepts only strict minute/hour ages", () => {
+  const now = Date.UTC(2026, 9, 1, 10, 0, 0);
+  assert.equal(
+    __test.parseAzoraRecentRelativeAt("منذ 3 ساعات تقريباً", now),
+    new Date(now - 3 * 3_600_000).toISOString(),
+  );
+  assert.equal(__test.parseAzoraRecentRelativeAt("منذ يوم واحد", now), null);
+  assert.equal(__test.parseAzoraRecentRelativeAt("جديد", now), null);
+});
+
+test("Azora chapter publication parser prefers machine timestamps", () => {
+  const html = '<meta property="article:published_time" content="2026-10-01T05:12:34+03:00">';
+  assert.equal(
+    __test.parseAzoraChapterPublishedAt(html),
+    "2026-10-01T02:12:34.000Z",
+  );
+});
+
+test("Azora archive recent candidates reject coarse old rows", () => {
+  const now = Date.UTC(2026, 9, 1, 10, 0, 0);
+  const html = `
+    <a href="/series/alpha/chapter-12">الفصل 12</a><span>منذ ساعتين تقريباً</span>
+    <a href="/series/alpha/chapter-11">الفصل 11</a><span>منذ 3 أيام</span>
+    <a href="/series/beta/chapter-7.5">الفصل 7.5</a><span>جديد</span>
+  `;
+  const rows = __test.azoraRecentArchiveCandidates(html, now);
+  assert.deepEqual(
+    rows.map((row) => [row.slug, row.number, Boolean(row.relativePublishedAt), row.isNew]),
+    [
+      ["alpha", 12, true, false],
+      ["beta", 7.5, false, true],
+    ],
+  );
+});

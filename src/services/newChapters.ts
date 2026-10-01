@@ -12,7 +12,7 @@ import { userDataService } from "./userData";
 // Only sources whose chapter publication timestamps have been explicitly
 // audited may enter the public New feed. Other sources remain available
 // everywhere else in Wany until their date adapters are verified.
-const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq", "teamx", "mangalik", "mangatime", "xsano", "starzmanga"];
+const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq", "teamx", "mangalik", "mangatime", "xsano", "starzmanga", "azora"];
 
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
@@ -23,6 +23,7 @@ const VERIFIED_SOURCE_SCAN_PAGES: Partial<Record<SourceName, number>> = {
   mangatime: 1,
   xsano: 1,
   starzmanga: 1,
+  azora: 1,
 };
 
 export interface FeedChapter {
@@ -328,12 +329,14 @@ export async function loadNewChapterFeed(
     }))
     .sort((a, b) => b.newestAt - a.newestAt || a.id.localeCompare(b.id));
 
-  const followed = groups
+  const followed = all
     .filter((group) => group.trackingStartedAt != null)
     .map((group) => ({
       ...group,
       chapters: group.chapters.filter(
-        (chapter) => chapter.releaseAt > Number(group.trackingStartedAt),
+        (chapter) =>
+          chapter.releaseAt > Number(group.trackingStartedAt) &&
+          !chapter.read,
       ),
     }))
     .filter((group) => group.chapters.length > 0)

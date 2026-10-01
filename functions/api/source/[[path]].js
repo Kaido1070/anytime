@@ -101,7 +101,7 @@ export async function onRequest(context) {
                 ? await xsanoLatest(context, db, page)
                 : source === "mangalik"
                   ? await mangalikLatest(db, page)
-                  : await azoraLatest(db, page);
+                  : await azoraRecent(context, db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -2757,6 +2757,168 @@ function starzHasNext(html) {
 
 // Azora ------------------------------------------------------------------
 
+
+async function azoraRecent(context, db, page) {
+  if (page > 1) return { items: [], hasMore: false, page };
+  const now = Date.now();
+  const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
+  const cached = await recentVerifiedReleasesFromDb(db, "azora", cutoffIso);
+  const state = await db.prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'azora' LIMIT 1").first();
+  const lastStartedAt = Number(state?.last_started_at ?? 0);
+
+  if (now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
+    await db.prepare(`INSERT INTO source_sync_state (source, last_started_at)
+      VALUES ('azora', ?)
+      ON CONFLICT(source) DO UPDATE SET last_started_at = excluded.last_started_at`)
+      .bind(now).run();
+    context.waitUntil(syncAzoraRecent(db, now).catch((error) => {
+      console.error("Azora recent background sync failed", error);
+    }));
+  }
+  return { items: cached, hasMore: false, page };
+}
+
+function parseAzoraRecentRelativeAt(value, now = Date.now()) {
+  const text = cleanText(stripTags(String(value ?? "")))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return null;
+  if (/(?:الآن|just now)/i.test(text)) return new Date(now).toISOString();
+  if (/(?:منذ\s*)?(?:دقيقة واحدة|دقيقة)\b/i.test(text)) return new Date(now - 60_000).toISOString();
+  if (/(?:منذ\s*)?دقيقتين\b/i.test(text)) return new Date(now - 2 * 60_000).toISOString();
+  let match = text.match(/(?:منذ\s*)?(\d+)\s*(?:دقيقة|دقائق|minute|minutes)\s*(?:تقريباً|تقريبا|ago)?/i);
+  if (match) return new Date(now - Number(match[1]) * 60_000).toISOString();
+  if (/(?:منذ\s*)?(?:ساعة واحدة|ساعة)\b/i.test(text)) return new Date(now - 3_600_000).toISOString();
+  if (/(?:منذ\s*)?ساعتين\b/i.test(text)) return new Date(now - 2 * 3_600_000).toISOString();
+  match = text.match(/(?:منذ\s*)?(\d+)\s*(?:ساعة|ساعات|hour|hours)\s*(?:تقريباً|تقريبا|ago)?/i);
+  if (match) return new Date(now - Number(match[1]) * 3_600_000).toISOString();
+  return null;
+}
+
+function parseAzoraChapterPublishedAt(html, now = Date.now()) {
+  const source = String(html ?? "");
+  for (const tag of source.match(/<meta\b[^>]*>/gi) ?? []) {
+    const attrs = parseAttrs(tag);
+    const key = String(attrs.property || attrs.name || attrs.itemprop || "").toLowerCase();
+    if (!["article:published_time","datepublished","date-published","publish_date","published_time"].includes(key)) continue;
+    const parsed = Date.parse(attrs.content || attrs.datetime || "");
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  }
+  for (const match of source.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    let payload;
+    try { payload = JSON.parse(decodeEntities(match[1])); } catch { continue; }
+    const queue = Array.isArray(payload) ? [...payload] : [payload];
+    while (queue.length) {
+      const node = queue.shift();
+      if (!node || typeof node !== "object") continue;
+      if (Array.isArray(node)) { queue.push(...node); continue; }
+      const raw = node.datePublished || node.dateCreated;
+      if (raw) {
+        const parsed = Date.parse(String(raw));
+        if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+      }
+      if (Array.isArray(node["@graph"])) queue.push(...node["@graph"]);
+    }
+  }
+  const machine =
+    firstMatch(source, /\bdatetime=["']([^"']+)["']/i) ||
+    firstMatch(source, /\bdata-(?:published|published-at|datetime|time)=["']([^"']+)["']/i);
+  if (machine) {
+    const parsed = Date.parse(machine);
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  }
+  return parseAzoraRecentRelativeAt(source, now);
+}
+
+function azoraRecentArchiveCandidates(html, now = Date.now()) {
+  const source = String(html ?? "");
+  const regex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  const anchors = [];
+  let match;
+  while ((match = regex.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    const href = absoluteUrl(AZORA_BASE, attrs.href);
+    if (!href) continue;
+    let parsed;
+    try { parsed = new URL(href); } catch { continue; }
+    if (!/^(?:www\.)?azorafly\.com$/i.test(parsed.hostname)) continue;
+    const chapter = parsed.pathname.match(/^\/series\/([^/]+)\/chapter-(\d+(?:\.\d+)?)\/?$/i);
+    if (!chapter) continue;
+    anchors.push({
+      slug: decodeURIComponent(chapter[1]),
+      number: Number(chapter[2]),
+      title: cleanText(stripTags(match[2])) || "الفصل " + chapter[2],
+      url: href,
+      start: match.index,
+      end: regex.lastIndex,
+    });
+  }
+  const out = [];
+  const seen = new Set();
+  for (let index = 0; index < anchors.length; index += 1) {
+    const chapter = anchors[index];
+    const nextStart = anchors[index + 1]?.start ?? Math.min(source.length, chapter.end + 900);
+    const interval = source.slice(chapter.end, Math.min(nextStart, chapter.end + 900));
+    const relativePublishedAt = parseAzoraRecentRelativeAt(interval, now);
+    const isNew = /(?:^|\s)جديد(?:\s|$)/i.test(cleanText(stripTags(interval)));
+    if (!relativePublishedAt && !isNew) continue;
+    const key = chapter.slug + ":" + chapter.number;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...chapter, relativePublishedAt, isNew });
+    if (out.length >= 48) break;
+  }
+  return out;
+}
+
+async function syncAzoraRecent(db, now = Date.now()) {
+  const html = await azoraFetchText("/series/");
+  const items = azoraItemsFromHtml(html);
+  await rememberItems(db, items);
+  const bySlug = new Map(items.map((item) => [item.slug, item]));
+  const candidates = azoraRecentArchiveCandidates(html, now);
+  const cutoff = now - 24 * 60 * 60_000;
+  const byWork = new Map();
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(5, candidates.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= candidates.length) break;
+      const candidate = candidates[index];
+      const item = bySlug.get(candidate.slug);
+      if (!item) continue;
+      try {
+        const chapterHtml = await azoraFetchText(candidate.url);
+        const publishedAt = parseAzoraChapterPublishedAt(chapterHtml, now) || candidate.relativePublishedAt;
+        const timestamp = publishedAt ? Date.parse(publishedAt) : Number.NaN;
+        if (!Number.isFinite(timestamp) || timestamp > now || timestamp <= cutoff) continue;
+        if (!parseAzoraPages(chapterHtml).length) continue;
+        const list = byWork.get(item.key) ?? [];
+        if (list.some((chapter) => Number(chapter.number) === Number(candidate.number))) continue;
+        list.push({
+          number: candidate.number,
+          title: candidate.title || "الفصل " + candidate.number,
+          publishedAt: new Date(timestamp).toISOString(),
+          url: candidate.url,
+        });
+        byWork.set(item.key, list);
+      } catch (error) {
+        console.warn("Azora recent chapter verification skipped", candidate.url, error);
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  for (const item of items) {
+    const chapters = (byWork.get(item.key) ?? [])
+      .sort((a, b) => Date.parse(String(b.publishedAt)) - Date.parse(String(a.publishedAt)))
+      .slice(0, 5);
+    if (chapters.length) await rememberRecentVerifiedChapters(db, { ...item, chapters }, now);
+  }
+}
+
 async function azoraLatest(db, page) {
   const params = new URLSearchParams();
   if (page > 1) params.set("page", String(page));
@@ -4404,6 +4566,9 @@ export const __test = {
   azoraGenreCandidates,
   parseAzoraChapters,
   parseAzoraPages,
+  parseAzoraRecentRelativeAt,
+  parseAzoraChapterPublishedAt,
+  azoraRecentArchiveCandidates,
   starzPostId,
   parseXsanoPages,
   xsanoChapterFeedUrl,
