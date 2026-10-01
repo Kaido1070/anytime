@@ -4147,11 +4147,27 @@ async function proxyImage(source, rawUrl, rawReferer = "") {
     } catch {}
   }
 
-  const fetchImage = (refererBase) => fetch(target, {
-    headers: sourceHeaders(refererBase, imageAccept),
-    redirect: "follow",
-    cf: { cacheTtl: 86400, cacheEverything: true },
-  });
+  const fetchImage = (refererBase) => {
+    const headers = sourceHeaders(refererBase, imageAccept);
+
+    // MangaDar reader images are stricter about the chapter Referer. When the
+    // caller supplied an exact chapter URL, preserve it byte-for-byte instead
+    // of letting sourceHeaders append another "/" (e.g. /65//).
+    if (source === "mangadar" && rawReferer) {
+      try {
+        const exactReferer = new URL(rawReferer, MANGADAR_BASE);
+        if (exactReferer.origin === new URL(MANGADAR_BASE).origin) {
+          headers.Referer = exactReferer.toString();
+        }
+      } catch {}
+    }
+
+    return fetch(target, {
+      headers,
+      redirect: "follow",
+      cf: { cacheTtl: 86400, cacheEverything: true },
+    });
+  };
 
   // Reader images can require the exact chapter URL as Referer. The client
   // already sends it; preserve it here instead of collapsing every request to
