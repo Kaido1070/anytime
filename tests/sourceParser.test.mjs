@@ -770,6 +770,28 @@ test("MangaTime list input omits null query but keeps real searches", () => {
 });
 
 
+test("chapter list recovery prefers the more complete source response", () => {
+  const preview = [{ number: 323 }, { number: 322 }, { number: 0 }];
+  const full = Array.from({ length: 324 }, (_, number) => ({ number }));
+  assert.equal(__test.moreCompleteChapters(preview, full).length, 324);
+  assert.equal(__test.moreCompleteChapters(full, preview).length, 324);
+});
+
+test("Azora recovers chapters embedded in Next payloads beyond the visible preview", () => {
+  const html = `
+    <a href="/series/example/chapter-323">الفصل 323</a>
+    <a href="/series/example/chapter-0">اقرأ الفصل 0</a>
+    <script>
+      self.__next_f.push([1,"\\/series\\/example\\/chapter-322 \\u002Fseries\\u002Fexample\\u002Fchapter-321"]);
+    </script>
+  `;
+  const chapters = __test.parseAzoraChapters(
+    html,
+    "https://azorafly.com/series/example",
+  );
+  assert.deepEqual(chapters.map((chapter) => chapter.number), [323, 322, 321, 0]);
+});
+
 test("Azora parser reads series chapters and metadata", () => {
   const html = `
     <meta name="description" content="وصف Shadow Slave">
