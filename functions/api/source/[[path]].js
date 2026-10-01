@@ -198,6 +198,7 @@ export async function onRequest(context) {
     if (action === "chapter") {
       const key = safeSourceKey(url.searchParams.get("key"));
       const number = Number(url.searchParams.get("number"));
+      const chapterUrl = String(url.searchParams.get("chapterUrl") ?? "").trim().slice(0, 2048);
       if (!key || !Number.isFinite(number) || number < 0) {
         return json({ error: "INVALID_CHAPTER" }, 400);
       }
@@ -208,14 +209,14 @@ export async function onRequest(context) {
         : item.source === "teamx"
           ? await teamXChapter(db, item, number)
           : item.source === "3asq"
-            ? await asqChapter(db, item, number)
+            ? await asqChapter(db, item, number, chapterUrl)
             : item.source === "starzmanga"
-              ? await starzChapter(db, item, number)
+              ? await starzChapter(db, item, number, chapterUrl)
               : item.source === "xsano"
-                ? await xsanoChapter(db, item, number)
+                ? await xsanoChapter(db, item, number, chapterUrl)
                 : item.source === "mangalik"
-                  ? await mangalikChapter(db, item, number)
-                  : await azoraChapter(db, item, number);
+                  ? await mangalikChapter(db, item, number, chapterUrl)
+                  : await azoraChapter(db, item, number, chapterUrl);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
@@ -263,6 +264,19 @@ function safePage(value) {
 function safeSourceKey(value) {
   const key = String(value ?? "").trim();
   return /^(mt|tx|aq|sz|xs|ml|az):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
+}
+
+function safePreferredChapterUrl(value, baseUrl) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw, baseUrl);
+    if (parsed.origin !== new URL(baseUrl).origin) return "";
+    if (!/^https?:$/.test(parsed.protocol)) return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
 }
 
 function shortCache() {
