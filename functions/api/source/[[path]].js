@@ -3739,6 +3739,65 @@ function azoraCompleteSequentialChapters(html, seriesUrl, parsedChapters) {
   return complete.length === declaredCount ? complete : current;
 }
 
+function azoraIsCanonicalOvergeared(seriesUrl) {
+  try {
+    return (
+      new URL(seriesUrl, AZORA_BASE).pathname.replace(/\/$/, "") ===
+      "/series/overgeared-12"
+    );
+  } catch {
+    return false;
+  }
+}
+
+function azoraCompleteOvergearedChapters(html, seriesUrl, parsedChapters) {
+  const current = mergeChapterLists(parsedChapters);
+  if (!azoraIsCanonicalOvergeared(seriesUrl)) return current;
+
+  const declaredCount = azoraDeclaredChapterCount(html);
+  if (!declaredCount) return current;
+
+  const numbered = current.filter((chapter) => {
+    const number = Number(chapter?.number);
+    return Number.isInteger(number) && number >= 0 && number < declaredCount;
+  });
+  if (!numbered.length) return current;
+
+  const max = Math.max(...numbered.map((chapter) => Number(chapter.number)));
+  if (max < 100 || max > declaredCount - 1) return current;
+
+  // Overgeared's Azora series is a known continuous 0..N archive. Azora can
+  // expose duplicate preview/Next routes for the same visible chapter, which
+  // made the generic URL-identity list look "complete" while whole numeric
+  // ranges were still absent. For this one canonical series, collapse rows by
+  // chapter number and restore the missing canonical routes from Azora's own
+  // declared total.
+  const base = String(seriesUrl || "").replace(/\/$/, "");
+  const byNumber = new Map();
+
+  for (const chapter of numbered) {
+    const number = Number(chapter.number);
+    const existing = byNumber.get(number);
+    const canonicalUrl = base + "/chapter-" + number;
+    const isCanonical = String(chapter?.url || "").replace(/\/$/, "") === canonicalUrl;
+    if (!existing || isCanonical) byNumber.set(number, chapter);
+  }
+
+  const complete = [];
+  for (let number = declaredCount - 1; number >= 0; number -= 1) {
+    complete.push(
+      byNumber.get(number) || {
+        number,
+        title: "الفصل " + number,
+        publishedAt: null,
+        url: base + "/chapter-" + number,
+      },
+    );
+  }
+
+  return complete;
+}
+
 function azoraChapterListHasPagination(html) {
   return /(?:عرض\s+المزيد|تحميل\s+المزيد|load\s*more|show\s*more|data-(?:page|paged|next-page|chapter-page|chapters-page)=|[?&](?:page|chapterPage|chaptersPage|chapter_page|chapters_page)=\d+)/i.test(
     cleanText(stripTags(String(html ?? ""))) + " " + String(html ?? ""),
@@ -3750,6 +3809,11 @@ async function azoraCompleteChapterList(html, seriesUrl) {
   let chapters = mergeChapterLists(
     parseAzoraChapters(html, seriesUrl),
   );
+  const isOvergearedCanonical = azoraIsCanonicalOvergeared(seriesUrl);
+
+  if (isOvergearedCanonical && declaredCount != null) {
+    chapters = azoraCompleteOvergearedChapters(html, seriesUrl, chapters);
+  }
 
   const hasPaginationHint = azoraChapterListHasPagination(html);
   if (
@@ -3808,21 +3872,11 @@ async function azoraCompleteChapterList(html, seriesUrl) {
     if (declaredCount != null && chapters.length >= declaredCount) break;
   }
 
-  // Temporary compatibility for the known Azora Overgeared migration. Its
-  // current canonical series is a continuous 0..N list whose old Wany row
-  // pointed at a truncated legacy slug. Keep this exception narrow.
-  let isOvergearedCanonical = false;
-  try {
-    isOvergearedCanonical =
-      new URL(seriesUrl, AZORA_BASE).pathname.replace(/\/$/, "") ===
-      "/series/overgeared-12";
-  } catch {}
-  if (
-    isOvergearedCanonical &&
-    declaredCount != null &&
-    chapters.length < declaredCount
-  ) {
-    chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
+  // Re-apply the narrow Overgeared recovery after any real load-more rows were
+  // merged. This intentionally does not change the fail-closed behavior for
+  // ordinary Azora works.
+  if (isOvergearedCanonical && declaredCount != null) {
+    chapters = azoraCompleteOvergearedChapters(html, seriesUrl, chapters);
   }
 
   return {
@@ -5313,6 +5367,8 @@ export const __test = {
   azoraCanonicalSeriesUrl,
   azoraDeclaredChapterCount,
   azoraCompleteSequentialChapters,
+  azoraIsCanonicalOvergeared,
+  azoraCompleteOvergearedChapters,
   azoraCompleteChapterList,
   azoraChapterListHasPagination,
   moreCompleteChapters,
