@@ -2345,8 +2345,11 @@ async function fetchMadaraCompleteChapterHtml(baseUrl, seriesUrl, code, message)
   };
 
   const first = await request(endpoint.toString());
-  if (!madaraChapterListHasPagination(first)) return first;
 
+  // Do not trust the first archive response as complete. Some Madara themes
+  // hide pagination/load-more state from the returned fragment. Always probe
+  // page 2 once; if it repeats the first batch we stop immediately, otherwise
+  // continue until pages stop adding new chapter URLs.
   const documents = [first];
   const seenUrls = madaraChapterUrls(first, seriesUrl, baseUrl);
   const seenDocuments = new Set([first]);
@@ -2389,7 +2392,8 @@ async function fetchMadaraCompleteChapterHtml(baseUrl, seriesUrl, code, message)
     documents.push(pageHtml);
     for (const url of pageUrls) seenUrls.add(url);
 
-    if (!madaraChapterListHasPagination(pageHtml)) break;
+    // Once a later page adds new rows, keep probing until the source stops
+    // adding URLs. Do not depend on a visible pagination marker in fragments.
   }
 
   return documents.join("\n");
