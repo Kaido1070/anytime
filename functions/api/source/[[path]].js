@@ -2322,7 +2322,9 @@ function madaraDeclaredChapterCount(html) {
     firstMatch(source, /\b(?:chapterCount|chaptersCount|totalChapters)\s*[:=]\s*["']?(\d{1,6})/i),
   ];
   for (const value of attributes) {
-    const count = Number(value);
+    const raw = String(value ?? "").trim();
+    if (!raw) continue;
+    const count = Number(raw);
     if (Number.isInteger(count) && count >= 0) return count;
   }
 
