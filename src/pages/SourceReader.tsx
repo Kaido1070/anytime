@@ -16,6 +16,7 @@ const READER_PRELOAD_MARGIN_SLOW = "700px 0px";
 const PROGRESS_SAVE_DELAY_MS = 60 * 1000;
 const PROGRESS_MIN_DELTA = 3;
 const PROGRESS_NOOP_DELTA = 0.25;
+const READER_IMAGE_RETRY_DELAYS_MS = [900, 2200] as const;
 type NavigatorWithConnection = Navigator & {
   connection?: {
     effectiveType?: string;
@@ -208,6 +209,9 @@ function ReaderChapter({
   const requestedRef = useRef<Set<number>>(new Set(initialPageIndexes));
   const activeRef = useRef<Set<number>>(new Set(initialPageIndexes));
   const queueRef = useRef<number[]>([]);
+  const retryCountRef = useRef<Map<number, number>>(new Map());
+  const retryPendingRef = useRef<Set<number>>(new Set());
+  const retryTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const maxConcurrentRef = useRef(readerConcurrency());
   const [requestedPages, setRequestedPages] = useState<Set<number>>(
     () => new Set(initialPageIndexes),
@@ -246,6 +250,7 @@ function ReaderChapter({
         index < 0 ||
         index >= payload.pages.length ||
         requestedRef.current.has(index) ||
+        retryPendingRef.current.has(index) ||
         queueRef.current.includes(index)
       ) {
         return;
@@ -256,16 +261,96 @@ function ReaderChapter({
     [payload.pages.length, pumpImageQueue],
   );
 
+  const retryPage = useCallback(
+    (index: number) => {
+      const retryCount = retryCountRef.current.get(index) ?? 0;
+      if (retryCount >= READER_IMAGE_RETRY_DELAYS_MS.length) {
+        retryPendingRef.current.delete(index);
+        return;
+      }
+
+      retryPendingRef.current.delete(index);
+      retryCountRef.current.set(index, retryCount + 1);
+      requestPage(index);
+    },
+    [requestPage],
+  );
+
+  const schedulePageRetry = useCallback(
+    (index: number) => {
+      const retryCount = retryCountRef.current.get(index) ?? 0;
+      if (retryCount >= READER_IMAGE_RETRY_DELAYS_MS.length) return false;
+
+      retryPendingRef.current.add(index);
+      const existingTimer = retryTimersRef.current.get(index);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        retryTimersRef.current.delete(index);
+      }
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        return true;
+      }
+
+      const timer = setTimeout(() => {
+        retryTimersRef.current.delete(index);
+        retryPage(index);
+      }, READER_IMAGE_RETRY_DELAYS_MS[retryCount]);
+
+      retryTimersRef.current.set(index, timer);
+      return true;
+    },
+    [retryPage],
+  );
+
   const settlePage = useCallback(
     (index: number, loaded: boolean) => {
       activeRef.current.delete(index);
-      pumpImageQueue();
-      if (loaded && !restoredRef.current && index < INITIAL_READER_PAGES) {
-        window.dispatchEvent(new Event("resize"));
+
+      if (loaded) {
+        retryPendingRef.current.delete(index);
+        retryCountRef.current.delete(index);
+        const timer = retryTimersRef.current.get(index);
+        if (timer) {
+          clearTimeout(timer);
+          retryTimersRef.current.delete(index);
+        }
+
+        if (!restoredRef.current && index < INITIAL_READER_PAGES) {
+          window.dispatchEvent(new Event("resize"));
+        }
+      } else if (schedulePageRetry(index)) {
+        // Remove the failed page from the requested set so the same <img> can
+        // receive its src again on the bounded retry attempt.
+        requestedRef.current.delete(index);
+        setRequestedPages(new Set(requestedRef.current));
       }
+
+      pumpImageQueue();
     },
-    [pumpImageQueue],
+    [pumpImageQueue, schedulePageRetry],
   );
+
+  useEffect(() => {
+    const retryPendingPages = () => {
+      for (const index of [...retryPendingRef.current]) {
+        const timer = retryTimersRef.current.get(index);
+        if (timer) {
+          clearTimeout(timer);
+          retryTimersRef.current.delete(index);
+        }
+        retryPage(index);
+      }
+    };
+
+    window.addEventListener("online", retryPendingPages);
+    return () => {
+      window.removeEventListener("online", retryPendingPages);
+      for (const timer of retryTimersRef.current.values()) clearTimeout(timer);
+      retryTimersRef.current.clear();
+      retryPendingRef.current.clear();
+    };
+  }, [retryPage]);
 
   const selectedChapter = payload.item.chapters?.find(
     (entry) => Number(entry.number) === Number(chapter),
