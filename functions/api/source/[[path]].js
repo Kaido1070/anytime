@@ -279,6 +279,19 @@ function safePreferredChapterUrl(value, baseUrl) {
   }
 }
 
+function preferredChapterUrlForSeries(value, seriesUrl, baseUrl) {
+  const safe = safePreferredChapterUrl(value, baseUrl);
+  if (!safe) return "";
+  try {
+    const chapter = new URL(safe);
+    const series = new URL(seriesUrl || baseUrl, baseUrl);
+    const seriesPath = series.pathname.replace(/\/$/, "");
+    return chapter.pathname.startsWith(seriesPath + "/") ? chapter.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function shortCache() {
   return { "Cache-Control": "private, max-age=45" };
 }
