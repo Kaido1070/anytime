@@ -281,6 +281,16 @@
 .chapter-read-tools button { min-width: 0; min-height: 44px; justify-content: center; white-space: nowrap; }
 .chapter-read-tools button svg { width: 18px; height: 18px; }
 .chapter-jump-error { width: 100%; color: #ff8b80; margin-top: -4px; }
+.chapter-list-warning {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #705a46;
+  border-radius: 9px;
+  background: #2a241e;
+  color: #d8b995;
+  font-size: 11px;
+  line-height: 1.7;
+}
 
 .chapter-pagination {
   display: grid;
