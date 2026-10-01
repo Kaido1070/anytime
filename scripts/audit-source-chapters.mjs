@@ -510,6 +510,7 @@ async function auditSource(source) {
   );
 
   const rows = [];
+  const blockedRetries = [];
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index];
     const label = item.title || item.slug || item.sourceId || ("#" + (index + 1));
@@ -549,6 +550,9 @@ async function auditSource(source) {
         transportBlocked,
         error: message,
       });
+      if (transportBlocked) {
+        blockedRetries.push({ rowIndex: rows.length - 1, item, label });
+      }
       console.log(
         "[" + (index + 1) + "/" + items.length + "] " +
         (transportBlocked ? "BLOCKED " : "ERROR ") +
@@ -557,6 +561,54 @@ async function auditSource(source) {
     }
 
     await sleep(delayMs);
+  }
+
+  if (blockedRetries.length) {
+    console.log(
+      source + ": retrying " + blockedRetries.length +
+      " transport-blocked series after cooldown",
+    );
+    await sleep(Math.max(10_000, delayMs * 4));
+
+    for (const retry of blockedRetries) {
+      try {
+        const result = await auditItem(source, retry.item);
+        const issue =
+          result.complete === false ||
+          (result.declared != null && result.resolved < result.declared);
+
+        rows[retry.rowIndex] = {
+          source,
+          title: retry.label,
+          slug: retry.item.slug || "",
+          url: retry.item.url || "",
+          ...result,
+          issue,
+          transportBlocked: false,
+        };
+
+        console.log(
+          "RETRY " + (issue ? "FAIL " : "OK ") + retry.label +
+          " resolved=" + result.resolved +
+          " declared=" + (result.declared == null ? "?" : result.declared),
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const transportBlocked = /HTTP (?:403|429|503)\b/.test(message);
+        rows[retry.rowIndex] = {
+          ...rows[retry.rowIndex],
+          issue: !transportBlocked,
+          transportBlocked,
+          error: message,
+        };
+        console.log(
+          "RETRY " + (transportBlocked ? "BLOCKED " : "ERROR ") +
+          retry.label + ": " + message,
+        );
+      }
+
+      await sleep(Math.max(delayMs, 1500));
+    }
   }
 
   return {
