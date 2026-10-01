@@ -3288,20 +3288,40 @@ function parseAzoraPages(html) {
 }
 
 async function azoraChapter(db, item, number) {
-  const series = await azoraSeries(db, item);
+  // Opening a readable chapter must not depend on successfully hydrating the
+  // series page first. Azora chapter URLs are stable, while the series page
+  // can fail independently because of metadata/parser/D1 issues.
+  let series = item;
+  try {
+    series = await azoraSeries(db, item);
+  } catch (error) {
+    console.warn("Azora series hydration skipped for reader", item?.key, error);
+  }
+
   const selected = series.chapters?.find(
     (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
   );
-  const chapterUrl =
-    selected?.url ||
-    String(series.url || item.url || "").replace(/\/$/, "") +
-      "/chapter-" +
-      encodeURIComponent(String(number));
-  const html = await azoraFetchText(chapterUrl);
-  const pages = parseAzoraPages(html);
+  const seriesBase =
+    String(series.url || item.url || "").replace(/\/$/, "") ||
+    AZORA_BASE + "/series/" + encodeURIComponent(String(item.slug || ""));
+  const directChapterUrl =
+    seriesBase + "/chapter-" + encodeURIComponent(String(number));
+  const chapterUrl = selected?.url || directChapterUrl;
+
+  let html = await azoraFetchText(chapterUrl);
+  let pages = parseAzoraPages(html);
+
+  // If a stale chapter URL came from cached series metadata, retry Azora's
+  // canonical direct route before declaring the chapter unreadable.
+  if (!pages.length && chapterUrl !== directChapterUrl) {
+    html = await azoraFetchText(directChapterUrl);
+    pages = parseAzoraPages(html);
+  }
+
   if (!pages.length) {
     throw new SourceError("CHAPTER_IMAGES_EMPTY", "Azora لم يرجع صور الفصل.", 502);
   }
+
   return {
     item: series,
     number,
