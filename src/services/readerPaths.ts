@@ -36,8 +36,7 @@ export function readerPath(
     item.source === "xsano" ||
     item.source === "mangalik" ||
     item.source === "starzmanga" ||
-    item.source === "3asq" ||
-    item.source === "azora";
+    item.source === "3asq";
   const path = usesCanonicalKeyRoute
     ? `/read-source/${encodeURIComponent(item.key)}/${encodeURIComponent(String(chapter))}`
     : `/read/${SOURCE_SEGMENTS[item.source]}/${encodeURIComponent(item.slug)}/${encodeURIComponent(String(chapter))}`;
