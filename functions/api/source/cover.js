@@ -32,7 +32,12 @@ export async function onRequestGet({ request, env }) {
   }
 
   const source = String(item.source);
-  const base = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : source === "xsano" ? XSANO_BASE : source === "mangalik" ? MANGALIK_BASE  : MANGATIME_BASE;
+  const base = source === "3asq" ? ASQ_BASE
+    : source === "starzmanga" ? STARZ_BASE
+    : source === "xsano" ? XSANO_BASE
+    : source === "mangalik" ? MANGALIK_BASE
+    : source === "mangadar" ? MANGADAR_BASE
+    : MANGATIME_BASE;
   const storedCover = absoluteUrl(base, item.cover_url);
 
   try {
