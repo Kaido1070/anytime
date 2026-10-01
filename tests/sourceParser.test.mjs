@@ -934,6 +934,44 @@ test("Madara chapter archive follows an explicit load-more page", async () => {
   }
 });
 
+test("Madara chapter archive probes hidden pagination without a visible marker", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = String(options.body ?? "");
+    const page = Number(new URLSearchParams(body).get("page") ?? 1);
+    const html =
+      page === 1
+        ? '<li class="wp-manga-chapter"><a href="/manga/example/chapter-4/">4</a></li>'
+        : page === 2
+          ? '<li class="wp-manga-chapter"><a href="/manga/example/chapter-3/">3</a></li>'
+          : page === 3
+            ? '<li class="wp-manga-chapter"><a href="/manga/example/chapter-2/">2</a></li>'
+            : page === 4
+              ? '<li class="wp-manga-chapter"><a href="/manga/example/chapter-1/">1</a></li>'
+              : '<li class="wp-manga-chapter"><a href="/manga/example/chapter-1/">1</a></li>';
+
+    return new Response(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  };
+
+  try {
+    const html = await __test.fetchMadaraCompleteChapterHtml(
+      "https://example.com",
+      "https://example.com/manga/example/",
+      "TEST",
+      "failed",
+    );
+    assert.match(html, /chapter-4/);
+    assert.match(html, /chapter-3/);
+    assert.match(html, /chapter-2/);
+    assert.match(html, /chapter-1/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Azora Overgeared uses the current canonical series slug", () => {
   assert.equal(
     __test.azoraCanonicalSeriesUrl({
