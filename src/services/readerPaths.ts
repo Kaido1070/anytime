@@ -44,7 +44,7 @@ export function readerPath(
 
   const search = new URLSearchParams();
   if (keys.length > 1) search.set("sources", keys.join(","));
-  if (chapterUrl) search.set("chapterUrl", chapterUrl);
+  if (chapterUrl && item.source !== "teamx") search.set("chapterUrl", chapterUrl);
 
   return search.size ? `${path}?${search.toString()}` : path;
 }
