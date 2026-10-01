@@ -18,14 +18,37 @@ test("reader retries failed images after connectivity returns", () => {
   );
   assert.match(
     readerSource,
-    /window\.addEventListener\("online", retryPendingPages\)/,
+    /window\.addEventListener\("online", retryUnsettledPages\)/,
+  );
+  assert.match(
+    readerSource,
+    /window\.addEventListener\("focus", retryUnsettledPages\)/,
   );
 });
 
-test("failed reader images are released before their bounded retry", () => {
+test("reader retries requested images that never settled on iOS", () => {
   assert.match(
     readerSource,
-    /requestedRef\.current\.delete\(index\);[\s\S]*setRequestedPages\(new Set\(requestedRef\.current\)\)/,
+    /const loadedRef = useRef<Set<number>>\(new Set\(\)\)/,
+  );
+  assert.match(
+    readerSource,
+    /\.\.\.requestedRef\.current/,
+  );
+  assert.match(
+    readerSource,
+    /if \(loadedRef\.current\.has\(index\)\) continue;/,
+  );
+  assert.match(
+    readerSource,
+    /activeRef\.current\.delete\(index\);[\s\S]*requestedRef\.current\.delete\(index\);/,
+  );
+});
+
+test("reader cache-busts bounded image retries", () => {
+  assert.match(
+    readerSource,
+    /wany_retry=\$\{retryVersion\}/,
   );
   assert.match(
     readerSource,
