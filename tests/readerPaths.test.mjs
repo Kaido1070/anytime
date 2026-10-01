@@ -138,15 +138,15 @@ test("3asq reader path preserves a normalized canonical key", () => {
   );
 });
 
-test("Azora reader path preserves a normalized canonical key", () => {
+test("Azora reader keeps the direct slug route used by its chapter URLs", () => {
   const azoraItem = {
-    key: "az:series_name",
+    key: "az:shadow-slave",
     source: "azora",
-    slug: "series.name",
+    slug: "shadow-slave",
   };
 
   assert.equal(
     readerPath(azoraItem, 12),
-    "/read-source/az%3Aseries_name/12",
+    "/read/azora/shadow-slave/12",
   );
 });
