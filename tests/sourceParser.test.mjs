@@ -1109,6 +1109,47 @@ test("Azora restores any provably sequential load-more list from the source coun
   );
 });
 
+test("Azora Overgeared restores every 0..N chapter even when the preview repeats a number", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    return new Response("", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  };
+
+  try {
+    const html = `
+      <div>الفصول ( 342 )</div>
+      <button>عرض المزيد</button>
+      <a href="/series/overgeared-12/chapter-341">الفصل 341</a>
+      <a href="/series/overgeared-12/chapter-341-preview">الفصل 341 معاينة</a>
+      <a href="/series/overgeared-12/chapter-340">الفصل 340</a>
+      <a href="/series/overgeared-12/chapter-0">اقرأ الفصل 0</a>
+    `;
+
+    const result = await __test.azoraCompleteChapterList(
+      html,
+      "https://azorafly.com/series/overgeared-12",
+    );
+
+    assert.equal(fetchCalls, 0);
+    assert.equal(result.complete, true);
+    assert.equal(result.chapters.length, 342);
+    assert.equal(new Set(result.chapters.map((chapter) => chapter.number)).size, 342);
+    assert.equal(result.chapters[0].number, 341);
+    assert.equal(result.chapters.at(-1).number, 0);
+    assert.equal(
+      result.chapters.find((chapter) => chapter.number === 292)?.url,
+      "https://azorafly.com/series/overgeared-12/chapter-292",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Azora keeps distinct same-number chapter rows instead of collapsing them", () => {
   const html = `
     <a href="/series/youth-set-menu/chapter-8">الفصل 8 قائمه طعام اليوم</a>
