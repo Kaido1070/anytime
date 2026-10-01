@@ -320,6 +320,72 @@ test("3asq chapter number parser handles Madara slugs", () => {
 });
 
 
+test("chapter parsers preserve distinct same-number rows by URL identity", () => {
+  const asqHtml = `
+    <li class="wp-manga-chapter"><a href="https://3asq.online/manga/example/chapter-8/">الفصل 8</a></li>
+    <li class="wp-manga-chapter"><a href="https://3asq.online/manga/example/chapter-8-extra/">الفصل 8 تكملة</a></li>
+  `;
+  const starzHtml = `
+    <li class="wp-manga-chapter"><a href="https://starzmanga.com/manga/example/chapter-8/">الفصل 8</a></li>
+    <li class="wp-manga-chapter"><a href="https://starzmanga.com/manga/example/chapter-8-extra/">الفصل 8 تكملة</a></li>
+  `;
+  const mangaLikHtml = `
+    <li class="wp-manga-chapter"><a href="https://mangalik.net/manga/example/8/">الفصل 8</a></li>
+    <li class="wp-manga-chapter"><a href="https://mangalik.net/manga/example/8-extra/">الفصل 8 تكملة</a></li>
+  `;
+
+  assert.equal(
+    __test.parseAsqChapters(asqHtml, "https://3asq.online/manga/example/").length,
+    2,
+  );
+  assert.equal(
+    __test.parseStarzChapters(starzHtml, "https://starzmanga.com/manga/example/").length,
+    2,
+  );
+  assert.equal(
+    __test.parseMangalikChapters(mangaLikHtml, "https://mangalik.net/manga/example/").length,
+    2,
+  );
+});
+
+test("exact source chapter URL selects the right duplicate-number row", () => {
+  const chapters = [
+    {
+      number: 8,
+      title: "الفصل 8",
+      url: "https://azorafly.com/series/example/chapter-8",
+    },
+    {
+      number: 8,
+      title: "الفصل 8 تكملة",
+      url: "https://azorafly.com/series/example/chapter-8-continuation",
+    },
+  ];
+
+  const selected = __test.selectChapterRow(
+    chapters,
+    8,
+    "https://azorafly.com/series/example/chapter-8-continuation",
+    "https://azorafly.com/series/example",
+    "https://azorafly.com",
+  );
+
+  assert.equal(selected.selected.title, "الفصل 8 تكملة");
+  assert.equal(
+    selected.exactUrl,
+    "https://azorafly.com/series/example/chapter-8-continuation",
+  );
+  assert.equal(
+    __test.preferredChapterUrlForSeries(
+      "https://evil.example/chapter-8",
+      "https://azorafly.com/series/example",
+      "https://azorafly.com",
+    ),
+    "",
+  );
+});
+
+
 test("3asq type classifier distinguishes novels and web novels", () => {
   assert.equal(__test.normalizeAsqType("رواية"), "novel");
   assert.equal(__test.normalizeAsqType("رواية ويب"), "web-novel");
