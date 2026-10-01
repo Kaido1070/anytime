@@ -2824,9 +2824,16 @@ function azoraImageCandidates(html) {
   const seen = new Set();
   const source = String(html ?? "");
 
+  const push = (value, attrs = {}, kind = "img") => {
+    const url = resolveAzoraMediaUrl(value);
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push({ url, attrs, kind });
+  };
+
   for (const match of source.matchAll(/<img\b([^>]*)>/gi)) {
     const attrs = parseAttrs(match[1]);
-    const values = [
+    [
       attrs["data-src"],
       attrs["data-lazy-src"],
       attrs["data-original"],
@@ -2836,15 +2843,27 @@ function azoraImageCandidates(html) {
       bestSrcset(attrs["data-lazy-srcset"]),
       bestSrcset(attrs.srcset),
       attrs.src,
-    ].filter(Boolean);
-
-    for (const value of values) {
-      const url = resolveAzoraMediaUrl(value);
-      if (!url || seen.has(url)) continue;
-      seen.add(url);
-      out.push({ url, attrs });
-    }
+    ].filter(Boolean).forEach((value) => push(value, attrs, "img"));
   }
+
+  // Azora renders the real portrait poster as a CSS/lazy background in some
+  // catalogue cards while the nested <img> is the generated landscape SEO
+  // share card. Read those backgrounds explicitly instead of treating the
+  // first <img> as the cover.
+  for (const match of source.matchAll(/\b(?:style|data-bg|data-background|data-background-image)=["']([^"']+)["']/gi)) {
+    const raw = match[1];
+    const urls = [...raw.matchAll(/url\(\s*["']?([^"'\)]+)["']?\s*\)/gi)].map((entry) => entry[1]);
+    if (!urls.length && /^https?:\/\//i.test(raw.trim())) urls.push(raw.trim());
+    urls.forEach((value) => push(value, {}, "background"));
+  }
+
+  for (const match of source.matchAll(/<source\b([^>]*)>/gi)) {
+    const attrs = parseAttrs(match[1]);
+    [bestSrcset(attrs["data-srcset"]), bestSrcset(attrs.srcset), attrs.src]
+      .filter(Boolean)
+      .forEach((value) => push(value, attrs, "source"));
+  }
+
   return out;
 }
 
@@ -2864,6 +2883,8 @@ function azoraCoverFromHtml(html, title = "") {
 
     if (wanted && label === wanted) score += 14;
     else if (wanted && label && (label.includes(wanted) || wanted.includes(label))) score += 8;
+    if (image.kind === "background") score += 16;
+    if (image.kind === "source") score += 5;
     if (/(?:cover|poster|thumbnail|thumb|series|manga)/i.test(className)) score += 6;
     if (/(?:cover|poster|thumbnail|thumb)/i.test(url)) score += 4;
     if (/\.(?:jpe?g|png|webp|avif)(?:\?|$)/i.test(url)) score += 1;
