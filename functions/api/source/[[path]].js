@@ -5218,6 +5218,18 @@ function json(body, status = 200, extraHeaders = {}) {
 }
 
 export const __test = {
+  xsanoFetchJson,
+  xsanoSeriesItemFromEntry,
+  azoraHasNext,
+  mangalikFetchSeriesChapters,
+  mangalikHasNext,
+  mangalikItemsFromHtml,
+  starzFetchSeriesChapters,
+  starzHasNext,
+  starzItemsFromHtml,
+  asqFetchSeriesChapters,
+  asqHasNext,
+  asqItemsFromHtml,
   extractAnchors,
   extractImages,
   parseTeamXChapters,
