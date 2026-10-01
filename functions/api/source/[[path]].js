@@ -3339,37 +3339,53 @@ async function mangalikLatest(db, page) {
 }
 
 function parseMangalikLatestCardChapters(block, seriesUrl, now = Date.now()) {
+  const source = String(block ?? "");
   const base = new URL(seriesUrl, MANGALIK_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
+  const anchors = [];
+  const anchorRegex = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+  let match;
 
-  const anchors = extractAnchors(block)
-    .map((anchor) => {
-      const href = absoluteUrl(MANGALIK_BASE, anchor.href);
-      if (!href) return null;
-      try {
-        const parsed = new URL(href);
-        if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") {
-          return null;
-        }
-        const chapterId = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
-        const title = cleanText(stripTags(anchor.inner)) || chapterId;
-        const number = asqChapterNumber(title, chapterId);
-        if (!Number.isFinite(number)) return null;
-        return { ...anchor, href, title, number };
-      } catch {
-        return null;
+  while ((match = anchorRegex.exec(source))) {
+    const attrs = parseAttrs(match[1]);
+    if (!attrs.href) continue;
+
+    const href = absoluteUrl(MANGALIK_BASE, attrs.href);
+    if (!href) continue;
+
+    try {
+      const parsed = new URL(href);
+      if (!parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") {
+        continue;
       }
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.start - b.start);
+
+      const chapterId = decodeURIComponent(
+        parsed.pathname.slice(basePath.length + 1),
+      ).replace(/\/$/, "");
+      const title = cleanText(stripTags(match[2])) || chapterId;
+      const number = asqChapterNumber(title, chapterId);
+      if (!Number.isFinite(number)) continue;
+
+      anchors.push({
+        start: match.index,
+        href,
+        title,
+        number,
+      });
+    } catch {
+      // Ignore malformed chapter links and keep parsing the same card.
+    }
+  }
+
+  anchors.sort((a, b) => a.start - b.start);
 
   const found = new Map();
   for (let index = 0; index < anchors.length; index += 1) {
     const anchor = anchors[index];
-    const nextStart = anchors[index + 1]?.start ?? block.length;
+    const nextStart = anchors[index + 1]?.start ?? source.length;
     // Date belongs only to the interval after this chapter anchor and before
     // the next chapter anchor. This prevents sibling chapters sharing dates.
-    const row = block.slice(anchor.start, nextStart);
+    const row = source.slice(anchor.start, nextStart);
     const publishedAt = parseMangalikPublishedAt(row, now);
     if (!publishedAt) continue;
 
