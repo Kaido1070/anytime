@@ -28,13 +28,16 @@ export function readerPath(
   const keys = [...new Set([item.key, ...sourceKeys])]
     .filter((key) => /^(mt|tx|aq|sz|xs|ml|az):[A-Za-z0-9_-]{1,110}$/.test(key));
 
-  // MangaTime and XSano use canonical keys that are not guaranteed to match
-  // the public series slug. Keep the real key in the route so direct chapter
-  // opens, refreshes and reader navigation never rebuild the wrong identity.
+  // Keep the canonical source key in the route whenever the stored identity
+  // can differ from the public slug. This prevents safeSlugKey normalization,
+  // hashed ids, punctuation or encoded slugs from rebuilding the wrong key.
   const usesCanonicalKeyRoute =
     item.source === "mangatime" ||
     item.source === "xsano" ||
-    item.source === "mangalik";
+    item.source === "mangalik" ||
+    item.source === "starzmanga" ||
+    item.source === "3asq" ||
+    item.source === "azora";
   const path = usesCanonicalKeyRoute
     ? `/read-source/${encodeURIComponent(item.key)}/${encodeURIComponent(String(chapter))}`
     : `/read/${SOURCE_SEGMENTS[item.source]}/${encodeURIComponent(item.slug)}/${encodeURIComponent(String(chapter))}`;
