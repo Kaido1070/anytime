@@ -1,0 +1,43 @@
+name: Count Large Source Catalogs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/count-large-source-catalog.mjs
+      - .github/workflows/catalog-count.yml
+
+permissions:
+  contents: read
+
+jobs:
+  mangatime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Count MangaTime catalog
+        env:
+          COUNT_SOURCE: mangatime
+          COUNT_DELAY_MS: "250"
+          COUNT_MAX_PAGES: "500"
+        run: node scripts/count-large-source-catalog.mjs
+
+  azora:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+      - name: Count Azora catalog
+        env:
+          COUNT_SOURCE: azora
+          COUNT_DELAY_MS: "250"
+          COUNT_MAX_PAGES: "500"
+        run: node scripts/count-large-source-catalog.mjs
