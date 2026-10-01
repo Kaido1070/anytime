@@ -2278,6 +2278,7 @@ async function asqSeries(db, item) {
     );
   }
 
+  const declaredChapterCount = madaraDeclaredChapterCount(html);
   const updated = {
     ...item,
     type: sourceType || item.type,
@@ -2288,6 +2289,9 @@ async function asqSeries(db, item) {
     genres: normalizedGenres,
     latest: chapters[0]?.number ?? null,
     chapters,
+    declaredChapterCount,
+    chapterListComplete:
+      declaredChapterCount == null ? null : chapters.length >= declaredChapterCount,
   };
   await rememberItems(db, [updated]);
   return updated;
@@ -2303,6 +2307,36 @@ function normalizeAsqType(value) {
   if (/مانجا|manga/.test(type)) return "manga";
   if (/كوميك|comic/.test(type)) return "comic";
   return type || "manga";
+}
+
+function madaraDeclaredChapterCount(html) {
+  const source = String(html ?? "");
+  const plain = cleanText(stripTags(source))
+    .replace(/,/g, "")
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const attributes = [
+    firstMatch(source, /\bdata-(?:chapter-count|chapters-count|total-chapters)=["'](\d{1,6})["']/i),
+    firstMatch(source, /\b(?:chapterCount|chaptersCount|totalChapters)\s*[:=]\s*["']?(\d{1,6})/i),
+  ];
+  for (const value of attributes) {
+    const count = Number(value);
+    if (Number.isInteger(count) && count >= 0) return count;
+  }
+
+  const patterns = [
+    /(?:chapters?|الفصول|عدد\s*الفصول)\s*[:：]?\s*(\d{1,6})/i,
+    /(\d{1,6})\s*(?:chapters?|فصل(?:اً|ا)?)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = plain.match(pattern);
+    const count = Number(match?.[1]);
+    if (Number.isInteger(count) && count >= 0) return count;
+  }
+
+  return null;
 }
 
 function madaraChapterUrls(html, seriesUrl, baseUrl) {
@@ -2829,6 +2863,7 @@ async function starzSeries(db, item) {
       parseStarzChapters(ajaxHtml, seriesUrl),
     );
   }
+  const declaredChapterCount = madaraDeclaredChapterCount(html);
   const updated = {
     ...item,
     sourceId: postId || item.sourceId,
@@ -2840,6 +2875,9 @@ async function starzSeries(db, item) {
     genres: [...new Set(genres)],
     latest: chapters[0]?.number ?? null,
     chapters,
+    declaredChapterCount,
+    chapterListComplete:
+      declaredChapterCount == null ? null : chapters.length >= declaredChapterCount,
   };
   await rememberItems(db, [updated]);
   return updated;
@@ -4202,6 +4240,7 @@ async function mangalikSeries(db, item) {
     parseMangalikChapters(fullChapterHtml, seriesUrl),
   );
 
+  const declaredChapterCount = madaraDeclaredChapterCount(html);
   const updated = {
     ...item,
     type,
@@ -4212,6 +4251,9 @@ async function mangalikSeries(db, item) {
     genres: [...new Set(genres)],
     latest: chapters[0]?.number ?? null,
     chapters,
+    declaredChapterCount,
+    chapterListComplete:
+      declaredChapterCount == null ? null : chapters.length >= declaredChapterCount,
   };
   await rememberItems(db, [updated]);
   return updated;
@@ -5247,6 +5289,7 @@ export const __test = {
   asqSafeSeriesTitle,
   asqLatestItemIsSane,
   parseAsqPages,
+  madaraDeclaredChapterCount,
   madaraChapterUrls,
   madaraChapterListHasPagination,
   fetchMadaraCompleteChapterHtml,
