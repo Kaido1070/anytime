@@ -13,6 +13,56 @@ import { sourceService } from "../services/sources";
 import { saveWorkSnapshot } from "../services/workSnapshots";
 import type { LibraryStatus, SourceManga } from "../types";
 
+const CHAPTERS_PER_PAGE = 100;
+
+function ChapterPagination({
+  page,
+  pages,
+  onPage,
+}: {
+  page: number;
+  pages: number;
+  onPage: (page: number) => void;
+}) {
+  if (pages <= 1) return null;
+
+  return (
+    <nav className="chapter-pagination" aria-label="صفحات الفصول">
+      <button
+        className="secondary"
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+      >
+        السابق
+      </button>
+
+      <label className="chapter-page-select">
+        <span>صفحة</span>
+        <select
+          value={page}
+          onChange={(event) => onPage(Number(event.target.value))}
+          aria-label="اختيار صفحة الفصول"
+        >
+          {Array.from({ length: pages }, (_, index) => index + 1).map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+        <span>من {pages}</span>
+      </label>
+
+      <button
+        className="secondary"
+        type="button"
+        disabled={page >= pages}
+        onClick={() => onPage(page + 1)}
+      >
+        التالي
+      </button>
+    </nav>
+  );
+}
+
 function statusLabel(status?: string) {
   switch (status) {
     case "completed": return "مكتمل";
@@ -45,6 +95,7 @@ export function SourceMangaDetails() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [chapterBusy, setChapterBusy] = useState<number | null>(null);
+  const [chapterPage, setChapterPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -80,6 +131,17 @@ export function SourceMangaDetails() {
     void saveWorkSnapshot(item);
   }, [item]);
 
+  const chapterCount = item?.chapters?.length ?? 0;
+  const chapterPageCount = Math.max(1, Math.ceil(chapterCount / CHAPTERS_PER_PAGE));
+
+  useEffect(() => {
+    setChapterPage(1);
+  }, [sourceKey]);
+
+  useEffect(() => {
+    setChapterPage((current) => Math.min(current, chapterPageCount));
+  }, [chapterPageCount]);
+
   if (loading) return <><Back to={returnTo} /><p className="empty">جاري تحميل القصة والفصول من المصدر…</p></>;
   if (!item || error) return <><Back to={returnTo} /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
 
@@ -90,6 +152,10 @@ export function SourceMangaDetails() {
     .filter((entry): entry is SourceManga => Boolean(entry));
   const chapters = item.chapters ?? [];
   const orderedChapters = [...chapters].sort((a, b) => ascending ? a.number - b.number : b.number - a.number);
+  const visibleChapters = orderedChapters.slice(
+    (chapterPage - 1) * CHAPTERS_PER_PAGE,
+    chapterPage * CHAPTERS_PER_PAGE,
+  );
   const firstChapter = [...chapters].sort((a, b) => a.number - b.number)[0]?.number;
   const highestChapter = libraryEntry?.highestReachedChapter ?? null;
   const highestCompleted =
@@ -165,6 +231,17 @@ export function SourceMangaDetails() {
     navigate(readerPath(item, chapter.number, requestedSourceKeys));
   };
 
+  const goToChapterPage = (nextPage: number) => {
+    const bounded = Math.max(1, Math.min(chapterPageCount, nextPage));
+    setChapterPage(bounded);
+    requestAnimationFrame(() => {
+      document.querySelector(".chapter-heading")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
   return (
     <>
       <Back to={returnTo} />
@@ -208,7 +285,7 @@ export function SourceMangaDetails() {
 
       {!!chapters.length && (
         <div className="chapter-tools">
-          <button className="secondary chapter-sort" onClick={() => setAscending((value) => !value)} aria-label="عكس ترتيب الفصول">
+          <button className="secondary chapter-sort" onClick={() => { setAscending((value) => !value); setChapterPage(1); }} aria-label="عكس ترتيب الفصول">
             <span className="sort-arrows">⇅</span>
             {ascending ? "من الأقدم للأحدث" : "من الأحدث للأقدم"}
           </button>
@@ -239,8 +316,14 @@ export function SourceMangaDetails() {
         </div>
       )}
 
+      <ChapterPagination
+        page={chapterPage}
+        pages={chapterPageCount}
+        onPage={goToChapterPage}
+      />
+
       <div className="chapter-list">
-        {orderedChapters.map((chapter) => {
+        {visibleChapters.map((chapter) => {
           const progressKey = `${sourceKey}:${chapter.number}`;
           const progress = data?.progress[progressKey];
           const done = data?.completed.includes(progressKey);
@@ -260,6 +343,13 @@ export function SourceMangaDetails() {
           </div>;
         })}
       </div>
+
+      <ChapterPagination
+        page={chapterPage}
+        pages={chapterPageCount}
+        onPage={goToChapterPage}
+      />
+
       {!chapters.length && <p className="empty">المصدر ما رجع فصول لهذه القصة.</p>}
     </>
   );
