@@ -2527,7 +2527,7 @@ function parseAsqChapters(html, seriesUrl) {
     const number = asqChapterNumber(title, chapterId);
     if (!Number.isFinite(number)) continue;
 
-    found.set(number, {
+    found.set(new URL(url).pathname.replace(/\\\/$/, ""), {
       number,
       title: title || "الفصل " + number,
       publishedAt: parseAsqPublishedAt(block),
@@ -2945,7 +2945,7 @@ function parseStarzChapters(html, seriesUrl, now = Date.now()) {
     const title = cleanText(stripTags(anchor.inner)) || chapterId;
     const number = asqChapterNumber(title, chapterId);
     if (!Number.isFinite(number)) continue;
-    found.set(number, {
+    found.set(new URL(url).pathname.replace(/\\\/$/, ""), {
       number,
       title: title || "الفصل " + number,
       publishedAt: parseStarzPublishedAt(block, now),
@@ -4263,7 +4263,7 @@ function parseMangalikChapters(html, seriesUrl) {
     const number = asqChapterNumber(title, chapterId);
     if (!Number.isFinite(number)) continue;
 
-    found.set(number, {
+    found.set(new URL(url).pathname.replace(/\\\/$/, ""), {
       number,
       title: title || "الفصل " + number,
       publishedAt: parseMangalikPublishedAt(block),
