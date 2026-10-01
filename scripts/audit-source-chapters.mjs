@@ -19,6 +19,7 @@ const maxItems = Number(process.env.AUDIT_MAX_ITEMS || 0);
 const delayMs = Math.max(0, Number(process.env.AUDIT_DELAY_MS || 350));
 const maxCatalogPages = Math.max(1, Number(process.env.AUDIT_CATALOG_MAX_PAGES || 250));
 const failOnIssues = process.env.AUDIT_FAIL_ON_ISSUES !== "0";
+const catalogDiagnostics = new Map();
 
 for (const source of selectedSources) {
   if (!SOURCES.includes(source)) throw new Error("Unsupported audit source: " + source);
@@ -82,28 +83,60 @@ function uniqueBy(items, keyFn) {
   return out;
 }
 
+function recordCatalogDiagnostic(source, value) {
+  catalogDiagnostics.set(source, value);
+}
+
 async function catalogMangaTime() {
   const items = [];
+  const seen = new Set();
+  let exhausted = false;
+  let pages = 0;
+
   for (let page = 1; page <= maxCatalogPages; page += 1) {
+    pages = page;
     const payload = await __test.mangaTimeTrpc(
       "search.searchSeries",
       __test.mangaTimeSearchInput({ page, sortBy: "recent", query: null }),
     );
     const rows = Array.isArray(payload && payload.results) ? payload.results : [];
-    for (const row of rows) {
-      if (row && row.id != null) {
-        items.push({
-          source: "mangatime",
-          sourceId: String(row.id),
-          slug: String(row.slug || ""),
-          title: String(row.title || row.slug || row.id),
-        });
-      }
+    if (!rows.length) {
+      exhausted = true;
+      break;
     }
-    if (!(payload && payload.hasMore) || !rows.length) break;
+
+    let newRows = 0;
+    for (const row of rows) {
+      if (!row || row.id == null) continue;
+      const id = String(row.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      newRows += 1;
+      items.push({
+        source: "mangatime",
+        sourceId: id,
+        slug: String(row.slug || ""),
+        title: String(row.title || row.slug || row.id),
+      });
+    }
+
+    // The catalogue must end by returning no new identities. We deliberately
+    // do not trust hasMore alone because the whole purpose of this audit is to
+    // catch hidden/secondary pages.
+    if (!newRows) {
+      exhausted = true;
+      break;
+    }
+
     await sleep(delayMs);
   }
-  return limited(uniqueBy(items, (item) => item.sourceId));
+
+  recordCatalogDiagnostic("mangatime", {
+    pages,
+    exhausted,
+    stopReason: exhausted ? "empty-or-repeated-page" : "page-cap",
+  });
+  return limited(items);
 }
 
 async function catalogMadara(source) {
@@ -114,30 +147,59 @@ async function catalogMadara(source) {
       : source === "starzmanga"
         ? __test.starzItemsFromHtml
         : __test.mangalikItemsFromHtml;
-  const hasNext =
-    source === "3asq"
-      ? __test.asqHasNext
-      : source === "starzmanga"
-        ? __test.starzHasNext
-        : __test.mangalikHasNext;
 
   const items = [];
+  const seen = new Set();
+  let exhausted = false;
+  let pages = 0;
+
   for (let page = 1; page <= maxCatalogPages; page += 1) {
+    pages = page;
     const url = base + "/manga/page/" + page + "/?m_orderby=latest";
     const html = await fetchText(url);
-    items.push(...parser(html));
-    if (!hasNext(html)) break;
+    const rows = parser(html);
+    if (!rows.length) {
+      exhausted = true;
+      break;
+    }
+
+    let newRows = 0;
+    for (const item of rows) {
+      const identity = item.url || item.slug;
+      if (!identity || seen.has(identity)) continue;
+      seen.add(identity);
+      newRows += 1;
+      items.push(item);
+    }
+
+    // Always probe the next catalogue page even if the rendered pagination
+    // controls are absent. Stop only when the source returns no new series.
+    if (!newRows) {
+      exhausted = true;
+      break;
+    }
+
     await sleep(delayMs);
   }
-  return limited(uniqueBy(items, (item) => item.url || item.slug));
+
+  recordCatalogDiagnostic(source, {
+    pages,
+    exhausted,
+    stopReason: exhausted ? "empty-or-repeated-page" : "page-cap",
+  });
+  return limited(items);
 }
 
 async function catalogXsano() {
   const entries = [];
+  const seenEntries = new Set();
   let start = 1;
   let total = Number.POSITIVE_INFINITY;
+  let pages = 0;
+  let exhausted = false;
 
-  while (start <= total && start <= maxCatalogPages * 500) {
+  while (start <= total && pages < maxCatalogPages) {
+    pages += 1;
     const url = new URL("/feeds/posts/default/-/Series", BASES.xsano);
     url.searchParams.set("alt", "json");
     url.searchParams.set("orderby", "published");
@@ -147,12 +209,39 @@ async function catalogXsano() {
     const payload = await fetchJson(url.toString());
     const feed = (payload && payload.feed) || {};
     const pageEntries = Array.isArray(feed.entry) ? feed.entry : [];
-    const reportedTotal = Number(feed["openSearch$totalResults"] && feed["openSearch$totalResults"]["$t"]);
-    if (Number.isFinite(reportedTotal)) total = reportedTotal;
-    if (!pageEntries.length) break;
+    const reportedTotal = Number(
+      feed["openSearch$totalResults"] &&
+      feed["openSearch$totalResults"]["$t"],
+    );
+    if (Number.isFinite(reportedTotal) && reportedTotal >= 0) total = reportedTotal;
 
-    entries.push(...pageEntries);
+    if (!pageEntries.length) {
+      exhausted = true;
+      break;
+    }
+
+    let newRows = 0;
+    for (const entry of pageEntries) {
+      const identity =
+        entry && entry.id && entry.id["$t"]
+          ? String(entry.id["$t"])
+          : JSON.stringify(entry && entry.link || entry && entry.title || "");
+      if (!identity || seenEntries.has(identity)) continue;
+      seenEntries.add(identity);
+      entries.push(entry);
+      newRows += 1;
+    }
+
+    if (!newRows) {
+      exhausted = true;
+      break;
+    }
+
     start += pageEntries.length;
+    if (Number.isFinite(total) && start > total) {
+      exhausted = true;
+      break;
+    }
     await sleep(delayMs);
   }
 
@@ -161,20 +250,56 @@ async function catalogXsano() {
     const item = await __test.xsanoSeriesItemFromEntry(entry);
     if (item) items.push(item);
   }
+
+  recordCatalogDiagnostic("xsano", {
+    pages,
+    exhausted,
+    reportedTotal: Number.isFinite(total) ? total : null,
+    stopReason: exhausted ? "source-end" : "page-cap",
+  });
   return limited(uniqueBy(items, (item) => item.url || item.sourceId));
 }
 
 async function catalogAzora() {
   const items = [];
+  const seen = new Set();
+  let exhausted = false;
+  let pages = 0;
+
   for (let page = 1; page <= maxCatalogPages; page += 1) {
+    pages = page;
     const url = new URL("/series/", BASES.azora);
     if (page > 1) url.searchParams.set("page", String(page));
     const html = await fetchText(url.toString());
-    items.push(...__test.azoraItemsFromHtml(html));
-    if (!__test.azoraHasNext(html, page)) break;
+    const rows = __test.azoraItemsFromHtml(html);
+    if (!rows.length) {
+      exhausted = true;
+      break;
+    }
+
+    let newRows = 0;
+    for (const item of rows) {
+      const identity = item.url || item.slug;
+      if (!identity || seen.has(identity)) continue;
+      seen.add(identity);
+      newRows += 1;
+      items.push(item);
+    }
+
+    if (!newRows) {
+      exhausted = true;
+      break;
+    }
+
     await sleep(delayMs);
   }
-  return limited(uniqueBy(items, (item) => item.url || item.slug));
+
+  recordCatalogDiagnostic("azora", {
+    pages,
+    exhausted,
+    stopReason: exhausted ? "empty-or-repeated-page" : "page-cap",
+  });
+  return limited(items);
 }
 
 async function catalog(source) {
@@ -218,14 +343,40 @@ async function auditMadara(source, item) {
   const firstHtml = await fetchText(item.url);
   const visible = parse(firstHtml, item.url);
   const completeHtml = await completeFetch(item.url);
-  const resolved = __test.mergeChapterLists(visible, parse(completeHtml, item.url));
+  let resolved = __test.mergeChapterLists(
+    visible,
+    parse(completeHtml, item.url),
+  );
+
+  // 3asq and Starz also expose WordPress admin-ajax chapter archives on some
+  // themes. Compare that independent route too; a "full" list is the union of
+  // every source-owned chapter archive we can reach.
+  let alternateCount = null;
+  if (source === "3asq") {
+    const postId = __test.asqPostId(firstHtml);
+    if (postId) {
+      const ajaxHtml = await __test.asqFetchChapters(postId, item.url).catch(() => "");
+      const alternate = parse(ajaxHtml, item.url);
+      alternateCount = alternate.length;
+      resolved = __test.mergeChapterLists(resolved, alternate);
+    }
+  } else if (source === "starzmanga") {
+    const postId = __test.starzPostId(firstHtml);
+    if (postId) {
+      const ajaxHtml = await __test.starzFetchChapters(postId).catch(() => "");
+      const alternate = parse(ajaxHtml, item.url);
+      alternateCount = alternate.length;
+      resolved = __test.mergeChapterLists(resolved, alternate);
+    }
+  }
 
   return {
     visible: visible.length,
     resolved: resolved.length,
     declared: null,
-    complete: true,
+    complete: null,
     recovered: Math.max(0, resolved.length - visible.length),
+    alternateCount,
   };
 }
 
@@ -295,7 +446,16 @@ async function auditSource(source) {
     };
   }
 
-  console.log(source + ": discovered " + items.length + " series");
+  const catalogDiagnostic = catalogDiagnostics.get(source) || {
+    pages: null,
+    exhausted: null,
+    stopReason: "unknown",
+  };
+  console.log(
+    source + ": discovered " + items.length +
+    " series; catalogPages=" + catalogDiagnostic.pages +
+    "; exhausted=" + catalogDiagnostic.exhausted,
+  );
 
   const rows = [];
   for (let index = 0; index < items.length; index += 1) {
@@ -351,6 +511,7 @@ async function auditSource(source) {
     rows,
     transportBlocked: false,
     catalogError: null,
+    catalogDiagnostic,
   };
 }
 
@@ -358,6 +519,7 @@ await mkdir("audit-results", { recursive: true });
 
 let issueCount = 0;
 let transportBlockedCount = 0;
+let catalogIncompleteCount = 0;
 let auditedCount = 0;
 
 for (const source of selectedSources) {
@@ -368,6 +530,9 @@ for (const source of selectedSources) {
   auditedCount += rows.length;
   issueCount += sourceIssues;
   transportBlockedCount += (result.transportBlocked ? 1 : 0) + rowTransportBlocks;
+  if (result.catalogDiagnostic && result.catalogDiagnostic.exhausted === false) {
+    catalogIncompleteCount += 1;
+  }
 
   await writeFile(
     "audit-results/" + source + ".json",
@@ -375,6 +540,7 @@ for (const source of selectedSources) {
       {
         source,
         auditedAt: new Date().toISOString(),
+        catalog: result.catalogDiagnostic || null,
         status: result.transportBlocked
           ? "transport-blocked"
           : result.catalogError
@@ -400,6 +566,7 @@ for (const source of selectedSources) {
 console.log(
   "\nAudited " + auditedCount +
   " series; chapterIssues=" + issueCount +
-  "; transportBlocked=" + transportBlockedCount,
+  "; transportBlocked=" + transportBlockedCount +
+  "; catalogIncomplete=" + catalogIncompleteCount,
 );
-if (issueCount && failOnIssues) process.exitCode = 1;
+if ((issueCount || catalogIncompleteCount) && failOnIssues) process.exitCode = 1;
