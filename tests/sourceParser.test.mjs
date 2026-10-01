@@ -850,6 +850,44 @@ test("chapter list recovery prefers the more complete source response", () => {
   assert.equal(__test.moreCompleteChapters(full, preview).length, 324);
 });
 
+test("Azora Overgeared uses the current canonical series slug", () => {
+  assert.equal(
+    __test.azoraCanonicalSeriesUrl({
+      title: "Overgeared",
+      slug: "overgeared",
+      url: "https://azorafly.com/series/overgeared",
+    }),
+    "https://azorafly.com/series/overgeared-12",
+  );
+});
+
+test("Azora Overgeared restores omitted chapter rows from the source-declared count", () => {
+  const html = `
+    <div>الفصول ( 342 )</div>
+    <a href="/series/overgeared-12/chapter-341">الفصل 341</a>
+    <a href="/series/overgeared-12/chapter-340">الفصل 340</a>
+    <a href="/series/overgeared-12/chapter-0">اقرأ الفصل 0</a>
+  `;
+  const parsed = __test.parseAzoraChapters(
+    html,
+    "https://azorafly.com/series/overgeared-12",
+  );
+  const chapters = __test.azoraCompleteOvergearedChapters(
+    html,
+    "https://azorafly.com/series/overgeared-12",
+    parsed,
+  );
+
+  assert.equal(__test.azoraDeclaredChapterCount(html), 342);
+  assert.equal(chapters.length, 342);
+  assert.equal(chapters[0].number, 341);
+  assert.equal(chapters.at(-1).number, 0);
+  assert.equal(
+    chapters.find((chapter) => chapter.number === 292)?.url,
+    "https://azorafly.com/series/overgeared-12/chapter-292",
+  );
+});
+
 test("Azora recovers chapters embedded in Next payloads beyond the visible preview", () => {
   const html = `
     <a href="/series/example/chapter-323">الفصل 323</a>
