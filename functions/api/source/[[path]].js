@@ -3306,8 +3306,78 @@ function parseAzoraChapters(html, seriesUrl) {
   return [...found.values()].sort((a, b) => Number(b.number) - Number(a.number));
 }
 
+function azoraCanonicalSeriesUrl(item) {
+  const title = cleanText(item?.title || "").toLowerCase();
+  const slug = String(item?.slug || "").toLowerCase();
+
+  // Azora migrated Overgeared to a new canonical series slug while the old
+  // Wany source row can still point at /series/overgeared. Keep Wany's source
+  // key stable, but read the current Azora series document.
+  if (title === "overgeared" || slug === "overgeared") {
+    return AZORA_BASE + "/series/overgeared-12";
+  }
+
+  return item?.url || AZORA_BASE + "/series/" + encodeURIComponent(item?.slug || "");
+}
+
+function azoraDeclaredChapterCount(html) {
+  const plain = cleanText(stripTags(String(html ?? "")))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
+
+  const patterns = [
+    /(?:الفصول|chapters?)\s*\(?\s*(\d{1,5})\s*\)?/i,
+    /(?:عدد\s*الفصول|chapter\s*count)\s*:?\s*(\d{1,5})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = plain.match(pattern);
+    const count = Number(match?.[1]);
+    if (Number.isInteger(count) && count > 0 && count <= 10_000) return count;
+  }
+  return null;
+}
+
+function azoraCompleteOvergearedChapters(html, seriesUrl, parsedChapters) {
+  const current = Array.isArray(parsedChapters) ? parsedChapters : [];
+  const numbers = current
+    .map((chapter) => Number(chapter?.number))
+    .filter((number) => Number.isInteger(number) && number >= 0);
+  const max = numbers.length ? Math.max(...numbers) : -1;
+  const hasZero = numbers.includes(0);
+  const declaredCount = azoraDeclaredChapterCount(html);
+
+  // Overgeared on Azora is numbered continuously from chapter 0. The source
+  // currently renders only a preview of the list in HTML, but also exposes its
+  // total chapter count. Use that source-owned count to restore the omitted
+  // rows without changing Wany's source identity.
+  let lastChapter = max;
+  if (declaredCount && (hasZero || max >= 100)) {
+    lastChapter = Math.max(lastChapter, declaredCount - 1);
+  }
+
+  if (lastChapter < 100) return current;
+
+  const existing = new Map(current.map((chapter) => [Number(chapter.number), chapter]));
+  const base = String(seriesUrl || "").replace(/\/$/, "");
+  const complete = [];
+
+  for (let number = lastChapter; number >= 0; number -= 1) {
+    const known = existing.get(number);
+    complete.push(
+      known || {
+        number,
+        title: "الفصل " + number,
+        publishedAt: null,
+        url: base + "/chapter-" + number,
+      },
+    );
+  }
+
+  return complete;
+}
+
 async function azoraSeries(db, item) {
-  const seriesUrl = item.url || AZORA_BASE + "/series/" + encodeURIComponent(item.slug);
+  const seriesUrl = azoraCanonicalSeriesUrl(item);
   const html = await azoraFetchText(seriesUrl);
   const title = cleanText(
     firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -3334,9 +3404,14 @@ async function azoraSeries(db, item) {
     firstMatch(plain, /(?:النوع|type)\s*:?\s*(رواية|مانهوا|مانها|مانغا|مانجا|كوميك|webtoon|manhwa|manhua|manga|novel|comic)/i) ||
     item.type,
   );
-  const chapters = parseAzoraChapters(html, seriesUrl);
+  let chapters = parseAzoraChapters(html, seriesUrl);
+  if (cleanText(title).toLowerCase() === "overgeared") {
+    chapters = azoraCompleteOvergearedChapters(html, seriesUrl, chapters);
+  }
+
   const updated = {
     ...item,
+    url: seriesUrl,
     type,
     title,
     cover,
@@ -4759,6 +4834,9 @@ export const __test = {
   azoraDescription,
   azoraGenreCandidates,
   parseAzoraChapters,
+  azoraCanonicalSeriesUrl,
+  azoraDeclaredChapterCount,
+  azoraCompleteOvergearedChapters,
   moreCompleteChapters,
   parseAzoraPages,
   parseAzoraRecentRelativeAt,
