@@ -568,6 +568,12 @@ function parseJsonArray(value) {
   }
 }
 
+function moreCompleteChapters(current, candidate) {
+  const first = Array.isArray(current) ? current : [];
+  const second = Array.isArray(candidate) ? candidate : [];
+  return second.length > first.length ? second : first;
+}
+
 async function recentVerifiedReleasesFromDb(db, source, cutoffIso) {
   const result = await db
     .prepare(`SELECT
@@ -2009,23 +2015,26 @@ async function asqSeries(db, item) {
   const normalizedGenres = [...new Set(genres)];
 
   const seriesUrl = item.url || ASQ_BASE + "/manga/" + item.slug + "/";
-  let chapterHtml = html;
-  let chapters = parseAsqChapters(chapterHtml, seriesUrl);
+  let chapters = parseAsqChapters(html, seriesUrl);
 
-  // Current 3asq/Madara pages often omit chapter rows from the initial HTML.
-  // Prefer the per-title AJAX chapter route because it does not depend on a post id.
-  if (!chapters.length) {
-    chapterHtml = await asqFetchSeriesChapters(seriesUrl).catch(() => html);
-    chapters = parseAsqChapters(chapterHtml, seriesUrl);
-  }
+  // Madara can render only a preview (recent chapters + the first chapter)
+  // in the initial page. Always compare it with the dedicated full chapter
+  // endpoint instead of treating any non-empty preview as complete.
+  const seriesChapterHtml = await asqFetchSeriesChapters(seriesUrl).catch(() => "");
+  chapters = moreCompleteChapters(
+    chapters,
+    parseAsqChapters(seriesChapterHtml, seriesUrl),
+  );
 
-  // Older Madara layouts expose a post id and use WordPress admin-ajax instead.
-  if (!chapters.length) {
-    const postId = asqPostId(html);
-    if (postId) {
-      chapterHtml = await asqFetchChapters(postId, seriesUrl).catch(() => html);
-      chapters = parseAsqChapters(chapterHtml, seriesUrl);
-    }
+  // Older layouts can also expose a WordPress post id. Keep whichever result
+  // actually contains more chapters.
+  const postId = asqPostId(html);
+  if (postId) {
+    const ajaxHtml = await asqFetchChapters(postId, seriesUrl).catch(() => "");
+    chapters = moreCompleteChapters(
+      chapters,
+      parseAsqChapters(ajaxHtml, seriesUrl),
+    );
   }
 
   const updated = {
@@ -2464,12 +2473,22 @@ async function starzSeries(db, item) {
   const genres = asqGenres(html);
   if (type === "novel" || type === "web-novel") genres.push("روايات");
 
+  let chapters = parseStarzChapters(html, seriesUrl);
+
+  const seriesChapterHtml = await starzFetchSeriesChapters(seriesUrl).catch(() => "");
+  chapters = moreCompleteChapters(
+    chapters,
+    parseStarzChapters(seriesChapterHtml, seriesUrl),
+  );
+
   const postId = starzPostId(html);
-  let chapterHtml = html;
   if (postId) {
-    chapterHtml = await starzFetchChapters(postId).catch(() => html);
+    const ajaxHtml = await starzFetchChapters(postId).catch(() => "");
+    chapters = moreCompleteChapters(
+      chapters,
+      parseStarzChapters(ajaxHtml, seriesUrl),
+    );
   }
-  const chapters = parseStarzChapters(chapterHtml, seriesUrl);
   const updated = {
     ...item,
     sourceId: postId || item.sourceId,
@@ -2494,6 +2513,25 @@ function starzPostId(html) {
       firstMatch(html, /value=["']([^"']+)["'][^>]*class=["'][^"']*rating-post-id/i) ||
       firstMatch(html, /data-post=["']([^"']+)["']/i),
   );
+}
+
+async function starzFetchSeriesChapters(seriesUrl) {
+  const base = new URL(seriesUrl, STARZ_BASE);
+  const chapterUrl = new URL(base.pathname.replace(/\/$/, "") + "/ajax/chapters/", base.origin);
+  const response = await fetch(chapterUrl.toString(), {
+    method: "POST",
+    headers: {
+      ...sourceHeaders(seriesUrl, "text/html,application/xhtml+xml,*/*;q=0.8"),
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: seriesUrl,
+    },
+    body: "",
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: false },
+  });
+  if (!response.ok) throw new SourceError("STARZ_CHAPTERS", "StarzManga لم يرجع قائمة الفصول.", 502);
+  return response.text();
 }
 
 async function starzFetchChapters(postId) {
@@ -3215,6 +3253,34 @@ function parseAzoraChapters(html, seriesUrl) {
     });
   }
 
+  // Azora/Next can keep older chapters inside the RSC/JSON payload while only
+  // rendering a small visible preview as <a> tags. Recover only explicit
+  // chapter routes that already exist in the page payload; never invent a
+  // numeric range of chapters.
+  const embedded = decodeEntities(source)
+    .replace(/\\u002[fF]/g, "/")
+    .replace(/\\u003[aA]/g, ":")
+    .replace(/\\\//g, "/");
+  const chapterRoute = /(?:https?:\/\/(?:www\.)?azorafly\.com)?(\/series\/[^"'<>\\\s?#]+\/chapter-(\d+(?:\.\d+)?))\/?/gi;
+  let routeMatch;
+  while ((routeMatch = chapterRoute.exec(embedded))) {
+    let parsed;
+    try {
+      parsed = new URL(routeMatch[1], AZORA_BASE);
+    } catch {
+      continue;
+    }
+    if (parsed.origin !== base.origin || !parsed.pathname.startsWith(prefix)) continue;
+    const number = Number(routeMatch[2]);
+    if (!Number.isFinite(number) || found.has(number)) continue;
+    found.set(number, {
+      number,
+      title: "الفصل " + number,
+      publishedAt: null,
+      url: parsed.toString(),
+    });
+  }
+
   return [...found.values()].sort((a, b) => Number(b.number) - Number(a.number));
 }
 
@@ -3612,7 +3678,13 @@ async function mangalikSeries(db, item) {
   const genres = asqGenres(html);
   if (type === "novel" || type === "web-novel") genres.push("روايات");
 
-  const chapters = parseMangalikChapters(html, seriesUrl);
+  let chapters = parseMangalikChapters(html, seriesUrl);
+  const fullChapterHtml = await mangalikFetchSeriesChapters(seriesUrl).catch(() => "");
+  chapters = moreCompleteChapters(
+    chapters,
+    parseMangalikChapters(fullChapterHtml, seriesUrl),
+  );
+
   const updated = {
     ...item,
     type,
@@ -3626,6 +3698,25 @@ async function mangalikSeries(db, item) {
   };
   await rememberItems(db, [updated]);
   return updated;
+}
+
+async function mangalikFetchSeriesChapters(seriesUrl) {
+  const base = new URL(seriesUrl, MANGALIK_BASE);
+  const chapterUrl = new URL(base.pathname.replace(/\/$/, "") + "/ajax/chapters/", base.origin);
+  const response = await fetch(chapterUrl.toString(), {
+    method: "POST",
+    headers: {
+      ...sourceHeaders(seriesUrl, "text/html,application/xhtml+xml,*/*;q=0.8"),
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      Referer: seriesUrl,
+    },
+    body: "",
+    redirect: "follow",
+    cf: { cacheTtl: 30, cacheEverything: false },
+  });
+  if (!response.ok) throw new SourceError("MANGALIK_CHAPTERS", "MangaLik لم يرجع قائمة الفصول.", 502);
+  return response.text();
 }
 
 function parseMangalikPublishedAt(block, now = Date.now()) {
@@ -4629,6 +4720,7 @@ export const __test = {
   azoraDescription,
   azoraGenreCandidates,
   parseAzoraChapters,
+  moreCompleteChapters,
   parseAzoraPages,
   parseAzoraRecentRelativeAt,
   parseAzoraChapterPublishedAt,
