@@ -57,8 +57,24 @@ export async function onRequestGet({ request, env }) {
       return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
     }
 
-    if (source === "3asq" || source === "starzmanga" || source === "mangalik" || source === "mangadar") {
-      const detailBase = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : source === "mangalik" ? MANGALIK_BASE : MANGADAR_BASE;
+    if (source === "mangadar") {
+      const detailCovers = await mangadarDetailCovers(String(item.slug || ""));
+      const stableCover = detailCovers[0] || storedCover;
+      const covers = [...new Set([...detailCovers, storedCover].filter(Boolean))];
+
+      if (stableCover) {
+        await env.DB
+          .prepare("UPDATE source_items SET cover_url = ?, updated_at = ? WHERE source_key = ?")
+          .bind(stableCover, Date.now(), key)
+          .run()
+          .catch(() => undefined);
+      }
+
+      return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
+    }
+
+    if (source === "3asq" || source === "starzmanga" || source === "mangalik") {
+      const detailBase = source === "3asq" ? ASQ_BASE : source === "starzmanga" ? STARZ_BASE : MANGALIK_BASE;
       const detailCovers = await madaraDetailCovers(detailBase, String(item.slug || ""));
       const stableCover = detailCovers[0] || storedCover;
       const covers = buildCoverCandidates(...detailCovers, storedCover);
@@ -179,6 +195,98 @@ async function bloggerDetailCovers(itemUrl) {
   for (const value of srcsetCandidates(attrs.srcset)) add(value);
   add(attrs.src);
   return candidates;
+}
+
+async function mangadarDetailCovers(slug) {
+  const target = new URL(`/manga/${encodeURIComponent(slug)}/`, MANGADAR_BASE);
+  const response = await fetch(target, {
+    headers: sourceHeaders(
+      MANGADAR_BASE,
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    ),
+    redirect: "follow",
+    cf: { cacheTtl: 3600, cacheEverything: true },
+  });
+  if (!response.ok) throw new Error(`MangaDar cover HTTP ${response.status}`);
+
+  const html = await response.text();
+  const rawCandidates = [];
+
+  const addRaw = (value) => {
+    if (!value) return;
+    const decoded = decodeEntities(String(value))
+      .replace(/\\u002[fF]/gi, "/")
+      .replace(/\\u003[aA]/gi, ":")
+      .replace(/\\u0026/gi, "&")
+      .replace(/\\\//g, "/");
+    const absolute = absoluteUrl(MANGADAR_BASE, decoded);
+    if (absolute && !rawCandidates.includes(absolute) && !absolute.startsWith("data:")) {
+      rawCandidates.push(absolute);
+    }
+  };
+
+  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    const attrs = parseAttrs(tag);
+    const key = String(attrs.property || attrs.name || "").toLowerCase();
+    if (["og:image", "twitter:image", "twitter:image:src"].includes(key)) addRaw(attrs.content);
+  }
+
+  for (const match of html.matchAll(/<img\b([^>]*)>/gi)) {
+    const attrs = parseAttrs(match[1]);
+    addRaw(attrs["data-src"]);
+    addRaw(attrs["data-lazy-src"]);
+    for (const value of srcsetCandidates(attrs.srcset)) addRaw(value);
+    addRaw(attrs.src);
+  }
+
+  const unwrap = (value) => {
+    let current = value;
+    for (let depth = 0; depth < 4; depth += 1) {
+      try {
+        const parsed = new URL(current);
+        const nested =
+          parsed.searchParams.get("url") ||
+          parsed.searchParams.get("src") ||
+          parsed.searchParams.get("image") ||
+          parsed.searchParams.get("imageUrl") ||
+          parsed.searchParams.get("image_url");
+        if (!nested) break;
+        const decoded = decodeURIComponent(nested);
+        const next = absoluteUrl(parsed.origin, decoded);
+        if (!next || next === current) break;
+        current = next;
+      } catch {
+        break;
+      }
+    }
+    return current;
+  };
+
+  const resolved = [];
+  for (const candidate of rawCandidates) {
+    const direct = unwrap(candidate);
+    if (!/^https?:\/\//i.test(direct)) continue;
+
+    let imageResponse;
+    try {
+      imageResponse = await fetch(direct, {
+        headers: sourceHeaders(MANGADAR_BASE, "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"),
+        redirect: "follow",
+        signal: AbortSignal.timeout(8_000),
+        cf: { cacheTtl: 3600, cacheEverything: true },
+      });
+    } catch {
+      continue;
+    }
+
+    const type = String(imageResponse.headers.get("Content-Type") || "").toLowerCase();
+    try { await imageResponse.body?.cancel(); } catch {}
+    if (!imageResponse.ok || !type.startsWith("image/")) continue;
+    if (!resolved.includes(direct)) resolved.push(direct);
+    if (resolved.length >= 4) break;
+  }
+
+  return resolved;
 }
 
 async function madaraDetailCovers(base, slug) {
