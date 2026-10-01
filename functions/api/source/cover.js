@@ -59,8 +59,10 @@ export async function onRequestGet({ request, env }) {
 
     if (source === "azora") {
       const detailCovers = await azoraDetailCovers(String(item.slug || ""));
-      const stableCover = detailCovers[0] || storedCover;
-      const covers = [...new Set([...detailCovers, storedCover].filter(Boolean))];
+      const safeStoredCover =
+        storedCover && !isAzoraSocialPreviewUrl(storedCover) ? storedCover : "";
+      const stableCover = detailCovers[0] || safeStoredCover;
+      const covers = [...new Set([...detailCovers, safeStoredCover].filter(Boolean))];
 
       if (stableCover) {
         await env.DB
@@ -197,6 +199,12 @@ async function bloggerDetailCovers(itemUrl) {
   return candidates;
 }
 
+function isAzoraSocialPreviewUrl(url) {
+  const value = String(url || "");
+  return /(?:^|[\/_-])(?:og|opengraph|open-graph|social|share|preview|card)(?:[\/_?.-]|$)/i.test(value) ||
+    /(?:api|generate)[\/_-]?(?:og|image|card)/i.test(value);
+}
+
 async function azoraDetailCovers(slug) {
   const target = new URL("/series/" + encodeURIComponent(slug), AZORA_BASE);
   const response = await fetch(target, {
@@ -210,41 +218,19 @@ async function azoraDetailCovers(slug) {
   if (!response.ok) throw new Error("Azora cover HTTP " + response.status);
 
   const html = await response.text();
-  const rawCandidates = [];
-  const addRaw = (value) => {
-    if (!value) return;
-    const decoded = decodeEntities(String(value))
+  const title = decodeEntities(firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i))
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+  const unwrap = (value) => {
+    let current = absoluteUrl(AZORA_BASE, decodeEntities(String(value || ""))
       .replace(/\\u002[fF]/gi, "/")
       .replace(/\\u003[aA]/gi, ":")
       .replace(/\\u0026/gi, "&")
-      .replace(/\\\//g, "/");
-    const absolute = absoluteUrl(AZORA_BASE, decoded);
-    if (!absolute || absolute.startsWith("data:")) return;
-    if (/(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(absolute)) return;
-    if (!rawCandidates.includes(absolute)) rawCandidates.push(absolute);
-  };
-
-  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
-    const attrs = parseAttrs(tag);
-    const key = String(attrs.property || attrs.name || "").toLowerCase();
-    if (["og:image", "twitter:image", "twitter:image:src"].includes(key)) addRaw(attrs.content);
-  }
-
-  const coverScope =
-    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:cover|poster|thumbnail|series-image|series-cover)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
-    firstMatch(html, /<figure\b[^>]*class=["'][^"']*(?:cover|poster|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/figure>/i) ||
-    "";
-  for (const match of coverScope.matchAll(/<img\b([^>]*)>/gi)) {
-    const attrs = parseAttrs(match[1]);
-    addRaw(attrs["data-src"]);
-    addRaw(attrs["data-lazy-src"]);
-    for (const value of srcsetCandidates(attrs.srcset)) addRaw(value);
-    addRaw(attrs.src);
-  }
-
-  const unwrap = (value) => {
-    let current = value;
-    for (let depth = 0; depth < 4; depth += 1) {
+      .replace(/\\\//g, "/"));
+    for (let depth = 0; depth < 4 && current; depth += 1) {
       try {
         const parsed = new URL(current);
         const nested =
@@ -263,17 +249,77 @@ async function azoraDetailCovers(slug) {
         break;
       }
     }
-    return current;
+    return current || "";
   };
 
-  const resolved = [];
-  for (const candidate of rawCandidates) {
-    const direct = unwrap(candidate);
-    if (!/^https?:\/\//i.test(direct)) continue;
+  const candidates = [];
+  const seen = new Set();
+  const add = (value, attrs = {}, kind = "img") => {
+    const url = unwrap(value);
+    if (!url || seen.has(url) || url.startsWith("data:")) return;
+    if (/(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(url)) return;
+    if (isAzoraSocialPreviewUrl(url)) return;
 
+    const label = decodeEntities(String(attrs.alt || attrs.title || ""))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    const className = String(attrs.class || "");
+    const width = Number.parseFloat(attrs.width || "");
+    const height = Number.parseFloat(attrs.height || "");
+    let score = 0;
+
+    if (title && label === title) score += 14;
+    else if (title && label && (label.includes(title) || title.includes(label))) score += 8;
+    if (kind === "background") score += 16;
+    if (kind === "source") score += 5;
+    if (/(?:cover|poster|thumbnail|thumb|series|manga)/i.test(className)) score += 6;
+    if (/(?:cover|poster|thumbnail|thumb)/i.test(url)) score += 4;
+    if (/\.(?:jpe?g|png|webp|avif)(?:\?|$)/i.test(url)) score += 1;
+
+    // Azora's SEO card is landscape. Reject it even if its alt matches title.
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+      if (width >= height * 1.15) return;
+      if (height > width * 1.15) score += 10;
+    }
+
+    if (score < 1) return;
+    seen.add(url);
+    candidates.push({ url, score });
+  };
+
+  for (const match of html.matchAll(/<img\b([^>]*)>/gi)) {
+    const attrs = parseAttrs(match[1]);
+    add(attrs["data-src"], attrs);
+    add(attrs["data-lazy-src"], attrs);
+    add(attrs["data-original"], attrs);
+    add(attrs["data-url"], attrs);
+    for (const value of srcsetCandidates(attrs["data-srcset"])) add(value, attrs);
+    for (const value of srcsetCandidates(attrs.srcset)) add(value, attrs);
+    add(attrs.src, attrs);
+  }
+
+  for (const match of html.matchAll(/\b(?:style|data-bg|data-background|data-background-image)=["']([^"']+)["']/gi)) {
+    const raw = match[1];
+    const urls = [...raw.matchAll(/url\(\s*["']?([^"'\)]+)["']?\s*\)/gi)].map((entry) => entry[1]);
+    if (!urls.length && /^https?:\/\//i.test(raw.trim())) urls.push(raw.trim());
+    for (const value of urls) add(value, {}, "background");
+  }
+
+  for (const match of html.matchAll(/<source\b([^>]*)>/gi)) {
+    const attrs = parseAttrs(match[1]);
+    for (const value of srcsetCandidates(attrs["data-srcset"])) add(value, attrs, "source");
+    for (const value of srcsetCandidates(attrs.srcset)) add(value, attrs, "source");
+    add(attrs.src, attrs, "source");
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  const resolved = [];
+  for (const candidate of candidates) {
     let imageResponse;
     try {
-      imageResponse = await fetch(direct, {
+      imageResponse = await fetch(candidate.url, {
         headers: sourceHeaders(AZORA_BASE, "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"),
         redirect: "follow",
         signal: AbortSignal.timeout(8_000),
@@ -285,9 +331,10 @@ async function azoraDetailCovers(slug) {
     const type = String(imageResponse.headers.get("Content-Type") || "").toLowerCase();
     try { await imageResponse.body?.cancel(); } catch {}
     if (!imageResponse.ok || !type.startsWith("image/")) continue;
-    if (!resolved.includes(direct)) resolved.push(direct);
+    if (!resolved.includes(candidate.url)) resolved.push(candidate.url);
     if (resolved.length >= 4) break;
   }
+
   return resolved;
 }
 

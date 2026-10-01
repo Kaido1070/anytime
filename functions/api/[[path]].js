@@ -835,6 +835,14 @@ async function route(request, url, db, covers) {
 
   const snapshotCoverKey = (userId, mangaId) =>
     `covers/${encodeURIComponent(String(userId))}/${encodeURIComponent(String(mangaId))}`;
+  const snapshotCoverVersion = (coverSourceUrl, coverSize) => {
+    const value = `${String(coverSourceUrl || "")}|${Number(coverSize || 0)}`;
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+      hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  };
 
   if (path === "work-snapshots/cover") {
     const mangaId = safeId(url.searchParams.get("key"));
@@ -990,7 +998,7 @@ async function route(request, url, db, covers) {
           row.cover_source_url == null ? null : String(row.cover_source_url),
         coverUrl:
           Number(row.cover_size ?? 0) > 0
-            ? `/api/work-snapshots/cover?key=${encodeURIComponent(String(row.manga_id))}`
+            ? `/api/work-snapshots/cover?key=${encodeURIComponent(String(row.manga_id))}&v=${snapshotCoverVersion(row.cover_source_url, row.cover_size)}`
             : null,
         lastReadChapter:
           row.last_read_chapter == null ? null : Number(row.last_read_chapter),

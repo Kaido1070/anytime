@@ -3038,9 +3038,14 @@ async function azoraSeries(db, item) {
   );
   const pageCover = azoraCoverFromHtml(html, title);
   const structuredCover = azoraPosterFromJsonLd(html, title);
-  // Never fall back to og:image/twitter:image for Azora. Those endpoints
-  // intentionally return a branded landscape SEO card, not the manga poster.
-  const cover = pageCover || item.cover || structuredCover;
+  const storedCover = resolveAzoraMediaUrl(item.cover);
+  const safeStoredCover =
+    storedCover && !isAzoraUiImage(storedCover) && !isAzoraSocialPreview(storedCover)
+      ? storedCover
+      : "";
+  // Prefer a poster verified from the current series page/JSON-LD. A stale
+  // source_items.cover_url may still contain Azora's branded SEO/social card.
+  const cover = pageCover || structuredCover || safeStoredCover;
   const plain = cleanText(stripTags(html));
   const status = normalizeStatus(
     firstMatch(plain, /الحالة\s*:?\s*(مستمر|مستمرة|مكتمل|مكتملة|متوقف|ملغي|ملغية|توقف مؤقت)/i) ||
