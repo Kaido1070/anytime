@@ -11,6 +11,8 @@ function sourceFromKey(key: string): SourceManga["source"] {
   if (key.startsWith("aq:")) return "3asq";
   if (key.startsWith("sz:")) return "starzmanga";
   if (key.startsWith("xs:")) return "xsano";
+  if (key.startsWith("ml:")) return "mangalik";
+  if (key.startsWith("az:")) return "azora";
   return "mangalik";
 }
 

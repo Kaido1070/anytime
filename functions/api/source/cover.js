@@ -4,7 +4,7 @@ const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
 const XSANO_BASE = "https://www.xsano-manga.com";
 const MANGALIK_BASE = "https://mangalik.net";
-const MANGADAR_BASE = "https://mangadar.com";
+const AZORA_BASE = "https://azorafly.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -18,7 +18,7 @@ export async function onRequestGet({ request, env }) {
 
   const url = new URL(request.url);
   const key = String(url.searchParams.get("key") ?? "").trim();
-  if (!/^(?:mt|aq|sz|xs|ml|md):[A-Za-z0-9_-]{1,110}$/.test(key)) {
+  if (!/^(?:mt|aq|sz|xs|ml|az):[A-Za-z0-9_-]{1,110}$/.test(key)) {
     return json({ error: "INVALID_SOURCE_KEY" }, 400);
   }
 
@@ -27,7 +27,7 @@ export async function onRequestGet({ request, env }) {
     .bind(key)
     .first();
 
-  if (!item || !["mangatime", "3asq", "starzmanga", "xsano", "mangalik", "mangadar"].includes(String(item.source))) {
+  if (!item || !["mangatime", "3asq", "starzmanga", "xsano", "mangalik", "azora"].includes(String(item.source))) {
     return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
   }
 
@@ -36,7 +36,7 @@ export async function onRequestGet({ request, env }) {
     : source === "starzmanga" ? STARZ_BASE
     : source === "xsano" ? XSANO_BASE
     : source === "mangalik" ? MANGALIK_BASE
-    : source === "mangadar" ? MANGADAR_BASE
+    : source === "azora" ? AZORA_BASE
     : MANGATIME_BASE;
   const storedCover = absoluteUrl(base, item.cover_url);
 
@@ -57,8 +57,8 @@ export async function onRequestGet({ request, env }) {
       return json({ covers }, 200, { "Cache-Control": "private, max-age=3600" });
     }
 
-    if (source === "mangadar") {
-      const detailCovers = await mangadarDetailCovers(String(item.slug || ""));
+    if (source === "azora") {
+      const detailCovers = await azoraDetailCovers(String(item.slug || ""));
       const stableCover = detailCovers[0] || storedCover;
       const covers = [...new Set([...detailCovers, storedCover].filter(Boolean))];
 
@@ -197,21 +197,20 @@ async function bloggerDetailCovers(itemUrl) {
   return candidates;
 }
 
-async function mangadarDetailCovers(slug) {
-  const target = new URL(`/manga/${encodeURIComponent(slug)}/`, MANGADAR_BASE);
+async function azoraDetailCovers(slug) {
+  const target = new URL("/series/" + encodeURIComponent(slug), AZORA_BASE);
   const response = await fetch(target, {
     headers: sourceHeaders(
-      MANGADAR_BASE,
+      AZORA_BASE,
       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     ),
     redirect: "follow",
     cf: { cacheTtl: 3600, cacheEverything: true },
   });
-  if (!response.ok) throw new Error(`MangaDar cover HTTP ${response.status}`);
+  if (!response.ok) throw new Error("Azora cover HTTP " + response.status);
 
   const html = await response.text();
   const rawCandidates = [];
-
   const addRaw = (value) => {
     if (!value) return;
     const decoded = decodeEntities(String(value))
@@ -219,26 +218,22 @@ async function mangadarDetailCovers(slug) {
       .replace(/\\u003[aA]/gi, ":")
       .replace(/\\u0026/gi, "&")
       .replace(/\\\//g, "/");
-    const absolute = absoluteUrl(MANGADAR_BASE, decoded);
+    const absolute = absoluteUrl(AZORA_BASE, decoded);
     if (!absolute || absolute.startsWith("data:")) return;
     if (/(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(absolute)) return;
     if (!rawCandidates.includes(absolute)) rawCandidates.push(absolute);
   };
 
-  // Strongest source: explicit social metadata for the series page.
   for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
     const attrs = parseAttrs(tag);
     const key = String(attrs.property || attrs.name || "").toLowerCase();
     if (["og:image", "twitter:image", "twitter:image:src"].includes(key)) addRaw(attrs.content);
   }
 
-  // MangaDar is not treated as generic Madara here. Only inspect the series
-  // cover/summary area; scanning every <img> can select the site logo or UI.
   const coverScope =
-    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_image|series-image|manga-thumb|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:cover|poster|thumbnail|series-image|series-cover)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
     firstMatch(html, /<figure\b[^>]*class=["'][^"']*(?:cover|poster|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/figure>/i) ||
     "";
-
   for (const match of coverScope.matchAll(/<img\b([^>]*)>/gi)) {
     const attrs = parseAttrs(match[1]);
     addRaw(attrs["data-src"]);
@@ -275,12 +270,11 @@ async function mangadarDetailCovers(slug) {
   for (const candidate of rawCandidates) {
     const direct = unwrap(candidate);
     if (!/^https?:\/\//i.test(direct)) continue;
-    if (/(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(direct)) continue;
 
     let imageResponse;
     try {
       imageResponse = await fetch(direct, {
-        headers: sourceHeaders(MANGADAR_BASE, "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"),
+        headers: sourceHeaders(AZORA_BASE, "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"),
         redirect: "follow",
         signal: AbortSignal.timeout(8_000),
         cf: { cacheTtl: 3600, cacheEverything: true },
@@ -288,14 +282,12 @@ async function mangadarDetailCovers(slug) {
     } catch {
       continue;
     }
-
     const type = String(imageResponse.headers.get("Content-Type") || "").toLowerCase();
     try { await imageResponse.body?.cancel(); } catch {}
     if (!imageResponse.ok || !type.startsWith("image/")) continue;
     if (!resolved.includes(direct)) resolved.push(direct);
     if (resolved.length >= 4) break;
   }
-
   return resolved;
 }
 

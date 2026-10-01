@@ -29,7 +29,7 @@ export interface AvatarSeries {
   avatars: Avatar[];
 }
 
-export type SourceName = "mangatime" | "teamx" | "3asq" | "starzmanga" | "xsano" | "mangalik" | "mangadar";
+export type SourceName = "mangatime" | "teamx" | "3asq" | "starzmanga" | "xsano" | "mangalik" | "azora";
 
 export interface SourceChapter {
   number: number;

@@ -706,7 +706,7 @@ async function route(request, url, db, covers) {
         }))
         .filter(
           (item) =>
-            /^(mt|tx|aq|sz|xs|ml):/.test(item.mangaId) &&
+            /^(mt|tx|aq|sz|xs|ml|az):/.test(item.mangaId) &&
             Number.isFinite(item.chapter) &&
             item.chapter >= 0,
         )

@@ -5,7 +5,7 @@ const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
 const XSANO_BASE = "https://www.xsano-manga.com";
 const MANGALIK_BASE = "https://mangalik.net";
-const MANGADAR_BASE = "https://mangadar.com";
+const AZORA_BASE = "https://azorafly.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -19,7 +19,7 @@ export async function onRequest(context) {
 
   const url = new URL(request.url);
   const source = String(url.searchParams.get("source") ?? "").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik" && source !== "mangadar") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik" && source !== "azora") {
     return json({ error: "UNKNOWN_SOURCE" }, 400);
   }
 
@@ -33,8 +33,8 @@ export async function onRequest(context) {
           ? XSANO_BASE
           : source === "mangalik"
             ? MANGALIK_BASE
-            : source === "mangadar"
-              ? MANGADAR_BASE
+            : source === "azora"
+              ? AZORA_BASE
               : MANGATIME_BASE;
   const raw = String(url.searchParams.get("url") ?? "");
   const target = absoluteUrl(base, raw);
@@ -55,8 +55,8 @@ export async function onRequest(context) {
           ? safeXsanoReferer(url.searchParams.get("referer"))
           : source === "mangalik"
             ? safeMangalikReferer(url.searchParams.get("referer"))
-            : source === "mangadar"
-              ? safeMangadarReferer(url.searchParams.get("referer"))
+            : source === "azora"
+              ? safeAzoraReferer(url.searchParams.get("referer"))
               : `${MANGATIME_BASE}/`;
 
   const response = await fetch(target, {
@@ -139,15 +139,15 @@ function safeXsanoReferer(value) {
   }
 }
 
-function safeMangadarReferer(value) {
-  if (!value) return `${MANGADAR_BASE}/`;
+function safeAzoraReferer(value) {
+  if (!value) return `${AZORA_BASE}/`;
   try {
-    const parsed = new URL(String(value), MANGADAR_BASE);
-    if (!/^(?:www\.)?mangadar\.com$/i.test(parsed.hostname)) return `${MANGADAR_BASE}/`;
-    if (!/^\/manga\//i.test(parsed.pathname)) return `${MANGADAR_BASE}/`;
+    const parsed = new URL(String(value), AZORA_BASE);
+    if (!/^(?:www\.)?azorafly\.com$/i.test(parsed.hostname)) return `${AZORA_BASE}/`;
+    if (!/^\/series\//i.test(parsed.pathname)) return `${AZORA_BASE}/`;
     return parsed.toString();
   } catch {
-    return `${MANGADAR_BASE}/`;
+    return `${AZORA_BASE}/`;
   }
 }
 

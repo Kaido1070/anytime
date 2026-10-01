@@ -5,7 +5,7 @@ const ASQ_BASE = "https://3asq.online";
 const STARZ_BASE = "https://starzmanga.com";
 const XSANO_BASE = "https://www.xsano-manga.com";
 const MANGALIK_BASE = "https://mangalik.net";
-const MANGADAR_BASE = "https://mangadar.com";
+const AZORA_BASE = "https://azorafly.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -27,7 +27,7 @@ export async function onRequest(context) {
         { id: "starzmanga", name: "StarzManga", mode: "madara" },
         { id: "xsano", name: "XSano Manga", mode: "blogger" },
         { id: "mangalik", name: "MangaLik", mode: "madara" },
-        { id: "mangadar", name: "MangaDar", mode: "html" },
+        { id: "azora", name: "Azora", mode: "html" },
       ],
     });
   }
@@ -51,7 +51,7 @@ export async function onRequest(context) {
     if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
     if (action === "status") {
-      const sources = ["mangatime", "teamx", "3asq", "starzmanga", "xsano", "mangalik", "mangadar"];
+      const sources = ["mangatime", "teamx", "3asq", "starzmanga", "xsano", "mangalik", "azora"];
       const cutoffIso = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
       const [syncRows, releaseRows] = await Promise.all([
         db.prepare("SELECT source, last_started_at FROM source_sync_state").all(),
@@ -101,7 +101,7 @@ export async function onRequest(context) {
                 ? await xsanoLatest(context, db, page)
                 : source === "mangalik"
                   ? await mangalikLatest(db, page)
-                  : await mangadarLatest(db, page);
+                  : await azoraLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -120,7 +120,7 @@ export async function onRequest(context) {
                 ? await xsanoCatalogLatest(db, page)
                 : source === "mangalik"
                   ? await mangalikLatest(db, page)
-                  : await mangadarLatest(db, page);
+                  : await azoraLatest(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -139,7 +139,7 @@ export async function onRequest(context) {
                 ? await xsanoPopular(db, page)
                 : source === "mangalik"
                   ? await mangalikPopular(db, page)
-                  : await mangadarPopular(db, page);
+                  : await azoraPopular(db, page);
       return json(payload, 200, shortCache());
     }
 
@@ -160,7 +160,7 @@ export async function onRequest(context) {
                 ? await xsanoSearch(db, query, page)
                 : source === "mangalik"
                   ? await mangalikSearch(db, query, page)
-                  : await mangadarSearch(db, query, page);
+                  : await azoraSearch(db, query, page);
       return json(payload, 200, shortCache());
     }
 
@@ -190,7 +190,7 @@ export async function onRequest(context) {
                 ? await xsanoSeries(db, item)
                 : item.source === "mangalik"
                   ? await mangalikSeries(db, item)
-                  : await mangadarSeries(db, item);
+                  : await azoraSeries(db, item);
       const observedDetail = await rememberChapterAvailability(db, detail);
       return json({ item: observedDetail }, 200, shortCache());
     }
@@ -215,7 +215,7 @@ export async function onRequest(context) {
                 ? await xsanoChapter(db, item, number)
                 : item.source === "mangalik"
                   ? await mangalikChapter(db, item, number)
-                  : await mangadarChapter(db, item, number);
+                  : await azoraChapter(db, item, number);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
@@ -249,7 +249,7 @@ class SourceError extends Error {
 
 function sourceFromQuery(url) {
   const source = String(url.searchParams.get("source") ?? "mangatime").toLowerCase();
-  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik" && source !== "mangadar") {
+  if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik" && source !== "azora") {
     throw new SourceError("UNKNOWN_SOURCE", "المصدر غير معروف.", 400);
   }
   return source;
@@ -262,7 +262,7 @@ function safePage(value) {
 
 function safeSourceKey(value) {
   const key = String(value ?? "").trim();
-  return /^(mt|tx|aq|sz|xs|ml|md):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
+  return /^(mt|tx|aq|sz|xs|ml|az):[A-Za-z0-9_-]{1,110}$/.test(key) ? key : "";
 }
 
 function shortCache() {
@@ -2755,120 +2755,106 @@ function starzHasNext(html) {
 
 
 
-// MangaDar ---------------------------------------------------------------
+// Azora ------------------------------------------------------------------
 
-async function mangadarLatest(db, page) {
-  const path = page > 1 ? "/manga/page/" + page + "/" : "/manga/";
-  const html = await mangadarFetchText(path);
-  const items = await mangadarItemsFromHtml(html);
+async function azoraLatest(db, page) {
+  const params = new URLSearchParams();
+  if (page > 1) params.set("page", String(page));
+  const html = await azoraFetchText("/series/" + (params.size ? "?" + params.toString() : ""));
+  const items = azoraItemsFromHtml(html);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html, page, "manga"), page };
+  return { items: items.slice(0, 24), hasMore: azoraHasNext(html, page), page };
 }
-async function mangadarPopular(db, page) { return mangadarList(db, page); }
-async function mangadarList(db, page) {
-  const path = page > 1 ? "/manga/page/" + page + "/" : "/manga/";
-  const html = await mangadarFetchText(path);
-  const items = await mangadarItemsFromHtml(html);
+
+async function azoraPopular(db, page) {
+  const params = new URLSearchParams({ m_orderby: "trending" });
+  if (page > 1) params.set("page", String(page));
+  const html = await azoraFetchText("/series/?" + params.toString());
+  const items = azoraItemsFromHtml(html);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html, page, "manga"), page };
+  return { items: items.slice(0, 24), hasMore: azoraHasNext(html, page), page };
 }
-async function mangadarSearch(db, query, page) {
-  const prefix = page > 1 ? "/page/" + page + "/" : "/";
-  const html = await mangadarFetchText(prefix + "?s=" + encodeURIComponent(query) + "&post_type=manga");
-  const items = await mangadarItemsFromHtml(html);
+
+async function azoraSearch(db, query, page) {
+  const params = new URLSearchParams({ searchTerm: query });
+  if (page > 1) params.set("page", String(page));
+  const html = await azoraFetchText("/series/?" + params.toString());
+  const items = azoraItemsFromHtml(html);
   await rememberItems(db, items);
-  return { items: items.slice(0, 24), hasMore: mangadarHasNext(html, page, "search"), page };
+  return { items: items.slice(0, 24), hasMore: azoraHasNext(html, page), page };
 }
-function mangadarItemsFromHtml(html) {
+
+function resolveAzoraMediaUrl(value) {
+  let current = absoluteUrl(AZORA_BASE, value);
+  if (!current) return "";
+  for (let depth = 0; depth < 4; depth += 1) {
+    try {
+      const parsed = new URL(current);
+      const nested =
+        parsed.searchParams.get("url") ||
+        parsed.searchParams.get("src") ||
+        parsed.searchParams.get("image") ||
+        parsed.searchParams.get("imageUrl") ||
+        parsed.searchParams.get("image_url");
+      if (!nested) break;
+      let decoded = nested;
+      try { decoded = decodeURIComponent(nested); } catch {}
+      const next = absoluteUrl(parsed.origin, decoded);
+      if (!next || next === current) break;
+      current = next;
+    } catch {
+      break;
+    }
+  }
+  return current;
+}
+
+function isAzoraUiImage(url) {
+  return /(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(String(url));
+}
+
+function azoraItemsFromHtml(html) {
   const source = String(html ?? "");
   const bySlug = new Map();
   for (const anchor of extractAnchors(source)) {
-    const href = absoluteUrl(MANGADAR_BASE, anchor.href);
+    const href = absoluteUrl(AZORA_BASE, anchor.href);
     if (!href) continue;
     let parsed;
     try { parsed = new URL(href); } catch { continue; }
-    if (!/^(?:www\.)?mangadar\.com$/i.test(parsed.hostname)) continue;
-    const match = parsed.pathname.match(/^\/manga\/([^/]+)\/?$/i);
+    if (!/^(?:www\.)?azorafly\.com$/i.test(parsed.hostname)) continue;
+    const match = parsed.pathname.match(/^\/series\/([^/]+)\/?$/i);
     if (!match) continue;
     const slug = decodeURIComponent(match[1]);
     if (!slug || bySlug.has(slug)) continue;
-    const title = cleanText(anchor.attrs.title || firstMatch(anchor.inner, /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i) || firstImgAttr(anchor.inner, "alt") || stripTags(anchor.inner));
+
+    const title = cleanText(
+      anchor.attrs.title ||
+      firstMatch(anchor.inner, /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i) ||
+      firstImgAttr(anchor.inner, "alt") ||
+      stripTags(anchor.inner),
+    );
     if (!title || /^image$/i.test(title) || /^الفصل\s+\d+/i.test(title)) continue;
-    const blockStart = Math.max(source.lastIndexOf("<article", anchor.start ?? 0), source.lastIndexOf('<div class="page-item-detail', anchor.start ?? 0), source.lastIndexOf('<div class="item-summary', anchor.start ?? 0), 0);
-    const block = source.slice(blockStart, Math.min(source.length, (anchor.start ?? 0) + 5000));
-    const cover = absoluteUrl(MANGADAR_BASE, firstImgUrl(block));
-    bySlug.set(slug, { key: "md:" + safeSlugKey(slug), source: "mangadar", sourceId: slug, slug, type: "manga", url: MANGADAR_BASE + "/manga/" + encodeURIComponent(slug) + "/", title, cover, description: "", status: "", genres: [] });
+
+    const rawCover = firstImgUrl(anchor.inner);
+    const cover = resolveAzoraMediaUrl(rawCover);
+    bySlug.set(slug, {
+      key: "az:" + safeSlugKey(slug),
+      source: "azora",
+      sourceId: slug,
+      slug,
+      type: "series",
+      url: AZORA_BASE + "/series/" + encodeURIComponent(slug),
+      title,
+      cover: cover && !isAzoraUiImage(cover) ? cover : "",
+      description: "",
+      status: "",
+      genres: [],
+    });
   }
   return [...bySlug.values()].slice(0, 80);
 }
-async function mangadarSeries(db, item) {
-  const seriesUrl = item.url || MANGADAR_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
-  const html = await mangadarFetchText(seriesUrl);
-  const title = cleanText(
-    firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
-    firstMatch(html, /<title[^>]*>([\s\S]*?)<\/title>/i) ||
-    item.title,
-  );
-  const summaryBlock =
-    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_image|series-image|manga-thumb|thumbnail)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
-    firstMatch(html, /<div\b[^>]*class=["'][^"']*(?:summary_content|summary-content|description-summary|manga-summary)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-  const cover =
-    absoluteUrl(MANGADAR_BASE, mangadarMetaImage(html)) ||
-    absoluteUrl(MANGADAR_BASE, firstImgUrl(summaryBlock || "")) ||
-    item.cover;
-  const plain = cleanText(stripTags(html));
-  const status = normalizeStatus(
-    firstMatch(plain, /الحالة\s*:?\s*(مستمرة|مستمر|مكتملة|مكتمل|متوقف|متروك|ملغية|ملغي)/i) ||
-    firstMatch(plain, /status\s*:?\s*(ongoing|completed|hiatus|cancelled|canceled|dropped)/i) ||
-    "",
-  );
-  const type = normalizeAsqType(
-    firstMatch(plain, /النوع\s*:?\s*(رواية ويب|رواية|مانجا ويب|مانهوا|مانها|مانجا|كوميك)/i) ||
-    firstMatch(plain, /type\s*:?\s*(web novel|light novel|novel|webtoon|manhwa|manhua|manga|comic)/i) ||
-    item.type,
-  );
-  const description = mangadarDescription(html, summaryBlock);
-  let chapters = parseMangadarChapters(html, seriesUrl);
-  const declaredChapterCount = mangadarDeclaredChapterCount(html);
 
-  // MangaDar often renders only the newest chapter rows in the initial HTML
-  // while the page itself declares a much larger total. Treat that declared
-  // count as a completeness signal instead of assuming "3+ chapters" means
-  // the list is complete. The archive fallback is generic for every title.
-  if (
-    chapters.length < 3 ||
-    (declaredChapterCount != null && chapters.length < declaredChapterCount)
-  ) {
-    const archiveChapters = await mangadarChapterArchiveChapters(item.slug, seriesUrl);
-    const merged = new Map(chapters.map((chapter) => [Number(chapter.number), chapter]));
-    for (const chapter of archiveChapters) {
-      merged.set(Number(chapter.number), chapter);
-    }
-    chapters = [...merged.values()].sort((a, b) => Number(b.number) - Number(a.number));
-  }
-
-  if (!chapters.length && declaredChapterCount && declaredChapterCount > 0) {
-    throw new SourceError(
-      "SERIES_PARSE_FAILED",
-      "تعذر قراءة قائمة فصول MangaDar رغم أن صفحة العمل تعلن وجود فصول.",
-      502,
-    );
-  }
-  const updated = {
-    ...item,
-    type,
-    title,
-    cover,
-    description,
-    status,
-    genres: mangadarGenreCandidates(html),
-    latest: chapters[0]?.number ?? null,
-    chapters,
-  };
-  await rememberItems(db, [updated]);
-  return updated;
-}
-function mangadarMetaContent(html, names) {
+function azoraMetaContent(html, names) {
   const source = String(html ?? "");
   const wanted = new Set(names.map((name) => String(name).toLowerCase()));
   for (const tag of source.match(/<meta\b[^>]*>/gi) ?? []) {
@@ -2882,295 +2868,143 @@ function mangadarMetaContent(html, names) {
   return "";
 }
 
-function mangadarMetaImage(html) {
-  return mangadarMetaContent(html, ["og:image", "twitter:image", "twitter:image:src"]);
+function azoraDescription(html) {
+  return cleanText(azoraMetaContent(html, ["og:description", "description"]));
 }
 
-function mangadarDescription(html, summaryBlock = "") {
-  const meta = mangadarMetaContent(html, ["og:description", "description"]);
-  const summary = cleanText(stripTags(summaryBlock || ""));
-  const value = cleanText(meta || summary)
-    .replace(/^(?:وصف|ملخص القصة)\s*[:：]\s*/i, "")
-    .trim();
-  if (!value || /<\/?(?:html|head|body|script|style|link|meta|svg)\b/i.test(value)) return "";
-  return value;
-}
-function mangadarGenreCandidates(html) {
-  const source = String(html ?? "");
-  const heading = source.match(/<h[2-4]\b[^>]*>\s*الأنواع\s*<\/h[2-4]>/i);
-  if (heading) {
-    const start = heading.index + heading[0].length;
-    const rest = source.slice(start);
-    const end = rest.search(/<h[2-4]\b/i);
-    const block = end >= 0 ? rest.slice(0, end) : rest.slice(0, 6000);
-    const genres = extractAnchors(block)
-      .map((anchor) => cleanText(stripTags(anchor.inner)))
-      .filter((text) => text && text.length <= 40 && !/^الفصل\s+/i.test(text));
-    if (genres.length) return [...new Set(genres)];
+function azoraGenreCandidates(html) {
+  const genres = [];
+  for (const anchor of extractAnchors(String(html ?? ""))) {
+    const href = String(anchor.href || "");
+    if (!/(?:genres?=|\/genres?\/|\/genre\/)/i.test(href)) continue;
+    const text = cleanText(stripTags(anchor.inner));
+    if (text && text.length <= 40) genres.push(text);
   }
-  return [];
-}
-function mangadarDeclaredChapterCount(html) {
-  const source = cleanText(stripTags(String(html ?? "")));
-  const raw =
-    firstMatch(source, /الفصول\s*\(([\d\s,٬،.]+)\)/i) ||
-    firstMatch(source, /([\d\s,٬،.]+)\s+الفصول\b/i) ||
-    "";
-  if (!raw) return null;
-  const digits = String(raw).replace(/[^\d]/g, "");
-  if (!digits) return null;
-  const count = Number(digits);
-  return Number.isSafeInteger(count) && count >= 0 ? count : null;
+  return [...new Set(genres)];
 }
 
-function parseMangadarChapters(html, seriesUrl) {
+function parseAzoraChapters(html, seriesUrl) {
   const source = String(html ?? "");
-  const base = new URL(seriesUrl, MANGADAR_BASE);
+  const base = new URL(seriesUrl, AZORA_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
+  const prefix = basePath + "/chapter-";
   const found = new Map();
-
-  const addChapter = (number, href, title = "") => {
-    if (!Number.isFinite(number)) return;
-    const normalizedHref = absoluteUrl(MANGADAR_BASE, href);
-    if (!normalizedHref) return;
-    let parsed;
-    try { parsed = new URL(normalizedHref); } catch { return; }
-    if (parsed.origin !== base.origin || !parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") return;
-    const finalTitle = cleanText(title) || "الفصل " + number;
-    found.set(number, {
-      number,
-      title: /^الفصل\s+\d+(?:\.\d+)?$/i.test(finalTitle) ? "الفصل " + number : finalTitle,
-      publishedAt: null,
-      url: normalizedHref,
-    });
-  };
 
   for (const anchor of extractAnchors(source)) {
-    const href = absoluteUrl(MANGADAR_BASE, anchor.href);
+    const href = absoluteUrl(AZORA_BASE, anchor.href);
     if (!href) continue;
-    try {
-      const parsed = new URL(href);
-      if (parsed.origin !== base.origin || !parsed.pathname.startsWith(basePath + "/") || parsed.pathname === basePath + "/") continue;
-      const tail = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
-      if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
-      addChapter(Number(tail), href, stripTags(anchor.inner));
-    } catch {}
-  }
-
-  // MangaDar can render the full chapter selector through markup/JSON that
-  // is not represented as normal <a> nodes. Scan the raw HTML as a second
-  // source of truth so we do not collapse a 300+ chapter work to two links.
-  const escapedBasePath = basePath.replace(/[.*+?^()|[\]\\]/g, "\\$&");
-  const normalizedSource = source.replace(/\\\//g, "/");
-  const chapterUrlPattern = new RegExp(
-    escapedBasePath.replace(/\//g, "\\/") + "\\/(\\d+(?:\\.\\d+)?)\\/?",
-    "gi",
-  );
-  let match;
-  while ((match = chapterUrlPattern.exec(normalizedSource))) {
-    const number = Number(match[1]);
-    const startNearby = Math.max(0, match.index - 350);
-    const endNearby = Math.min(source.length, chapterUrlPattern.lastIndex + 450);
-    const nearby = cleanText(stripTags(source.slice(startNearby, endNearby)));
-    const title = firstMatch(nearby, /(الفصل\s+\d+(?:\.\d+)?(?:\s+[^\n|#]+)?)/i) || "";
-    addChapter(number, basePath + "/" + match[1] + "/", title);
-  }
-
-  return [...found.values()].sort((a, b) => b.number - a.number || a.url.localeCompare(b.url));
-}
-
-async function mangadarChapter(db, item, number) {
-  const series = await mangadarSeries(db, item);
-  const selected = series.chapters?.find(chapter => Math.abs(Number(chapter.number) - Number(number)) < 0.000001);
-  const baseUrl = String(series.url || item.url || "").replace(/\/$/, "");
-  const directUrl = baseUrl + "/" + encodeURIComponent(String(number)) + "/";
-  const candidates = [selected?.url, directUrl].filter(Boolean);
-  let pages = [];
-  let lastError = null;
-
-  for (const chapterUrl of [...new Set(candidates)]) {
-    try {
-      const html = await mangadarFetchText(chapterUrl);
-      const parsed = parseMangadarPages(html);
-      if (parsed.length > pages.length) pages = parsed;
-      if (pages.length >= 2) break;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  if (!pages.length) {
-    if (lastError instanceof SourceError) throw lastError;
-    throw new SourceError("CHAPTER_IMAGES_EMPTY", "MangaDar لم يرجع صور الفصل.", 502);
-  }
-
-  return { item: series, number, title: selected?.title || "الفصل " + number, pages, ...chapterNavigation(series.chapters ?? [], number) };
-}
-async function mangadarChapterArchiveChapters(slug, seriesUrl) {
-  const base = new URL(seriesUrl, MANGADAR_BASE);
-  const basePath = base.pathname.replace(/\/$/, "");
-  const query = encodeURIComponent(String(slug ?? "").replace(/[-_]+/g, " ").trim());
-  const found = new Map();
-
-  for (let page = 1; page <= 50; page += 1) {
-    const path = page === 1
-      ? "/?post_type=chapter&s=" + query
-      : "/page/" + page + "/?post_type=chapter&s=" + query;
-    let html;
-    try {
-      html = await mangadarFetchText(path);
-    } catch {
-      break;
-    }
-
-    let matched = 0;
-    for (const anchor of extractAnchors(html)) {
-      const href = absoluteUrl(MANGADAR_BASE, anchor.href);
-      if (!href) continue;
-      try {
-        const parsed = new URL(href);
-        if (parsed.origin !== base.origin || !parsed.pathname.startsWith(basePath + "/")) continue;
-        const tail = decodeURIComponent(parsed.pathname.slice(basePath.length + 1)).replace(/\/$/, "");
-        if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
-        const number = Number(tail);
-        if (!Number.isFinite(number)) continue;
-        found.set(number, {
-          number,
-          title: cleanText(stripTags(anchor.inner)) || "الفصل " + number,
-          publishedAt: null,
-          url: href,
-        });
-        matched += 1;
-      } catch {}
-    }
-
-    if (!mangadarHasNext(html, page, "chapter") || matched === 0) break;
+    let parsed;
+    try { parsed = new URL(href); } catch { continue; }
+    if (parsed.origin !== base.origin || !parsed.pathname.startsWith(prefix)) continue;
+    const tail = decodeURIComponent(parsed.pathname.slice(prefix.length)).replace(/\/$/, "");
+    if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
+    const number = Number(tail);
+    if (!Number.isFinite(number)) continue;
+    found.set(number, {
+      number,
+      title: cleanText(stripTags(anchor.inner)) || "الفصل " + number,
+      publishedAt: null,
+      url: href,
+    });
   }
 
   return [...found.values()].sort((a, b) => Number(b.number) - Number(a.number));
 }
 
-function parseMangadarPages(html) {
-  const source = String(html ?? "");
-  const decodeEmbeddedUrl = (value) => {
-    let raw = String(value ?? "")
-      .replace(/\\u002[fF]/g, "/")
-      .replace(/\\u003[aA]/g, ":")
-      .replace(/\\u0026/g, "&")
-      .replace(/\\\//g, "/")
-      .replace(/&amp;/g, "&")
-      .trim();
-    try {
-      if (/^https?%3A%2F%2F/i.test(raw)) raw = decodeURIComponent(raw);
-    } catch {}
-    return absoluteUrl(MANGADAR_BASE, raw);
+async function azoraSeries(db, item) {
+  const seriesUrl = item.url || AZORA_BASE + "/series/" + encodeURIComponent(item.slug);
+  const html = await azoraFetchText(seriesUrl);
+  const title = cleanText(
+    firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+    azoraMetaContent(html, ["og:title", "twitter:title"]) ||
+    item.title,
+  );
+  const metaCover = resolveAzoraMediaUrl(
+    azoraMetaContent(html, ["og:image", "twitter:image", "twitter:image:src"]),
+  );
+  const cover = metaCover && !isAzoraUiImage(metaCover) ? metaCover : item.cover;
+  const plain = cleanText(stripTags(html));
+  const status = normalizeStatus(
+    firstMatch(plain, /الحالة\s*:?\s*(مستمر|مستمرة|مكتمل|مكتملة|متوقف|ملغي|ملغية|توقف مؤقت)/i) ||
+    firstMatch(plain, /status\s*:?\s*(ongoing|completed|hiatus|cancelled|canceled|dropped)/i) ||
+    item.status,
+  );
+  const type = normalizeAsqType(
+    firstMatch(plain, /(?:النوع|type)\s*:?\s*(رواية|مانهوا|مانها|مانغا|مانجا|كوميك|webtoon|manhwa|manhua|manga|novel|comic)/i) ||
+    item.type,
+  );
+  const chapters = parseAzoraChapters(html, seriesUrl);
+  const updated = {
+    ...item,
+    type,
+    title,
+    cover,
+    description: azoraDescription(html) || item.description || "",
+    status,
+    genres: azoraGenreCandidates(html),
+    latest: chapters[0]?.number ?? null,
+    chapters,
   };
-  const valid = (url) => url && !isMangadarUiImage(url);
-  const direct = (url) => resolveMangadarMediaUrl(url);
-  const numbered = new Map();
+  await rememberItems(db, [updated]);
+  return updated;
+}
 
-  // MangaDar's reader is not a Madara reader. Prefer its own numbered page
-  // markup (alt/title such as "صفحة 12") instead of a generic reader-content
-  // slice, which can capture only the reader placeholder.
+function parseAzoraPages(html) {
+  const source = String(html ?? "");
+  const numbered = new Map();
+  const loose = [];
+
   for (const image of extractImages(source)) {
-    const label = cleanText(
-      image.attrs.alt || image.attrs.title || image.attrs["aria-label"] || "",
-    );
+    const label = cleanText(image.attrs.alt || image.attrs.title || image.attrs["aria-label"] || "");
+    const url = resolveAzoraMediaUrl(image.src);
+    if (!url || isAzoraUiImage(url)) continue;
     const match = label.match(/(?:صفحة|page)\s*(\d+)/i);
-    if (!match) continue;
-    const url = direct(decodeEmbeddedUrl(image.src));
-    if (valid(url)) numbered.set(Number(match[1]), url);
+    if (match && /(?:الفصل|chapter|page|صفحة)/i.test(label)) {
+      numbered.set(Number(match[1]), url);
+      continue;
+    }
+    if (/(?:reader|chapter|page)/i.test(String(image.attrs.class || ""))) loose.push(url);
   }
-  if (numbered.size >= 2) {
+
+  if (numbered.size) {
     return [...numbered.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([, url]) => url);
   }
-
-  // Current MangaDar pages can serialize the complete reader payload in
-  // script/JSON while only the first image exists as an <img> in server HTML.
-  // Read image-looking values from that payload, including JS escaped URLs.
-  const normalized = source
-    .replace(/\\u002[fF]/g, "/")
-    .replace(/\\u003[aA]/g, ":")
-    .replace(/\\u0026/g, "&")
-    .replace(/\\\//g, "/")
-    .replace(/&amp;/g, "&");
-  const embedded = [];
-  const patterns = [
-    /["'](?:src|url|image|imageUrl|image_url|pageUrl|page_url)["']\s*:\s*["']([^"']+)["']/gi,
-    /https?:\/\/[^"'<>\\\s]+?\.(?:jpe?g|png|webp|avif)(?:\?[^"'<>\\\s]*)?/gi,
-  ];
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(normalized))) {
-      const url = direct(decodeEmbeddedUrl(match[1] || match[0]));
-      if (valid(url)) embedded.push(url);
-    }
-  }
-
-  // Keep source order: MangaDar serializes pages in reading order.
-  const uniqueEmbedded = [...new Set(embedded)];
-  if (uniqueEmbedded.length >= 2) return uniqueEmbedded;
-
-  // Last resort for older MangaDar chapter templates.
-  const markers = [
-    /class=["'][^"']*\b(?:reading-content|reader-content|chapter-content|chapter-images)\b[^"']*["']/i,
-    /id=["'][^"']*\b(?:chapter-content|chapter-images)\b[^"']*["']/i,
-  ];
-  let scoped = source;
-  for (const marker of markers) {
-    const index = source.search(marker);
-    if (index >= 0) { scoped = source.slice(index); break; }
-  }
-  const footer = scoped.search(/(?:<footer\b|id=["'][^"']*(?:comments|discussion)["'])/i);
-  if (footer >= 0) scoped = scoped.slice(0, footer);
-  return [...new Set(
-    extractImages(scoped)
-      .map((image) => direct(decodeEmbeddedUrl(image.src)))
-      .filter(valid),
-  )];
-}
-function resolveMangadarMediaUrl(value) {
-  let current = absoluteUrl(MANGADAR_BASE, value);
-  if (!current) return "";
-
-  for (let depth = 0; depth < 4; depth += 1) {
-    try {
-      const parsed = new URL(current);
-      const nested =
-        parsed.searchParams.get("url") ||
-        parsed.searchParams.get("src") ||
-        parsed.searchParams.get("image") ||
-        parsed.searchParams.get("imageUrl") ||
-        parsed.searchParams.get("image_url") ||
-        parsed.searchParams.get("pageUrl") ||
-        parsed.searchParams.get("page_url");
-      if (!nested) break;
-
-      let decoded = nested;
-      try { decoded = decodeURIComponent(nested); } catch {}
-      const next = absoluteUrl(parsed.origin, decoded);
-      if (!next || next === current) break;
-      current = next;
-    } catch {
-      break;
-    }
-  }
-
-  return current;
+  return [...new Set(loose)];
 }
 
-function isMangadarUiImage(url) {
-  return /(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(String(url));
+async function azoraChapter(db, item, number) {
+  const series = await azoraSeries(db, item);
+  const selected = series.chapters?.find(
+    (chapter) => Math.abs(Number(chapter.number) - Number(number)) < 0.000001,
+  );
+  const chapterUrl =
+    selected?.url ||
+    String(series.url || item.url || "").replace(/\/$/, "") +
+      "/chapter-" +
+      encodeURIComponent(String(number));
+  const html = await azoraFetchText(chapterUrl);
+  const pages = parseAzoraPages(html);
+  if (!pages.length) {
+    throw new SourceError("CHAPTER_IMAGES_EMPTY", "Azora لم يرجع صور الفصل.", 502);
+  }
+  return {
+    item: series,
+    number,
+    title: selected?.title || "الفصل " + number,
+    pages,
+    ...chapterNavigation(series.chapters ?? [], number),
+  };
 }
-async function mangadarFetchText(pathOrUrl) {
-  const target = new URL(pathOrUrl, MANGADAR_BASE).toString();
+
+async function azoraFetchText(pathOrUrl) {
+  const target = new URL(pathOrUrl, AZORA_BASE).toString();
   let response;
   try {
     response = await fetch(target, {
       headers: sourceHeaders(
-        MANGADAR_BASE,
+        AZORA_BASE,
         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       ),
       redirect: "follow",
@@ -3179,34 +3013,24 @@ async function mangadarFetchText(pathOrUrl) {
     });
   } catch (error) {
     if (error?.name === "TimeoutError" || error?.name === "AbortError") {
-      throw new SourceError("SOURCE_TIMEOUT", "MangaDar تأخر عن مهلة الاتصال.", 504);
+      throw new SourceError("SOURCE_TIMEOUT", "Azora تأخر عن مهلة الاتصال.", 504);
     }
-    throw new SourceError("SOURCE_NETWORK_ERROR", "تعذر الاتصال بـMangaDar.", 502);
+    throw new SourceError("SOURCE_NETWORK_ERROR", "تعذر الاتصال بـAzora.", 502);
   }
 
   if (!response.ok) {
-    if (response.status === 429) {
-      throw new SourceError("SOURCE_RATE_LIMITED", "MangaDar حدّ الطلبات مؤقتًا.", 429);
-    }
-    if (response.status === 403) {
-      throw new SourceError("SOURCE_RATE_LIMITED", "MangaDar رفض الطلب مؤقتًا.", 503);
-    }
-    if (response.status >= 500) {
-      throw new SourceError("SOURCE_UPSTREAM_5XX", "MangaDar متعطل مؤقتًا.", 502);
-    }
-    if (response.status === 404) {
-      throw new SourceError("SOURCE_NOT_FOUND", "المحتوى لم يعد موجودًا في MangaDar.", 404);
-    }
-    throw new SourceError("SOURCE_UPSTREAM_ERROR", "MangaDar رجع HTTP " + response.status + ".", 502);
+    if (response.status === 429) throw new SourceError("SOURCE_RATE_LIMITED", "Azora حدّ الطلبات مؤقتًا.", 429);
+    if (response.status === 403) throw new SourceError("SOURCE_RATE_LIMITED", "Azora رفض الطلب مؤقتًا.", 503);
+    if (response.status >= 500) throw new SourceError("SOURCE_UPSTREAM_5XX", "Azora متعطل مؤقتًا.", 502);
+    if (response.status === 404) throw new SourceError("SOURCE_NOT_FOUND", "المحتوى لم يعد موجودًا في Azora.", 404);
+    throw new SourceError("SOURCE_UPSTREAM_ERROR", "Azora رجع HTTP " + response.status + ".", 502);
   }
   return response.text();
 }
-function mangadarHasNext(html, page = 1, mode = "manga") {
+
+function azoraHasNext(html, page = 1) {
   if (/<a\b[^>]*(?:rel=["']next["']|class=["'][^"']*\bnext\b[^"']*["'])[^>]*>/i.test(html)) return true;
-  const nextPath = mode === "manga"
-    ? "/manga/page/" + (page + 1) + "/"
-    : "/page/" + (page + 1) + "/";
-  return html.includes(nextPath);
+  return String(html ?? "").includes("page=" + (page + 1));
 }
 
 // MangaLik / Madara ----------------------------------------------------------
@@ -4152,8 +3976,8 @@ async function proxyImage(source, rawUrl, rawReferer = "") {
           ? XSANO_BASE
           : source === "mangalik"
             ? MANGALIK_BASE
-            : source === "mangadar"
-              ? MANGADAR_BASE
+            : source === "azora"
+              ? AZORA_BASE
               : MANGATIME_BASE;
   const target = absoluteUrl(base, rawUrl);
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
@@ -4181,13 +4005,13 @@ async function proxyImage(source, rawUrl, rawReferer = "") {
   const fetchImage = (refererBase) => {
     const headers = sourceHeaders(refererBase, imageAccept);
 
-    // MangaDar reader images are stricter about the chapter Referer. When the
+    // Azora reader images are stricter about the chapter Referer. When the
     // caller supplied an exact chapter URL, preserve it byte-for-byte instead
     // of letting sourceHeaders append another "/" (e.g. /65//).
-    if (source === "mangadar" && rawReferer) {
+    if (source === "azora" && rawReferer) {
       try {
-        const exactReferer = new URL(rawReferer, MANGADAR_BASE);
-        if (exactReferer.origin === new URL(MANGADAR_BASE).origin) {
+        const exactReferer = new URL(rawReferer, AZORA_BASE);
+        if (exactReferer.origin === new URL(AZORA_BASE).origin) {
           headers.Referer = exactReferer.toString();
         }
       } catch {}
@@ -4206,11 +4030,11 @@ async function proxyImage(source, rawUrl, rawReferer = "") {
   // origin below.
   let response = await fetchImage(requestedReferer);
   let type = response.headers.get("Content-Type") ?? "";
-  // Chapter pages on MangaDar commonly serve images from external storage/CDN
-  // hosts. Those hosts may reject a mangadar.com Referer even though the image
+  // Chapter pages on Azora commonly serve images from external storage/CDN
+  // hosts. Those hosts may reject a azorafly.com Referer even though the image
   // URL itself is valid. Retry against the image origin, just as MangaTime
   // already does for its CDN covers, without transforming the image bytes.
-  if ((source === "mangatime" || source === "mangadar") &&
+  if ((source === "mangatime" || source === "azora") &&
       parsed.origin !== new URL(base).origin &&
       (!response.ok || !type.toLowerCase().startsWith("image/"))) {
     response = await fetchImage(parsed.origin);
@@ -4452,12 +4276,11 @@ export const __test = {
   mangalikLatestItemsFromHtml,
   parseMangalikLatestCardChapters,
   parseMangalikPages,
-  mangadarItemsFromHtml,
-  mangadarDescription,
-  mangadarGenreCandidates,
-  mangadarDeclaredChapterCount,
-  parseMangadarChapters,
-  parseMangadarPages,
+  azoraItemsFromHtml,
+  azoraDescription,
+  azoraGenreCandidates,
+  parseAzoraChapters,
+  parseAzoraPages,
   starzPostId,
   parseXsanoPages,
   xsanoChapterFeedUrl,

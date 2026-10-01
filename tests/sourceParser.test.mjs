@@ -750,84 +750,48 @@ test("MangaTime list input omits null query but keeps real searches", () => {
 });
 
 
-test("MangaDar parser keeps the full chapter range and clean description", () => {
+test("Azora parser reads series chapters and metadata", () => {
   const html = `
-    <meta property="og:description" content="ملخص Overgeared النظيف">
-    <h2>الأنواع</h2>
-    <a href="/genre/action/">أكشن</a>
-    <a href="/genre/fantasy/">خيال</a>
-    <h2>الفصول (340)</h2>
-    <a href="https://mangadar.com/manga/overgeared/340/">الفصل 340</a>
-    <a href="/manga/overgeared/339/">الفصل 339</a>
-    <a href="/manga/overgeared/338/">الفصل 338</a>
-    <script>const chapter = "/manga/overgeared/337/";</script>
-    <a href="/manga/overgeared/1/">الفصل 1</a>
-  `;
-  const chapters = __test.parseMangadarChapters(
-    html,
-    "https://mangadar.com/manga/overgeared/",
-  );
-  assert.deepEqual(chapters.map((chapter) => chapter.number), [340, 339, 338, 337, 1]);
-  assert.deepEqual(__test.mangadarGenreCandidates(html), ["أكشن", "خيال"]);
-  assert.equal(__test.mangadarDescription(html), "ملخص Overgeared النظيف");
-});
-
-test("MangaDar declared chapter count detects truncated series markup", () => {
-  const html = `
-    <div class="series-stats">1٬171 الفصول</div>
-    <h2>الفصول (1٬171)</h2>
-    <a href="/manga/one-piece/1194/">الفصل 1194</a>
-    <a href="/manga/one-piece/1193/">الفصل 1193</a>
-  `;
-  assert.equal(__test.mangadarDeclaredChapterCount(html), 1171);
-  assert.equal(
-    __test.parseMangadarChapters(html, "https://mangadar.com/manga/one-piece/").length,
-    2,
-  );
-});
-
-test("MangaDar declared chapter count supports ordinary and missing counts", () => {
-  assert.equal(__test.mangadarDeclaredChapterCount("<h2>الفصول (374)</h2>"), 374);
-  assert.equal(__test.mangadarDeclaredChapterCount("<main>لا توجد فصول معلنة</main>"), null);
-});
-
-test("MangaDar parser preserves decimal chapter numbers", () => {
-  const html = `
-    <h2>الفصول (3)</h2>
-    <a href="/manga/us-after/27.5/">الفصل 27.5</a>
-    <a href="/manga/us-after/27/">الفصل 27</a>
-    <a href="/manga/us-after/26/">الفصل 26</a>
+    <meta name="description" content="وصف Shadow Slave">
+    <a href="/genres/action">أكشن</a>
+    <a href="https://azorafly.com/series/shadow-slave/chapter-10">الفصل 10</a>
+    <a href="/series/shadow-slave/chapter-9.5">الفصل 9.5</a>
+    <a href="/series/shadow-slave/chapter-9">الفصل 9</a>
   `;
   assert.deepEqual(
-    __test.parseMangadarChapters(html, "https://mangadar.com/manga/us-after/").map((chapter) => chapter.number),
-    [27.5, 27, 26],
+    __test.parseAzoraChapters(html, "https://azorafly.com/series/shadow-slave").map((chapter) => chapter.number),
+    [10, 9.5, 9],
   );
+  assert.equal(__test.azoraDescription(html), "وصف Shadow Slave");
+  assert.deepEqual(__test.azoraGenreCandidates(html), ["أكشن"]);
 });
 
-test("MangaDar description ignores raw HTML and chapter URLs survive escaped JSON", () => {
+test("Azora list parser creates az source keys", () => {
   const html = `
-    <meta name="description" content="وصف نظيف للعمل">
-    <div class="description"><link rel="canonical" href="https://mangadar.com/manga/overgeared/"></div>
-    <script>const chapters = ["\\/manga\\/overgeared\\/340\\/", "\\/manga\\/overgeared\\/339\\/"];</script>
+    <article>
+      <a href="/series/shadow-slave" title="Shadow Slave">
+        <img alt="Shadow Slave" src="https://cdn.example.com/covers/shadow-slave.webp">
+        <h3>Shadow Slave</h3>
+      </a>
+    </article>
   `;
-  assert.equal(__test.mangadarDescription(html, "<div><link rel=\"canonical\" href=\"bad\"></div>"), "وصف نظيف للعمل");
-  assert.deepEqual(
-    __test.parseMangadarChapters(html, "https://mangadar.com/manga/overgeared/").map((chapter) => chapter.number),
-    [340, 339],
-  );
+  const items = __test.azoraItemsFromHtml(html);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].key, "az:shadow-slave");
+  assert.equal(items[0].source, "azora");
+  assert.equal(items[0].title, "Shadow Slave");
 });
 
-test("MangaDar page parser reads lazy reader images and excludes UI images", () => {
+test("Azora page parser unwraps Next image URLs in page order", () => {
   const html = `
-    <div class="reading-content">
-      <div class="page-break"><img class="wp-manga-chapter-img" data-src="https://cdn.example.com/overgeared/001.webp"></div>
-      <div class="page-break"><img class="wp-manga-chapter-img" data-src="https://cdn.example.com/overgeared/002.webp"></div>
-      <img src="https://mangadar.com/wp-content/uploads/logo.webp">
-    </div>
-    <footer><img src="https://mangadar.com/wp-content/uploads/avatar.webp"></footer>
+    <main>
+      <img alt="Shadow Slave الفصل 1 Page 1" src="/_next/image?url=https%3A%2F%2Fcdn.example.com%2Fshadow-slave%2F001.webp&w=1600&q=90">
+      <img alt="Shadow Slave الفصل 1 Page 2" src="/_next/image?url=https%3A%2F%2Fcdn.example.com%2Fshadow-slave%2F002.webp&w=1600&q=90">
+      <img alt="logo" src="/logo.webp">
+    </main>
   `;
-  assert.deepEqual(__test.parseMangadarPages(html), [
-    "https://cdn.example.com/overgeared/001.webp",
-    "https://cdn.example.com/overgeared/002.webp",
+  assert.deepEqual(__test.parseAzoraPages(html), [
+    "https://cdn.example.com/shadow-slave/001.webp",
+    "https://cdn.example.com/shadow-slave/002.webp",
   ]);
 });
