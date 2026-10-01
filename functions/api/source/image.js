@@ -59,21 +59,63 @@ export async function onRequest(context) {
               ? safeAzoraReferer(url.searchParams.get("referer"))
               : `${MANGATIME_BASE}/`;
 
-  const response = await fetch(target, {
-    headers: {
+  const imageHeaders = (refererValue = "") => {
+    const headers = {
       Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
       "Accept-Language": "ar,en-US;q=0.9,en;q=0.8",
-      Referer: referer,
       "User-Agent": SOURCE_UA,
-    },
-    redirect: "follow",
-    cf: source === "teamx"
-      ? { cacheTtl: 0 }
-      : { cacheTtl: 86400, cacheEverything: true },
-  });
+    };
+    if (refererValue) headers.Referer = refererValue;
+    return headers;
+  };
 
-  if (!response.ok) return json({ error: "IMAGE_UPSTREAM", status: response.status }, 502);
-  const type = response.headers.get("Content-Type") ?? "";
+  const fetchImage = async (refererValue = "", bypassCache = false) => {
+    try {
+      return await fetch(target, {
+        headers: imageHeaders(refererValue),
+        redirect: "follow",
+        signal: AbortSignal.timeout(12_000),
+        cf: source === "teamx"
+          ? { cacheTtl: 0 }
+          : bypassCache
+            ? { cacheTtl: 0, cacheEverything: false }
+            : { cacheTtl: 86400, cacheEverything: true },
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  let response = await fetchImage(referer);
+  let type = response?.headers.get("Content-Type") ?? "";
+  const isUsableImage = () =>
+    Boolean(response?.ok && type.toLowerCase().startsWith("image/"));
+
+  // Azora chapter pages can mix image hosts inside one chapter. Some storage
+  // hosts reject the chapter Referer while others require it. Retry failed
+  // external images against their own origin, then once without a Referer.
+  // This is intentionally limited to Azora/MangaTime external CDNs.
+  const sourceOrigin = new URL(base).origin;
+  if (
+    !isUsableImage() &&
+    (source === "azora" || source === "mangatime") &&
+    parsed.origin !== sourceOrigin
+  ) {
+    response = await fetchImage(parsed.origin + "/", true);
+    type = response?.headers.get("Content-Type") ?? "";
+
+    if (!isUsableImage()) {
+      response = await fetchImage("", true);
+      type = response?.headers.get("Content-Type") ?? "";
+    }
+  }
+
+  if (!response) {
+    return json({ error: "IMAGE_UPSTREAM", status: 0 }, 502);
+  }
+  if (!response.ok) {
+    return json({ error: "IMAGE_UPSTREAM", status: response.status }, 502);
+  }
   if (!type.toLowerCase().startsWith("image/")) {
     return json({ error: "NOT_AN_IMAGE" }, 502);
   }
