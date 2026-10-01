@@ -351,6 +351,33 @@ test("priority windows use Saudi time and stay work-specific", () => {
   assert.equal(__test.sourceRefreshIntervalMs(mondayNoonRiyadh), 5 * 60_000);
 });
 
+test("MangaTime keeps the most complete chapter list across source limit variants", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    const rawInput = JSON.parse(parsed.searchParams.get("input"));
+    const input = rawInput.json ?? rawInput["0"]?.json ?? {};
+    const count = input.limit === 20000 ? 1200 : input.limit === 5000 ? 500 : 12;
+    const chapters = Array.from({ length: count }, (_, index) => ({
+      number: count - index,
+      title: "Chapter " + (count - index),
+    }));
+    return new Response(
+      JSON.stringify({ result: { data: { json: { chapters } } } }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+
+  try {
+    const chapters = await __test.mangaTimeAllChapters("series-1");
+    assert.equal(chapters.length, 1200);
+    assert.equal(chapters[0].number, 1200);
+    assert.equal(chapters.at(-1).number, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("MangaTime keeps exact publishedAt values from its chapter API", () => {
   const chapters = __test.mangaTimeChaptersFromPayload({
     chapters: [
@@ -521,6 +548,52 @@ test("XSano detects its Zeist chapter feed", () => {
     __test.xsanoChapterFeedUrl(html),
     "https://www.xsano-manga.com/feeds/posts/default/-/Chapter/Ao-Ashi?alt=json",
   );
+});
+
+test("XSano paginates chapter feeds until the source-reported end", async () => {
+  const originalFetch = globalThis.fetch;
+  const starts = [];
+  globalThis.fetch = async (url) => {
+    const parsed = new URL(String(url));
+    const start = Number(parsed.searchParams.get("start-index"));
+    starts.push(start);
+    const total = 1200;
+    const remaining = Math.max(0, total - start + 1);
+    const count = Math.min(500, remaining);
+    const entries = Array.from({ length: count }, (_, offset) => {
+      const number = start + offset;
+      return {
+        id: { "$t": "chapter-" + number },
+        title: { "$t": "Chapter " + number },
+        published: { "$t": "2026-01-01T00:00:00.000Z" },
+        category: [{ term: "Chapter" }],
+        link: [{
+          rel: "alternate",
+          href: "https://www.xsano-manga.com/2026/01/chapter-" + number + ".html",
+        }],
+      };
+    });
+
+    return new Response(
+      JSON.stringify({
+        feed: {
+          "openSearch$totalResults": { "$t": String(total) },
+          entry: entries,
+        },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+
+  try {
+    const chapters = await __test.xsanoFetchChapters(
+      "https://www.xsano-manga.com/feeds/posts/default/-/Chapter/Test?alt=json",
+    );
+    assert.equal(chapters.length, 1200);
+    assert.deepEqual(starts, [1, 501, 1001]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("XSano parses Blogger chapter entries", () => {
