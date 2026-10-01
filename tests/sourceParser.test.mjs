@@ -1108,6 +1108,34 @@ test("Azora keeps distinct same-number chapter rows instead of collapsing them",
   assert.notEqual(chapters[0].url, chapters[1].url);
 });
 
+test("Azora does not invent missing chapter rows for ordinary series", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response("", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+
+  try {
+    const html = `
+      <div>الفصول ( 10 )</div>
+      <button>عرض المزيد</button>
+      <a href="/series/example/chapter-10">الفصل 10</a>
+      <a href="/series/example/chapter-9">الفصل 9</a>
+    `;
+    const result = await __test.azoraCompleteChapterList(
+      html,
+      "https://azorafly.com/series/example",
+    );
+
+    assert.equal(result.declaredCount, 10);
+    assert.equal(result.chapters.length, 2);
+    assert.equal(result.complete, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Azora follows chapter load-more pages when the first HTML is incomplete", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
