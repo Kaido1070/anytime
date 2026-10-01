@@ -468,11 +468,12 @@ async function auditMadara(source, item) {
     }
   }
 
+  const declared = __test.madaraDeclaredChapterCount(firstHtml);
   return {
     visible: visible.length,
     resolved: resolved.length,
-    declared: null,
-    complete: null,
+    declared,
+    complete: declared == null ? null : resolved.length >= declared,
     recovered: Math.max(0, resolved.length - visible.length),
     alternateCount,
   };
