@@ -1,0 +1,54 @@
+name: Audit Source Chapter Completeness
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/audit-source-chapters.mjs"
+      - ".github/workflows/source-audit.yml"
+      - "functions/api/source/[[path]].js"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit ${{ matrix.source }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        source:
+          - mangatime
+          - 3asq
+          - starzmanga
+          - xsano
+          - mangalik
+          - azora
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+
+      - name: Audit complete chapter lists
+        env:
+          AUDIT_SOURCE: ${{ matrix.source }}
+          AUDIT_DELAY_MS: "450"
+          AUDIT_CATALOG_MAX_PAGES: "250"
+          AUDIT_FAIL_ON_ISSUES: "1"
+        run: node scripts/audit-source-chapters.mjs
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-audit-${{ matrix.source }}
+          path: audit-results/${{ matrix.source }}.json
+          if-no-files-found: ignore
