@@ -3685,6 +3685,12 @@ function azoraCompleteSequentialChapters(html, seriesUrl, parsedChapters) {
   return complete.length === declaredCount ? complete : current;
 }
 
+function azoraChapterListHasPagination(html) {
+  return /(?:عرض\s+المزيد|تحميل\s+المزيد|load\s*more|show\s*more|data-(?:page|paged|next-page|chapter-page|chapters-page)=|[?&](?:page|chapterPage|chaptersPage|chapter_page|chapters_page)=\d+)/i.test(
+    cleanText(stripTags(String(html ?? ""))) + " " + String(html ?? ""),
+  );
+}
+
 async function azoraCompleteChapterList(html, seriesUrl) {
   const declaredCount = azoraDeclaredChapterCount(html);
   let chapters = mergeChapterLists(
@@ -3692,7 +3698,11 @@ async function azoraCompleteChapterList(html, seriesUrl) {
   );
 
   chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
-  if (!declaredCount || chapters.length >= declaredCount) {
+  const hasPaginationHint = azoraChapterListHasPagination(html);
+  if (
+    (declaredCount != null && chapters.length >= declaredCount) ||
+    (declaredCount == null && !hasPaginationHint)
+  ) {
     return {
       chapters,
       declaredCount,
@@ -3711,7 +3721,9 @@ async function azoraCompleteChapterList(html, seriesUrl) {
     "chapters_page",
     "page",
   ];
-  const maxPages = Math.min(30, Math.max(2, Math.ceil(declaredCount / 20) + 1));
+  const maxPages = declaredCount != null
+    ? Math.min(30, Math.max(2, Math.ceil(declaredCount / 20) + 1))
+    : 30;
 
   for (const parameter of strategies) {
     let candidate = chapters;
@@ -3736,7 +3748,7 @@ async function azoraCompleteChapterList(html, seriesUrl) {
 
       candidate = merged;
       gained = true;
-      if (candidate.length >= declaredCount) break;
+      if (declaredCount != null && candidate.length >= declaredCount) break;
     }
 
     if (!gained) continue;
@@ -3751,7 +3763,12 @@ async function azoraCompleteChapterList(html, seriesUrl) {
   return {
     chapters,
     declaredCount,
-    complete: chapters.length >= declaredCount,
+    complete:
+      declaredCount != null
+        ? chapters.length >= declaredCount
+        : hasPaginationHint
+          ? null
+          : null,
   };
 }
 
@@ -5215,6 +5232,7 @@ export const __test = {
   azoraDeclaredChapterCount,
   azoraCompleteSequentialChapters,
   azoraCompleteChapterList,
+  azoraChapterListHasPagination,
   moreCompleteChapters,
   mergeChapterLists,
   safePreferredChapterUrl,
