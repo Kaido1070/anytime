@@ -18,6 +18,6 @@ test("Azora reader falls back to the direct chapter route when series hydration 
   );
   assert.match(
     source,
-    /if \(!pages\.length && chapterUrl !== directChapterUrl\)/,
+    /if \(!pages\.length && sourceChapterUrl !== directChapterUrl\)/,
   );
 });
