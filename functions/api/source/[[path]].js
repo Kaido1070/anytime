@@ -3292,6 +3292,28 @@ function parseAzoraChapters(html, seriesUrl) {
   const prefix = basePath + "/chapter-";
   const found = new Map();
 
+  const remember = (number, title, rawUrl) => {
+    if (!Number.isFinite(number)) return;
+    const href = absoluteUrl(AZORA_BASE, rawUrl);
+    if (!href) return;
+
+    let parsed;
+    try { parsed = new URL(href); } catch { return; }
+    if (parsed.origin !== base.origin || !parsed.pathname.startsWith(prefix)) return;
+
+    // A source can publish two distinct chapter entries with the same visible
+    // number (for example a continuation of chapter 8). URL identity keeps
+    // both rows instead of silently replacing one by chapter number.
+    const identity = parsed.pathname.replace(/\/$/, "");
+    const existing = found.get(identity);
+    found.set(identity, {
+      number,
+      title: cleanText(title || existing?.title || "") || "الفصل " + number,
+      publishedAt: existing?.publishedAt ?? null,
+      url: parsed.toString(),
+    });
+  };
+
   for (const anchor of extractAnchors(source)) {
     const href = absoluteUrl(AZORA_BASE, anchor.href);
     if (!href) continue;
@@ -3299,46 +3321,32 @@ function parseAzoraChapters(html, seriesUrl) {
     try { parsed = new URL(href); } catch { continue; }
     if (parsed.origin !== base.origin || !parsed.pathname.startsWith(prefix)) continue;
     const tail = decodeURIComponent(parsed.pathname.slice(prefix.length)).replace(/\/$/, "");
-    if (!/^\d+(?:\.\d+)?$/.test(tail)) continue;
-    const number = Number(tail);
-    if (!Number.isFinite(number)) continue;
-    found.set(number, {
-      number,
-      title: cleanText(stripTags(anchor.inner)) || "الفصل " + number,
-      publishedAt: null,
-      url: href,
-    });
+    const numeric = tail.match(/^(\d+(?:\.\d+)?)(?:[^0-9].*)?$/);
+    if (!numeric) continue;
+    remember(
+      Number(numeric[1]),
+      cleanText(stripTags(anchor.inner)),
+      href,
+    );
   }
 
   // Azora/Next can keep older chapters inside the RSC/JSON payload while only
-  // rendering a small visible preview as <a> tags. Recover only explicit
-  // chapter routes that already exist in the page payload; never invent a
-  // numeric range of chapters.
+  // rendering the first visible batch. Recover every explicit chapter route
+  // embedded in that payload as well.
   const embedded = decodeEntities(source)
     .replace(/\\u002[fF]/g, "/")
     .replace(/\\u003[aA]/g, ":")
     .replace(/\\\//g, "/");
-  const chapterRoute = /(?:https?:\/\/(?:www\.)?azorafly\.com)?(\/series\/[^"'<>\\\s?#]+\/chapter-(\d+(?:\.\d+)?))\/?/gi;
+  const chapterRoute = /(?:https?:\/\/(?:www\.)?azorafly\.com)?(\/series\/[^"'<>\\\s?#]+\/chapter-(\d+(?:\.\d+)?)(?:[^"'<>\\\s?#\/]*))\/?/gi;
   let routeMatch;
   while ((routeMatch = chapterRoute.exec(embedded))) {
-    let parsed;
-    try {
-      parsed = new URL(routeMatch[1], AZORA_BASE);
-    } catch {
-      continue;
-    }
-    if (parsed.origin !== base.origin || !parsed.pathname.startsWith(prefix)) continue;
-    const number = Number(routeMatch[2]);
-    if (!Number.isFinite(number) || found.has(number)) continue;
-    found.set(number, {
-      number,
-      title: "الفصل " + number,
-      publishedAt: null,
-      url: parsed.toString(),
-    });
+    remember(Number(routeMatch[2]), "الفصل " + routeMatch[2], routeMatch[1]);
   }
 
-  return [...found.values()].sort((a, b) => Number(b.number) - Number(a.number));
+  return [...found.values()].sort((a, b) =>
+    Number(b.number) - Number(a.number) ||
+    String(a.url || "").localeCompare(String(b.url || "")),
+  );
 }
 
 function azoraCanonicalSeriesUrl(item) {
@@ -3372,34 +3380,37 @@ function azoraDeclaredChapterCount(html) {
   return null;
 }
 
-function azoraCompleteOvergearedChapters(html, seriesUrl, parsedChapters) {
-  const current = Array.isArray(parsedChapters) ? parsedChapters : [];
-  const numbers = current
-    .map((chapter) => Number(chapter?.number))
-    .filter((number) => Number.isInteger(number) && number >= 0);
-  const max = numbers.length ? Math.max(...numbers) : -1;
-  const hasZero = numbers.includes(0);
+function azoraCompleteSequentialChapters(html, seriesUrl, parsedChapters) {
+  const current = mergeChapterLists(parsedChapters);
   const declaredCount = azoraDeclaredChapterCount(html);
+  if (!declaredCount || current.length >= declaredCount) return current;
 
-  // Overgeared on Azora is numbered continuously from chapter 0. The source
-  // currently renders only a preview of the list in HTML, but also exposes its
-  // total chapter count. Use that source-owned count to restore the omitted
-  // rows without changing Wany's source identity.
-  let lastChapter = max;
-  if (declaredCount && (hasZero || max >= 100)) {
-    lastChapter = Math.max(lastChapter, declaredCount - 1);
+  const numbers = current.map((chapter) => Number(chapter?.number));
+  if (!numbers.length || numbers.some((number) => !Number.isInteger(number) || number < 0)) {
+    return current;
   }
 
-  if (lastChapter < 100) return current;
+  // Never fabricate around duplicate-number/special chapters. Only fill the
+  // hidden rows when the source's own total proves a plain contiguous 0..N or
+  // 1..N numbering scheme.
+  const uniqueNumbers = new Set(numbers);
+  if (uniqueNumbers.size !== current.length) return current;
+
+  const max = Math.max(...numbers);
+  const first = declaredCount === max + 1
+    ? 0
+    : declaredCount === max
+      ? 1
+      : null;
+  if (first == null) return current;
 
   const existing = new Map(current.map((chapter) => [Number(chapter.number), chapter]));
   const base = String(seriesUrl || "").replace(/\/$/, "");
   const complete = [];
 
-  for (let number = lastChapter; number >= 0; number -= 1) {
-    const known = existing.get(number);
+  for (let number = max; number >= first; number -= 1) {
     complete.push(
-      known || {
+      existing.get(number) || {
         number,
         title: "الفصل " + number,
         publishedAt: null,
@@ -3408,7 +3419,77 @@ function azoraCompleteOvergearedChapters(html, seriesUrl, parsedChapters) {
     );
   }
 
-  return complete;
+  return complete.length === declaredCount ? complete : current;
+}
+
+async function azoraCompleteChapterList(html, seriesUrl) {
+  const declaredCount = azoraDeclaredChapterCount(html);
+  let chapters = mergeChapterLists(
+    parseAzoraChapters(html, seriesUrl),
+  );
+
+  chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
+  if (!declaredCount || chapters.length >= declaredCount) {
+    return {
+      chapters,
+      declaredCount,
+      complete: declaredCount ? chapters.length >= declaredCount : null,
+    };
+  }
+
+  // Some Azora series paginate the chapter component behind "عرض المزيد".
+  // Probe only common page parameters and stop immediately when a parameter
+  // returns the same batch. This avoids assuming the first HTML is complete
+  // while keeping upstream traffic bounded.
+  const strategies = [
+    "chapterPage",
+    "chaptersPage",
+    "chapter_page",
+    "chapters_page",
+    "page",
+  ];
+  const maxPages = Math.min(30, Math.max(2, Math.ceil(declaredCount / 20) + 1));
+
+  for (const parameter of strategies) {
+    let candidate = chapters;
+    let gained = false;
+
+    for (let page = 2; page <= maxPages; page += 1) {
+      const target = new URL(seriesUrl, AZORA_BASE);
+      target.searchParams.set(parameter, String(page));
+
+      let pageHtml;
+      try {
+        pageHtml = await azoraFetchText(target.toString());
+      } catch {
+        break;
+      }
+
+      const merged = mergeChapterLists(
+        candidate,
+        parseAzoraChapters(pageHtml, seriesUrl),
+      );
+      if (merged.length === candidate.length) break;
+
+      candidate = merged;
+      gained = true;
+      if (candidate.length >= declaredCount) break;
+    }
+
+    if (!gained) continue;
+    chapters = candidate;
+    break;
+  }
+
+  // A later page can expose the true highest chapter and make a sequential
+  // source-owned range provable, so run the safe completion rule once more.
+  chapters = azoraCompleteSequentialChapters(html, seriesUrl, chapters);
+
+  return {
+    chapters,
+    declaredCount,
+    complete: chapters.length >= declaredCount,
+  };
 }
 
 async function azoraSeries(db, item) {
@@ -3439,10 +3520,8 @@ async function azoraSeries(db, item) {
     firstMatch(plain, /(?:النوع|type)\s*:?\s*(رواية|مانهوا|مانها|مانغا|مانجا|كوميك|webtoon|manhwa|manhua|manga|novel|comic)/i) ||
     item.type,
   );
-  let chapters = parseAzoraChapters(html, seriesUrl);
-  if (cleanText(title).toLowerCase() === "overgeared") {
-    chapters = azoraCompleteOvergearedChapters(html, seriesUrl, chapters);
-  }
+  const chapterList = await azoraCompleteChapterList(html, seriesUrl);
+  const chapters = chapterList.chapters;
 
   const updated = {
     ...item,
@@ -3455,6 +3534,8 @@ async function azoraSeries(db, item) {
     genres: azoraGenreCandidates(html),
     latest: chapters[0]?.number ?? null,
     chapters,
+    declaredChapterCount: chapterList.declaredCount,
+    chapterListComplete: chapterList.complete,
   };
   await rememberItems(db, [updated]);
   return updated;
@@ -4871,8 +4952,10 @@ export const __test = {
   parseAzoraChapters,
   azoraCanonicalSeriesUrl,
   azoraDeclaredChapterCount,
-  azoraCompleteOvergearedChapters,
+  azoraCompleteSequentialChapters,
+  azoraCompleteChapterList,
   moreCompleteChapters,
+  mergeChapterLists,
   parseAzoraPages,
   parseAzoraRecentRelativeAt,
   parseAzoraChapterPublishedAt,
