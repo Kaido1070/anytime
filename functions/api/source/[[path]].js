@@ -2813,6 +2813,41 @@ function isAzoraUiImage(url) {
   return /(?:logo|favicon|avatar|profile|banner|icon|badge|placeholder|sprite|emoji|ads?)(?:[\/_-]|\.)/i.test(String(url));
 }
 
+function isAzoraSocialPreview(url) {
+  const value = String(url || "");
+  return /(?:^|[\/_-])(?:og|opengraph|open-graph|social|share|preview|card)(?:[\/_?.-]|$)/i.test(value) ||
+    /(?:api|generate)[\/_-]?(?:og|image|card)/i.test(value);
+}
+
+function azoraCoverFromHtml(html, title = "") {
+  const wanted = cleanText(title).toLowerCase();
+  let best = null;
+
+  for (const image of extractImages(String(html ?? ""))) {
+    const url = resolveAzoraMediaUrl(image.src);
+    if (!url || isAzoraUiImage(url) || isAzoraSocialPreview(url)) continue;
+
+    const label = cleanText(image.attrs.alt || image.attrs.title || "").toLowerCase();
+    const className = String(image.attrs.class || "");
+    const width = Number.parseFloat(image.attrs.width || "");
+    const height = Number.parseFloat(image.attrs.height || "");
+    let score = 0;
+
+    if (wanted && label === wanted) score += 12;
+    else if (wanted && label && (label.includes(wanted) || wanted.includes(label))) score += 7;
+    if (/(?:cover|poster|thumbnail|thumb|series|manga)/i.test(className)) score += 5;
+    if (/(?:cover|poster|thumbnail|thumb)/i.test(url)) score += 3;
+    if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+      if (height > width * 1.15) score += 6;
+      else if (width > height * 1.2) score -= 8;
+    }
+
+    if (!best || score > best.score) best = { url, score };
+  }
+
+  return best && best.score >= 0 ? best.url : "";
+}
+
 function azoraItemsFromHtml(html) {
   const source = String(html ?? "");
   const bySlug = new Map();
@@ -2835,8 +2870,7 @@ function azoraItemsFromHtml(html) {
     );
     if (!title || /^image$/i.test(title) || /^الفصل\s+\d+/i.test(title)) continue;
 
-    const rawCover = firstImgUrl(anchor.inner);
-    const cover = resolveAzoraMediaUrl(rawCover);
+    const cover = azoraCoverFromHtml(anchor.inner, title);
     bySlug.set(slug, {
       key: "az:" + safeSlugKey(slug),
       source: "azora",
@@ -2919,10 +2953,18 @@ async function azoraSeries(db, item) {
     azoraMetaContent(html, ["og:title", "twitter:title"]) ||
     item.title,
   );
+  const pageCover = azoraCoverFromHtml(html, title);
   const metaCover = resolveAzoraMediaUrl(
     azoraMetaContent(html, ["og:image", "twitter:image", "twitter:image:src"]),
   );
-  const cover = metaCover && !isAzoraUiImage(metaCover) ? metaCover : item.cover;
+  const safeMetaCover =
+    metaCover && !isAzoraUiImage(metaCover) && !isAzoraSocialPreview(metaCover)
+      ? metaCover
+      : "";
+  // Azora's og:image can be a landscape social card containing the title,
+  // branding and only a slice of the real cover. Prefer the actual poster
+  // found in the page, then the listing cover, and use metadata only last.
+  const cover = pageCover || item.cover || safeMetaCover;
   const plain = cleanText(stripTags(html));
   const status = normalizeStatus(
     firstMatch(plain, /الحالة\s*:?\s*(مستمر|مستمرة|مكتمل|مكتملة|متوقف|ملغي|ملغية|توقف مؤقت)/i) ||
