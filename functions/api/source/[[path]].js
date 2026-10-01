@@ -2232,28 +2232,117 @@ function normalizeAsqType(value) {
   return type || "manga";
 }
 
-async function asqFetchSeriesChapters(seriesUrl) {
-  const base = new URL(seriesUrl, ASQ_BASE);
-  const chapterUrl = new URL(base.pathname.replace(/\/$/, "") + "/ajax/chapters/", base.origin);
-  const response = await fetch(chapterUrl.toString(), {
-    method: "POST",
-    headers: {
-      ...sourceHeaders(
-        seriesUrl,
-        "text/html,application/xhtml+xml,*/*;q=0.8",
-      ),
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Requested-With": "XMLHttpRequest",
-      Referer: seriesUrl,
-    },
-    body: "",
-    redirect: "follow",
-    cf: { cacheTtl: 30, cacheEverything: false },
-  });
-  if (!response.ok) {
-    throw new SourceError("ASQ_CHAPTERS", "العاشق لم يرجع قائمة الفصول.", 502);
+function madaraChapterUrls(html, seriesUrl, baseUrl) {
+  const base = new URL(seriesUrl, baseUrl);
+  const basePath = base.pathname.replace(/\/$/, "");
+  const urls = new Set();
+
+  for (const anchor of extractAnchors(String(html ?? ""))) {
+    const href = absoluteUrl(baseUrl, anchor.href);
+    if (!href) continue;
+    try {
+      const parsed = new URL(href);
+      if (
+        parsed.origin === base.origin &&
+        parsed.pathname.startsWith(basePath + "/") &&
+        parsed.pathname !== basePath + "/"
+      ) {
+        urls.add(parsed.toString());
+      }
+    } catch {}
   }
-  return response.text();
+
+  return urls;
+}
+
+function madaraChapterListHasPagination(html) {
+  const source = String(html ?? "");
+  return /(?:class=["'][^"']*(?:pagination|page-numbers|chapter[^"']*(?:load|more))[^"']*["']|data-(?:page|paged|next-page|current-page)=|load[_ -]?more|عرض\s+المزيد)/i.test(source);
+}
+
+async function fetchMadaraCompleteChapterHtml(baseUrl, seriesUrl, code, message) {
+  const base = new URL(seriesUrl, baseUrl);
+  const endpoint = new URL(
+    base.pathname.replace(/\/$/, "") + "/ajax/chapters/",
+    base.origin,
+  );
+  const headers = {
+    ...sourceHeaders(seriesUrl, "text/html,application/xhtml+xml,*/*;q=0.8"),
+    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "X-Requested-With": "XMLHttpRequest",
+    Referer: seriesUrl,
+  };
+
+  const request = async (target, body = "") => {
+    const response = await fetch(target, {
+      method: "POST",
+      headers,
+      body,
+      redirect: "follow",
+      cf: { cacheTtl: 30, cacheEverything: false },
+    });
+    if (!response.ok) throw new SourceError(code, message, 502);
+    return response.text();
+  };
+
+  const first = await request(endpoint.toString());
+  if (!madaraChapterListHasPagination(first)) return first;
+
+  const documents = [first];
+  const seenUrls = madaraChapterUrls(first, seriesUrl, baseUrl);
+  const seenDocuments = new Set([first]);
+
+  for (let page = 2; page <= 50; page += 1) {
+    const body = new URLSearchParams({
+      page: String(page),
+      paged: String(page),
+    }).toString();
+
+    let pageHtml = "";
+    try {
+      pageHtml = await request(endpoint.toString(), body);
+    } catch {
+      break;
+    }
+
+    let pageUrls = madaraChapterUrls(pageHtml, seriesUrl, baseUrl);
+    let hasNew = [...pageUrls].some((url) => !seenUrls.has(url));
+
+    // Some Madara customizations read pagination from the query string rather
+    // than POST form data. Try that form only if the POST page repeated.
+    if (!hasNew) {
+      const queryTarget = new URL(endpoint);
+      queryTarget.searchParams.set("page", String(page));
+      queryTarget.searchParams.set("paged", String(page));
+      try {
+        const queryHtml = await request(queryTarget.toString());
+        const queryUrls = madaraChapterUrls(queryHtml, seriesUrl, baseUrl);
+        if ([...queryUrls].some((url) => !seenUrls.has(url))) {
+          pageHtml = queryHtml;
+          pageUrls = queryUrls;
+          hasNew = true;
+        }
+      } catch {}
+    }
+
+    if (!hasNew || seenDocuments.has(pageHtml)) break;
+    seenDocuments.add(pageHtml);
+    documents.push(pageHtml);
+    for (const url of pageUrls) seenUrls.add(url);
+
+    if (!madaraChapterListHasPagination(pageHtml)) break;
+  }
+
+  return documents.join("\n");
+}
+
+async function asqFetchSeriesChapters(seriesUrl) {
+  return fetchMadaraCompleteChapterHtml(
+    ASQ_BASE,
+    seriesUrl,
+    "ASQ_CHAPTERS",
+    "العاشق لم يرجع قائمة الفصول.",
+  );
 }
 
 function asqPostId(html) {
@@ -2684,22 +2773,12 @@ function starzPostId(html) {
 }
 
 async function starzFetchSeriesChapters(seriesUrl) {
-  const base = new URL(seriesUrl, STARZ_BASE);
-  const chapterUrl = new URL(base.pathname.replace(/\/$/, "") + "/ajax/chapters/", base.origin);
-  const response = await fetch(chapterUrl.toString(), {
-    method: "POST",
-    headers: {
-      ...sourceHeaders(seriesUrl, "text/html,application/xhtml+xml,*/*;q=0.8"),
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Requested-With": "XMLHttpRequest",
-      Referer: seriesUrl,
-    },
-    body: "",
-    redirect: "follow",
-    cf: { cacheTtl: 30, cacheEverything: false },
-  });
-  if (!response.ok) throw new SourceError("STARZ_CHAPTERS", "StarzManga لم يرجع قائمة الفصول.", 502);
-  return response.text();
+  return fetchMadaraCompleteChapterHtml(
+    STARZ_BASE,
+    seriesUrl,
+    "STARZ_CHAPTERS",
+    "StarzManga لم يرجع قائمة الفصول.",
+  );
 }
 
 async function starzFetchChapters(postId) {
@@ -4025,22 +4104,12 @@ async function mangalikSeries(db, item) {
 }
 
 async function mangalikFetchSeriesChapters(seriesUrl) {
-  const base = new URL(seriesUrl, MANGALIK_BASE);
-  const chapterUrl = new URL(base.pathname.replace(/\/$/, "") + "/ajax/chapters/", base.origin);
-  const response = await fetch(chapterUrl.toString(), {
-    method: "POST",
-    headers: {
-      ...sourceHeaders(seriesUrl, "text/html,application/xhtml+xml,*/*;q=0.8"),
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Requested-With": "XMLHttpRequest",
-      Referer: seriesUrl,
-    },
-    body: "",
-    redirect: "follow",
-    cf: { cacheTtl: 30, cacheEverything: false },
-  });
-  if (!response.ok) throw new SourceError("MANGALIK_CHAPTERS", "MangaLik لم يرجع قائمة الفصول.", 502);
-  return response.text();
+  return fetchMadaraCompleteChapterHtml(
+    MANGALIK_BASE,
+    seriesUrl,
+    "MANGALIK_CHAPTERS",
+    "MangaLik لم يرجع قائمة الفصول.",
+  );
 }
 
 function parseMangalikPublishedAt(block, now = Date.now()) {
@@ -5046,6 +5115,9 @@ export const __test = {
   asqSafeSeriesTitle,
   asqLatestItemIsSane,
   parseAsqPages,
+  madaraChapterUrls,
+  madaraChapterListHasPagination,
+  fetchMadaraCompleteChapterHtml,
   asqPostId,
   parseStarzChapters,
   parseStarzPublishedAt,
