@@ -126,7 +126,7 @@ class RouteStatement {
   }
 
   async first() {
-    if (this.query.includes("SELECT value FROM schema_meta")) return { value: "9" };
+    if (this.query.includes("SELECT value FROM schema_meta")) return { value: "19" };
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
         token_hash: "token",
@@ -224,3 +224,4 @@ test("client cannot create arbitrary activity through an activity endpoint", asy
   assert.equal(response.status, 404);
   assert.equal(payload.error, "NOT_FOUND");
 });
+

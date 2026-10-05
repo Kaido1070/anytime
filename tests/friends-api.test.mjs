@@ -25,7 +25,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "9" };
+      return { value: "19" };
     }
 
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
@@ -308,3 +308,4 @@ test("third user cannot remove another pair's friendship", async () => {
   assert.equal(db.friendships.has("a:b"), true);
   assert.equal(db.friendships.has("b:a"), true);
 });
+

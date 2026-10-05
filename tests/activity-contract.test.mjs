@@ -4,8 +4,9 @@ import test from "node:test";
 
 test("Phase 7 stores only activity references and the six requested event types", async () => {
   const source = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../migrations/0007_activity.sql", import.meta.url), "utf8");
 
-  assert.match(source, /CREATE TABLE IF NOT EXISTS activity_events/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS activity_events/);
   for (const type of [
     "started_work",
     "progress_reached",
@@ -16,7 +17,7 @@ test("Phase 7 stores only activity references and the six requested event types"
   ]) {
     assert.match(source, new RegExp(type));
   }
-  assert.match(source, /FOREIGN KEY \(list_id\) REFERENCES user_lists\(id\) ON DELETE CASCADE/);
+  assert.match(schema, /FOREIGN KEY \(list_id\) REFERENCES user_lists\(id\) ON DELETE CASCADE/);
   assert.doesNotMatch(source, /activity_events[\s\S]{0,400}(work_title|cover_url|sentence|message) TEXT/i);
 });
 
@@ -63,3 +64,4 @@ test("Phase 7 does not introduce notifications, reactions, avatar library, or ad
 
   assert.doesNotMatch(migration, /notification|reaction|comment|avatar|admin/i);
 });
+

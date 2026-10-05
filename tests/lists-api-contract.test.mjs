@@ -4,6 +4,7 @@ import test from "node:test";
 
 test("Phase 3 API keeps list writes scoped to the authenticated owner", async () => {
   const source = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../migrations/0003_user_lists.sql", import.meta.url), "utf8");
 
   assert.match(
     source,
@@ -21,7 +22,7 @@ test("Phase 3 API keeps list writes scoped to the authenticated owner", async ()
     "list edits must be owner-scoped",
   );
   assert.match(
-    source,
+    schema,
     /PRIMARY KEY \(list_id, manga_id\)/,
     "the same work may appear in different lists but cannot be duplicated in one list",
   );
@@ -36,3 +37,4 @@ test("Phase 3 API keeps list writes scoped to the authenticated owner", async ()
     "list deletion must not delete reading history",
   );
 });
+

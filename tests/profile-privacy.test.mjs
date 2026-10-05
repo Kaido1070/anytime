@@ -27,7 +27,7 @@ class FakeStatement {
       return { total: 0 };
     }
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "9" };
+      return { value: "19" };
     }
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
@@ -266,3 +266,4 @@ test("direct list access is denied when the list owner is private", async () => 
   assert.equal((await response.json()).error, "LIST_NOT_FOUND");
   assert.equal(db.sensitiveQueries.includes("list-detail-items"), false);
 });
+

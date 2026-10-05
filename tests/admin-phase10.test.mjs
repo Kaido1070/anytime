@@ -147,17 +147,17 @@ test("admin responses are no-store and public user serializer does not expose ro
 });
 
 
-test("admin schema repair is non-destructive for existing user accounts", async () => {
+test("admin schema validation never changes existing user accounts", async () => {
   const helpers = await readFile(new URL("../functions/_admin.js", import.meta.url), "utf8");
   const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
   const api = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
 
   assert.match(helpers, /PRAGMA table_info\(users\)/);
-  assert.match(helpers, /ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'/);
+  assert.doesNotMatch(helpers, /ALTER TABLE|CREATE TABLE|CREATE INDEX/);
   assert.doesNotMatch(helpers, /DROP TABLE users|DELETE FROM users|UPDATE users/);
   assert.doesNotMatch(helpers, /schema_version[\s\S]*return/);
 
-  assert.match(api, /role TEXT NOT NULL DEFAULT 'user'[\s\S]*role IN \('user','admin'\)/);
+  assert.doesNotMatch(api, /ensureCanonicalAccountNames|SEEDED_USERS/);
   assert.doesNotMatch(provision, /DROP TABLE users|DELETE FROM users/);
   const updateStart = provision.indexOf("UPDATE users");
   const updateEnd = provision.indexOf(".run();", updateStart);
@@ -180,10 +180,10 @@ test("admin provisioning never hijacks an ordinary existing account named Admin"
 test("admin login exposes safe stage diagnostics without leaking secrets", async () => {
   const login = await readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8");
   assert.match(login, /ADMIN_SCHEMA_FAILED/);
-  assert.match(login, /ADMIN_PROVISION_FAILED/);
+  assert.doesNotMatch(login, /ensureAdminAccount|ADMIN_PROVISION_FAILED/);
   assert.match(login, /ADMIN_LOOKUP_FAILED/);
   assert.match(login, /ADMIN_SESSION_FAILED/);
-  assert.match(login, /ADMIN_SECRET_MISSING/);
+  assert.doesNotMatch(login, /ADMIN_INITIAL_PASSWORD|ADMIN_SECRET_MISSING/);
   assert.doesNotMatch(login, /initialSecret.*message|suppliedSecret.*message/);
 });
 
@@ -197,8 +197,8 @@ test("Admin login uses the reserved id and preserves any ordinary account named 
   assert.match(provision, /existingByUsername && existingByUsername\.id !== existing\.id/);
   assert.match(provision, /const username = existingByUsername \? ADMIN_INTERNAL_USERNAME : ADMIN_USERNAME/);
   assert.match(provision, /purgeSocialRowsBestEffort/);
-  assert.match(login, /FROM users WHERE id = \? AND role = 'admin' LIMIT 1/);
-  assert.match(login, /\.bind\("admin"\)/);
+  assert.match(login, /FROM users WHERE username = \? COLLATE NOCASE AND role = 'admin' LIMIT 1/);
+  assert.match(login, /\.bind\(username\)/);
 });
 
 
@@ -215,7 +215,7 @@ test("Admin provisioning reports the failing production substage without leaking
   ]) {
     assert.match(provision, new RegExp(code));
   }
-  assert.match(login, /typeof error\.code === "string"/);
+  assert.doesNotMatch(login, /ensureAdminAccount/);
   assert.doesNotMatch(login, /cause.*message:/);
 });
 
@@ -226,7 +226,7 @@ test("Admin PBKDF2 cost matches the Cloudflare-safe password flow", async () => 
     readFile(new URL("../functions/api/change-password.js", import.meta.url), "utf8"),
   ]);
   assert.match(provision, /ADMIN_PASSWORD_ITERATIONS = 25000/);
-  assert.match(changePassword, /PASSWORD_ITERATIONS = 25000/);
+  assert.match(await readFile(new URL("../functions/_password.js", import.meta.url), "utf8"), /PASSWORD_ITERATIONS = 25000/);
 });
 
 
@@ -244,3 +244,4 @@ test("admin dashboard removes redundant navigation and surfaces chapters read", 
   assert.match(api, /GROUP BY manga_id, chapter/);
   assert.match(types, /chaptersReadCount: number/);
 });
+

@@ -1,5 +1,5 @@
+import { verifyPassword } from "../_password.js";
 import { ensureAdminSchema, isAdminUser, recordAdminAudit, sessionUser } from "../_admin.js";
-import { ensureAdminAccount } from "../_admin_provision.js";
 
 const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -20,29 +20,10 @@ export async function onRequestPost(context) {
       return adminStageError("ADMIN_SCHEMA_FAILED", error);
     }
 
-    try {
-      const result = await ensureAdminAccount(db, context.env);
-      if (!result?.configured) {
-        return json(
-          {
-            error: "ADMIN_SECRET_MISSING",
-            message: "تعذر تسجيل الدخول الآن. (ADMIN_SECRET_MISSING)",
-          },
-          500,
-        );
-      }
-    } catch (error) {
-      const code =
-        error && typeof error === "object" && typeof error.code === "string"
-          ? error.code
-          : "ADMIN_PROVISION_FAILED";
-      return adminStageError(code, error);
-    }
-
     const body = await request.json().catch(() => ({}));
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     const suppliedSecret = typeof body.password === "string" ? body.password : "";
-    if (username !== "admin" || !suppliedSecret || suppliedSecret.length > 128) {
+    if (!username || !suppliedSecret || suppliedSecret.length > 128) {
       return invalidLogin();
     }
 
@@ -51,14 +32,21 @@ export async function onRequestPost(context) {
       user = await db
         .prepare(`SELECT id, username, name, profile_visibility, avatar_id, role,
           password_salt, password_hash, password_iterations
-          FROM users WHERE id = ? AND role = 'admin' LIMIT 1`)
-        .bind("admin")
+          FROM users WHERE username = ? COLLATE NOCASE AND role = 'admin' LIMIT 1`)
+        .bind(username)
         .first();
+      // Preserve the old login alias only for an existing admin-role row.
+      // The alias grants no role and never provisions or rewrites credentials.
+      if (!user && username === "admin") {
+        user = await db.prepare(`SELECT id, username, name, profile_visibility, avatar_id, role,
+          password_salt, password_hash, password_iterations
+          FROM users WHERE id = 'admin' AND role = 'admin' LIMIT 1`).first();
+      }
     } catch (error) {
       return adminStageError("ADMIN_LOOKUP_FAILED", error);
     }
 
-    if (!user || !isAdminUser(user) || !(await verifySecret(suppliedSecret, user))) {
+    if (!user || !isAdminUser(user) || !(await verifyPassword(suppliedSecret, user))) {
       await sleep(120);
       return invalidLogin();
     }
@@ -103,28 +91,6 @@ function adminStageError(code, error) {
 
 function invalidLogin() {
   return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
-}
-
-async function verifySecret(value, row) {
-  const salt = base64UrlToBytes(row.password_salt);
-  const derived = await deriveHash(value, salt, Number(row.password_iterations));
-  return timingSafeEqual(base64UrlToBytes(derived), base64UrlToBytes(row.password_hash));
-}
-
-async function deriveHash(value, salt, iterations) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(value),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
-    key,
-    256,
-  );
-  return bytesToBase64Url(new Uint8Array(bits));
 }
 
 async function sha256Base64Url(value) {
@@ -175,3 +141,4 @@ function json(body, status = 200, extraHeaders = {}) {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+

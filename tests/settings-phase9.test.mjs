@@ -17,7 +17,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "9" };
+      return { value: "19" };
     }
 
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
@@ -191,8 +191,9 @@ test("password change verifies the current password and invalidates other sessio
   );
 
   assert.match(source, /verifyPassword\(currentPassword, authRow\)/);
-  assert.match(source, /PBKDF2/);
-  assert.match(source, /hash: "SHA-256"/);
+  const passwords = await readFile(new URL("../functions/_password.js", import.meta.url), "utf8");
+  assert.match(passwords, /PBKDF2/);
+  assert.match(passwords, /hash: "SHA-256"/);
   assert.match(
     source,
     /DELETE FROM sessions WHERE user_id = \? AND token_hash <> \?/,
@@ -221,3 +222,4 @@ test("login delegates to the shared API handler that preserves avatar data", asy
   assert.match(api, /profile_visibility, avatar_id, role, password_salt/);
   assert.match(admin, /avatarId: row\.avatar_id \?\? row\.avatarId \?\? null/);
 });
+

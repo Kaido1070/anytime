@@ -15,7 +15,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "4" };
+      return { value: "19" };
     }
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
@@ -104,3 +104,4 @@ test("backend rejects every personal-list mutation when the list is not owned by
   assert.equal(removeList.status, 404);
   assert.equal((await removeList.json()).error, "LIST_NOT_FOUND");
 });
+

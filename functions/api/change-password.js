@@ -1,11 +1,5 @@
+import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash } from "../_password.js";
 const SESSION_COOKIE = "anytime_session";
-const PASSWORD_ITERATIONS = 25000;
-
-const DEFAULT_PASSWORD_MIGRATIONS = new Map([
-  ["Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE", "dN13h-kpkhGSQJVBkmDOvXb69LKMwGicgTtea0zEAdE"],
-  ["g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y", "hb284Iod4PzsMFaR1UF0ZeovMGnQi2XHETuB_oPGFLU"],
-  ["Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI", "a6i7k3yCu28zBKb6rGpJFeJLV8WmWRn3wH18pGbrwWc"],
-]);
 
 export async function onRequestPost(context) {
   const { request } = context;
@@ -27,13 +21,12 @@ export async function onRequestPost(context) {
       return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر." }, 400);
     }
 
-    let authRow = await db
+    const authRow = await db
       .prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ? LIMIT 1")
       .bind(session.user.id)
       .first();
     if (!authRow) return json({ error: "UNAUTHORIZED" }, 401);
 
-    authRow = await migrateDefaultPasswordIfNeeded(db, authRow);
     if (!(await verifyPassword(currentPassword, authRow))) {
       return json({ error: "WRONG_PASSWORD", message: "كلمة المرور الحالية غير صحيحة." }, 400);
     }
@@ -58,16 +51,6 @@ export async function onRequestPost(context) {
   }
 }
 
-async function migrateDefaultPasswordIfNeeded(db, user) {
-  const nextHash = DEFAULT_PASSWORD_MIGRATIONS.get(String(user.password_hash));
-  if (!nextHash || Number(user.password_iterations) !== 210000) return user;
-  await db
-    .prepare("UPDATE users SET password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ? AND password_hash = ? AND password_iterations = 210000")
-    .bind(nextHash, PASSWORD_ITERATIONS, Date.now(), user.id, user.password_hash)
-    .run();
-  return { ...user, password_hash: nextHash, password_iterations: PASSWORD_ITERATIONS };
-}
-
 async function getSession(request, db) {
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) return null;
@@ -81,18 +64,6 @@ async function getSession(request, db) {
     .first();
   if (!row) return null;
   return { tokenHash, user: { id: row.id, username: row.username, name: row.name } };
-}
-
-async function verifyPassword(password, row) {
-  const salt = base64UrlToBytes(row.password_salt);
-  const derived = await derivePasswordHash(password, salt, Number(row.password_iterations));
-  return timingSafeEqual(base64UrlToBytes(derived), base64UrlToBytes(row.password_hash));
-}
-
-async function derivePasswordHash(password, salt, iterations) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, key, 256);
-  return bytesToBase64Url(new Uint8Array(bits));
 }
 
 async function sha256Base64Url(value) {
@@ -140,3 +111,4 @@ function json(body, status = 200, extraHeaders = {}) {
     },
   });
 }
+
