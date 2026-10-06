@@ -211,23 +211,27 @@ def transform(original, support, config):
     desired['work_snapshot_cover_locations'] = [
         {'user_id': key[0], 'manga_id': key[1], 'r2_user_id': old_locations.get((old, key[1]), old)}
         for key, old in selected_covers.items()]
-    compat = json.loads((ROOT / 'scripts/legacy-auth-compat.json').read_text())
-    for user in original['users']['rows']:
-        new = mapping[str(user['id'])]
-        verifier = {k: user[k] for k in ('password_salt', 'password_hash', 'password_iterations')}
-        desired['user_password_verifiers'].append({'user_id': new, **verifier})
-        legacy_hash = compat['password_hashes'].get(str(user['password_hash'])) if int(user['password_iterations']) == 210000 else None
-        if legacy_hash:
-            desired['user_password_verifiers'].append({'user_id': new, **verifier, 'password_hash': legacy_hash, 'password_iterations': 25000})
-        legacy_recovery = compat['recovery'].get(str(user['id']))
-        if legacy_recovery:
-            desired['user_recovery_verifiers'].append({
-                'user_id': new, 'scheme': legacy_recovery['scheme'], 'recovery_salt': legacy_recovery['salt'],
-                'recovery_hash': legacy_recovery['hash'], 'recovery_iterations': legacy_recovery['iterations']})
-    for old in original.get('account_recovery', {}).get('rows', []):
+    # Never carry credentials or recovery codes from a possibly exposed legacy system.
+    # Fresh high-entropy secrets exist only in private output files on this computer.
+    credentials = []
+    desired['sessions'] = []
+    desired['account_recovery'] = []
+    desired['user_password_verifiers'] = []
+    desired['user_recovery_verifiers'] = []
+    for user in new_users:
+        password = secrets.token_urlsafe(24)
+        recovery_code = secrets.token_urlsafe(32)
+        salt = secrets.token_bytes(16)
+        user['password_salt'] = base64.urlsafe_b64encode(salt).decode().rstrip('=')
+        user['password_hash'] = base64.urlsafe_b64encode(hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 25000)).decode().rstrip('=')
+        user['password_iterations'] = 25000
+        user['updated_at'] = now
         desired['user_recovery_verifiers'].append({
-            'user_id': mapping[str(old['user_id'])], 'scheme': 'pbkdf2-sha256',
-            **{key: old[key] for key in ('recovery_salt', 'recovery_hash', 'recovery_iterations')}})
+            'user_id': user['id'], 'scheme': 'sha256', 'recovery_salt': '',
+            'recovery_hash': base64.urlsafe_b64encode(hashlib.sha256(recovery_code.encode()).digest()).decode().rstrip('='),
+            'recovery_iterations': 1})
+        credentials.append({'user_id': user['id'], 'username': user['username'],
+            'password': password, 'recoveryCode': recovery_code})
     # Reconcile existing aliases/verifiers without dropping a conflicting owner.
     for name in SUPPORT_TABLES:
         keyed = {}
@@ -238,7 +242,7 @@ def transform(original, support, config):
                 raise MigrationError(f'Conflicting migration metadata in {name}.')
             keyed[key] = row
         desired[name] = list(keyed.values())
-    return all_data, desired, changed, mapping, collisions, dropped_self
+    return all_data, desired, changed, mapping, collisions, dropped_self, credentials
 
 
 def insert_statements(name, columns, pk, row):
@@ -330,12 +334,25 @@ def build_plan(backup, config, output):
     original = catalog(source)
     source.executescript(SUPPORT_SQL)
     support = catalog(source)
-    data, desired, changed, mapping, collisions, dropped = transform(original, support, config)
+    data, desired, changed, mapping, collisions, dropped, credentials = transform(original, support, config)
     for trigger in source.execute("SELECT tbl_name FROM sqlite_master WHERE type='trigger'"):
         if trigger[0] in changed: raise MigrationError('An account-table trigger needs manual review before migration.')
     before = {name: original.get(name, {}).get('rows', []) for name in changed}
     apply_sql = migration_sql(data, before, desired, changed, 'numeric-ID transition')
-    rollback_sql = migration_sql(data, desired, before, changed, 'guarded rollback')
+    # Data rollback must NOT resurrect exposed credentials or authenticated sessions.
+    rollback_rows = {name: [dict(row) for row in rows] for name, rows in before.items()}
+    fresh_users = {row['id']: row for row in desired['users']}
+    for user in rollback_rows['users']:
+        fresh = fresh_users[mapping[str(user['id'])]]
+        for field in ('password_salt', 'password_hash', 'password_iterations', 'updated_at'):
+            user[field] = fresh[field]
+    for name in ('sessions', 'account_recovery', 'user_password_verifiers'):
+        rollback_rows[name] = []
+    primary_by_new = {mapping[a['primary_id']]: a['primary_id'] for a in config['accounts']}
+    rollback_rows['user_recovery_verifiers'] = [
+        {**row, 'user_id': primary_by_new[row['user_id']]}
+        for row in desired['user_recovery_verifiers']]
+    rollback_sql = migration_sql(data, desired, rollback_rows, changed, 'guarded data rollback; credentials stay rotated')
     # Both directions are tested against the actual private export in memory.
     apply_atomic(source, apply_sql)
     actual = catalog(source)
@@ -346,16 +363,17 @@ def build_plan(backup, config, output):
     apply_atomic(source, rollback_sql)
     actual = catalog(source)
     for name in changed:
-        if canonical_rows(actual[name]['rows']) != canonical_rows(before[name]): raise MigrationError(f'Rollback mismatch in {name}.')
+        if canonical_rows(actual[name]['rows']) != canonical_rows(rollback_rows[name]): raise MigrationError(f'Rollback mismatch in {name}.')
     folder = Path(output)
     folder.mkdir(parents=True, exist_ok=False)
-    for name, content in [('apply.sql', apply_sql), ('rollback.sql', rollback_sql), ('mapping.local.json', json.dumps(mapping, indent=2))]:
+    for name, content in [('apply.sql', apply_sql), ('rollback.sql', rollback_sql), ('mapping.local.json', json.dumps(mapping, indent=2)), ('credentials.local.json', json.dumps({'accounts': credentials}, indent=2))]:
         path = folder / name
         path.write_text(content, encoding='utf-8'); path.chmod(0o600)
     destination = sqlite3.connect(folder / 'migrated.sqlite')
     transformed.backup(destination); destination.close(); (folder / 'migrated.sqlite').chmod(0o600)
     report = {
         'accounts_before': len(original['users']['rows']), 'accounts_after': len(desired['users']),
+        'all_credentials_rotated': True, 'all_old_sessions_revoked': True, 'rollback_keeps_fresh_credentials': True,
         'all_ids_are_numeric_text': all(isinstance(r['id'], str) and re.fullmatch(r'[1-9][0-9]{31}', r['id']) for r in desired['users']),
         'apply_and_rollback_verified_locally': True,
         'table_counts': {name: {'before': len(before[name]), 'after': len(desired[name])} for name in sorted(changed)},
@@ -390,7 +408,9 @@ def main():
     elif args.accounts and args.out:
         report = build_plan(args.backup, json.loads(Path(args.accounts).read_text()), args.out)
         print(json.dumps({'accounts_before': report['accounts_before'], 'accounts_after': report['accounts_after'],
-            'all_ids_are_numeric_text': report['all_ids_are_numeric_text'], 'apply_and_rollback_verified_locally': True}))
+            'all_credentials_rotated': True, 'all_old_sessions_revoked': True, 'rollback_keeps_fresh_credentials': True,
+        'all_ids_are_numeric_text': report['all_ids_are_numeric_text'], 'apply_and_rollback_verified_locally': True}))
+        print('Fresh passwords and recovery codes are in credentials.local.json. Applying the migration invalidates ALL old credentials and sessions.')
         print('No Cloudflare connection or production change occurred. Private files remain on this computer.')
     else: parser.error('Use --template, or both --accounts and --out.')
 

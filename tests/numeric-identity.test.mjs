@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,7 +60,8 @@ async function fixture(t) {
   const sqlite = new DatabaseSync(join(folder, 'plan', 'migrated.sqlite'));
   sqlite.exec('PRAGMA foreign_keys=ON');
   t.after(() => sqlite.close());
-  return { sqlite, db: d1Adapter(sqlite) };
+  const credentials = JSON.parse(await readFile(join(folder, 'plan', 'credentials.local.json'), 'utf8')).accounts;
+  return { sqlite, db: d1Adapter(sqlite), credentials: Object.fromEntries(credentials.map(row => [row.username, row])) };
 }
 
 function context(path, db, body, cookie, extra = {}) {
@@ -77,29 +78,36 @@ async function login(db, username, password) {
   return { response, payload, cookie: response.headers.get('Set-Cookie')?.split(';')[0] };
 }
 
-test('both old H credentials resolve to the same numeric D1 identity, then password change retires both', async t => {
-  const { sqlite, db } = await fixture(t);
-  const primary = await login(db, 'h', 'has-before');
-  const alternate = await login(db, 'H', 'h-before');
+test('migration rejects old H credentials and new password changes actually replace the private credential', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  assert.equal((await login(db, 'h', 'has-before')).response.status, 401);
+  assert.equal((await login(db, 'h', 'h-before')).response.status, 401);
+  for (const [username, oldPassword] of [['y','yas-before'],['y','y-before'],['m','m-before'],['admin','admin-before']]) {
+    assert.equal((await login(db, username, oldPassword)).response.status, 401);
+    assert.equal((await login(db, username, credentials[username].password)).response.status, 200);
+  }
+  const primary = await login(db, 'h', credentials.h.password);
+  const alternate = await login(db, 'H', credentials.h.password);
   assert.equal(primary.response.status, 200);
   assert.equal(alternate.response.status, 200);
   assert.ok(isNumericUserId(primary.payload.user.id));
   assert.equal(primary.payload.user.id, alternate.payload.user.id);
   const id = primary.payload.user.id;
-  const response = await changePassword(context('change-password', db, { currentPassword: 'h-before', newPassword: 'after-migration-password' }, alternate.cookie));
+  const response = await changePassword(context('change-password', db, { currentPassword: credentials.h.password, newPassword: 'after-migration-password' }, alternate.cookie));
   assert.equal(response.status, 200);
   assert.equal(sqlite.prepare('SELECT id FROM users WHERE username=?').get('h').id, id);
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM user_password_verifiers WHERE user_id=?').get(id).n, 0);
   assert.equal((await login(db, 'h', 'has-before')).response.status, 401);
   assert.equal((await login(db, 'h', 'h-before')).response.status, 401);
+  assert.equal((await login(db, 'h', credentials.h.password)).response.status, 401);
   assert.equal((await login(db, 'h', 'after-migration-password')).payload.user.id, id);
   assert.equal((await (await onRequest(context('session', db, null, primary.cookie))).json()).user, null);
   assert.equal((await (await onRequest(context('session', db, null, alternate.cookie))).json()).user.id, id);
 });
 
 test('numeric admin identity authenticates by its D1 username and role', async t => {
-  const { sqlite, db } = await fixture(t);
-  const result = await login(db, 'admin', 'admin-before');
+  const { sqlite, db, credentials } = await fixture(t);
+  const result = await login(db, 'admin', credentials.admin.password);
   assert.equal(result.response.status, 200);
   assert.ok(isNumericUserId(result.payload.user.id));
   assert.equal(result.payload.user.role, 'admin');
@@ -107,8 +115,8 @@ test('numeric admin identity authenticates by its D1 username and role', async t
 });
 
 test('R2 cover fallback uses only aliases belonging to the numeric session owner', async t => {
-  const { db } = await fixture(t);
-  const h = await login(db, 'h', 'has-before');
+  const { db, credentials } = await fixture(t);
+  const h = await login(db, 'h', credentials.h.password);
   const requested = [];
   const covers = { async get(key) {
     requested.push(key);
@@ -119,19 +127,17 @@ test('R2 cover fallback uses only aliases belonging to the numeric session owner
   assert.equal(await response.text(), 'old-cover');
   assert.equal(requested[1], 'covers/has/story');
   requested.length = 0;
-  const m = await login(db, 'm', 'm-before');
+  const m = await login(db, 'm', credentials.m.password);
   response = await onRequest(context('work-snapshots/cover?key=story', db, null, m.cookie, { WANY_COVERS: covers }));
   assert.equal(response.status, 404);
   assert.ok(requested.every(key => !key.startsWith('covers/has/') && !key.startsWith('covers/h/')));
 });
 
 test('recovery follows the numeric D1 account, is one-use, and invalidates sessions without changing ID', async t => {
-  const { sqlite, db } = await fixture(t);
-  const h = await login(db, 'h', 'has-before');
+  const { sqlite, db, credentials } = await fixture(t);
+  const h = await login(db, 'h', credentials.h.password);
   const id = h.payload.user.id;
-  const code = 'private-fixture-recovery-code';
-  const hash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code))).toString('base64url');
-  sqlite.prepare("INSERT INTO user_recovery_verifiers VALUES(?,'sha256','',?,1)").run(id, hash);
+  const code = credentials.h.recoveryCode;
   const body = { username: 'h', recoveryCode: code, newPassword: 'recovered-password' };
   const responses = await Promise.all([recoverPassword(context('recover-password', db, body)), recoverPassword(context('recover-password', db, body))]);
   assert.deepEqual(responses.map(r => r.status).sort(), [200, 401]);
@@ -145,5 +151,5 @@ test('private migration suite verifies merge, blobs, stale-plan guards and rollb
   const script = fileURLToPath(new URL('./numeric-identity-migration.test.py', import.meta.url));
   const result = spawnSync('python', [script], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /Ran 10 tests/);
+  assert.match(result.stderr, /Ran 11 tests/);
 });

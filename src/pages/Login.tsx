@@ -81,10 +81,10 @@ export function Login() {
               <input name="recoveryCode" autoComplete="off" autoCapitalize="none" spellCheck={false} required placeholder="WANY-..." />
             </label>
             <label>كلمة المرور الجديدة
-              <input name="newPassword" type="password" autoComplete="new-password" minLength={4} required placeholder="كلمة المرور الجديدة" />
+              <input name="newPassword" type="password" autoComplete="new-password" minLength={12} required placeholder="كلمة المرور الجديدة" />
             </label>
             <label>تأكيد كلمة المرور
-              <input name="confirmPassword" type="password" autoComplete="new-password" minLength={4} required placeholder="أعد كتابة كلمة المرور" />
+              <input name="confirmPassword" type="password" autoComplete="new-password" minLength={12} required placeholder="أعد كتابة كلمة المرور" />
             </label>
             {error && <p className="error" role="alert">{error}</p>}
             <button className="primary" disabled={busy}>{busy ? "جاري الاستعادة…" : "تغيير كلمة المرور"} <span>←</span></button>
@@ -107,3 +107,4 @@ export function Login() {
     </main>
   );
 }
+

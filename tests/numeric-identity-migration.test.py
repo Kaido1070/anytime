@@ -124,11 +124,39 @@ class NumericIdentityMigrationTests(unittest.TestCase):
         self.assertEqual(request['pair_high_id'],max(ids['yas'],ids['m']))
         self.assertEqual(request['created_at'],200)
 
-    def test_old_passwords_are_preserved_in_database_verifiers(self):
+    def test_old_credentials_are_revoked_and_new_secrets_stay_private(self):
         output, report, db, ids = self.plan()
-        rows = list(db.execute('SELECT password_hash FROM user_password_verifiers WHERE user_id=?',(ids['has'],)))
-        self.assertEqual(len(rows),2)
+        self.assertEqual(db.execute('SELECT count(*) FROM user_password_verifiers').fetchone()[0],0)
+        self.assertEqual(db.execute('SELECT count(*) FROM account_recovery').fetchone()[0],0)
+        secrets_file = output / 'credentials.local.json'
+        credentials = json.loads(secrets_file.read_text())['accounts']
+        self.assertEqual(len(credentials),4)
+        self.assertEqual(secrets_file.stat().st_mode & 0o777,0o600)
+        self.assertEqual(len({r['password'] for r in credentials}),4)
+        self.assertEqual(len({r['recoveryCode'] for r in credentials}),4)
+        for credential in credentials:
+            row = db.execute('SELECT * FROM users WHERE id=?',(credential['user_id'],)).fetchone()
+            salt = base64.urlsafe_b64decode(row['password_salt']+'==')
+            derived = base64.urlsafe_b64encode(hashlib.pbkdf2_hmac('sha256',credential['password'].encode(),salt,row['password_iterations'])).decode().rstrip('=')
+            self.assertEqual(derived,row['password_hash'])
+            self.assertGreaterEqual(len(credential['password']),32)
+            self.assertNotIn(credential['password'],(output/'apply.sql').read_text())
+            self.assertNotIn(credential['recoveryCode'],(output/'apply.sql').read_text())
+            self.assertNotIn(credential['password'],(output/'report.json').read_text())
+        self.assertTrue(report['all_credentials_rotated'])
         self.assertEqual(db.execute('SELECT role FROM users WHERE username=?',('admin',)).fetchone()[0],'admin')
+
+    def test_rollback_never_resurrects_old_credentials_or_sessions(self):
+        output, report, db, ids = self.plan()
+        fresh_hashes = {r['id']:r['password_hash'] for r in db.execute('SELECT * FROM users')}
+        m.apply_atomic(db,(output/'rollback.sql').read_text())
+        self.assertEqual(db.execute('SELECT count(*) FROM users').fetchone()[0],6)
+        for row in db.execute('SELECT id,password_hash FROM users'):
+            self.assertEqual(row['password_hash'],fresh_hashes[ids[row['id']]])
+        for table in ('sessions','account_recovery','user_password_verifiers'):
+            self.assertEqual(db.execute('SELECT count(*) FROM '+table).fetchone()[0],0)
+        self.assertEqual(db.execute('SELECT count(*) FROM user_recovery_verifiers').fetchone()[0],4)
+        self.assertTrue(report['rollback_keeps_fresh_credentials'])
 
     def test_rollback_refuses_new_reading_data_and_keeps_it(self):
         output, report, db, ids = self.plan()

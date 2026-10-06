@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile, access } from 'node:fs/promises';
 import { onRequest } from '../functions/api/[[path]].js';
 import { onRequestPost as adminLogin } from '../functions/api/admin-login.js';
 import { onRequestPost as changePassword } from '../functions/api/change-password.js';
@@ -105,4 +106,15 @@ test('incorrect current password never changes credentials or sessions', async (
   const response = await changePassword(context('change-password', db, { currentPassword: 'wrong', newPassword: 'new-password' }));
   assert.equal(response.status, 400);
   assert.deepEqual(db.writes, []);
+});
+
+
+test('source migrations never seed real credentials or revive the deleted compatibility bridge', async () => {
+  const initial = await readFile(new URL('../migrations/0001_phase2.sql', import.meta.url), 'utf8');
+  const recovery = await readFile(new URL('../migrations/0013_account_recovery.sql', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../scripts/migrate-numeric-user-ids.py', import.meta.url), 'utf8');
+  assert.doesNotMatch(initial, /INSERT(?: OR IGNORE)? INTO users/i);
+  assert.doesNotMatch(recovery, /INSERT(?: OR IGNORE)? INTO account_recovery/i);
+  assert.doesNotMatch(migration, /legacy-auth-compat|compat\['password_hashes'\]/);
+  await assert.rejects(access(new URL('../scripts/legacy-auth-compat.json', import.meta.url)));
 });

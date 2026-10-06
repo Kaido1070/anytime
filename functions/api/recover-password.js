@@ -12,7 +12,7 @@ export async function onRequestPost(context) {
     const code = typeof body.recoveryCode === 'string' ? body.recoveryCode.trim() : '';
     const password = typeof body.newPassword === 'string' ? body.newPassword : '';
     if (!username || code.length < 20 || code.length > 128) return invalid();
-    if (password.length < 4 || password.length > 128) return json({ error: 'WEAK_PASSWORD', message: 'كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر.' }, 400);
+    if (password.length < 12 || password.length > 128) return json({ error: 'WEAK_PASSWORD', message: 'كلمة المرور الجديدة لازم تكون 12 حرفًا أو أكثر.' }, 400);
     const user = await db.prepare('SELECT id FROM users WHERE username = ? COLLATE NOCASE LIMIT 1').bind(username).first();
     if (!user) return invalid();
     const result = await db.prepare(`SELECT scheme, recovery_salt, recovery_hash, recovery_iterations

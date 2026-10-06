@@ -26,6 +26,8 @@ pnpm dev
 
 ## Deployment
 
+Account-security migration is required before deploying this branch. Follow [the private numeric-ID and credential-rotation procedure](docs/account-safety-rollout.md). Do not upload D1 exports or generated credentials. No real accounts are seeded by source migrations.
+
 Production:
 
 ```text
@@ -205,3 +207,4 @@ Before implementing a feature:
 - `QA.md` contains earlier browser/build verification notes.
 
 These files contain historical phase-specific details. This README is the high-level description of the repository's current architecture and feature set.
+

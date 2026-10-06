@@ -136,8 +136,8 @@ export function Profile({
       return;
     }
 
-    if (newPassword.length < 4 || newPassword.length > PASSWORD_MAX_LENGTH) {
-      setPasswordError("كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر.");
+    if (newPassword.length < 12 || newPassword.length > PASSWORD_MAX_LENGTH) {
+      setPasswordError("كلمة المرور الجديدة لازم تكون 12 حرفًا أو أكثر.");
       return;
     }
 
@@ -359,7 +359,7 @@ export function Profile({
                   name="newPassword"
                   type="password"
                   autoComplete="new-password"
-                  minLength={4}
+                  minLength={12}
                   maxLength={PASSWORD_MAX_LENGTH}
                   disabled={passwordBusy}
                   required
@@ -371,7 +371,7 @@ export function Profile({
                   name="confirmPassword"
                   type="password"
                   autoComplete="new-password"
-                  minLength={4}
+                  minLength={12}
                   maxLength={PASSWORD_MAX_LENGTH}
                   disabled={passwordBusy}
                   required
@@ -428,3 +428,4 @@ export function Profile({
     </>
   );
 }
+
