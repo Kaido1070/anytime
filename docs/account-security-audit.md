@@ -125,3 +125,13 @@ The exact Team-X chapter route shares the core adapter budget with its HTML reco
 Validation: 14 new transport tests cover initial/private redirects, relative redirects/loops, credential stripping and POST behavior, declared/chunked/false-length oversized bodies, empty-chunk limits, shared request/byte budgets, isolated new budgets, stalled headers/body, concurrency, queue abort, deadline expiry, parent cancellation and the actual image/cover/reader entrypoints. All 37 selected transport/image/source-schema/Team-X tests pass. Full suite: 295 tests, 286 pass, the same nine unrelated documented failures; no new failures. Knip, TypeScript and production build pass.
 
 No D1 schema/data migration or live D1 action is needed or performed. Normal source cache DML still occurs when users access sources. DNS-based private destinations behind public-looking hostnames and platform-wide egress/rate-limit policy remain unverified; URL checks alone do not prove DNS rebinding protection. Live site, D1 and real upstream-source checks are deferred until the correction sequence is complete, as requested.
+
+## Patched source-map-js dependency — 2026-10-06
+
+The installed dependency graph previously resolved `source-map-js@1.2.1` through PostCSS/Vite in the development/build toolchain. GitHub-reviewed advisory GHSA-68fv-2mgg-jv7q identifies indexed source-map offsets as an event-loop denial-of-service risk and lists 1.2.2 as the patched release: https://github.com/advisories/GHSA-68fv-2mgg-jv7q . This finding does not establish an exploitable live Pages account/API path; application Functions do not import this package.
+
+A workspace override pins `source-map-js` to 1.2.2, and the reviewed lockfile now resolves only that version with its registry integrity digest. No other dependency versions were changed. The override protects subsequent installs from selecting the old transitive version again; the frozen lockfile keeps deployment reproducible.
+
+Validation: before the update `pnpm audit --json` reported one high advisory; afterward it completed successfully with zero reported vulnerabilities in every severity category. `pnpm why source-map-js` confirms only 1.2.2. Frozen-lockfile installation with local pnpm 11.25.0 and CI-pinned pnpm 10.15.1 (lockfile-only compatibility check), Knip, TypeScript and production build pass. Full suite: 295 tests, 286 pass, the same nine previously documented unrelated failures. Audit results describe known registry advisories at the time of the scan, not a guarantee of zero application vulnerabilities.
+
+No application account policy, D1 schema/data, credentials, or live database operations changed in this step. The final live review remains deferred until the correction sequence is complete.
