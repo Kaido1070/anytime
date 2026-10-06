@@ -81,11 +81,11 @@ test('legacy ID and uppercase username can log in without rewriting their creden
   assert.ok(db.writes.every(w => !/UPDATE users|DELETE FROM users|CREATE|ALTER/.test(w.query)));
 });
 
-test('failed admin login ignores provisioning secret and makes no writes', async () => {
+test('failed admin login ignores provisioning secret and writes only attempt counters', async () => {
   const db = database({ id: 'admin', username: 'Admin', role: 'admin', ...await credential('actual-password') });
   const response = await adminLogin(context('admin-login', db, { username: 'admin', password: 'wrong' }, { ADMIN_INITIAL_PASSWORD: 'different-password' }));
   assert.equal(response.status, 401);
-  assert.deepEqual(db.writes, []);
+  assert.ok(db.writes.every(w => w.query.includes('auth_attempt_windows')));
 });
 
 test('admin role with a random ID authenticates by stored username', async () => {
@@ -98,14 +98,14 @@ test('admin role with a random ID authenticates by stored username', async () =>
 test('an ordinary account named admin cannot use the admin endpoint', async () => {
   const db = database({ id: 'ordinary', username: 'Admin', role: 'user', ...await credential('actual-password') });
   assert.equal((await adminLogin(context('admin-login', db, { username: 'admin', password: 'actual-password' }))).status, 401);
-  assert.deepEqual(db.writes, []);
+  assert.ok(db.writes.every(w => w.query.includes('auth_attempt_windows')));
 });
 
 test('incorrect current password never changes credentials or sessions', async () => {
   const db = database({ id: 'has', username: 'H', role: 'user', ...await credential('actual-password') });
   const response = await changePassword(context('change-password', db, { currentPassword: 'wrong', newPassword: 'new-password' }));
   assert.equal(response.status, 400);
-  assert.deepEqual(db.writes, []);
+  assert.ok(db.writes.every(w => w.query.includes('auth_attempt_windows')));
 });
 
 

@@ -62,6 +62,7 @@ async function call(path, method, body) {
   const request = new Request(`https://wany.test/api/${path}`, {
     method,
     headers: {
+      Origin: "https://wany.test",
       Cookie: "anytime_session=test-session",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
@@ -104,4 +105,3 @@ test("backend rejects every personal-list mutation when the list is not owned by
   assert.equal(removeList.status, 404);
   assert.equal((await removeList.json()).error, "LIST_NOT_FOUND");
 });
-

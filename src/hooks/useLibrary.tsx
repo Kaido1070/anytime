@@ -79,9 +79,9 @@ function useLibraryState() {
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (allDevices = false) => {
     setError("");
-    await service.signOut();
+    await service.signOut(allDevices);
     setUser(null);
     setData(null);
     setFriends([]);
@@ -350,6 +350,8 @@ function useLibraryState() {
     await service.changePassword(currentPassword, newPassword);
   };
 
+  const generateRecoveryCode = (currentPassword: string) => service.generateRecoveryCode(currentPassword);
+
   return {
     user,
     data,
@@ -379,6 +381,7 @@ function useLibraryState() {
     setDisplayName,
     setProfileVisibility,
     changePassword,
+    generateRecoveryCode,
   };
 }
 

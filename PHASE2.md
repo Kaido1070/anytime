@@ -16,7 +16,7 @@ Phase 2 moves account state from browser-only storage to Cloudflare Pages Functi
 - “أكمل القراءة” is driven by the user library and advances to the next available chapter only when the highest reached chapter is completed.
 - Friends and their favorites/current reading state come from D1.
 - Existing Phase 1 local data is imported once after the first successful Phase 2 login.
-- Profile password changes invalidate the user's other active sessions.
+- Profile password changes invalidate other sessions and rotate the current session cookie.
 - API responses are `Cache-Control: no-store`, and the PWA service worker never caches `/api/*`.
 - The existing automatic PWA cache versioning remains enabled for every build.
 
@@ -58,4 +58,6 @@ Usernames are reviewed privately; internal IDs are immutable random numeric TEXT
 - `DELETE /api/friends/:userId`
 - `POST /api/import`
 - `POST /api/change-password`
+- `POST /api/logout-all`
+- `POST /api/recovery-code`
 

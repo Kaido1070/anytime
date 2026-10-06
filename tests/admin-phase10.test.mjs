@@ -179,9 +179,9 @@ test("admin login diagnostics do not expose credentials", async () => {
 });
 
 
-test("password creation uses the shared existing password-change parameters", async () => {
+test("password creation uses the shared strengthened password-change parameters", async () => {
   const passwords = await readFile(new URL("../functions/_password.js", import.meta.url), "utf8");
-  assert.match(passwords, /PASSWORD_ITERATIONS = 25000/);
+  assert.match(passwords, /PASSWORD_ITERATIONS = 100000/);
 });
 
 

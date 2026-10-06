@@ -1,9 +1,13 @@
-export const PASSWORD_ITERATIONS = 25000;
+export const PASSWORD_ITERATIONS = 100000;
+
+export async function verifyMissingUser(password) {
+  // Equalize the expensive credential check without a real account or stored secret.
+  await derivePasswordHash(password, new Uint8Array(16), PASSWORD_ITERATIONS);
+  return false;
+}
 
 export async function verifyPassword(password, row, db) {
-  const alternatives = db ? await db.prepare(`SELECT password_salt, password_hash, password_iterations
-    FROM user_password_verifiers WHERE user_id = ?`).bind(row.id).all() : { results: [] };
-  const candidates = [row, ...(alternatives.results ?? [])].filter(candidate =>
+  const candidates = [row].filter(candidate =>
     typeof candidate.password_salt === "string" && typeof candidate.password_hash === "string");
   let unsupported = false;
   for (const candidate of candidates) {
@@ -46,14 +50,20 @@ function base64UrlToBytes(value) {
   return Uint8Array.from(atob(String(value).replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
 }
 
-export async function replacePassword(db, userId, expectedHash, salt, hash, currentTokenHash) {
+export async function replacePassword(db, userId, expectedHash, salt, hash, currentTokenHash, rotatedTokenHash) {
+  const now = Date.now();
   const results = await db.batch([
-    db.prepare("UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ? AND password_hash = ?")
-      .bind(salt, hash, PASSWORD_ITERATIONS, Date.now(), userId, expectedHash),
+    db.prepare(`UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ?
+      WHERE id = ? AND password_hash = ? AND EXISTS
+      (SELECT 1 FROM sessions WHERE user_id = ? AND token_hash = ? AND expires_at > ?)`)
+      .bind(salt, hash, PASSWORD_ITERATIONS, now, userId, expectedHash, userId, currentTokenHash, now),
     db.prepare("DELETE FROM user_password_verifiers WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)")
       .bind(userId, userId, hash),
     db.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)")
       .bind(userId, currentTokenHash, userId, hash),
+    db.prepare(`UPDATE sessions SET token_hash = ?, created_at = ?, last_seen_at = ?, expires_at = ?
+      WHERE user_id = ? AND token_hash = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)`)
+      .bind(rotatedTokenHash, now, now, now + 30 * 24 * 60 * 60 * 1000, userId, currentTokenHash, userId, hash),
   ]);
   return Number(results[0]?.meta?.changes) === 1;
 }

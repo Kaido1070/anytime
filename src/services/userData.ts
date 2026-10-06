@@ -27,7 +27,8 @@ import type {
 export interface UserDataService {
   getUser(): Promise<User | null>;
   signIn(username: string, password: string): Promise<User>;
-  signOut(): Promise<void>;
+  signOut(allDevices?: boolean): Promise<void>;
+  generateRecoveryCode(currentPassword: string): Promise<string>;
   recoverPassword(username: string, recoveryCode: string, newPassword: string): Promise<void>;
   getData(): Promise<UserData>;
   getFavorites(): Promise<string[]>;
@@ -291,9 +292,9 @@ class ApiUserDataService implements UserDataService {
     return this.currentUser;
   }
 
-  async signOut() {
+  async signOut(allDevices = false) {
     try {
-      await this.request<{ ok: boolean }>("logout", { method: "POST" });
+      await this.request<{ ok: boolean }>(allDevices ? "logout-all" : "logout", { method: "POST" });
     } finally {
       this.currentUser = null;
       this.cleaned = false;
@@ -868,6 +869,13 @@ class ApiUserDataService implements UserDataService {
     });
   }
 
+  async generateRecoveryCode(currentPassword: string) {
+    const result = await this.request<{ recoveryCode: string }>("recovery-code", {
+      method: "POST", body: JSON.stringify({ currentPassword }),
+    });
+    return result.recoveryCode;
+  }
+
   private async cleanupDemoData() {
     if (this.cleaned || !this.currentUser || this.currentUser.role === "admin") return;
     try {
@@ -920,4 +928,3 @@ class ApiUserDataService implements UserDataService {
 }
 
 export const userDataService: UserDataService = new ApiUserDataService();
-

@@ -1,5 +1,6 @@
-import { verifyPassword } from "../_password.js";
+import { verifyPassword, verifyMissingUser } from "../_password.js";
 import { ensureAdminSchema, isAdminUser, recordAdminAudit, sessionUser } from "../_admin.js";
+import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError } from "../_auth-security.js";
 
 const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -9,9 +10,8 @@ export async function onRequestPost(context) {
   const db = context.env?.DB;
   if (!db) return json({ error: "D1_NOT_CONFIGURED" }, 503);
 
-  const url = new URL(request.url);
-  const origin = request.headers.get("Origin");
-  if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
 
   try {
     try {
@@ -20,9 +20,10 @@ export async function onRequestPost(context) {
       return adminStageError("ADMIN_SCHEMA_FAILED", error);
     }
 
-    const body = await request.json().catch(() => ({}));
-    const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
+    const body = await readAuthJson(request);
+    const username = normalizeLoginName(body.username);
     const suppliedSecret = typeof body.password === "string" ? body.password : "";
+    if (!(await reserveAuthAttempt(db, request, "login", username))) return rateLimited();
     if (!username || !suppliedSecret || suppliedSecret.length > 128) {
       return invalidLogin();
     }
@@ -39,7 +40,7 @@ export async function onRequestPost(context) {
       return adminStageError("ADMIN_LOOKUP_FAILED", error);
     }
 
-    if (!user || !isAdminUser(user) || !(await verifyPassword(suppliedSecret, user, db))) {
+    if (!(user && isAdminUser(user) ? await verifyPassword(suppliedSecret, user, db) : await verifyMissingUser(suppliedSecret))) {
       await sleep(120);
       return invalidLogin();
     }
@@ -50,12 +51,14 @@ export async function onRequestPost(context) {
     const expiresAt = now + SESSION_TTL_MS;
 
     try {
-      await db.batch([
+      const issued = await db.batch([
         db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
         db.prepare(
-          "INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-        ).bind(tokenHash, user.id, now, now, expiresAt),
+          `INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at)
+           SELECT ?, id, ?, ?, ? FROM users WHERE id = ? AND password_hash = ? AND role = 'admin'`,
+        ).bind(tokenHash, now, now, expiresAt, user.id, user.password_hash),
       ]);
+      if (Number(issued[1]?.meta?.changes) !== 1) return invalidLogin();
       await recordAdminAudit(db, user.id, "admin_login");
     } catch (error) {
       return adminStageError("ADMIN_SESSION_FAILED", error);
@@ -72,7 +75,9 @@ export async function onRequestPost(context) {
 }
 
 function adminStageError(code, error) {
-  console.error("Anytime admin login error", code, error instanceof Error ? error.message : "unknown");
+  const safeError = authError(error);
+  if (safeError) return safeError;
+  console.error("Anytime admin login error", code, error instanceof Error ? error.name : "unknown");
   return json(
     {
       error: code,
@@ -134,4 +139,3 @@ function json(body, status = 200, extraHeaders = {}) {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-

@@ -8,6 +8,13 @@ CREATE TABLE IF NOT EXISTS user_identity_aliases (
 );
 CREATE INDEX IF NOT EXISTS idx_identity_aliases_user ON user_identity_aliases(user_id);
 
+CREATE TABLE IF NOT EXISTS auth_attempt_windows (
+  bucket_key TEXT PRIMARY KEY,
+  window_start INTEGER NOT NULL,
+  attempts INTEGER NOT NULL CHECK (attempts >= 1)
+);
+CREATE INDEX IF NOT EXISTS idx_auth_attempt_window_start ON auth_attempt_windows(window_start);
+
 CREATE TABLE IF NOT EXISTS work_snapshot_cover_locations (
   user_id TEXT NOT NULL,
   manga_id TEXT NOT NULL,

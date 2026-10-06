@@ -191,6 +191,7 @@ async function call(db, method, path, body) {
   const request = new Request(`https://wany.test/api/${path}`, {
     method,
     headers: {
+      Origin: "https://wany.test",
       Cookie: "anytime_session=test-session",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
@@ -224,4 +225,3 @@ test("client cannot create arbitrary activity through an activity endpoint", asy
   assert.equal(response.status, 404);
   assert.equal(payload.error, "NOT_FOUND");
 });
-

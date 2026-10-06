@@ -10,6 +10,11 @@ import { randomNumericUserId, isNumericUserId, allocateNumericUserId } from '../
 import { onRequest } from '../functions/api/[[path]].js';
 import { onRequestPost as changePassword } from '../functions/api/change-password.js';
 import { onRequestPost as recoverPassword } from '../functions/api/recover-password.js';
+import { onRequestPost as adminLogin } from '../functions/api/admin-login.js';
+import { onRequestPost as cleanupDemo } from '../functions/api/cleanup-demo.js';
+import { onRequest as adminApi } from '../functions/api/admin/[[path]].js';
+import { reserveAuthAttempt } from '../functions/_auth-security.js';
+import { PASSWORD_ITERATIONS, derivePasswordHash } from '../functions/_password.js';
 
 test('random numeric IDs have exact string precision and no fixed account mapping', () => {
   const ids = new Set(Array.from({ length: 1000 }, () => randomNumericUserId()));
@@ -35,6 +40,7 @@ function d1Adapter(sqlite) {
     prepare(query) {
       let args = [];
       return {
+        query,
         bind(...values) { args = values; return this; },
         async first() { return sqlite.prepare(query).get(...args) ?? null; },
         async all() { return { results: sqlite.prepare(query).all(...args) }; },
@@ -102,9 +108,13 @@ test('migration rejects old H credentials and new password changes actually repl
   assert.equal((await login(db, 'h', 'has-before')).response.status, 401);
   assert.equal((await login(db, 'h', 'h-before')).response.status, 401);
   assert.equal((await login(db, 'h', credentials.h.password)).response.status, 401);
+  sqlite.prepare('UPDATE auth_attempt_windows SET window_start=?').run(Date.now() - 900001);
   assert.equal((await login(db, 'h', 'new123')).payload.user.id, id);
   assert.equal((await (await onRequest(context('session', db, null, primary.cookie))).json()).user, null);
-  assert.equal((await (await onRequest(context('session', db, null, alternate.cookie))).json()).user.id, id);
+  assert.equal((await (await onRequest(context('session', db, null, alternate.cookie))).json()).user, null);
+  const rotatedCookie = response.headers.get('Set-Cookie').split(';')[0];
+  assert.notEqual(rotatedCookie, alternate.cookie);
+  assert.equal((await (await onRequest(context('session', db, null, rotatedCookie))).json()).user.id, id);
 });
 
 test('numeric admin identity authenticates by its D1 username and role', async t => {
@@ -155,4 +165,117 @@ test('private migration suite verifies merge, blobs, stale-plan guards and rollb
   const result = spawnSync('python', [script], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /Ran 11 tests/);
+});
+
+test('all account mutation entry points reject missing and foreign Origin before database access', async () => {
+  for (const [handler,path] of [[onRequest,'login'],[adminLogin,'admin-login'],[changePassword,'change-password'],[recoverPassword,'recover-password'],[cleanupDemo,'cleanup-demo']]) {
+    for (const origin of [null,'https://attacker.test']) {
+      const headers={'Content-Type':'application/json'}; if(origin)headers.Origin=origin;
+      const db={prepare(){throw new Error('Must reject before SQL');}};
+      const response=await handler({env:{DB:db},request:new Request(`https://wany.test/api/${path}`,{method:'POST',headers,body:'{}'})});
+      assert.equal(response.status,403);
+    }
+  }
+});
+
+test('bounded JSON rejects oversized bodies without relying on Content-Length', async t => {
+  const {db,credentials}=await fixture(t);
+  const h=await login(db,'h',credentials.h.password);
+  for(const [handler,path] of [[onRequest,'login'],[adminLogin,'admin-login'],[changePassword,'change-password'],[recoverPassword,'recover-password']]) {
+    const request=new Request(`https://wany.test/api/${path}`,{method:'POST',headers:{Origin:'https://wany.test','Content-Type':'application/json',Cookie:h.cookie},body:JSON.stringify({padding:'x'.repeat(32768)})});
+    assert.equal((await handler({env:{DB:db},request})).status,413);
+  }
+});
+
+test('D1 attempt budgets survive independent handlers, concurrency and expiry', async t => {
+  const {sqlite,db}=await fixture(t);
+  const request=new Request('https://wany.test/api/login',{headers:{'CF-Connecting-IP':'192.0.2.1'}});
+  const budgets=await Promise.all(Array.from({length:16},(_,i)=>reserveAuthAttempt(i%2?db:d1Adapter(sqlite),request,'login','h')));
+  assert.equal(budgets.filter(Boolean).length,8);
+  const rows=sqlite.prepare('SELECT bucket_key, attempts FROM auth_attempt_windows').all();
+  assert.ok(rows.every(r=>/^[0-9a-f]{64}$/.test(r.bucket_key)));
+  assert.equal(await reserveAuthAttempt(d1Adapter(sqlite),request,'login','h',Date.now()+900001),true);
+});
+
+test('general login and admin login share a persistent guessing budget', async t => {
+  const {db}=await fixture(t);
+  for(let i=0;i<8;i++)assert.equal((await (i%2?adminLogin:onRequest)(context(i%2?'admin-login':'login',db,{username:'admin',password:'wrong'}))).status,401);
+  assert.equal((await onRequest(context('login',db,{username:'admin',password:'wrong'}))).status,429);
+});
+
+test('an in-flight login cannot issue a session after its verified credential changes', async t => {
+  for(const [handler,path,username] of [[onRequest,'login','h'],[adminLogin,'admin-login','admin']]) {
+    const {sqlite,db,credentials}=await fixture(t); const batch=db.batch;
+    db.batch=async statements=>{
+      if(statements.some(s=>s.query.includes('INSERT INTO sessions')))sqlite.prepare('UPDATE users SET password_hash=? WHERE username=?').run('different-current-hash',username);
+      return batch(statements);
+    };
+    const response=await handler(context(path,db,{username,password:credentials[username].password}));
+    assert.equal(response.status,401);assert.equal(response.headers.get('Set-Cookie'),null);
+    assert.equal(sqlite.prepare('SELECT count(*) AS n FROM sessions').get().n,0);
+  }
+});
+
+test('password change cannot succeed after the authorizing session is revoked', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);
+  const before=sqlite.prepare("SELECT password_hash FROM users WHERE username='h'").get().password_hash;const batch=db.batch;
+  db.batch=async statements=>{
+    if(statements.some(s=>s.query.startsWith('UPDATE users SET password_salt')))sqlite.prepare('DELETE FROM sessions').run();
+    return batch(statements);
+  };
+  assert.equal((await changePassword(context('change-password',db,{currentPassword:credentials.h.password,newPassword:'new123'},h.cookie))).status,409);
+  assert.equal(sqlite.prepare("SELECT password_hash FROM users WHERE username='h'").get().password_hash,before);
+});
+
+test('retired alternative credentials cannot authenticate an account', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const c=credentials.h;const salt=crypto.getRandomValues(new Uint8Array(16));
+  const hash=await derivePasswordHash('retired123',salt,PASSWORD_ITERATIONS);
+  sqlite.prepare('INSERT INTO user_password_verifiers VALUES(?,?,?,?)').run(c.user_id,Buffer.from(salt).toString('base64url'),hash,PASSWORD_ITERATIONS);
+  assert.equal((await login(db,'h','retired123')).response.status,401);
+  assert.equal((await login(db,'h',c.password)).response.status,200);
+});
+
+test('logout-all clears every session and ordinary accounts cannot access admin data', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);const other=await login(db,'h',credentials.h.password);
+  assert.equal((await adminApi(context('admin/users',db,null,h.cookie))).status,403);
+  const response=await onRequest(context('logout-all',db,{},h.cookie));assert.equal(response.status,200);
+  assert.match(response.headers.get('Set-Cookie'),/Max-Age=0/);
+  assert.equal((await(await onRequest(context('session',db,null,other.cookie))).json()).user,null);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM sessions WHERE user_id=?').get(credentials.h.user_id).n,0);
+});
+
+test('replacement recovery code requires the current password and invalidates the previous code', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);
+  assert.equal((await onRequest(context('recovery-code',db,{currentPassword:'wrong'},h.cookie))).status,400);
+  const response=await onRequest(context('recovery-code',db,{currentPassword:credentials.h.password},h.cookie));assert.equal(response.status,200);
+  const code=(await response.json()).recoveryCode;assert.ok(code.length>=40);
+  const row=sqlite.prepare('SELECT * FROM user_recovery_verifiers WHERE user_id=?').get(credentials.h.user_id);assert.notEqual(row.recovery_hash,code);
+  assert.equal((await recoverPassword(context('recover-password',db,{username:'h',recoveryCode:credentials.h.recoveryCode,newPassword:'reset6'}))).status,401);
+  assert.equal((await recoverPassword(context('recover-password',db,{username:'h',recoveryCode:code,newPassword:'reset6'}))).status,200);
+  assert.equal((await recoverPassword(context('recover-password',db,{username:'h',recoveryCode:code,newPassword:'reset6'}))).status,401);
+  assert.equal(sqlite.prepare('SELECT password_iterations FROM users WHERE username=?').get('h').password_iterations,100000);
+});
+
+test('distributed IPs cannot exceed the shared per-account attempt budget', async t => {
+  const {sqlite,db}=await fixture(t);
+  const results=await Promise.all(Array.from({length:30},(_,i)=>reserveAuthAttempt(db,new Request('https://wany.test/api/login',{headers:{'CF-Connecting-IP':`192.0.2.${i+1}`}}),'login','h')));
+  assert.equal(results.filter(Boolean).length,24);
+  assert.ok(sqlite.prepare('SELECT max(attempts) AS n FROM auth_attempt_windows').get().n<=24);
+});
+
+test('exhausted IPs cannot grow the throttle table with random account names', async t => {
+  const {sqlite,db}=await fixture(t);const request=new Request('https://wany.test/api/login',{headers:{'CF-Connecting-IP':'192.0.2.100'}});
+  for(let i=0;i<60;i++)assert.equal(await reserveAuthAttempt(db,request,'login',`unknown-${i}`),true);
+  const before=sqlite.prepare('SELECT count(*) AS n FROM auth_attempt_windows').get().n;
+  assert.equal(await reserveAuthAttempt(db,request,'login','another-random-name'),false);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM auth_attempt_windows').get().n,before);
+});
+
+test('missing security support schema fails closed without request-time repairs', async t => {
+  const {sqlite,db,credentials}=await fixture(t);sqlite.exec('DROP TABLE auth_attempt_windows');
+  for(const [handler,path,body] of [[onRequest,'login',{username:'h',password:credentials.h.password}],[adminLogin,'admin-login',{username:'admin',password:credentials.admin.password}],[recoverPassword,'recover-password',{username:'h',recoveryCode:credentials.h.recoveryCode,newPassword:'reset6'}]]) {
+    const response=await handler(context(path,db,body));assert.equal(response.status,503);assert.equal((await response.json()).error,'SCHEMA_MIGRATION_REQUIRED');
+  }
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM sessions').get().n,0);
+  assert.equal(sqlite.prepare("SELECT name FROM sqlite_master WHERE name='auth_attempt_windows'").get(),undefined);
 });

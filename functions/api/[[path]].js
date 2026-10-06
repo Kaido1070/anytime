@@ -1,6 +1,7 @@
 import { snapshotCoverKey, snapshotCoverKeys } from "../_identity.js";
-import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash, replacePassword } from "../_password.js";
+import { PASSWORD_ITERATIONS, verifyPassword, verifyMissingUser, derivePasswordHash, replacePassword } from "../_password.js";
 import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_admin.js";
+import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError, newSessionToken, sessionTokenHash, authCookie } from "../_auth-security.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -30,16 +31,16 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return json({ error: "NOT_FOUND" }, 404);
 
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
-    const origin = request.headers.get("Origin");
-    if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
-  }
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
 
   try {
     await ensureApiRuntime(db);
     return await route(request, url, db, covers);
   } catch (error) {
-    console.error("Anytime API error", error);
+    console.error("Anytime API error", error instanceof Error ? error.name : "unknown");
+    const safeError = authError(error);
+    if (safeError) return safeError;
     if (["SCHEMA_MIGRATION_REQUIRED", "CREDENTIAL_RUNTIME_UNSUPPORTED"].includes(error?.code)) {
       return json({ error: error.code, message: error.code === "SCHEMA_MIGRATION_REQUIRED"
         ? "تحتاج قاعدة البيانات إلى ترحيل مُراجع قبل تشغيل هذا الإصدار."
@@ -66,6 +67,7 @@ async function route(request, url, db, covers) {
     const body = await readJson(request);
     const username = normalizeUsername(body.username);
     const password = typeof body.password === "string" ? body.password : "";
+    if (!(await reserveAuthAttempt(db, request, "login", username))) return rateLimited();
     if (!username || password.length < 1 || password.length > 128) {
       return json({ error: "INVALID_LOGIN", message: "بيانات الدخول غير صحيحة." }, 401);
     }
@@ -77,7 +79,7 @@ async function route(request, url, db, covers) {
       .bind(username)
       .first();
 
-    if (!user || !(await verifyPassword(password, user, db))) {
+    if (!(user ? await verifyPassword(password, user, db) : await verifyMissingUser(password))) {
       await sleep(120);
       return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
     }
@@ -87,14 +89,16 @@ async function route(request, url, db, covers) {
     const now = Date.now();
     const expiresAt = now + SESSION_TTL_MS;
 
-    await db.batch([
+    const issued = await db.batch([
       db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
       db
         .prepare(
-          "INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+          `INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at)
+           SELECT ?, id, ?, ?, ? FROM users WHERE id = ? AND password_hash = ? AND role = ?`,
         )
-        .bind(tokenHash, user.id, now, now, expiresAt),
+        .bind(tokenHash, now, now, expiresAt, user.id, user.password_hash, user.role),
     ]);
+    if (Number(issued[1]?.meta?.changes) !== 1) return json({ error: "INVALID_LOGIN" }, 401);
 
     if (isAdminUser(user)) await recordAdminAudit(db, user.id, "admin_login");
     return json(
@@ -127,6 +131,37 @@ async function route(request, url, db, covers) {
     return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
   }
   const user = session.user;
+
+  if (request.method === "POST" && path === "logout-all") {
+    await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
+    return json({ ok: true }, 200, { "Set-Cookie": authCookie("") });
+  }
+
+  if (request.method === "POST" && path === "recovery-code") {
+    const body = await readAuthJson(request);
+    const password = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
+    if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
+    const row = await db.prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ?").bind(user.id).first();
+    if (!row || !(await verifyPassword(password, row, db))) return json({ error: "WRONG_PASSWORD" }, 400);
+    const code = newSessionToken();
+    const hash = await sessionTokenHash(code);
+    const now = Date.now();
+    const result = await db.batch([
+      db.prepare(`DELETE FROM user_recovery_verifiers WHERE user_id = ? AND EXISTS
+        (SELECT 1 FROM users u JOIN sessions s ON s.user_id = u.id WHERE u.id = ? AND u.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?)`)
+        .bind(user.id, user.id, row.password_hash, session.tokenHash, now),
+      db.prepare(`INSERT INTO user_recovery_verifiers (user_id, scheme, recovery_salt, recovery_hash, recovery_iterations)
+        SELECT u.id, 'sha256', '', ?, 1 FROM users u JOIN sessions s ON s.user_id = u.id
+        WHERE u.id = ? AND u.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?`)
+        .bind(hash, user.id, row.password_hash, session.tokenHash, now),
+      db.prepare(`DELETE FROM account_recovery WHERE user_id = ? AND EXISTS
+        (SELECT 1 FROM user_recovery_verifiers WHERE user_id = ? AND recovery_hash = ?)`)
+        .bind(user.id, user.id, hash),
+    ]);
+    if (Number(result[1]?.meta?.changes) !== 1) return json({ error: "UNAUTHORIZED" }, 401);
+    return json({ recoveryCode: code });
+  }
 
   if (path === "personalization-state") {
     if (!isSocialUser(user)) {
@@ -1685,6 +1720,8 @@ async function route(request, url, db, covers) {
     if (newPassword.length < 6 || newPassword.length > 128) {
       return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر." }, 400);
     }
+    if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
+    if (currentPassword.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
 
     const authRow = await db
       .prepare(
@@ -1699,10 +1736,11 @@ async function route(request, url, db, covers) {
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
     const salt = bytesToBase64Url(saltBytes);
     const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
-    const changed = await replacePassword(db, user.id, authRow.password_hash, salt, hash, session.tokenHash);
+    const token = newSessionToken();
+    const changed = await replacePassword(db, user.id, authRow.password_hash, salt, hash, session.tokenHash, await sessionTokenHash(token));
     if (!changed) return json({ error: "PASSWORD_CHANGED_RETRY", message: "تغيرت بيانات الدخول أثناء الطلب. حاول مرة ثانية." }, 409);
 
-    return json({ ok: true });
+    return json({ ok: true }, 200, { "Set-Cookie": authCookie(token) });
   }
 
   return json({ error: "NOT_FOUND" }, 404);
@@ -3144,9 +3182,8 @@ function publicUser(row) {
 }
 
 function normalizeUsername(value) {
-  if (typeof value !== "string") return "";
-  const normalized = value.trim().toLowerCase();
-  return /^[a-z0-9_-]{1,32}$/.test(normalized) ? normalized : "";
+  const normalized = normalizeLoginName(value);
+  return /^[a-z0-9][a-z0-9_.-]{0,31}$/.test(normalized) ? normalized : "";
 }
 
 function normalizeDisplayName(value) {
@@ -3175,11 +3212,7 @@ function safeId(value) {
 }
 
 async function readJson(request) {
-  const length = Number(request.headers.get("Content-Length") ?? 0);
-  if (length > MAX_JSON_BYTES) throw new Error("Request body too large");
-  const type = request.headers.get("Content-Type") ?? "";
-  if (!type.toLowerCase().includes("application/json")) return {};
-  return await request.json();
+  return readAuthJson(request);
 }
 
 function json(body, status = 200, extraHeaders = {}) {
@@ -3197,4 +3230,3 @@ function json(body, status = 200, extraHeaders = {}) {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-

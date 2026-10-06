@@ -208,3 +208,5 @@ Before implementing a feature:
 
 These files contain historical phase-specific details. This README is the high-level description of the repository's current architecture and feature set.
 
+
+Account security validation and deployment limits: [account-security-audit.md](docs/account-security-audit.md). Settings support one-use recovery-code replacement and logout from all devices. Password changes remain optional (minimum six characters), rotate the current cookie and revoke other sessions.

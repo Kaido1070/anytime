@@ -34,6 +34,7 @@ export function Profile({
     setDisplayName,
     setProfileVisibility,
     changePassword,
+    generateRecoveryCode,
   } = useLibrary();
 
   const [displayName, setDisplayNameValue] = useState(user?.name ?? "");
@@ -56,10 +57,15 @@ export function Profile({
 
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
 
   useEffect(() => {
     setDisplayNameValue(user?.name ?? "");
   }, [user?.name]);
+
+  useEffect(() => { setRecoveryCode(""); }, [user?.id]);
 
   async function submitDisplayName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,12 +162,27 @@ export function Profile({
     }
   }
 
-  async function handleSignOut() {
+  async function createRecoveryCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (recoveryBusy) return;
+    const form = event.currentTarget;
+    const password = String(new FormData(form).get("recoveryPassword") ?? "");
+    setRecoveryBusy(true); setRecoveryError(""); setRecoveryCode("");
+    try {
+      const code = await generateRecoveryCode(password);
+      form.reset(); setRecoveryCode(code);
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "تعذر إصدار رمز الاستعادة.");
+    } finally { setRecoveryBusy(false); }
+  }
+
+  async function handleSignOut(allDevices = false) {
     if (logoutBusy) return;
+    setRecoveryCode("");
     setLogoutBusy(true);
     setLogoutError("");
     try {
-      await signOut();
+      await signOut(allDevices);
     } catch (cause) {
       setLogoutError(
         cause instanceof Error ? cause.message : "تعذر تسجيل الخروج الآن.",
@@ -402,6 +423,19 @@ export function Profile({
           )}
         </section>
 
+        <section className="settings-section">
+          <h3>رمز استعادة الحساب</h3>
+          <p>إصدار رمز جديد يلغي الرمز السابق. احفظه في مكان خاص؛ يُستخدم مرة واحدة.</p>
+          <form className="settings-password-form" onSubmit={createRecoveryCode}>
+            <label>كلمة المرور الحالية
+              <input name="recoveryPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={recoveryBusy} />
+            </label>
+            <button className="primary" type="submit" disabled={recoveryBusy}>{recoveryBusy ? "جارٍ الإصدار…" : "إصدار رمز جديد"}</button>
+          </form>
+          {recoveryError && <p className="settings-feedback error" role="alert">{recoveryError}</p>}
+          {recoveryCode && <div role="status"><p>احفظ الرمز الآن؛ لن يظهر بعد إغلاق الصفحة.</p><input aria-label="رمز الاستعادة الجديد" readOnly value={recoveryCode} dir="ltr" onFocus={event => event.currentTarget.select()} /></div>}
+        </section>
+
         <div className="settings-logout-simple">
           <button
             className="settings-logout-danger"
@@ -411,6 +445,7 @@ export function Profile({
           >
             {logoutBusy ? "جارٍ تسجيل الخروج…" : "تسجيل الخروج"}
           </button>
+          <button className="settings-logout-danger" type="button" disabled={logoutBusy} onClick={() => void handleSignOut(true)}>تسجيل الخروج من كل الأجهزة</button>
           {logoutError && <p className="settings-feedback error" role="alert">{logoutError}</p>}
         </div>
       </div>
@@ -428,4 +463,3 @@ export function Profile({
     </>
   );
 }
-

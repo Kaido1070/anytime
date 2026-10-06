@@ -14,7 +14,7 @@ import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
 SUPPORT_SQL = (ROOT / 'migrations/0015_numeric_identity_support.sql').read_text()
-SUPPORT_TABLES = {'user_identity_aliases', 'work_snapshot_cover_locations', 'user_password_verifiers', 'user_recovery_verifiers', 'account_recovery'}
+SUPPORT_TABLES = {'user_identity_aliases', 'work_snapshot_cover_locations', 'user_password_verifiers', 'user_recovery_verifiers', 'account_recovery', 'auth_attempt_windows'}
 USER_COLUMNS = {'user_id', 'friend_id', 'requester_id', 'receiver_id', 'pair_low_id', 'pair_high_id', 'admin_user_id', 'target_user_id'}
 
 class MigrationError(ValueError):
@@ -223,8 +223,8 @@ def transform(original, support, config):
         recovery_code = secrets.token_urlsafe(32)
         salt = secrets.token_bytes(16)
         user['password_salt'] = base64.urlsafe_b64encode(salt).decode().rstrip('=')
-        user['password_hash'] = base64.urlsafe_b64encode(hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 25000)).decode().rstrip('=')
-        user['password_iterations'] = 25000
+        user['password_hash'] = base64.urlsafe_b64encode(hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)).decode().rstrip('=')
+        user['password_iterations'] = 100000
         user['updated_at'] = now
         desired['user_recovery_verifiers'].append({
             'user_id': user['id'], 'scheme': 'sha256', 'recovery_salt': '',

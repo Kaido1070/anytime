@@ -184,6 +184,7 @@ async function call(db, actor, method, path, body) {
   const request = new Request(`https://wany.test/api/${path}`, {
     method,
     headers: {
+      Origin: "https://wany.test",
       Cookie: "anytime_session=test-session",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
@@ -308,4 +309,3 @@ test("third user cannot remove another pair's friendship", async () => {
   assert.equal(db.friendships.has("a:b"), true);
   assert.equal(db.friendships.has("b:a"), true);
 });
-

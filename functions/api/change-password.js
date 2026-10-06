@@ -1,4 +1,5 @@
 import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash, replacePassword } from "../_password.js";
+import { mutationOriginError, readAuthJson, reserveAuthAttempt, rateLimited, authError, newSessionToken, sessionTokenHash, authCookie } from "../_auth-security.js";
 const SESSION_COOKIE = "anytime_session";
 
 export async function onRequestPost(context) {
@@ -6,20 +7,21 @@ export async function onRequestPost(context) {
   const db = context.env?.DB;
   if (!db) return json({ error: "D1_NOT_CONFIGURED", message: "قاعدة بيانات Anytime غير مربوطة بالموقع بعد." }, 503);
 
-  const url = new URL(request.url);
-  const origin = request.headers.get("Origin");
-  if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
 
   try {
     const session = await getSession(request, db);
     if (!session) return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
 
-    const body = await request.json().catch(() => ({}));
+    const body = await readAuthJson(request);
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
     if (newPassword.length < 6 || newPassword.length > 128) {
       return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر." }, 400);
     }
+    if (!(await reserveAuthAttempt(db, request, "password-change", session.user.id))) return rateLimited();
+    if (currentPassword.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
 
     const authRow = await db
       .prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ? LIMIT 1")
@@ -34,12 +36,15 @@ export async function onRequestPost(context) {
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
     const salt = bytesToBase64Url(saltBytes);
     const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
-    const changed = await replacePassword(db, session.user.id, authRow.password_hash, salt, hash, session.tokenHash);
+    const token = newSessionToken();
+    const changed = await replacePassword(db, session.user.id, authRow.password_hash, salt, hash, session.tokenHash, await sessionTokenHash(token));
     if (!changed) return json({ error: "PASSWORD_CHANGED_RETRY", message: "تغيرت بيانات الدخول أثناء الطلب. حاول مرة ثانية." }, 409);
 
-    return json({ ok: true });
+    return json({ ok: true }, 200, { "Set-Cookie": authCookie(token) });
   } catch (error) {
-    console.error("Anytime change-password error", error);
+    console.error("Anytime change-password error", error instanceof Error ? error.name : "unknown");
+    const safeError = authError(error);
+    if (safeError) return safeError;
     if (error?.code === "CREDENTIAL_RUNTIME_UNSUPPORTED") return json({ error: error.code }, 503);
     return json({ error: "SERVER_ERROR", message: "تعذر تغيير كلمة المرور الآن." }, 500);
   }
@@ -105,4 +110,3 @@ function json(body, status = 200, extraHeaders = {}) {
     },
   });
 }
-
