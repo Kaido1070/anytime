@@ -100,7 +100,7 @@ test("relative release time stays Arabic while long dates stay Gregorian", () =>
   assert.match(formatArabicRelativeTime(now - 20 * 24 * 60 * 60_000, now), /\d{2}\/\d{2}\/\d{4}/);
 });
 
-test("Phase 10.5 navigation exposes exactly the four social destinations and keeps admin isolated", async () => {
+test("navigation keeps four destinations and admin isolation with the automatic New badge disabled", async () => {
   const [layout, app, adminLayout] = await Promise.all([
     readFile(new URL("../src/layouts/AppLayout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
@@ -112,7 +112,9 @@ test("Phase 10.5 navigation exposes exactly the four social destinations and kee
   }
   assert.match(app, /path="fyp" element={<Fyp \/>}/);
   assert.match(app, /path="new" element={<NewChapters \/>}/);
-  assert.match(layout, /loadUnreadFollowedCount/);
+  assert.equal((layout.match(/label: "/g) ?? []).length, 4);
+  assert.match(layout, /label: "جديد", path: "\/new"/);
+  assert.doesNotMatch(layout, /loadUnreadFollowedCount|loadNewChapterFeed|bottom-nav-badge|newCount|fetch\(|setInterval\(/);
   assert.doesNotMatch(adminLayout, /FYP|جديد|استكشف|حسابي/);
 });
 

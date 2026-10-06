@@ -310,12 +310,3 @@ export async function loadNewChapterFeed(
 }
 
 
-export async function loadUnreadFollowedCount() {
-  // The nav badge must use the exact same strict source/date rules as the
-  // visible New feed. The old path hydrated every followed series and counted
-  // older unread chapters, which produced misleading values such as +99 even
-  // when the 24-hour feed was empty.
-  const feed = await loadNewChapterFeed(1);
-  return feed.unreadFollowedCount;
-}
-

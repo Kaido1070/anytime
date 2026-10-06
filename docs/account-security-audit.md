@@ -162,3 +162,9 @@ A runtime feed regression executes the actual feed implementation with isolated 
 One original failure remains deliberately unresolved: AppLayout fixes the New badge count at zero and does not call loadUnreadFollowedCount. That helper performs a complete multi-source feed scan. Restoring an automatic scan on navigation would add upstream/API/D1 traffic and needs an account-scoped, shared feed-state approach; this patch neither restores that scan nor removes/weakens its failing assertion. Four navigation destinations and admin isolation remain present. GitHub validation therefore remains red for this known badge failure.
 
 Validation: original nine now eight pass/one fails; new feed regression passes; full suite 302 tests, 301 pass and only the badge contract fails. Unused-code/TypeScript checks and production build pass. No live D1/R2 operation, schema migration, account credential/policy change, or reader behavior change was performed.
+
+## Explicitly disable automatic navigation badge — 2026-10-06
+
+At the user's request, retired the automatic New navigation badge instead of restoring its multi-source background scan. Removed the fixed-zero counter, unreachable badge markup and unused loadUnreadFollowedCount wrapper. The New route and visible feed are unchanged; the feed's followed/read calculation remains available and covered by the runtime regression. The navigation contract now requires exactly four destinations, the New route, admin isolation and absence of badge/background loaders, fetches and polling in AppLayout. This is a deliberate feature retirement, not a repaired unread badge.
+
+Validation: all 302 tests pass; unused-code/TypeScript and production build pass. The prior eight fixes remain intact. No live D1/R2, migration, account policy, reader or source-adapter changes were made. Live site flows remain unverified.

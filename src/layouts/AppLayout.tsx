@@ -3,17 +3,14 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import { Icon } from "../components/UI";
 
 export function AppLayout() {
-  const newCount = 0;
   const [mobileNavHidden, setMobileNavHidden] = useState(false);
   const lastScrollY = useRef(0);
   const navItems = [
     { label: "استكشف", path: "/discover", icon: "search" },
     { label: "FYP", path: "/fyp", icon: "sparkles" },
-    { label: "جديد", path: "/new", icon: "new", badge: newCount },
+    { label: "جديد", path: "/new", icon: "new" },
     { label: "حسابي", path: "/profile", icon: "profile" },
   ];
-
-;
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 759px)");
@@ -70,22 +67,14 @@ export function AppLayout() {
       </main>
 
       <nav className={`bottom-nav${mobileNavHidden ? " mobile-hidden" : ""}`} aria-label="التنقل الرئيسي">
-        {navItems.map((item) => {
-          const badge = "badge" in item ? (item.badge ?? 0) : 0;
-          return (
+        {navItems.map((item) => (
             <NavLink key={item.path} to={item.path} end={item.path === "/profile"}>
               <span className="bottom-nav-icon">
                 <Icon name={item.icon} />
-                {badge > 0 && (
-                  <span className="bottom-nav-badge" aria-label={badge + " فصل جديد غير مقروء"}>
-                    {badge > 99 ? "99+" : badge}
-                  </span>
-                )}
               </span>
               <span>{item.label}</span>
             </NavLink>
-          );
-        })}
+        ))}
       </nav>
     </div>
   );
