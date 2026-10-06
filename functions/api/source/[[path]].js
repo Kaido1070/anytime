@@ -1752,7 +1752,8 @@ async function teamXItemsFromHtml(html) {
 }
 
 async function teamXSeries(db, item) {
-  const html = await teamXFetchText(item.url || `/series/${encodeURIComponent(item.slug)}`);
+  const seriesUrl = item.url || `${TEAMX_BASE}/series/${encodeURIComponent(item.slug)}`;
+  const html = await teamXFetchText(seriesUrl);
   const plain = cleanText(stripTags(html));
   const title = cleanText(
     firstMatch(html, /author-info-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -1772,7 +1773,7 @@ async function teamXSeries(db, item) {
     firstMatch(plain, /الحالة\s*:?\s*(مستمرة|مكتملة|مكتمل|متوقف|متروك|موسم منتهي|قادم قريبًا)/i) || "",
   );
   const genres = extractGenreCandidates(html);
-  const chapters = parseTeamXChapters(html, item.url || `${TEAMX_BASE}/series/${item.slug}`);
+  const chapters = await teamXAllChapters(html, seriesUrl);
   const updated = {
     ...item,
     title,
@@ -1785,6 +1786,62 @@ async function teamXSeries(db, item) {
   };
   await rememberItems(db, [updated]);
   return updated;
+}
+
+function teamXLastChapterPage(html) {
+  let lastPage = 1;
+  for (const match of String(html ?? "").matchAll(/[?&]page=(\d+)/gi)) {
+    const page = Number(match[1]);
+    if (Number.isInteger(page) && page > lastPage) lastPage = page;
+  }
+  return Math.min(lastPage, 200);
+}
+
+function mergeTeamXChapterPages(pages) {
+  const byNumber = new Map();
+
+  for (const chapters of pages) {
+    for (const chapter of chapters) {
+      const number = Number(chapter.number);
+      if (!Number.isFinite(number)) continue;
+
+      const existing = byNumber.get(number);
+      if (
+        !existing ||
+        (existing.synthetic && !chapter.synthetic) ||
+        (!existing.publishedAt && chapter.publishedAt)
+      ) {
+        byNumber.set(number, chapter);
+      }
+    }
+  }
+
+  return [...byNumber.values()].sort((a, b) => b.number - a.number);
+}
+
+async function teamXAllChapters(firstHtml, seriesUrl) {
+  const firstPage = parseTeamXChapters(firstHtml, seriesUrl);
+  const lastPage = teamXLastChapterPage(firstHtml);
+  if (lastPage <= 1) return firstPage;
+
+  const pageResults = new Array(lastPage);
+  pageResults[0] = firstPage;
+
+  let cursor = 2;
+  const workers = Array.from({ length: Math.min(6, lastPage - 1) }, async () => {
+    while (true) {
+      const page = cursor++;
+      if (page > lastPage) break;
+
+      const url = new URL(seriesUrl, TEAMX_BASE);
+      url.searchParams.set("page", String(page));
+      const html = await teamXFetchText(url.toString());
+      pageResults[page - 1] = parseTeamXChapters(html, seriesUrl);
+    }
+  });
+
+  await Promise.all(workers);
+  return mergeTeamXChapterPages(pageResults.filter(Boolean));
 }
 
 function parseTeamXPublishedAt(block, now = Date.now()) {
