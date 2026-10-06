@@ -152,6 +152,8 @@ test('R2 cover fallback uses only aliases belonging to the numeric session owner
   } };
   let response = await onRequest(context('work-snapshots/cover?key=story', db, null, h.cookie, { WANY_COVERS: covers }));
   assert.equal(response.status, 200);
+  assert.match(response.headers.get('Content-Security-Policy'), /sandbox/);
+  assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
   assert.equal(await response.text(), 'old-cover');
   assert.equal(requested[1], 'covers/has/story');
   requested.length = 0;
@@ -159,6 +161,14 @@ test('R2 cover fallback uses only aliases belonging to the numeric session owner
   response = await onRequest(context('work-snapshots/cover?key=story', db, null, m.cookie, { WANY_COVERS: covers }));
   assert.equal(response.status, 404);
   assert.ok(requested.every(key => !key.startsWith('covers/has/') && !key.startsWith('covers/h/')));
+  const activeCovers = { async get() { return { body: '<svg/>', httpEtag: 'active', writeHttpMetadata(headers) { headers.set('Content-Type', 'image/svg+xml'); } }; } };
+  response = await onRequest(context('work-snapshots/cover?key=story', db, null, h.cookie, { WANY_COVERS: activeCovers }));
+  assert.equal(response.status, 415);
+  const upload = new Request('https://anytime.test/api/work-snapshots/cover?key=story', { method: 'PUT', headers: { Origin: 'https://anytime.test', Cookie: h.cookie, 'Content-Type': 'image/svg+xml' }, body: '<svg/>' });
+  let writes = 0;
+  response = await onRequest({ request: upload, env: { DB: db, WANY_COVERS: { async put() { writes++; } } } });
+  assert.equal(response.status, 400);
+  assert.equal(writes, 0);
 });
 
 test('recovery follows the numeric D1 account, is one-use, and invalidates sessions without changing ID', async t => {

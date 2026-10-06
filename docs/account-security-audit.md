@@ -1,5 +1,17 @@
 # Account security audit — 2026-10-06
 
+## Security-only follow-up: image endpoints
+
+Review found that the authenticated image proxy accepted arbitrary upstream `image/*`, including script-capable SVG, and returned it from the application origin. Snapshot cover uploads and legacy R2/D1 reads also allowed active image documents. This creates a same-origin active-content path; no production exploitation is asserted. These routes now allow only known raster media types and send `nosniff`, a sandboxed restrictive CSP, and same-origin resource policy. Legacy non-raster cache objects fail closed. Authenticated proxy responses use private browser caching rather than public caching.
+
+The proxy validated only the initial hostname while following upstream redirects automatically. It now follows at most four redirects manually, validates every destination before fetching it, and rejects local/private IP literals (including URL-normalized alternate IPv4 and mapped IPv6), local host names, URL credentials and nonstandard ports. This is not a DNS-resolution/egress allowlist: a public hostname resolving to a private address is not detected by these checks. A comprehensive source-fetch/edge egress audit remains outstanding. External image hosts are kept compatible with the existing sources.
+
+Snapshot uploads previously read the entire request before enforcing the 8 MiB limit. They now cancel the stream as soon as it exceeds the limit, including requests without Content-Length. Tests cover active SVG rejection, cached cover rejection, protected raster responses, private redirect destinations, redirect loops, alternate IP spellings, owner-scoped R2 aliases and bounded streams.
+
+Validation for this follow-up: all 53 selected account/image/security tests passed, including the migration test wrapper; the production bundle build and whitespace checks passed. Live deployment tests remain unperformed.
+
+Account review also rechecked dedicated progress routing (delegates to the guarded API), role/session enforcement, bound SQL ownership, credential output whitelists and current-source secret handling. Existing password-change, recovery-lock, administrator-reset and concurrent authorization tests are rerun. Evidence is local WebCrypto/SQLite and mocked fetch/R2; it does not establish live browser or deployed Workers behavior. No production database or settings are changed by this follow-up.
+
 ## Test-branch follow-up
 
 The user completed restoring and applying the guarded identity transition on the separate `wany-db` test database; this is evidenced by their terminal screenshots, not direct access to Cloudflare. Production remains unchanged. A subsequent code review fixed successful login being coupled to optional cleanup/library synchronization, preserved client account state when logout fails, and aligned login/recovery username normalization without silently stripping characters. Admin now has a dedicated self-password/settings route with logout-all; changing their own password keeps the role and rotates the session. Admin throttling and runtime errors use the shared safe responses.

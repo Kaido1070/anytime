@@ -1,3 +1,4 @@
+import { rasterImageType, protectImageHeaders, isPublicImageUrl, fetchPublicImage } from "../../_image-security.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
@@ -41,7 +42,7 @@ export async function onRequest(context) {
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
 
   const parsed = new URL(target);
-  if (!["http:", "https:"].includes(parsed.protocol) || isPrivateHost(parsed.hostname)) {
+  if (!isPublicImageUrl(target)) {
     return json({ error: "INVALID_IMAGE_HOST" }, 400);
   }
 
@@ -71,9 +72,8 @@ export async function onRequest(context) {
 
   const fetchImage = async (refererValue = "", bypassCache = false) => {
     try {
-      return await fetch(target, {
+      return await fetchPublicImage(target, {
         headers: imageHeaders(refererValue),
-        redirect: "follow",
         signal: AbortSignal.timeout(12_000),
         cf: source === "teamx"
           ? { cacheTtl: 0 }
@@ -89,7 +89,7 @@ export async function onRequest(context) {
   let response = await fetchImage(referer);
   let type = response?.headers.get("Content-Type") ?? "";
   const isUsableImage = () =>
-    Boolean(response?.ok && type.toLowerCase().startsWith("image/"));
+    Boolean(response?.ok && rasterImageType(type));
 
   // Azora chapter pages can mix image hosts inside one chapter. Some storage
   // hosts reject the chapter Referer while others require it. Retry failed
@@ -116,17 +116,17 @@ export async function onRequest(context) {
   if (!response.ok) {
     return json({ error: "IMAGE_UPSTREAM", status: response.status }, 502);
   }
-  if (!type.toLowerCase().startsWith("image/")) {
+  if (!rasterImageType(type)) {
     return json({ error: "NOT_AN_IMAGE" }, 502);
   }
 
   const headers = new Headers();
-  headers.set("Content-Type", type);
+  protectImageHeaders(headers, rasterImageType(type));
   headers.set(
     "Cache-Control",
     source === "teamx"
       ? "private, max-age=300"
-      : "public, max-age=86400, stale-while-revalidate=604800",
+      : "private, max-age=86400, stale-while-revalidate=604800",
   );
   headers.set("X-Content-Type-Options", "nosniff");
   const length = response.headers.get("Content-Length");
@@ -215,15 +215,6 @@ function absoluteUrl(base, value) {
   }
 }
 
-function isPrivateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host)) return true;
-  const match = host.match(/^172\.(\d+)\./);
-  if (match && Number(match[1]) >= 16 && Number(match[1]) <= 31) return true;
-  return false;
-}
-
 async function getSession(request, db) {
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) return null;
@@ -265,3 +256,4 @@ function json(body, status = 200) {
     },
   });
 }
+

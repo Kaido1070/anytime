@@ -1,3 +1,4 @@
+import { rasterImageType, protectImageHeaders, readImageBody } from "../_image-security.js";
 import { snapshotCoverKey, snapshotCoverKeys } from "../_identity.js";
 import { PASSWORD_ITERATIONS, verifyPassword, verifyMissingUser, derivePasswordHash, replacePassword } from "../_password.js";
 import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_admin.js";
@@ -414,6 +415,9 @@ async function route(request, url, db, covers) {
         if (object) {
           const headers = new Headers();
           object.writeHttpMetadata(headers);
+          const type = rasterImageType(headers.get("Content-Type"));
+          if (!type) return json({ error: "INVALID_COVER_TYPE" }, 415);
+          protectImageHeaders(headers, type);
           headers.set("ETag", object.httpEtag);
           headers.set("Cache-Control", "private, max-age=31536000, immutable");
           return new Response(object.body, { status: 200, headers });
@@ -453,14 +457,16 @@ async function route(request, url, db, covers) {
         bytes.set(chunk, offset);
         offset += chunk.byteLength;
       }
+      const storedType = rasterImageType(meta.cover_content_type || "image/jpeg");
+      if (!storedType) return json({ error: "INVALID_COVER_TYPE" }, 415);
       return new Response(bytes, {
         status: 200,
-        headers: {
-          "Content-Type": String(meta.cover_content_type || "image/jpeg"),
+        headers: protectImageHeaders(new Headers({
+          "Content-Type": storedType,
           "Content-Length": String(total),
           "Cache-Control": "private, max-age=31536000, immutable",
           "X-Wany-Cover-Storage": "d1-fallback",
-        },
+        }), storedType),
       });
     }
 
@@ -475,12 +481,14 @@ async function route(request, url, db, covers) {
         );
       }
 
-      const contentType = String(request.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.startsWith("image/")) {
+      const contentType = rasterImageType(request.headers.get("content-type"));
+      if (!contentType) {
         return json({ error: "INVALID_COVER_TYPE" }, 400);
       }
-      const bytes = new Uint8Array(await request.arrayBuffer());
       const MAX_COVER_BYTES = 8 * 1024 * 1024;
+      let bytes;
+      try { bytes = await readImageBody(request, MAX_COVER_BYTES); }
+      catch { return json({ error: "INVALID_COVER_SIZE" }, 413); }
       if (!bytes.byteLength || bytes.byteLength > MAX_COVER_BYTES) {
         return json(
           { error: "INVALID_COVER_SIZE", message: "حجم الغلاف المحفوظ غير مدعوم." },
