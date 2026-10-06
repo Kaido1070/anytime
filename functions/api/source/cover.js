@@ -117,7 +117,12 @@ async function onRequestGet({ request, env }) {
   } catch (error) {
     console.error(source === "mangatime" ? "MangaTime cover resolver error" : `${source} cover resolver error`, error);
     return json(
-      { covers: buildCoverCandidates(storedCover) },
+      {
+        covers:
+          source === "azora"
+            ? []
+            : buildCoverCandidates(storedCover),
+      },
       200,
       { "Cache-Control": "private, max-age=300" },
     );

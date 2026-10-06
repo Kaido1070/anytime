@@ -7,13 +7,15 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
 };
 
 export function SourceCoverImage({ item, onError, className, ...props }: Props) {
-  const initialCovers = sourceService.coverFallbackCandidates(item);
+  const initialCovers =
+    item.source === "azora" ? [] : sourceService.coverFallbackCandidates(item);
   const [covers, setCovers] = useState<string[]>(initialCovers);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     let active = true;
-    const fallback = sourceService.coverFallbackCandidates(item);
+    const fallback =
+      item.source === "azora" ? [] : sourceService.coverFallbackCandidates(item);
     setCovers(fallback);
     setIndex(0);
 
@@ -28,7 +30,8 @@ export function SourceCoverImage({ item, onError, className, ...props }: Props) 
     };
   }, [item.key, item.cover, item.source]);
 
-  const cover = covers[index] ?? item.cover;
+  const cover =
+    covers[index] ?? (item.source === "azora" ? "" : item.cover);
   if (!cover) return null;
 
   return (
