@@ -12,13 +12,17 @@ const SOURCE_UA =
 
 export async function onRequest(context) {
   const { request, env } = context;
+  const url = new URL(request.url);
+  if (!/^\/api\/source\/image\/?$/.test(url.pathname)) {
+    return json({ error: "NOT_FOUND" }, 404);
+  }
+  if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
   const db = env?.DB;
   if (!db) return json({ error: "D1_NOT_CONFIGURED" }, 503);
 
   const session = await getSession(request, db);
   if (!session) return json({ error: "UNAUTHORIZED" }, 401);
 
-  const url = new URL(request.url);
   const source = String(url.searchParams.get("source") ?? "").toLowerCase();
   if (source !== "mangatime" && source !== "teamx" && source !== "3asq" && source !== "starzmanga" && source !== "xsano" && source !== "mangalik" && source !== "azora") {
     return json({ error: "UNKNOWN_SOURCE" }, 400);

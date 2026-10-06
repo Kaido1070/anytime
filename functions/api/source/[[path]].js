@@ -1,3 +1,4 @@
+import { onRequest as handleImageRequest } from "./image.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
@@ -14,7 +15,11 @@ const sourceSchemaReady = new WeakMap();
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const action = url.pathname.replace(/^\/api\/source\/?/, "").split("/")[0] || "health";
+  // Match the complete route: suffixes must never reach a legacy handler.
+  const route = url.pathname.match(/^\/api\/source(?:\/([^/]+))?\/?$/);
+  if (!route) return json({ error: "NOT_FOUND" }, 404);
+  const action = route[1] || "health";
+  if (action === "image") return handleImageRequest(context);
 
   if (request.method === "GET" && action === "health") {
     return json({
@@ -218,13 +223,6 @@ export async function onRequest(context) {
                   ? await mangalikChapter(db, item, number, chapterUrl)
                   : await azoraChapter(db, item, number, chapterUrl);
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
-    }
-
-    if (action === "image") {
-      const source = sourceFromQuery(url);
-      const raw = String(url.searchParams.get("url") ?? "");
-      const referer = String(url.searchParams.get("referer") ?? "");
-      return proxyImage(source, raw, referer);
     }
 
     return json({ error: "NOT_FOUND" }, 404);
@@ -5031,95 +5029,6 @@ function chapterNavigation(chapters, number) {
   };
 }
 
-async function proxyImage(source, rawUrl, rawReferer = "") {
-  const base = source === "teamx"
-    ? TEAMX_BASE
-    : source === "3asq"
-      ? ASQ_BASE
-      : source === "starzmanga"
-        ? STARZ_BASE
-        : source === "xsano"
-          ? XSANO_BASE
-          : source === "mangalik"
-            ? MANGALIK_BASE
-            : source === "azora"
-              ? AZORA_BASE
-              : MANGATIME_BASE;
-  const target = absoluteUrl(base, rawUrl);
-  if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
-
-  const parsed = new URL(target);
-  if (!["http:", "https:"].includes(parsed.protocol) || isPrivateHost(parsed.hostname)) {
-    return json({ error: "INVALID_IMAGE_HOST" }, 400);
-  }
-
-  const imageAccept = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
-  let requestedReferer = base;
-  if (rawReferer) {
-    try {
-      const parsedReferer = new URL(rawReferer, base);
-      const sourceOrigin = new URL(base).origin;
-      if (
-        ["http:", "https:"].includes(parsedReferer.protocol) &&
-        parsedReferer.origin === sourceOrigin
-      ) {
-        requestedReferer = parsedReferer.toString();
-      }
-    } catch {}
-  }
-
-  const fetchImage = (refererBase) => {
-    const headers = sourceHeaders(refererBase, imageAccept);
-
-    // Azora reader images are stricter about the chapter Referer. When the
-    // caller supplied an exact chapter URL, preserve it byte-for-byte instead
-    // of letting sourceHeaders append another "/" (e.g. /65//).
-    if (source === "azora" && rawReferer) {
-      try {
-        const exactReferer = new URL(rawReferer, AZORA_BASE);
-        if (exactReferer.origin === new URL(AZORA_BASE).origin) {
-          headers.Referer = exactReferer.toString();
-        }
-      } catch {}
-    }
-
-    return fetch(target, {
-      headers,
-      redirect: "follow",
-      cf: { cacheTtl: 86400, cacheEverything: true },
-    });
-  };
-
-  // Reader images can require the exact chapter URL as Referer. The client
-  // already sends it; preserve it here instead of collapsing every request to
-  // the source homepage. If the CDN rejects that, retry against the image
-  // origin below.
-  let response = await fetchImage(requestedReferer);
-  let type = response.headers.get("Content-Type") ?? "";
-  // Chapter pages on Azora commonly serve images from external storage/CDN
-  // hosts. Those hosts may reject a azorafly.com Referer even though the image
-  // URL itself is valid. Retry against the image origin, just as MangaTime
-  // already does for its CDN covers, without transforming the image bytes.
-  if ((source === "mangatime" || source === "azora") &&
-      parsed.origin !== new URL(base).origin &&
-      (!response.ok || !type.toLowerCase().startsWith("image/"))) {
-    response = await fetchImage(parsed.origin);
-    type = response.headers.get("Content-Type") ?? "";
-  }
-
-  if (!response.ok) return json({ error: "IMAGE_UPSTREAM", status: response.status }, 502);
-  if (!type.toLowerCase().startsWith("image/")) {
-    return json({ error: "NOT_AN_IMAGE" }, 502);
-  }
-  const headers = new Headers();
-  headers.set("Content-Type", type);
-  headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
-  headers.set("X-Content-Type-Options", "nosniff");
-  const length = response.headers.get("Content-Length");
-  if (length) headers.set("Content-Length", length);
-  return new Response(response.body, { status: 200, headers });
-}
-
 function sourceHeaders(base, accept) {
   return {
     Accept: accept,
@@ -5261,15 +5170,6 @@ function decodeEntities(value) {
     .replace(/&nbsp;/g, " ")
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)));
-}
-
-function isPrivateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host)) return true;
-  const match = host.match(/^172\.(\d+)\./);
-  if (match && Number(match[1]) >= 16 && Number(match[1]) <= 31) return true;
-  return false;
 }
 
 async function getSession(request, db) {
