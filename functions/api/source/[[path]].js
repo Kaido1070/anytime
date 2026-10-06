@@ -2699,7 +2699,12 @@ async function starzLatest(db, page) {
   const html = await starzFetchText(
     "/manga/page/" + page + "/?m_orderby=latest",
   );
-  const items = starzLatestItemsFromHtml(html);
+
+  // Starz frequently omits the visible date on the newest chapter row while
+  // keeping older chapter dates on the same card. Keep that newest row as a
+  // candidate, then verify its real publication time from the chapter page.
+  const candidates = starzLatestItemsFromHtml(html, Date.now(), true);
+  const items = await hydrateStarzLatestPublicationTimes(candidates);
 
   if (items.length) {
     await rememberItems(db, items);
@@ -2970,7 +2975,7 @@ function parseStarzChapters(html, seriesUrl, now = Date.now()) {
   return [...found.values()].sort((a, b) => b.number - a.number);
 }
 
-function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now()) {
+function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now(), includeUndated = false) {
   const source = String(block ?? "");
   const base = new URL(seriesUrl, STARZ_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
@@ -3017,7 +3022,7 @@ function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now()) {
     const nextStart = anchors[index + 1]?.start ?? source.length;
     const row = source.slice(anchor.start, nextStart);
     const publishedAt = parseStarzPublishedAt(row, now);
-    if (!publishedAt) continue;
+    if (!publishedAt && !includeUndated) continue;
 
     found.set(anchor.number, {
       number: anchor.number,
@@ -3032,7 +3037,110 @@ function parseStarzLatestCardChapters(block, seriesUrl, now = Date.now()) {
   );
 }
 
-function starzLatestItemsFromHtml(html, now = Date.now()) {
+function parseStarzChapterPublishedAt(html, now = Date.now()) {
+  const source = String(html ?? "");
+
+  for (const tag of source.match(/<meta\b[^>]*>/gi) ?? []) {
+    const attrs = parseAttrs(tag);
+    const key = String(
+      attrs.property || attrs.name || attrs.itemprop || "",
+    ).toLowerCase();
+    if (![
+      "article:published_time",
+      "datepublished",
+      "date-published",
+      "publish_date",
+      "published_time",
+    ].includes(key)) continue;
+    const raw = attrs.content || attrs.datetime || "";
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed) && parsed <= now) {
+      return new Date(parsed).toISOString();
+    }
+  }
+
+  for (const match of source.matchAll(
+    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    let payload;
+    try {
+      payload = JSON.parse(decodeEntities(match[1]));
+    } catch {
+      continue;
+    }
+    const queue = Array.isArray(payload) ? [...payload] : [payload];
+    while (queue.length) {
+      const node = queue.shift();
+      if (!node || typeof node !== "object") continue;
+      if (Array.isArray(node)) {
+        queue.push(...node);
+        continue;
+      }
+      const raw = node.datePublished || node.dateCreated;
+      if (raw) {
+        const parsed = Date.parse(String(raw));
+        if (Number.isFinite(parsed) && parsed <= now) {
+          return new Date(parsed).toISOString();
+        }
+      }
+      if (Array.isArray(node["@graph"])) queue.push(...node["@graph"]);
+    }
+  }
+
+  return parseStarzPublishedAt(source, now);
+}
+
+async function hydrateStarzLatestPublicationTimes(items, now = Date.now()) {
+  const cutoff = now - 48 * 60 * 60_000;
+  const output = items.map((item) => ({
+    ...item,
+    chapters: (item.chapters ?? []).map((chapter) => ({ ...chapter })),
+  }));
+
+  const pending = [];
+  for (const item of output) {
+    // Only verify the newest undated row for each work. Older undated rows are
+    // not candidates for the public 24-hour feed and do not justify extra I/O.
+    const chapter = (item.chapters ?? [])
+      .filter((entry) => !entry.publishedAt && entry.url)
+      .sort((a, b) => Number(b.number) - Number(a.number))[0];
+    if (chapter) pending.push({ item, chapter });
+  }
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(5, pending.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= pending.length) break;
+      const { chapter } = pending[index];
+
+      try {
+        const chapterHtml = await starzFetchText(chapter.url);
+        const publishedAt = parseStarzChapterPublishedAt(chapterHtml, now);
+        const timestamp = publishedAt ? Date.parse(publishedAt) : Number.NaN;
+        if (Number.isFinite(timestamp) && timestamp > cutoff && timestamp <= now) {
+          chapter.publishedAt = new Date(timestamp).toISOString();
+        }
+      } catch (error) {
+        console.warn("Starz latest chapter date verification skipped", chapter.url, error);
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  return output
+    .map((item) => ({
+      ...item,
+      chapters: (item.chapters ?? []).filter((chapter) => Boolean(chapter.publishedAt)),
+    }))
+    .filter((item) => item.chapters.length > 0)
+    .map((item) => ({
+      ...item,
+      latest: Math.max(...item.chapters.map((chapter) => Number(chapter.number))),
+    }));
+}
+
+function starzLatestItemsFromHtml(html, now = Date.now(), includeUndated = false) {
   const source = String(html ?? "");
   let blocks = madaraBlocksByClass(source, ["page-item-detail"]);
   if (!blocks.length) blocks = madaraBlocksByClass(source, ["c-tabs-item__content"]);
@@ -3043,8 +3151,20 @@ function starzLatestItemsFromHtml(html, now = Date.now()) {
     if (!item) continue;
 
     let chapters = parseStarzChapters(block, item.url, now)
-      .filter((chapter) => Boolean(chapter.publishedAt));
-    if (!chapters.length) chapters = parseStarzLatestCardChapters(block, item.url, now);
+      .filter((chapter) => includeUndated || Boolean(chapter.publishedAt));
+    if (!chapters.length || includeUndated) {
+      const cardChapters = parseStarzLatestCardChapters(block, item.url, now, includeUndated);
+      if (cardChapters.length) {
+        const byNumber = new Map(chapters.map((chapter) => [Number(chapter.number), chapter]));
+        for (const chapter of cardChapters) {
+          const current = byNumber.get(Number(chapter.number));
+          if (!current || (!current.publishedAt && chapter.publishedAt)) {
+            byNumber.set(Number(chapter.number), chapter);
+          }
+        }
+        chapters = [...byNumber.values()].sort((a, b) => b.number - a.number);
+      }
+    }
     if (!chapters.length) continue;
 
     const candidate = {
