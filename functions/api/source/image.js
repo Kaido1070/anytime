@@ -1,5 +1,6 @@
+import { isAllowedSourceUrl } from "../../_source-egress.js";
 import { createSourceFetcher } from "../../_source-transport.js";
-import { rasterImageType, protectImageHeaders, isPublicImageUrl } from "../../_image-security.js";
+import { rasterImageType, protectImageHeaders } from "../../_image-security.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
@@ -47,7 +48,7 @@ export async function onRequest(context) {
   if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
 
   const parsed = new URL(target);
-  if (!isPublicImageUrl(target)) {
+  if (!isAllowedSourceUrl(target)) {
     return json({ error: "INVALID_IMAGE_HOST" }, 400);
   }
 

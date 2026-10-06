@@ -1,6 +1,7 @@
+import { createSourceFetcher } from "../functions/_source-transport.js";
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rasterImageType, protectImageHeaders, isPublicImageUrl, fetchPublicImage, readImageBody } from '../functions/_image-security.js';
+import { rasterImageType, protectImageHeaders, isPublicImageUrl, readImageBody } from '../functions/_image-security.js';
 import { onRequest } from '../functions/api/source/image.js';
 import { onRequest as sourceRequest } from '../functions/api/source/[[path]].js';
 
@@ -14,30 +15,30 @@ test('active image documents are excluded, raster types normalized', () => {
 
 test('image URLs reject private and alternate IP spellings and URL credentials', () => {
   for (const value of ['http://localhost/x', 'http://localhost./x', 'http://127.1/x', 'http://2130706433/x', 'http://0x7f000001/x', 'http://10.1.2.3/x', 'http://172.16.1.1/x', 'http://169.254.169.254/x', 'http://100.64.0.1/x', 'http://[::1]/x', 'http://[::ffff:127.0.0.1]/x', 'http://[fe80::1]/x', 'http://[fd00::1]/x', 'http://host.internal/x', 'http://user:pass@example.com/x', 'https://example.com:1234/x']) assert.equal(isPublicImageUrl(value), false, value);
-  assert.equal(isPublicImageUrl('https://cdn.example.com/a.png'), true);
+  assert.equal(isPublicImageUrl('https://cdn-stellarsaber.com/a.png'), true);
 });
 
 test('redirects to private targets are rejected before a second fetch', async () => {
   for (const target of ['http://127.0.0.1/x', 'http://[::ffff:10.0.0.1]/x', 'http://localhost./x']) {
     let calls = 0;
-    await assert.rejects(fetchPublicImage('https://cdn.example.com/start', {}, async (_, options) => {
+    await assert.rejects(createSourceFetcher({ fetcher: async (_, options) => {
       calls++; assert.equal(options.redirect, 'manual');
       return new Response(null, { status: 302, headers: { Location: target } });
-    }), /INVALID_IMAGE_HOST/);
+    } })('https://cdn-stellarsaber.com/start'), /INVALID_SOURCE_HOST/);
     assert.equal(calls, 1);
   }
 });
 
 test('public relative redirects work, redirect loops have a fixed budget', async () => {
   const visited = [];
-  const result = await fetchPublicImage('https://cdn.example.com/start', {}, async url => {
+  const result = await createSourceFetcher({ fetcher: async url => {
     visited.push(url);
     return visited.length === 1 ? new Response(null, { status: 302, headers: { Location: '/end' } }) : new Response('image');
-  });
-  assert.deepEqual(visited, ['https://cdn.example.com/start', 'https://cdn.example.com/end']);
+  } })('https://cdn-stellarsaber.com/start');
+  assert.deepEqual(visited, ['https://cdn-stellarsaber.com/start', 'https://cdn-stellarsaber.com/end']);
   assert.equal(await result.text(), 'image');
   let calls = 0;
-  await assert.rejects(fetchPublicImage('https://cdn.example.com/start', {}, async () => { calls++; return new Response(null, { status: 302, headers: { Location: '/start' } }); }), /INVALID_IMAGE_REDIRECT/);
+  await assert.rejects(createSourceFetcher({ fetcher: async () => { calls++; return new Response(null, { status: 302, headers: { Location: '/start' } }); } })('https://cdn-stellarsaber.com/start'), /SOURCE_REDIRECT_LIMIT/);
   assert.equal(calls, 5);
 });
 
@@ -52,7 +53,7 @@ test('cover upload stream stops at the limit even without Content-Length', async
 const db = { prepare() { return { bind() { return this; }, async first() { return { user_id: 'test-user' }; } }; } };
 test('authenticated proxy rejects attacker SVG and protects raster responses', async t => {
   const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; });
-  const request = new Request('https://wany.example/api/source/image?source=mangatime&url=https://cdn.example.com/test', { headers: { Cookie: 'anytime_session=test-token' } });
+  const request = new Request('https://wany.example/api/source/image?source=mangatime&url=https://cdn-stellarsaber.com/test', { headers: { Cookie: 'anytime_session=test-token' } });
   globalThis.fetch = async () => new Response('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', { headers: { 'Content-Type': 'image/svg+xml' } });
   assert.equal((await onRequest({ request, env: { DB: db } })).status, 502);
   globalThis.fetch = async () => new Response(new Uint8Array([1,2,3]), { headers: { 'Content-Type': 'image/png' } });
@@ -63,7 +64,7 @@ test('authenticated proxy rejects attacker SVG and protects raster responses', a
 });
 
 const imageEntrypoints = [onRequest, sourceRequest];
-function imageContext(path = '/api/source/image', target = 'https://cdn.example.com/test', method = 'GET', database = db, authenticated = true) {
+function imageContext(path = '/api/source/image', target = 'https://cdn-stellarsaber.com/test', method = 'GET', database = db, authenticated = true) {
   return { env: { DB: database }, request: new Request(`https://wany.example${path}?source=teamx&url=${encodeURIComponent(target)}`, {
     method, headers: authenticated ? { Cookie: 'anytime_session=test-token' } : {},
   }) };
@@ -137,7 +138,7 @@ test('both image routes stop private redirects before fetching their destination
       let calls = 0;
       globalThis.fetch = async (url, options) => {
         calls++;
-        assert.equal(url, 'https://cdn.example.com/test');
+        assert.equal(url, 'https://cdn-stellarsaber.com/test');
         assert.equal(options.redirect, 'manual');
         return new Response(null, { status: 302, headers: { Location: target } });
       };

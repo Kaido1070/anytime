@@ -1,4 +1,4 @@
-import { isPublicImageUrl } from './_image-security.js';
+import { isAllowedSourceUrl } from './_source-egress.js';
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 export class SourceTransportError extends Error {
@@ -43,6 +43,9 @@ export function createSourceFetcher({
 
   return async function fetchSource(target, options = {}) {
     if (Date.now() >= deadline) throw fail('SOURCE_DEADLINE');
+    if (new Headers(options.headers).has('Host') || Object.hasOwn(options.cf || {}, 'resolveOverride')) {
+      throw fail('INVALID_SOURCE_ROUTING');
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(fail('SOURCE_TIMEOUT')),
       Math.min(timeoutMs, deadline - Date.now()));
@@ -69,7 +72,7 @@ export function createSourceFetcher({
       for (let hop = 0; hop <= 4; hop++) {
         if (signal.aborted) throw signal.reason;
         if (Date.now() >= deadline) throw fail('SOURCE_DEADLINE');
-        if (!isPublicImageUrl(current)) throw fail('INVALID_SOURCE_HOST');
+        if (!isAllowedSourceUrl(current)) throw fail('INVALID_SOURCE_HOST');
         if (++requests > maxRequests) throw fail('SOURCE_REQUEST_LIMIT');
         const pending = fetcher(current, { ...options, method, body, headers, signal, redirect: 'manual' });
         // A late response from a transport ignoring abort must not leak a body.
@@ -80,7 +83,7 @@ export function createSourceFetcher({
           response.body?.cancel().catch(() => undefined);
           if (!location || hop === 4) throw fail('SOURCE_REDIRECT_LIMIT');
           const next = new URL(location, current);
-          if (!isPublicImageUrl(next.href)) throw fail('INVALID_SOURCE_HOST');
+          if (!isAllowedSourceUrl(next.href)) throw fail('INVALID_SOURCE_HOST');
           if (next.origin !== new URL(current).origin) {
             if (![301, 302, 303].includes(response.status) && body != null) throw fail('SOURCE_CROSS_ORIGIN_BODY');
             headers = new Headers(headers);

@@ -27,19 +27,6 @@ export function isPublicImageUrl(value) {
   }
   return true;
 }
-export async function fetchPublicImage(target, options = {}, fetcher = fetch) {
-  let current = String(target);
-  for (let hop = 0; hop <= 4; hop++) {
-    if (!isPublicImageUrl(current)) throw new Error('INVALID_IMAGE_HOST');
-    const result = await fetcher(current, { ...options, redirect: 'manual' });
-    if (![301, 302, 303, 307, 308].includes(result.status)) return result;
-    const location = result.headers.get('Location');
-    await result.body?.cancel();
-    if (!location || hop === 4) throw new Error('INVALID_IMAGE_REDIRECT');
-    current = new URL(location, current).toString();
-  }
-  throw new Error('INVALID_IMAGE_REDIRECT');
-}
 export async function readImageBody(request, limit) {
   const reader = request.body?.getReader();
   if (!reader) return new Uint8Array();

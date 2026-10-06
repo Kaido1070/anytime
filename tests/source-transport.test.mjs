@@ -6,7 +6,7 @@ import { onRequest } from '../functions/api/source/image.js';
 import { onRequestGet as coverRequest } from '../functions/api/source/cover.js';
 import { __test } from '../functions/api/source/[[path]].js';
 import { __test as chapterTest } from '../functions/api/source/chapter.js';
-const publicUrl = 'https://cdn.example.com/start';
+const publicUrl = 'https://cdn-stellarsaber.com/start';
 const code = expected => error => error.code === expected;
 
 function stream(size = 4) {
@@ -31,7 +31,7 @@ test('relative redirects preserve resolved URL; loops stop at four hops', async 
     return visits.length === 1 ? new Response(null, { status: 302, headers: { Location: '/final' } }) : new Response('normal');
   } });
   const response = await fetchSource(publicUrl);
-  assert.equal(response.url, 'https://cdn.example.com/final');
+  assert.equal(response.url, 'https://cdn-stellarsaber.com/final');
   assert.equal(await response.text(), 'normal');
   let calls = 0;
   const loop = createSourceFetcher({ fetcher: async () => { calls++; return new Response(null, { status: 302, headers: { Location: '/start' } }); } });
@@ -43,12 +43,12 @@ test('redirects strip credentials and correctly convert POST while refusing cros
   const calls = [];
   const fetchSource = createSourceFetcher({ fetcher: async (url, options) => {
     calls.push({ url, ...options });
-    return calls.length === 1 ? new Response(null, { status: 302, headers: { Location: 'https://other.example.com/end' } }) : new Response('ok');
+    return calls.length === 1 ? new Response(null, { status: 302, headers: { Location: 'https://storage.azorafly.com/end' } }) : new Response('ok');
   } });
   await fetchSource(publicUrl, { method: 'POST', body: 'fixture', headers: { Authorization: 'synthetic', Cookie: 'synthetic', 'Content-Type': 'text/plain' } });
   assert.equal(calls[1].method, 'GET'); assert.equal(calls[1].body, undefined);
   for (const key of ['authorization', 'cookie', 'content-type']) assert.equal(new Headers(calls[1].headers).has(key), false);
-  const unsafe = createSourceFetcher({ fetcher: async () => new Response(null, { status: 307, headers: { Location: 'https://other.example.com/end' } }) });
+  const unsafe = createSourceFetcher({ fetcher: async () => new Response(null, { status: 307, headers: { Location: 'https://storage.azorafly.com/end' } }) });
   await assert.rejects(unsafe(publicUrl, { method: 'POST', body: 'fixture' }), code('SOURCE_CROSS_ORIGIN_BODY'));
 });
 
@@ -110,7 +110,7 @@ test('concurrency, queued abort and overall deadline are bounded', async () => {
 });
 
 const db = { prepare(sql) { return { bind() { return this; }, async first() {
-  return sql.includes('FROM sessions') ? { user_id: 'fixture' } : { source: 'azora', source_key: 'az:fixture', slug: 'fixture', url: 'https://azorafly.com/series/fixture', cover_url: 'https://cdn.example.com/stored.png' };
+  return sql.includes('FROM sessions') ? { user_id: 'fixture' } : { source: 'azora', source_key: 'az:fixture', slug: 'fixture', url: 'https://azorafly.com/series/fixture', cover_url: 'https://cdn-stellarsaber.com/stored.png' };
 }, async run() { return {}; } }; } };
 
 test('real image route refuses oversized response and preserves raster headers and ordinary bytes', async t => {
@@ -130,7 +130,7 @@ test('real cover resolver blocks private redirects and retains stored-cover fall
   globalThis.fetch = async () => { calls++; return new Response(null, { status: 302, headers: { Location: 'http://127.0.0.1/x' } }); };
   const response = await coverRequest({ env: { DB: db }, request: new Request('https://wany.site/api/source/cover?key=az:fixture', { headers: { Cookie: 'anytime_session=fixture' } }) });
   assert.equal(response.status, 200);
-  assert.ok((await response.json()).covers.includes('https://cdn.example.com/stored.png'));
+  assert.ok((await response.json()).covers.includes('https://cdn-stellarsaber.com/stored.png'));
   assert.equal(calls, 1);
 });
 
@@ -170,7 +170,7 @@ test('all subrequests share the elapsed request deadline, not just individual fe
 });
 
 test('Team-X banner verification has bounded fanout and retains unverified chapter pages', async () => {
-  const pages = Array.from({ length: 80 }, (_, index) => ({ url: 'https://cdn.example.com/fanout-' + index + '.png' }));
+  const pages = Array.from({ length: 80 }, (_, index) => ({ url: 'https://cdn-stellarsaber.com/fanout-' + index + '.png' }));
   let active = 0, peak = 0, calls = 0;
   const result = await chapterTest.filterKnownTeamXBanners(pages, 'https://olympustaff.com/series/fixture/1', async () => {
     calls++; active++; peak = Math.max(peak, active);

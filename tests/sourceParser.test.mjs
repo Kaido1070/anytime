@@ -1020,8 +1020,8 @@ test("Madara chapter archive follows an explicit load-more page", async () => {
 
   try {
     const html = await __test.fetchMadaraCompleteChapterHtml(
-      "https://example.com",
-      "https://example.com/manga/example/",
+      "https://3asq.online",
+      "https://3asq.online/manga/example/",
       "TEST",
       "failed",
     );
@@ -1057,8 +1057,8 @@ test("Madara chapter archive probes hidden pagination without a visible marker",
 
   try {
     const html = await __test.fetchMadaraCompleteChapterHtml(
-      "https://example.com",
-      "https://example.com/manga/example/",
+      "https://3asq.online",
+      "https://3asq.online/manga/example/",
       "TEST",
       "failed",
     );
@@ -1399,3 +1399,4 @@ test("Azora archive recent candidates reject coarse old rows", () => {
     ],
   );
 });
+

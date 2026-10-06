@@ -48,7 +48,7 @@ test("Azora image proxy retries an external CDN with its own Referer", async () 
     const request = new Request(
       "https://wany.site/api/source/image?source=azora" +
         "&url=" +
-        encodeURIComponent("https://cdn.example.com/overgeared/190/008.webp") +
+        encodeURIComponent("https://cdn-stellarsaber.com/overgeared/190/008.webp") +
         "&referer=" +
         encodeURIComponent("https://azorafly.com/series/overgeared-12/chapter-190"),
       {
@@ -68,7 +68,7 @@ test("Azora image proxy retries an external CDN with its own Referer", async () 
       calls[0].referer,
       "https://azorafly.com/series/overgeared-12/chapter-190",
     );
-    assert.equal(calls[1].referer, "https://cdn.example.com/");
+    assert.equal(calls[1].referer, "https://cdn-stellarsaber.com/");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -98,7 +98,7 @@ test("Azora image proxy falls back to no Referer after two rejected attempts", a
     const request = new Request(
       "https://wany.site/api/source/image?source=azora" +
         "&url=" +
-        encodeURIComponent("https://cdn.example.com/overgeared/190/009.jpg") +
+        encodeURIComponent("https://cdn-stellarsaber.com/overgeared/190/009.jpg") +
         "&referer=" +
         encodeURIComponent("https://azorafly.com/series/overgeared-12/chapter-190"),
       {
@@ -114,10 +114,11 @@ test("Azora image proxy falls back to no Referer after two rejected attempts", a
     assert.equal(response.status, 200);
     assert.deepEqual(calls, [
       "https://azorafly.com/series/overgeared-12/chapter-190",
-      "https://cdn.example.com/",
+      "https://cdn-stellarsaber.com/",
       "",
     ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
+
