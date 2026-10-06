@@ -36,7 +36,8 @@ export async function onRequest(context) {
       if (!target) return json({ error: "USER_NOT_FOUND" }, 404);
       if (securityMatch[2] === "security-question" && request.method === "GET") {
         const row = await db.prepare("SELECT question FROM user_security_questions WHERE user_id = ?").bind(targetId).first();
-        return json({ question: row?.question ?? null });
+        const lock = await db.prepare("SELECT failures FROM user_security_question_locks WHERE user_id = ?").bind(targetId).first();
+        return json({ question: row?.question ?? null, recoveryLocked: Number(lock?.failures) >= 5, failedAnswers: Number(lock?.failures ?? 0) });
       }
       if (securityMatch[2] === "reset-password" && request.method === "POST") {
         const body = await readAuthJson(request);
@@ -55,7 +56,7 @@ export async function onRequest(context) {
             WHERE id = ? AND role = 'user' AND password_hash = ? AND EXISTS
             (SELECT 1 FROM users a JOIN sessions s ON s.user_id = a.id WHERE a.id = ? AND a.role = 'admin' AND a.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?)`)
             .bind(salt, hash, PASSWORD_ITERATIONS, now, targetId, target.password_hash, session.user.id, admin.password_hash, session.tokenHash, now),
-          ...["sessions", "user_password_verifiers", "user_recovery_verifiers", "account_recovery"].map(table => db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)`).bind(targetId, targetId, hash)),
+          ...["sessions", "user_password_verifiers", "user_recovery_verifiers", "account_recovery", "user_security_question_locks"].map(table => db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)`).bind(targetId, targetId, hash)),
           db.prepare(`INSERT INTO admin_credential_events (admin_user_id, target_user_id, created_at)
             SELECT ?, id, ? FROM users WHERE id = ? AND password_hash = ?`).bind(session.user.id, now, targetId, hash),
         ]);

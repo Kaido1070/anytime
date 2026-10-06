@@ -317,6 +317,8 @@ export function AdminUserDetail() {
   const historyOffset = Math.max(0, Number(searchParams.get("historyOffset") ?? 0) || 0);
   const [detail, setDetail] = useState<AdminUserDetailType | null>(null);
   const [securityQuestion, setSecurityQuestion] = useState<string | null>(null);
+  const [recoveryLocked, setRecoveryLocked] = useState(false);
+  const [failedAnswers, setFailedAnswers] = useState(0);
   const [securityBusy, setSecurityBusy] = useState(false);
   const [securityMessage, setSecurityMessage] = useState("");
   const [resetEditing, setResetEditing] = useState(false);
@@ -346,9 +348,11 @@ export function AdminUserDetail() {
   useEffect(() => {
     let active = true;
     setSecurityQuestion(null);
+    setRecoveryLocked(false);
+    setFailedAnswers(0);
     setSecurityMessage("");
     setResetEditing(false);
-    userDataService.getAdminSecurityQuestion(id).then(value => { if (active) setSecurityQuestion(value); })
+    userDataService.getAdminSecurityQuestion(id).then(value => { if (active) { setSecurityQuestion(value.question); setRecoveryLocked(value.recoveryLocked); setFailedAnswers(value.failedAnswers); } })
       .catch(() => { if (active) setSecurityMessage("تعذر تحميل سؤال الأمان."); });
     return () => { active = false; };
   }, [id]);
@@ -364,8 +368,10 @@ export function AdminUserDetail() {
     try {
       await userDataService.adminResetPassword(id, String(data.get("currentPassword") ?? ""), password);
       form.reset();
+      setRecoveryLocked(false);
+      setFailedAnswers(0);
       setResetEditing(false);
-      setSecurityMessage("تم تغيير كلمة المرور وإبطال جلسات المستخدم ورموز الاستعادة القديمة.");
+      setSecurityMessage("تم تغيير كلمة المرور وفتح الاستعادة وإبطال الجلسات ورموز الاستعادة القديمة.");
     } catch (cause) { setSecurityMessage(cause instanceof Error ? cause.message : "تعذر تغيير كلمة المرور."); }
     finally { setSecurityBusy(false); }
   }
@@ -424,6 +430,7 @@ export function AdminUserDetail() {
       <section className="settings-card">
         <h2>أمان الحساب</h2>
         <p>سؤال الأمان: {securityQuestion ?? "لم يُحفظ سؤال أمان"}</p>
+        <p>الاستعادة: {recoveryLocked ? "مقفلة — أعد تعيين كلمة المرور لفتحها" : `متاحة · ${failedAnswers} من 5 إجابات خاطئة`}</p>
         <p className="muted">كلمات المرور وإجابات الأمان لا تُعرض. إعادة التعيين تُخرج المستخدم من جميع الأجهزة.</p>
         <button type="button" className="secondary" disabled={securityBusy} onClick={() => setResetEditing(!resetEditing)}>إعادة تعيين كلمة المرور</button>
         {resetEditing && <form onSubmit={resetPassword}>

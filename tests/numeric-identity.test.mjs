@@ -344,7 +344,7 @@ test('admin reads only the saved question and persistently resets the target pas
   assert.equal((await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'My private question?', answer: 'Secret answer' }, owner.cookie))).status, 200);
   const question = await adminApi(context(`admin/users/${targetId}/security-question`, db, null, admin.cookie));
   assert.equal(question.status, 200);
-  assert.deepEqual(await question.json(), { question: 'My private question?' });
+  assert.deepEqual(await question.json(), { question: 'My private question?', recoveryLocked: false, failedAnswers: 0 });
   const path = `admin/users/${targetId}/reset-password`;
   assert.equal((await adminApi(context(path, db, { currentPassword: 'wrong', newPassword: 'newpass' }, admin.cookie))).status, 400);
   assert.equal((await adminApi(context(path, db, { currentPassword: credentials.admin.password, newPassword: 'newpass' }, admin.cookie))).status, 200);
@@ -457,4 +457,68 @@ test('security answers accept a single character without complexity checks while
   assert.equal((await recoverPassword(context('recover-password', db, { ...recover, answer: ' ' , newPassword: '123456' }))).status, 401);
   assert.equal((await recoverPassword(context('recover-password', db, { ...recover, newPassword: '123456' }))).status, 200);
   assert.equal((await login(db, 'h', '123456')).response.status, 200);
+});
+
+test('five wrong security answers persistently lock recovery until the admin resets the password', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'My question here?', answer: '1' }, owner.cookie));
+  const body = { method: 'security-question', username: 'h', answer: 'wrong', newPassword: 'newsecret' };
+  for (let i = 0; i < 5; i++) {
+    const request = context('recover-password', db, body);
+    request.request.headers.set('CF-Connecting-IP', `198.51.100.${i}`);
+    assert.equal((await recoverPassword(request)).status, i === 4 ? 423 : 401);
+  }
+  const freshDb = d1Adapter(sqlite);
+  assert.equal((await recoverPassword(context('recover-password', freshDb, { ...body, answer: '1' }))).status, 423);
+  assert.equal((await recoverPassword(context('recover-password', freshDb, { username: 'h', recoveryCode: credentials.h.recoveryCode, newPassword: 'newsecret' }))).status, 423);
+  assert.equal((await recoverPassword(context('recover-password', freshDb, { action: 'question', username: 'h' }))).status, 423);
+  assert.equal((await login(db, 'h', credentials.h.password)).response.status, 200);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const info = await adminApi(context(`admin/users/${credentials.h.user_id}/security-question`, db, null, admin.cookie));
+  assert.deepEqual(await info.json(), { question: 'My question here?', recoveryLocked: true, failedAnswers: 5 });
+  assert.equal((await adminApi(context(`admin/users/${credentials.h.user_id}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'adminnew' }, admin.cookie))).status, 200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM user_security_question_locks WHERE user_id = ?').get(credentials.h.user_id).n, 0);
+  assert.equal((await login(db, 'h', 'adminnew')).response.status, 200);
+  assert.equal((await recoverPassword(context('recover-password', db, { ...body, answer: '1' }))).status, 200);
+});
+
+test('parallel wrong answers cannot lose increments or exceed the five-answer lock cap', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const owner = await login(db, 'y', credentials.y.password);
+  await onRequest(context('security-question', db, { currentPassword: credentials.y.password, question: 'My question here?', answer: '1' }, owner.cookie));
+  const results = await Promise.all(Array.from({ length: 5 }, (_, i) => {
+    const c = context('recover-password', db, { method: 'security-question', username: 'y', answer: 'wrong', newPassword: 'newsecret' });
+    c.request.headers.set('CF-Connecting-IP', `198.51.100.${i}`);
+    return recoverPassword(c);
+  }));
+  assert.ok(results.some(r => r.status === 423));
+  assert.equal(sqlite.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').get(credentials.y.user_id).failures, 5);
+  assert.equal((await recoverPassword(context('recover-password', db, { method: 'security-question', username: 'y', answer: '1', newPassword: 'newsecret' }))).status, 423);
+});
+
+test('a correct answer verified before the fifth failure cannot commit after recovery is locked', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'My question here?', answer: '1' }, owner.cookie));
+  const target = credentials.h.user_id;
+  const before = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash;
+  const raced = { ...db, async batch(statements) {
+    if (statements[0].query.startsWith('UPDATE users SET password_salt')) sqlite.prepare('INSERT INTO user_security_question_locks VALUES (?, 5)').run(target);
+    return db.batch(statements);
+  } };
+  assert.equal((await recoverPassword(context('recover-password', raced, { method: 'security-question', username: 'h', answer: '1', newPassword: 'newsecret' }))).status, 423);
+  assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, before);
+  assert.equal(sqlite.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').get(target).failures, 5);
+});
+
+test('successful answer recovery clears preceding failed answers', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const owner = await login(db, 'm', credentials.m.password);
+  await onRequest(context('security-question', db, { currentPassword: credentials.m.password, question: 'My question here?', answer: '1' }, owner.cookie));
+  const body = { method: 'security-question', username: 'm', answer: 'wrong', newPassword: 'newsecret' };
+  assert.equal((await recoverPassword(context('recover-password', db, body))).status, 401);
+  assert.equal(sqlite.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').get(credentials.m.user_id).failures, 1);
+  assert.equal((await recoverPassword(context('recover-password', db, { ...body, answer: '1' }))).status, 200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM user_security_question_locks WHERE user_id = ?').get(credentials.m.user_id).n, 0);
 });

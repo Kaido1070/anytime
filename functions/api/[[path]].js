@@ -149,7 +149,7 @@ async function route(request, url, db, covers) {
     const question = typeof body.question === "string" ? body.question.trim() : "";
     const answer = normalizeSecurityAnswer(body.answer);
     if (question.length < 6 || question.length > 200 || /[\u0000-\u001f\u007f]/.test(question) || answer.length < 1 || answer.length > 128) {
-      return json({ error: "INVALID_SECURITY_QUESTION", message: "اكتب سؤالًا وجوابًا من 6 أحرف أو أكثر." }, 400);
+      return json({ error: "INVALID_SECURITY_QUESTION", message: "اكتب سؤالًا من 6 أحرف أو أكثر وإجابة غير فارغة." }, 400);
     }
     if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
     if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);

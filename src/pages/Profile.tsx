@@ -446,7 +446,7 @@ export function Profile({
           <h3>سؤال الأمان</h3>
           {!questionEditing && <button className="secondary" type="button" onClick={() => { setQuestionEditing(true); setQuestionFeedback(""); }}>إعداد أو تغيير سؤال الأمان</button>}
           {questionEditing && <form className="settings-password-form" onSubmit={saveSecurityQuestion}>
-            <p>اكتب إجابة تتذكرها لاستخدامها لاحقًا في استعادة كلمة المرور.</p>
+            <p>اكتب إجابة تتذكرها. بعد 5 إجابات خاطئة تُقفل الاستعادة حتى يتدخل مسؤول الموقع.</p>
             <label>كلمة المرور الحالية<input name="questionPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={questionBusy} /></label>
             <label>سؤال الأمان<input name="securityQuestion" minLength={6} maxLength={200} required disabled={questionBusy} placeholder="اكتب سؤالًا تتذكر جوابه" /></label>
             <label>الإجابة<input name="securityAnswer" type="password" autoComplete="off" minLength={1} maxLength={128} required disabled={questionBusy} /></label>

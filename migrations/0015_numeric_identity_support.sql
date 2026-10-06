@@ -68,3 +68,8 @@ CREATE TABLE IF NOT EXISTS admin_credential_events (
   target_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS user_security_question_locks (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  failures INTEGER NOT NULL CHECK (failures BETWEEN 1 AND 5)
+);

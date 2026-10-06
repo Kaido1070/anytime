@@ -15,6 +15,8 @@ export async function onRequestPost(context) {
     const password = typeof body.newPassword === 'string' ? body.newPassword : '';
     if (!(await reserveAuthAttempt(db, request, 'recovery', username))) return rateLimited();
     if (!username) return invalid();
+    const user = await db.prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE LIMIT 1').bind(username).first();
+    if (user && await isLocked(db, user.id)) return locked();
     if (body.action === 'question') {
       const row = await db.prepare(`SELECT q.question FROM user_security_questions q
         JOIN users u ON u.id = q.user_id WHERE u.username = ? COLLATE NOCASE LIMIT 1`).bind(username).first();
@@ -24,13 +26,22 @@ export async function onRequestPost(context) {
     const answer = normalizeSecurityAnswer(body.answer);
     if (byQuestion ? answer.length < 1 || answer.length > 128 : code.length < 20 || code.length > 128) return invalid();
     if (password.length < 6 || password.length > 128) return json({ error: 'WEAK_PASSWORD', message: 'كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر.' }, 400);
-    const user = await db.prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE LIMIT 1').bind(username).first();
     let matched = null;
     let condition;
     let conditionArgs;
     if (byQuestion) {
       const question = user ? await db.prepare('SELECT question, answer_salt, answer_hash, answer_iterations FROM user_security_questions WHERE user_id = ?').bind(user.id).first() : null;
-      if (!(await verifySecurityAnswer(answer, question))) return invalid();
+      if (!(await verifySecurityAnswer(answer, question))) {
+        if (user && question) {
+          const count = await db.prepare(`INSERT INTO user_security_question_locks (user_id, failures)
+            SELECT u.id, 1 FROM users u JOIN user_security_questions q ON q.user_id = u.id
+            WHERE u.id = ? AND u.password_hash = ? AND q.answer_hash = ? AND q.answer_salt = ?
+            ON CONFLICT(user_id) DO UPDATE SET failures = MIN(failures + 1, 5)
+            RETURNING failures`).bind(user.id, user.password_hash, question.answer_hash, question.answer_salt).first();
+          if (Number(count?.failures) >= 5) return locked();
+        }
+        return invalid();
+      }
       matched = question;
       condition = `EXISTS (SELECT 1 FROM user_security_questions WHERE user_id = ? AND question = ? AND answer_salt = ? AND answer_hash = ? AND answer_iterations = ?)`;
       conditionArgs = [user.id, matched.question, matched.answer_salt, matched.answer_hash, matched.answer_iterations];
@@ -63,14 +74,15 @@ export async function onRequestPost(context) {
     // Guard both the verified recovery factor and the credential generation in the atomic reset.
     const changed = await db.batch([
       db.prepare(`UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ?
-        WHERE id = ? AND password_hash = ? AND ${condition}`)
+        WHERE id = ? AND password_hash = ? AND ${condition} AND NOT EXISTS (SELECT 1 FROM user_security_question_locks WHERE user_id = users.id AND failures >= 5)`)
         .bind(salt, hash, PASSWORD_ITERATIONS, Date.now(), user.id, user.password_hash, ...conditionArgs),
       db.prepare('DELETE FROM user_recovery_verifiers WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
       db.prepare('DELETE FROM account_recovery WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
       db.prepare('DELETE FROM user_password_verifiers WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
+      db.prepare('DELETE FROM user_security_question_locks WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
       db.prepare('DELETE FROM sessions WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
     ]);
-    if (Number(changed[0]?.meta?.changes) !== 1) return invalid();
+    if (Number(changed[0]?.meta?.changes) !== 1) return await isLocked(db, user.id) ? locked() : invalid();
     return json({ ok: true });
   } catch (error) {
     console.error('Wany recovery failed', error instanceof Error ? error.name : 'unknown');
@@ -78,6 +90,13 @@ export async function onRequestPost(context) {
     if (safeError) return safeError;
     return json({ error: 'SERVER_ERROR', message: 'تعذر استعادة الحساب الآن.' }, 500);
   }
+}
+async function isLocked(db, userId) {
+  const row = await db.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').bind(userId).first();
+  return Number(row?.failures) >= 5;
+}
+function locked() {
+  return json({ error: 'RECOVERY_LOCKED', message: 'تم إيقاف الاستعادة بعد 5 إجابات خاطئة. تواصل مع مسؤول الموقع لفتح الاستعادة وتغيير كلمة المرور.' }, 423);
 }
 async function invalid() {
   await new Promise(resolve => setTimeout(resolve, 120));
