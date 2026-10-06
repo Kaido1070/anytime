@@ -1789,8 +1789,11 @@ async function teamXSeries(db, item) {
 }
 
 function teamXLastChapterPage(html) {
+  const raw = String(html ?? "");
+  const listMarker = raw.search(/قائمة\s*الفصول/i);
+  const source = listMarker >= 0 ? raw.slice(listMarker) : raw;
   let lastPage = 1;
-  for (const match of String(html ?? "").matchAll(/[?&]page=(\d+)/gi)) {
+  for (const match of source.matchAll(/[?&]page=(\d+)/gi)) {
     const page = Number(match[1]);
     if (Number.isInteger(page) && page > lastPage) lastPage = page;
   }
@@ -1867,7 +1870,11 @@ function parseTeamXPublishedAt(block, now = Date.now()) {
 }
 
 function parseTeamXChapters(html, seriesUrl, now = Date.now()) {
-  const source = String(html ?? "");
+  const rawSource = String(html ?? "");
+  const listMarker = rawSource.search(/قائمة\s*الفصول/i);
+  const listTail = listMarker >= 0 ? rawSource.slice(listMarker) : rawSource;
+  const listEnd = listTail.search(/(?:id=["']comments["']|class=["'][^"']*comments[^"']*["']|<footer\b)/i);
+  const source = listEnd >= 0 ? listTail.slice(0, listEnd) : listTail;
   const parsedBase = new URL(seriesUrl, TEAMX_BASE);
   const basePath = parsedBase.pathname.replace(/\/$/, "");
   const found = new Map();
@@ -1917,25 +1924,6 @@ function parseTeamXChapters(html, seriesUrl, now = Date.now()) {
       publishedAt: parseTeamXPublishedAt(row, now),
       url: anchor.href,
     });
-  }
-
-  const numbers = [...found.keys()].sort((a, b) => b - a);
-  if (numbers.length) {
-    const top = Math.floor(numbers[0]);
-    const bottom = Math.max(0, Math.floor(numbers[numbers.length - 1]));
-    if (top - bottom <= 2500) {
-      for (let number = top; number >= bottom; number -= 1) {
-        if (!found.has(number)) {
-          found.set(number, {
-            number,
-            title: `الفصل ${number}`,
-            publishedAt: null,
-            synthetic: true,
-            url: `${parsedBase.origin}${basePath}/${number}`,
-          });
-        }
-      }
-    }
   }
 
   return [...found.values()].sort((a, b) => b.number - a.number);
