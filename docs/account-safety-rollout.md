@@ -32,7 +32,7 @@ Every account receives a fresh random 32-character password and a fresh random r
 
 Historical credential seeds have been removed from migrations 0001/0013 and the offline compatibility bridge has been deleted. This does not erase earlier Git commits or rotate a live account until the migration is applied. Already-applied migrations are not replayed; new installations no longer seed real accounts. General account names remaining in historic identity migrations are identifiers, not passwords.
 
-Authenticated settings can issue a replacement one-use recovery code after verifying the current password; only its SHA-256 digest is stored. The code appears once in the response/UI and replaces every previous code. D1 persists 15-minute attempt budgets shared across isolates and the general/admin login endpoints (8 per IP/account pair, 24 per account, 60 per IP). Successful attempts also count. Login, recovery and current-password verification use separate operation scopes; password change and code issuance share a scope. Admin-assisted recovery is not implemented.
+Authenticated settings can issue a replacement one-use recovery code after verifying the current password; only its SHA-256 digest is stored. The code appears once in the response/UI and replaces every previous code. D1 persists 15-minute attempt budgets shared across isolates and the general/admin login endpoints (8 per IP/account pair, 24 per account, 60 per IP). Successful attempts also count. Login, recovery and current-password verification use separate operation scopes; password change and code issuance share a scope. Admin password reset is implemented; a separate recovery-approval workflow is not implemented.
 
 R2 objects are not moved or deleted. Owner-scoped aliases and preferred snapshot locations in D1 keep old cover paths readable. Profile content refresh checks for missing covers and refetches/uploads them in the background when the source is available; failure must not block reading. R2 is a disposable cover cache, not account/reading data. A full R2 backup or copying objects is optional, not an account-rollout prerequisite. All sessions are invalidated, even for accounts whose ID was already numeric, so those users sign in again.
 
@@ -52,7 +52,7 @@ Keep the mapping, credentials and original backup private. Verify rollback on st
 
 If writes occurred, rollback intentionally stops: reconcile the new data first instead of restoring an old export blindly. Do not restore the original export or deploy the old fixed-code recovery endpoint as a security rollback; either can reintroduce exposed credentials.
 
-The branch is a draft implementation. No production D1/R2 conversion or deployment has occurred. Initial private credential rotation is included. Replacement recovery-code issuance and durable rate limiting are implemented. Admin-assisted recovery remains future work.
+The branch is a draft implementation. No production D1/R2 conversion or deployment has occurred. Initial private credential rotation is included. Replacement recovery-code issuance and durable rate limiting are implemented. Admin password reset is implemented; a separate recovery-approval workflow remains future work.
 
 ## Request and session protections
 

@@ -384,3 +384,63 @@ test('admin reset rechecks the authorizing session inside the mutation', async t
   assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, original);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM admin_credential_events').get().n, 0);
 });
+
+test('admin reset fails closed when role, administrator password or target credential changes during the request', async t => {
+  for (const change of ['role', 'admin-password', 'target-password']) {
+    const { sqlite, db, credentials } = await fixture(t);
+    const admin = await login(db, 'admin', credentials.admin.password);
+    const target = credentials.h.user_id;
+    const original = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash;
+    const raced = { ...db, async batch(statements) {
+      if (statements[0].query.startsWith('UPDATE users SET password_salt')) {
+        if (change === 'role') sqlite.prepare("UPDATE users SET role = 'user' WHERE id = ?").run(credentials.admin.user_id);
+        if (change === 'admin-password') sqlite.prepare("UPDATE users SET password_hash = 'changed' WHERE id = ?").run(credentials.admin.user_id);
+        if (change === 'target-password') sqlite.prepare("UPDATE users SET password_hash = 'changed' WHERE id = ?").run(target);
+      }
+      return db.batch(statements);
+    } };
+    const response = await adminApi(context(`admin/users/${target}/reset-password`, raced, { currentPassword: credentials.admin.password, newPassword: 'newsecret' }, admin.cookie));
+    assert.equal(response.status, 401, change);
+    assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, change === 'target-password' ? 'changed' : original);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM admin_credential_events').get().n, 0);
+  }
+});
+
+test('admin credential operations expose no secrets and reject anonymous, missing-origin and admin targets', async t => {
+  const { db, credentials } = await fixture(t);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const path = `admin/users/${credentials.h.user_id}/reset-password`;
+  const body = { currentPassword: credentials.admin.password, newPassword: 'newsecret' };
+  assert.equal((await adminApi(context(path, db, body))).status, 401);
+  const missingOrigin = context(path, db, body, admin.cookie);
+  missingOrigin.request.headers.delete('Origin');
+  assert.equal((await adminApi(missingOrigin)).status, 403);
+  assert.equal((await adminApi(context(`admin/users/${credentials.admin.user_id}/reset-password`, db, body, admin.cookie))).status, 404);
+  const response = await adminApi(context(path, db, body, admin.cookie));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.match(response.headers.get('Cache-Control'), /no-store/);
+});
+
+test('missing admin audit support rolls back the entire password reset and preserves sessions', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const owner = await login(db, 'h', credentials.h.password);
+  const target = credentials.h.user_id;
+  const before = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash;
+  sqlite.exec('DROP TABLE admin_credential_events');
+  const response = await adminApi(context(`admin/users/${target}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'newsecret' }, admin.cookie));
+  assert.equal(response.status, 500);
+  assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, before);
+  assert.equal((await onRequest(context('security-question', db, null, owner.cookie))).status, 200);
+});
+
+test('admin reset current-password guessing is rate limited across different target accounts', async t => {
+  const { db, credentials } = await fixture(t);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  for (let i = 0; i < 8; i++) {
+    const target = i % 2 ? credentials.h.user_id : credentials.y.user_id;
+    assert.equal((await adminApi(context(`admin/users/${target}/reset-password`, db, { currentPassword: 'incorrect', newPassword: 'newsecret' }, admin.cookie))).status, 400);
+  }
+  assert.equal((await adminApi(context(`admin/users/${credentials.m.user_id}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'newsecret' }, admin.cookie))).status, 429);
+});
