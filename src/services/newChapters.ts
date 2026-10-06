@@ -84,6 +84,14 @@ function exactChapterIdentity(chapter: SourceChapter) {
   return Number.isFinite(number) ? String(number) : chapter.title.trim();
 }
 
+const NEW_SOURCE_BUDGET_MS: Partial<Record<SourceName, number>> = {
+  mangatime: 20_000,
+  starzmanga: 15_000,
+  mangalik: 15_000,
+  xsano: 20_000,
+  azora: 20_000,
+};
+
 async function withinSourceBudget<T>(promise: Promise<T>, milliseconds = 7500): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -230,7 +238,10 @@ export async function loadNewChapterFeed(
 
   const latestPromise = Promise.allSettled(
     sourceTasks.map(({ source, page: sourcePage }) =>
-      withinSourceBudget(sourceService.recent(source, sourcePage)).finally(() => {
+      withinSourceBudget(
+        sourceService.recent(source, sourcePage),
+        NEW_SOURCE_BUDGET_MS[source] ?? 7500,
+      ).finally(() => {
         completedSteps += 1;
         report("جاري جمع أحدث الفصول");
       }),

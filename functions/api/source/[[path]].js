@@ -803,7 +803,7 @@ async function mangaTimeLatest(context, db, page) {
     .first();
   const lastStartedAt = Number(state?.last_started_at ?? 0);
 
-  if (now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
+  if (!cached.length || now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
     await db
       .prepare(`INSERT INTO source_sync_state (source, last_started_at)
         VALUES ('mangatime', ?)
@@ -3275,18 +3275,27 @@ async function azoraRecent(context, db, page) {
   if (page > 1) return { items: [], hasMore: false, page };
   const now = Date.now();
   const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
-  const cached = await recentVerifiedReleasesFromDb(db, "azora", cutoffIso);
+  let cached = await recentVerifiedReleasesFromDb(db, "azora", cutoffIso);
   const state = await db.prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'azora' LIMIT 1").first();
   const lastStartedAt = Number(state?.last_started_at ?? 0);
 
-  if (now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
+  if (!cached.length || now - lastStartedAt >= sourceRefreshIntervalMs(now)) {
     await db.prepare(`INSERT INTO source_sync_state (source, last_started_at)
       VALUES ('azora', ?)
       ON CONFLICT(source) DO UPDATE SET last_started_at = excluded.last_started_at`)
       .bind(now).run();
-    context.waitUntil(syncAzoraRecent(db, now).catch((error) => {
-      console.error("Azora recent background sync failed", error);
-    }));
+    if (!cached.length) {
+      try {
+        await syncAzoraRecent(db, now);
+        cached = await recentVerifiedReleasesFromDb(db, "azora", cutoffIso);
+      } catch (error) {
+        console.error("Azora foreground sync failed", error);
+      }
+    } else {
+      context.waitUntil(syncAzoraRecent(db, now).catch((error) => {
+        console.error("Azora recent background sync failed", error);
+      }));
+    }
   }
   return { items: cached, hasMore: false, page };
 }
@@ -4127,24 +4136,24 @@ function azoraHasNext(html, page = 1) {
 // MangaLik / Madara ----------------------------------------------------------
 
 async function mangalikLatest(db, page) {
-  // MangaLik exposes a dedicated newest-chapters stream. Parse that directly
-  // so Wany never has to open every series page just to build New.
+  // MangaLik can omit the visible date from the newest chapter row. Keep that
+  // row as a candidate, then verify its publication time from the chapter page.
   const path = page > 1
     ? "/mangasid/page/" + page + "/"
     : "/mangasid/";
   const html = await mangalikFetchText(path);
-  const items = mangalikLatestItemsFromHtml(html);
+  const candidates = mangalikLatestItemsFromHtml(html, Date.now(), true);
+  const items = await hydrateMangalikLatestPublicationTimes(candidates);
 
   if (items.length) {
     await rememberItems(db, items);
     return { items: items.slice(0, 48), hasMore: mangalikHasNext(html), page };
   }
 
-  // Fail closed for strict New if the dedicated latest layout changes.
   return { items: [], hasMore: mangalikHasNext(html), page };
 }
 
-function parseMangalikLatestCardChapters(block, seriesUrl, now = Date.now()) {
+function parseMangalikLatestCardChapters(block, seriesUrl, now = Date.now(), includeUndated = false) {
   const source = String(block ?? "");
   const base = new URL(seriesUrl, MANGALIK_BASE);
   const basePath = base.pathname.replace(/\/$/, "");
@@ -4193,7 +4202,7 @@ function parseMangalikLatestCardChapters(block, seriesUrl, now = Date.now()) {
     // the next chapter anchor. This prevents sibling chapters sharing dates.
     const row = source.slice(anchor.start, nextStart);
     const publishedAt = parseMangalikPublishedAt(row, now);
-    if (!publishedAt) continue;
+    if (!publishedAt && !includeUndated) continue;
 
     found.set(anchor.number, {
       number: anchor.number,
@@ -4208,7 +4217,108 @@ function parseMangalikLatestCardChapters(block, seriesUrl, now = Date.now()) {
   );
 }
 
-function mangalikLatestItemsFromHtml(html, now = Date.now()) {
+function parseMangalikChapterPublishedAt(html, now = Date.now()) {
+  const source = String(html ?? "");
+
+  for (const tag of source.match(/<meta\b[^>]*>/gi) ?? []) {
+    const attrs = parseAttrs(tag);
+    const key = String(attrs.property || attrs.name || attrs.itemprop || "").toLowerCase();
+    if (![
+      "article:published_time",
+      "datepublished",
+      "date-published",
+      "publish_date",
+      "published_time",
+    ].includes(key)) continue;
+    const parsed = Date.parse(attrs.content || attrs.datetime || "");
+    if (Number.isFinite(parsed) && parsed <= now) return new Date(parsed).toISOString();
+  }
+
+  for (const match of source.matchAll(
+    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    let payload;
+    try {
+      payload = JSON.parse(decodeEntities(match[1]));
+    } catch {
+      continue;
+    }
+    const queue = Array.isArray(payload) ? [...payload] : [payload];
+    while (queue.length) {
+      const node = queue.shift();
+      if (!node || typeof node !== "object") continue;
+      if (Array.isArray(node)) {
+        queue.push(...node);
+        continue;
+      }
+      const raw = node.datePublished || node.dateCreated;
+      if (raw) {
+        const parsed = Date.parse(String(raw));
+        if (Number.isFinite(parsed) && parsed <= now) return new Date(parsed).toISOString();
+      }
+      if (Array.isArray(node["@graph"])) queue.push(...node["@graph"]);
+    }
+  }
+
+  const machine =
+    firstMatch(source, /\bdatetime=["']([^"']+)["']/i) ||
+    firstMatch(source, /\bdata-(?:time|datetime|published)=["']([^"']+)["']/i);
+  if (machine) {
+    const parsed = Date.parse(machine);
+    if (Number.isFinite(parsed) && parsed <= now) return new Date(parsed).toISOString();
+  }
+
+  return null;
+}
+
+async function hydrateMangalikLatestPublicationTimes(items, now = Date.now()) {
+  const cutoff = now - 48 * 60 * 60_000;
+  const output = items.map((item) => ({
+    ...item,
+    chapters: (item.chapters ?? []).map((chapter) => ({ ...chapter })),
+  }));
+
+  const pending = [];
+  for (const item of output) {
+    const chapter = (item.chapters ?? [])
+      .filter((entry) => !entry.publishedAt && entry.url)
+      .sort((a, b) => Number(b.number) - Number(a.number))[0];
+    if (chapter) pending.push(chapter);
+  }
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(5, pending.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= pending.length) break;
+      const chapter = pending[index];
+      try {
+        const chapterHtml = await mangalikFetchText(chapter.url);
+        const publishedAt = parseMangalikChapterPublishedAt(chapterHtml, now);
+        const timestamp = publishedAt ? Date.parse(publishedAt) : Number.NaN;
+        if (Number.isFinite(timestamp) && timestamp > cutoff && timestamp <= now) {
+          chapter.publishedAt = new Date(timestamp).toISOString();
+        }
+      } catch (error) {
+        console.warn("MangaLik latest chapter date verification skipped", chapter.url, error);
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  return output
+    .map((item) => ({
+      ...item,
+      chapters: (item.chapters ?? []).filter((chapter) => Boolean(chapter.publishedAt)),
+    }))
+    .filter((item) => item.chapters.length > 0)
+    .map((item) => ({
+      ...item,
+      latest: Math.max(...item.chapters.map((chapter) => Number(chapter.number))),
+    }));
+}
+
+function mangalikLatestItemsFromHtml(html, now = Date.now(), includeUndated = false) {
   const source = String(html ?? "");
   let blocks = madaraBlocksByClass(source, ["page-item-detail"]);
   if (!blocks.length) blocks = madaraBlocksByClass(source, ["c-tabs-item__content"]);
@@ -4219,11 +4329,23 @@ function mangalikLatestItemsFromHtml(html, now = Date.now()) {
     if (!item) continue;
 
     let chapters = parseMangalikChapters(block, item.url)
-      .filter((chapter) => Boolean(chapter.publishedAt));
+      .filter((chapter) => includeUndated || Boolean(chapter.publishedAt));
 
-    // MangaLik's newest page can render chapter rows without wp-manga-chapter
-    // <li> wrappers. Fall back to exact anchor intervals inside the same card.
-    if (!chapters.length) chapters = parseMangalikLatestCardChapters(block, item.url, now);
+    // Merge exact chapter-anchor intervals too. For New, keep the newest
+    // undated candidate so its own page can prove the publication time.
+    if (!chapters.length || includeUndated) {
+      const cardChapters = parseMangalikLatestCardChapters(block, item.url, now, includeUndated);
+      if (cardChapters.length) {
+        const byNumber = new Map(chapters.map((chapter) => [Number(chapter.number), chapter]));
+        for (const chapter of cardChapters) {
+          const current = byNumber.get(Number(chapter.number));
+          if (!current || (!current.publishedAt && chapter.publishedAt)) {
+            byNumber.set(Number(chapter.number), chapter);
+          }
+        }
+        chapters = [...byNumber.values()].sort((a, b) => b.number - a.number);
+      }
+    }
     if (!chapters.length) continue;
 
     const candidate = {
@@ -4624,14 +4746,14 @@ async function xsanoLatest(context, db, page) {
 
   const now = Date.now();
   const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
-  const cached = await recentVerifiedReleasesFromDb(db, "xsano", cutoffIso);
+  let cached = await recentVerifiedReleasesFromDb(db, "xsano", cutoffIso);
 
   const state = await db
     .prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'xsano' LIMIT 1")
     .first();
   const lastStartedAt = Number(state?.last_started_at ?? 0);
 
-  if (now - lastStartedAt >= 15 * 60_000) {
+  if (!cached.length || now - lastStartedAt >= 15 * 60_000) {
     await db
       .prepare(`INSERT INTO source_sync_state (source, last_started_at)
         VALUES ('xsano', ?)
@@ -4639,11 +4761,20 @@ async function xsanoLatest(context, db, page) {
       .bind(now)
       .run();
 
-    context.waitUntil(
-      syncXsanoLatest(db).catch((error) => {
-        console.error("XSano background sync failed", error);
-      }),
-    );
+    if (!cached.length) {
+      try {
+        await syncXsanoLatest(db);
+        cached = await recentVerifiedReleasesFromDb(db, "xsano", cutoffIso);
+      } catch (error) {
+        console.error("XSano foreground sync failed", error);
+      }
+    } else {
+      context.waitUntil(
+        syncXsanoLatest(db).catch((error) => {
+          console.error("XSano background sync failed", error);
+        }),
+      );
+    }
   }
 
   return { items: cached, hasMore: false, page };
