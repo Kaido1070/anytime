@@ -17,8 +17,8 @@ export async function onRequestPost(context) {
     const body = await request.json().catch(() => ({}));
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
-    if (newPassword.length < 12 || newPassword.length > 128) {
-      return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 12 حرفًا أو أكثر." }, 400);
+    if (newPassword.length < 6 || newPassword.length > 128) {
+      return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر." }, 400);
     }
 
     const authRow = await db
