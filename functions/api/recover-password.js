@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
     }
     const byQuestion = body.method === 'security-question';
     const answer = normalizeSecurityAnswer(body.answer);
-    if (byQuestion ? answer.length < 6 || answer.length > 128 : code.length < 20 || code.length > 128) return invalid();
+    if (byQuestion ? answer.length < 1 || answer.length > 128 : code.length < 20 || code.length > 128) return invalid();
     if (password.length < 6 || password.length > 128) return json({ error: 'WEAK_PASSWORD', message: 'كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر.' }, 400);
     const user = await db.prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE LIMIT 1').bind(username).first();
     let matched = null;

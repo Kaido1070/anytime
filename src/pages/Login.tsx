@@ -92,7 +92,7 @@ export function Login() {
             <label>طريقة الاستعادة<select value={recoveryMethod} disabled={busy} onChange={event => { setRecoveryMethod(event.target.value); setError(""); }}><option value="security-question">سؤال الأمان</option><option value="code">رمز الاستعادة</option></select></label>
             {recoveryMethod === "security-question" ? <>
               <button className="secondary" type="button" disabled={busy || !recoveryUsername.trim()} onClick={() => void loadSecurityQuestion()}>عرض سؤال الأمان</button>
-              {securityQuestion && <label>{securityQuestion}<input name="securityAnswer" type="password" autoComplete="off" minLength={6} maxLength={128} required disabled={busy} placeholder="إجابتك" /></label>}
+              {securityQuestion && <label>{securityQuestion}<input name="securityAnswer" type="password" autoComplete="off" minLength={1} maxLength={128} required disabled={busy} placeholder="إجابتك" /></label>}
             </> : <label>رمز الاستعادة
               <input name="recoveryCode" autoComplete="off" autoCapitalize="none" spellCheck={false} required placeholder="WANY-..." />
             </label>}

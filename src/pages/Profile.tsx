@@ -446,10 +446,10 @@ export function Profile({
           <h3>سؤال الأمان</h3>
           {!questionEditing && <button className="secondary" type="button" onClick={() => { setQuestionEditing(true); setQuestionFeedback(""); }}>إعداد أو تغيير سؤال الأمان</button>}
           {questionEditing && <form className="settings-password-form" onSubmit={saveSecurityQuestion}>
-            <p>اختر جوابًا لا يعرفه غيرك؛ تجنّب الأسماء والتواريخ المعروفة.</p>
+            <p>اكتب إجابة تتذكرها لاستخدامها لاحقًا في استعادة كلمة المرور.</p>
             <label>كلمة المرور الحالية<input name="questionPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={questionBusy} /></label>
             <label>سؤال الأمان<input name="securityQuestion" minLength={6} maxLength={200} required disabled={questionBusy} placeholder="اكتب سؤالًا تتذكر جوابه" /></label>
-            <label>الإجابة<input name="securityAnswer" type="password" autoComplete="off" minLength={6} maxLength={128} required disabled={questionBusy} /></label>
+            <label>الإجابة<input name="securityAnswer" type="password" autoComplete="off" minLength={1} maxLength={128} required disabled={questionBusy} /></label>
             <button className="primary" type="submit" disabled={questionBusy}>{questionBusy ? "جارٍ الحفظ…" : "حفظ سؤال الأمان"}</button>
             <button className="secondary" type="button" disabled={questionBusy} onClick={() => setQuestionEditing(false)}>إلغاء</button>
           </form>}

@@ -444,3 +444,17 @@ test('admin reset current-password guessing is rate limited across different tar
   }
   assert.equal((await adminApi(context(`admin/users/${credentials.m.user_id}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'newsecret' }, admin.cookie))).status, 429);
 });
+
+
+test('security answers accept a single character without complexity checks while rejecting empty answers and short passwords', async t => {
+  const { db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  const setup = { currentPassword: credentials.h.password, question: 'What answer did I save?', answer: '  ' };
+  assert.equal((await onRequest(context('security-question', db, setup, owner.cookie))).status, 400);
+  assert.equal((await onRequest(context('security-question', db, { ...setup, answer: '1' }, owner.cookie))).status, 200);
+  const recover = { method: 'security-question', username: 'h', answer: '1', newPassword: '12345' };
+  assert.equal((await recoverPassword(context('recover-password', db, recover))).status, 400);
+  assert.equal((await recoverPassword(context('recover-password', db, { ...recover, answer: ' ' , newPassword: '123456' }))).status, 401);
+  assert.equal((await recoverPassword(context('recover-password', db, { ...recover, newPassword: '123456' }))).status, 200);
+  assert.equal((await login(db, 'h', '123456')).response.status, 200);
+});
