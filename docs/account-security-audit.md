@@ -89,3 +89,19 @@ Account transitions remove private local data/friend snapshots and session recom
 Cover jobs are deduplicated by account and session generation plus work/chapter, cancelled with the account signal, and recheck ownership after metadata/image/body reads before starting upload. Existing authorized server operations already sent before logout cannot be undone by browser cancellation; D1 remains the authoritative owner boundary. No schema migration or account-ID change is needed.
 
 Tests delay library/friend/cleanup requests across account changes, inject late network failures, repeat login to the same account, verify successful/failed logout behavior, check authentication ordering, run the actual cover-job orchestration with controlled adapters, and simulate cross-tab invalidation. Live multi-tab/browser validation remains outstanding.
+
+## Source schema outside requests — 2026-10-06
+
+The source catchall no longer creates tables/indexes, adds columns or backfills cache rows. Authenticated supported GET routes share three read-only, zero-row SELECT checks covering all required columns. Missing tables/columns return `503 SOURCE_SCHEMA_NOT_READY`; failed checks are evicted so an externally completed migration can take effect without permanent failure caching. Transient database failures remain source errors rather than being mislabeled as migration requirements. Unsupported methods and unknown routes stop before database access. Public health remains a source catalogue/liveness response, not a database-readiness claim. The hardened image route retains its separate handling.
+
+`migrations/0016_source_schema.sql` defines the source cache tables and index outside API requests and backfills only missing `source_items.first_seen_at` from its stored update time. It deliberately leaves the account schema version, identity and credentials alone. Existing older source tables missing `first_seen_at` or `is_baseline` require preparatory ALTER statements. `scripts/prepare-source-schema.py` generates these from a read-only local SQLite backup, refuses unrecognized incomplete schemas and refuses to overwrite its output. It emits schema statements, no backup/user rows, and never accesses D1. Example from a private local SQLite backup:
+
+```sh
+python3 scripts/prepare-source-schema.py /private/backup.sqlite /private/source-schema.sql
+```
+
+Apply that generated SQL outside requests to the intended database before deployment when readiness is missing, using an authorized database operator. Do not replay historic account migrations on an already migrated database. On a new database, run the standalone source SQL alongside the separately managed account setup. A populated current source schema needs no structural change for this release. Do not undo an additive migration by dropping source/user tables when rolling back application code.
+
+Validation: six new source-schema tests exercise early method/path rejection, concurrent read-only readiness, missing-schema 503 with retry after external repair, unauthorized access, transient failures and an offline migration wrapper. The wrapper covers empty/old/current schemas, repeated prepared migration application, account/source row preservation and refusal of unknown schemas. All 16 selected source/image/D1 tests pass. Full suite: 281 tests, 272 pass, the same 9 previously documented unrelated failures. Knip, TypeScript and production build pass.
+
+The saved migrated private SQLite snapshot passes all three readiness queries. An in-memory migration test preserves every account/related row and all source rows except the documented null-timestamp backfill; the original file remains unchanged. This is local snapshot evidence, not a live D1 inspection. No remote D1 migration was performed. Broader source fetching/resource limits remain a separate audit step.

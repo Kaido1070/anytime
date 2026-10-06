@@ -37,6 +37,11 @@ export async function onRequest(context) {
     });
   }
 
+  if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
+  if (!["status", "recent", "latest", "popular", "search", "resolve", "series", "chapter"].includes(action)) {
+    return json({ error: "NOT_FOUND" }, 404);
+  }
+
   const db = env?.DB;
   if (!db) {
     return json(
@@ -51,9 +56,7 @@ export async function onRequest(context) {
   }
 
   try {
-    await ensureSourceSchema(db);
-
-    if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+    await assertSourceSchema(db);
 
     if (action === "status") {
       const sources = ["mangatime", "teamx", "3asq", "starzmanga", "xsano", "mangalik", "azora"];
@@ -326,82 +329,19 @@ function shortCache() {
   return { "Cache-Control": "private, max-age=45" };
 }
 
-async function ensureSourceSchema(db) {
+// Read-only readiness check. Schema changes belong to deployment migration 0016.
+async function assertSourceSchema(db) {
   let pending = sourceSchemaReady.get(db);
   if (!pending) {
-    pending = (async () => {
-      try {
-        await Promise.all([
-          db.prepare("SELECT first_seen_at FROM source_items LIMIT 1").first(),
-          db.prepare("SELECT is_baseline FROM source_chapter_seen LIMIT 1").first(),
-          db.prepare("SELECT last_started_at FROM source_sync_state LIMIT 1").first(),
-        ]);
-        return;
-      } catch {
-        // Missing tables/columns are repaired below once per binding.
-      }
-
-      await db
-        .prepare(`CREATE TABLE IF NOT EXISTS source_items (
-          source_key TEXT PRIMARY KEY,
-          source TEXT NOT NULL,
-          source_id TEXT NOT NULL,
-          slug TEXT NOT NULL,
-          type TEXT NOT NULL DEFAULT '',
-          url TEXT NOT NULL DEFAULT '',
-          title TEXT NOT NULL,
-          cover_url TEXT NOT NULL DEFAULT '',
-          description TEXT,
-          status TEXT,
-          genres_json TEXT NOT NULL DEFAULT '[]',
-          updated_at INTEGER NOT NULL,
-          first_seen_at INTEGER,
-          UNIQUE(source, source_id)
-        )`)
-        .run();
-
-      const columns = await db.prepare("PRAGMA table_info(source_items)").all();
-      if (!(columns.results ?? []).some((column) => column.name === "first_seen_at")) {
-        await db.prepare("ALTER TABLE source_items ADD COLUMN first_seen_at INTEGER").run();
-      }
-
-      const missingFirstSeen = await db
-        .prepare("SELECT 1 AS present FROM source_items WHERE first_seen_at IS NULL LIMIT 1")
-        .first();
-      if (missingFirstSeen) {
-        await db
-          .prepare("UPDATE source_items SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
-          .run();
-      }
-
-      await db
-        .prepare(`CREATE TABLE IF NOT EXISTS source_chapter_seen (
-          source_key TEXT NOT NULL,
-          chapter_identity TEXT NOT NULL,
-          chapter_number REAL,
-          published_at TEXT,
-          first_seen_at INTEGER NOT NULL,
-          is_baseline INTEGER NOT NULL DEFAULT 0,
-          PRIMARY KEY (source_key, chapter_identity),
-          FOREIGN KEY (source_key) REFERENCES source_items(source_key) ON DELETE CASCADE
-        )`)
-        .run();
-      const chapterColumns = await db.prepare("PRAGMA table_info(source_chapter_seen)").all();
-      if (!(chapterColumns.results ?? []).some((column) => column.name === "is_baseline")) {
-        await db.prepare("ALTER TABLE source_chapter_seen ADD COLUMN is_baseline INTEGER NOT NULL DEFAULT 0").run();
-      }
-      await db
-        .prepare("CREATE INDEX IF NOT EXISTS idx_source_chapter_seen_release ON source_chapter_seen(first_seen_at DESC, source_key)")
-        .run();
-
-      await db
-        .prepare(`CREATE TABLE IF NOT EXISTS source_sync_state (
-          source TEXT PRIMARY KEY,
-          last_started_at INTEGER NOT NULL DEFAULT 0
-        )`)
-        .run();
-    })().catch((error) => {
+    pending = Promise.all([
+      db.prepare("SELECT source_key, source, source_id, slug, type, url, title, cover_url, description, status, genres_json, updated_at, first_seen_at FROM source_items LIMIT 0").all(),
+      db.prepare("SELECT source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline FROM source_chapter_seen LIMIT 0").all(),
+      db.prepare("SELECT source, last_started_at FROM source_sync_state LIMIT 0").all(),
+    ]).catch((error) => {
       sourceSchemaReady.delete(db);
+      if (/no such (?:table|column)/i.test(String(error?.message ?? error))) {
+        throw new SourceError("SOURCE_SCHEMA_NOT_READY", "بيانات المصادر تحتاج تهيئة من مسؤول الموقع.", 503);
+      }
       throw error;
     });
     sourceSchemaReady.set(db, pending);
