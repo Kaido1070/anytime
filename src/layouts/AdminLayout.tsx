@@ -1,8 +1,19 @@
 import { Link, Outlet } from "react-router-dom";
+import { useState } from "react";
 import { useLibrary } from "../hooks/useLibrary";
 
 export function AdminLayout() {
   const { signOut } = useLibrary();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function logout() {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await signOut(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "تعذر تسجيل الخروج."); }
+    finally { setBusy(false); }
+  }
 
   return (
     <div className="app-shell admin-shell">
@@ -12,12 +23,14 @@ export function AdminLayout() {
           Wany
         </Link>
         <span className="admin-role-badge">ADMIN</span>
-        <button className="secondary admin-signout" type="button" onClick={() => void signOut()}>
+        <Link to="/admin/settings">إعدادات الحساب</Link>
+        <button className="secondary admin-signout" type="button" disabled={busy} onClick={() => void logout()}>
           تسجيل الخروج
         </button>
       </header>
 
       <main className="page admin-page">
+        {error && <p role="alert">{error}</p>}
         <Outlet />
       </main>
     </div>

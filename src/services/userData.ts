@@ -285,7 +285,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async signIn(username: string, password: string) {
-    const normalizedUsername = username.trim().toLowerCase();
+    const normalizedUsername = username.normalize("NFKC").trim().toLowerCase();
     const endpoint = "login";
     const result = await this.request<{ user: User }>(endpoint, {
       method: "POST",
@@ -293,25 +293,20 @@ class ApiUserDataService implements UserDataService {
     });
     this.currentUser = normalizeUser(result.user);
     this.cleaned = false;
-    if (this.currentUser.role !== "admin") await this.cleanupDemoData();
     return this.currentUser;
   }
 
   async signOut(allDevices = false) {
-    try {
-      await this.request<{ ok: boolean }>(allDevices ? "logout-all" : "logout", { method: "POST" });
-    } finally {
-      this.currentUser = null;
-      this.cleaned = false;
-    }
+    await this.request<{ ok: boolean }>(allDevices ? "logout-all" : "logout", { method: "POST" });
+    this.currentUser = null;
+    this.cleaned = false;
   }
 
   async recoverPassword(username: string, recoveryCode: string, newPassword: string) {
     const normalizedUsername = username
       .normalize("NFKC")
       .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "");
+      .toLowerCase();
     await this.request<{ ok: boolean }>("recover-password", {
       method: "POST",
       body: JSON.stringify({ username: normalizedUsername, recoveryCode: recoveryCode.trim(), newPassword }),

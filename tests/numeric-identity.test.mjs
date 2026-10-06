@@ -126,6 +126,22 @@ test('numeric admin identity authenticates by its D1 username and role', async t
   assert.equal(sqlite.prepare("SELECT count(*) AS n FROM admin_audit_log WHERE action='admin_login' AND admin_user_id=?").get(result.payload.user.id).n, 2);
 });
 
+test('admin can replace their own password while keeping their role and rotating sessions', async t => {
+  const { db, credentials } = await fixture(t);
+  const first = await login(db, 'admin', credentials.admin.password);
+  const second = await login(db, 'admin', credentials.admin.password);
+  const changed = await changePassword(context('change-password', db, { currentPassword: credentials.admin.password, newPassword: 'admin6' }, first.cookie));
+  assert.equal(changed.status, 200);
+  const cookie = changed.headers.get('Set-Cookie').split(';')[0];
+  assert.notEqual(cookie, first.cookie);
+  const session = await (await onRequest(context('session', db, null, cookie))).json();
+  assert.equal(session.user.id, credentials.admin.user_id);
+  assert.equal(session.user.role, 'admin');
+  assert.equal((await (await onRequest(context('session', db, null, second.cookie))).json()).user, null);
+  assert.equal((await login(db, 'admin', credentials.admin.password)).response.status, 401);
+  assert.equal((await login(db, 'admin', 'admin6')).response.status, 200);
+});
+
 test('R2 cover fallback uses only aliases belonging to the numeric session owner', async t => {
   const { db, credentials } = await fixture(t);
   const h = await login(db, 'h', credentials.h.password);

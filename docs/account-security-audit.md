@@ -1,5 +1,11 @@
 # Account security audit — 2026-10-06
 
+## Test-branch follow-up
+
+The user completed restoring and applying the guarded identity transition on the separate `wany-db` test database; this is evidenced by their terminal screenshots, not direct access to Cloudflare. Production remains unchanged. A subsequent code review fixed successful login being coupled to optional cleanup/library synchronization, preserved client account state when logout fails, and aligned login/recovery username normalization without silently stripping characters. Admin now has a dedicated self-password/settings route with logout-all; changing their own password keeps the role and rotates the session. Admin throttling and runtime errors use the shared safe responses.
+
+The build now rejects database dumps, archives, environment files and known credential/mapping files in public or generated assets, and private-upload names are ignored by Git. The current source/functions/build assets contain none of the privately generated passwords, recovery codes or migrated credential hashes checked locally. This scan covers current local build output, not the live deployment or old Git history. Authentication tests and the build are rerun before updating the test branch. Nine pre-existing full-suite failures concern navigation/profile/source behavior and copy outside this follow-up; they are not evidence that all project issues are fixed.
+
 ## Scope and evidence
 
 Reviewed the account API, dedicated login/admin/password/recovery handlers, cookie/session behavior, role authorization, owned-data access, offline identity migration and a privately provided production D1 SQL export. Tests ran offline on SQLite with a D1-shaped transactional adapter. No production database, R2 object, Cloudflare setting or live deployment was modified. Private exports, hashes, mappings and generated credentials are not committed.

@@ -71,11 +71,14 @@ function useLibraryState() {
     setError("");
     const nextUser = await service.signIn(username, password);
     setUser(nextUser);
-    if (nextUser.role === "admin") {
-      setData(null);
-      setFriends([]);
-    } else {
-      await refresh();
+    setData(null);
+    setFriends([]);
+    if (nextUser.role !== "admin") {
+      try {
+        await refresh();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "تم تسجيل الدخول، لكن تعذر تحديث المكتبة الآن.");
+      }
     }
   };
 

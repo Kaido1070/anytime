@@ -159,7 +159,8 @@ test("settings UI extends the existing account settings view and reuses AvatarPi
   ]);
 
   assert.match(account, /tab=settings/);
-  assert.doesNotMatch(app, /path="settings"/);
+  assert.doesNotMatch(app.slice(app.indexOf('<Route element={<AppLayout />}')), /path="settings"/);
+  assert.match(app, /path="settings" element={<AdminSettings \/>}/);
   assert.match(profile, /setDisplayName/);
   assert.match(profile, /AvatarPicker/);
   assert.match(profile, /setProfileVisibility/);
@@ -222,4 +223,3 @@ test("login delegates to the shared API handler that preserves avatar data", asy
   assert.match(api, /profile_visibility, avatar_id, role, password_salt/);
   assert.match(admin, /avatarId: row\.avatar_id \?\? row\.avatarId \?\? null/);
 });
-

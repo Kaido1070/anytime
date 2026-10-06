@@ -8,6 +8,7 @@ import { Favorites } from "./pages/Favorites";
 import { FriendProfile, Friends } from "./pages/Friends";
 import { Account } from "./pages/Account";
 import { AdminDashboard, AdminUserDetail } from "./pages/Admin";
+import { AdminSettings } from "./pages/AdminSettings";
 import { UserList } from "./pages/UserList";
 import { Lists } from "./pages/Lists";
 import { Discover } from "./pages/Discover";
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/profile" element={<Navigate to="/admin" replace />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
+            <Route path="settings" element={<AdminSettings />} />
             <Route path="users/:id" element={<AdminUserDetail />} />
           </Route>
           <Route path="*" element={<Navigate to="/admin" replace />} />

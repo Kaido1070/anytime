@@ -1,4 +1,4 @@
-import { mutationOriginError, readAuthJson, reserveAuthAttempt } from "../../_auth-security.js";
+import { mutationOriginError, readAuthJson, reserveAuthAttempt, rateLimited, authError } from "../../_auth-security.js";
 import { verifyPassword, derivePasswordHash, PASSWORD_ITERATIONS } from "../../_password.js";
 import {
   ensureAdminSchema,
@@ -44,7 +44,7 @@ export async function onRequest(context) {
         const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
         const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
         if (newPassword.length < 6 || newPassword.length > 128) return json({ error: "INVALID_PASSWORD", message: "كلمة المرور الجديدة يجب أن تكون بين 6 و128 حرفًا." }, 400);
-        if (!(await reserveAuthAttempt(db, request, "password-change", session.user.id))) return json({ error: "RATE_LIMITED" }, 429);
+        if (!(await reserveAuthAttempt(db, request, "password-change", session.user.id))) return rateLimited();
         const admin = await db.prepare("SELECT password_salt, password_hash, password_iterations FROM users WHERE id = ? AND role = 'admin'").bind(session.user.id).first();
         if (!currentPassword || currentPassword.length > 128 || !admin || !(await verifyPassword(currentPassword, admin, db))) return json({ error: "WRONG_PASSWORD", message: "كلمة مرور الأدمن غير صحيحة." }, 400);
         const saltBytes = crypto.getRandomValues(new Uint8Array(16));
@@ -83,6 +83,8 @@ export async function onRequest(context) {
     return json({ error: "NOT_FOUND" }, 404);
   } catch (error) {
     console.error("Anytime admin API error", error?.name ?? "Error");
+    const safeError = authError(error);
+    if (safeError) return safeError;
     if (error?.code === "INVALID_JSON" || error?.code === "BODY_TOO_LARGE") return json({ error: error.code }, error.code === "BODY_TOO_LARGE" ? 413 : 400);
     if (error?.code === "SCHEMA_MIGRATION_REQUIRED") return json({ error: error.code }, 503);
     return json({ error: "SERVER_ERROR", message: "تعذر تحميل بيانات الإدارة الآن." }, 500);
@@ -398,4 +400,3 @@ function json(body, status = 200) {
     },
   });
 }
-
