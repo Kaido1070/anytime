@@ -29,6 +29,9 @@ export interface UserDataService {
   signIn(username: string, password: string): Promise<User>;
   signOut(allDevices?: boolean): Promise<void>;
   generateRecoveryCode(currentPassword: string): Promise<string>;
+  setSecurityQuestion(currentPassword: string, question: string, answer: string): Promise<void>;
+  getSecurityQuestion(username: string): Promise<string>;
+  recoverWithSecurityAnswer(username: string, answer: string, newPassword: string): Promise<void>;
   recoverPassword(username: string, recoveryCode: string, newPassword: string): Promise<void>;
   getData(): Promise<UserData>;
   getFavorites(): Promise<string[]>;
@@ -874,6 +877,19 @@ class ApiUserDataService implements UserDataService {
       method: "POST", body: JSON.stringify({ currentPassword }),
     });
     return result.recoveryCode;
+  }
+
+  async setSecurityQuestion(currentPassword: string, question: string, answer: string) {
+    await this.request("security-question", { method: "POST", body: JSON.stringify({ currentPassword, question, answer }) });
+  }
+
+  async getSecurityQuestion(username: string) {
+    const result = await this.request<{ question: string }>("recover-password", { method: "POST", body: JSON.stringify({ action: "question", username }) });
+    return result.question;
+  }
+
+  async recoverWithSecurityAnswer(username: string, answer: string, newPassword: string) {
+    await this.request("recover-password", { method: "POST", body: JSON.stringify({ method: "security-question", username, answer, newPassword }) });
   }
 
   private async cleanupDemoData() {

@@ -351,6 +351,7 @@ function useLibraryState() {
   };
 
   const generateRecoveryCode = (currentPassword: string) => service.generateRecoveryCode(currentPassword);
+  const setSecurityQuestion = (currentPassword: string, question: string, answer: string) => service.setSecurityQuestion(currentPassword, question, answer);
 
   return {
     user,
@@ -382,6 +383,7 @@ function useLibraryState() {
     setProfileVisibility,
     changePassword,
     generateRecoveryCode,
+    setSecurityQuestion,
   };
 }
 

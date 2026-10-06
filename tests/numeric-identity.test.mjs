@@ -279,3 +279,58 @@ test('missing security support schema fails closed without request-time repairs'
   assert.equal(sqlite.prepare('SELECT count(*) AS n FROM sessions').get().n,0);
   assert.equal(sqlite.prepare("SELECT name FROM sqlite_master WHERE name='auth_attempt_windows'").get(),undefined);
 });
+
+test('security question is stored per D1 account with a salted hash and requires current password', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);
+  const body={currentPassword:credentials.h.password,question:'What is my private phrase?',answer:' Secret  Answer '};
+  assert.equal((await onRequest(context('security-question',db,{...body,currentPassword:'wrong'},h.cookie))).status,400);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM user_security_questions').get().n,0);
+  const response=await onRequest(context('security-question',db,body,h.cookie));assert.equal(response.status,200);
+  const row=sqlite.prepare('SELECT * FROM user_security_questions WHERE user_id=?').get(credentials.h.user_id);
+  assert.equal(row.question,body.question);assert.notEqual(row.answer_hash,body.answer);assert.notEqual(row.answer_hash,'secret answer');assert.ok(row.answer_salt.length>=20);assert.equal(row.answer_iterations,100000);
+  const profile=await(await onRequest(context('security-question',db,null,h.cookie))).json();assert.deepEqual(Object.keys(profile),['question']);
+  const challenge=await(await recoverPassword(context('recover-password',db,{action:'question',username:'h'}))).json();assert.equal(challenge.question,body.question);assert.deepEqual(Object.keys(challenge),['question']);
+});
+
+test('security answer recovery replaces the password and revokes every session without changing user data', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);const id=credentials.h.user_id;
+  await onRequest(context('security-question',db,{currentPassword:credentials.h.password,question:'What is my private phrase?',answer:'Secret Answer'},h.cookie));
+  const before=sqlite.prepare('SELECT password_hash FROM users WHERE id=?').get(id).password_hash;
+  const body={method:'security-question',username:'h',answer:'wrong answer',newPassword:'reset6'};
+  assert.equal((await recoverPassword(context('recover-password',db,body))).status,401);
+  assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id=?').get(id).password_hash,before);
+  assert.equal((await recoverPassword(context('recover-password',db,{...body,answer:'  SECRET   answer  '}))).status,200);
+  assert.equal((await login(db,'h',credentials.h.password)).response.status,401);
+  assert.equal((await login(db,'h','reset6')).payload.user.id,id);
+  assert.equal((await(await onRequest(context('session',db,null,h.cookie))).json()).user,null);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM reading_history WHERE user_id=?').get(id).n,2);
+});
+
+test('changing a security answer retires the previous answer and prevents cross-account recovery', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);
+  for(const answer of ['first secret','second secret'])assert.equal((await onRequest(context('security-question',db,{currentPassword:credentials.h.password,question:'What is my private phrase?',answer},h.cookie))).status,200);
+  const body={method:'security-question',username:'h',answer:'first secret',newPassword:'reset6'};
+  assert.equal((await recoverPassword(context('recover-password',db,body))).status,401);
+  assert.equal((await recoverPassword(context('recover-password',db,{...body,username:'y',answer:'second secret'}))).status,401);
+  assert.equal((await recoverPassword(context('recover-password',db,{...body,answer:'second secret'}))).status,200);
+  assert.equal(sqlite.prepare('SELECT count(*) AS n FROM user_security_questions WHERE user_id=?').get(credentials.y.user_id).n,0);
+});
+
+test('concurrent security-answer resets recheck the credential generation atomically', async t => {
+  const {db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);
+  await onRequest(context('security-question',db,{currentPassword:credentials.h.password,question:'What is my private phrase?',answer:'secret answer'},h.cookie));
+  const body={method:'security-question',username:'h',answer:'secret answer',newPassword:'reset6'};
+  const results=await Promise.all([recoverPassword(context('recover-password',db,body)),recoverPassword(context('recover-password',db,{...body,newPassword:'other6'}))]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,401]);
+});
+
+test('security-question setup cannot commit after its session is revoked', async t => {
+  const {sqlite,db,credentials}=await fixture(t);const h=await login(db,'h',credentials.h.password);const prepare=db.prepare;
+  db.prepare=query=>{
+    const statement=prepare(query);
+    if(query.startsWith('INSERT INTO user_security_questions')){const run=statement.run;statement.run=async()=>{sqlite.prepare('DELETE FROM sessions').run();return run.call(statement);};}
+    return statement;
+  };
+  const response=await onRequest(context('security-question',db,{currentPassword:credentials.h.password,question:'What is my private phrase?',answer:'secret answer'},h.cookie));
+  assert.equal(response.status,401);assert.equal(sqlite.prepare('SELECT count(*) AS n FROM user_security_questions').get().n,0);
+});

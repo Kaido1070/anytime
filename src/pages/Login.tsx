@@ -8,6 +8,17 @@ export function Login() {
   const [busy, setBusy] = useState(false);
   const [recovering, setRecovering] = useState(false);
   const [recoveryDone, setRecoveryDone] = useState(false);
+  const [recoveryMethod, setRecoveryMethod] = useState("security-question");
+  const [recoveryUsername, setRecoveryUsername] = useState("");
+  const [securityQuestion, setSecurityQuestion] = useState("");
+
+  async function loadSecurityQuestion() {
+    if (busy || !recoveryUsername.trim()) return;
+    setBusy(true); setError(""); setSecurityQuestion("");
+    try { setSecurityQuestion(await userDataService.getSecurityQuestion(recoveryUsername)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "تعذر عرض سؤال الأمان."); }
+    finally { setBusy(false); }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,11 +48,12 @@ export function Login() {
       return;
     }
     try {
-      await userDataService.recoverPassword(
-        String(form.get("username")),
-        String(form.get("recoveryCode")),
-        password,
-      );
+      if (recoveryMethod === "security-question") {
+        if (!securityQuestion) throw new Error("اضغط «عرض سؤال الأمان» أولًا.");
+        await userDataService.recoverWithSecurityAnswer(String(form.get("username")), String(form.get("securityAnswer")), password);
+      } else {
+        await userDataService.recoverPassword(String(form.get("username")), String(form.get("recoveryCode")), password);
+      }
       setRecoveryDone(true);
       setRecovering(false);
     } catch (cause) {
@@ -67,7 +79,7 @@ export function Login() {
       <div className="login-form">
         <h2>{recovering ? "استعادة الحساب." : "ومن أي مكان."}</h2>
         <p className="muted">
-          {recovering ? "استخدم رمز الاستعادة الخاص بحسابك لتعيين كلمة مرور جديدة." : "سجّل دخولك وكمل من حيث توقفت."}
+          {recovering ? "استعد حسابك بسؤال الأمان أو رمز الاستعادة." : "سجّل دخولك وكمل من حيث توقفت."}
         </p>
 
         {recoveryDone && <p className="login-success" role="status">تم تغيير كلمة المرور. تقدر تسجل دخولك الآن.</p>}
@@ -75,11 +87,15 @@ export function Login() {
         {recovering ? (
           <form onSubmit={recover}>
             <label>اسم المستخدم
-              <input name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required placeholder="اسم المستخدم" />
+              <input name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required placeholder="اسم المستخدم" value={recoveryUsername} disabled={busy} onChange={event => { setRecoveryUsername(event.target.value); setSecurityQuestion(""); }} />
             </label>
-            <label>رمز الاستعادة
+            <label>طريقة الاستعادة<select value={recoveryMethod} disabled={busy} onChange={event => { setRecoveryMethod(event.target.value); setError(""); }}><option value="security-question">سؤال الأمان</option><option value="code">رمز الاستعادة</option></select></label>
+            {recoveryMethod === "security-question" ? <>
+              <button className="secondary" type="button" disabled={busy || !recoveryUsername.trim()} onClick={() => void loadSecurityQuestion()}>عرض سؤال الأمان</button>
+              {securityQuestion && <label>{securityQuestion}<input name="securityAnswer" type="password" autoComplete="off" minLength={6} maxLength={128} required disabled={busy} placeholder="إجابتك" /></label>}
+            </> : <label>رمز الاستعادة
               <input name="recoveryCode" autoComplete="off" autoCapitalize="none" spellCheck={false} required placeholder="WANY-..." />
-            </label>
+            </label>}
             <label>كلمة المرور الجديدة
               <input name="newPassword" type="password" autoComplete="new-password" minLength={6} required placeholder="كلمة المرور الجديدة" />
             </label>
@@ -107,4 +123,3 @@ export function Login() {
     </main>
   );
 }
-

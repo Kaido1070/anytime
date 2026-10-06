@@ -15,6 +15,16 @@ CREATE TABLE IF NOT EXISTS auth_attempt_windows (
 );
 CREATE INDEX IF NOT EXISTS idx_auth_attempt_window_start ON auth_attempt_windows(window_start);
 
+CREATE TABLE IF NOT EXISTS user_security_questions (
+  user_id TEXT PRIMARY KEY,
+  question TEXT NOT NULL,
+  answer_salt TEXT NOT NULL,
+  answer_hash TEXT NOT NULL,
+  answer_iterations INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS work_snapshot_cover_locations (
   user_id TEXT NOT NULL,
   manga_id TEXT NOT NULL,

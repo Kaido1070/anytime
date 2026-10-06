@@ -2,6 +2,7 @@ import { snapshotCoverKey, snapshotCoverKeys } from "../_identity.js";
 import { PASSWORD_ITERATIONS, verifyPassword, verifyMissingUser, derivePasswordHash, replacePassword } from "../_password.js";
 import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_admin.js";
 import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError, newSessionToken, sessionTokenHash, authCookie } from "../_auth-security.js";
+import { normalizeSecurityAnswer, createSecurityAnswer } from "../_security-question.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -135,6 +136,35 @@ async function route(request, url, db, covers) {
   if (request.method === "POST" && path === "logout-all") {
     await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
     return json({ ok: true }, 200, { "Set-Cookie": authCookie("") });
+  }
+
+  if (path === "security-question" && request.method === "GET") {
+    const row = await db.prepare("SELECT question FROM user_security_questions WHERE user_id = ?").bind(user.id).first();
+    return json({ question: row?.question ?? null });
+  }
+
+  if (path === "security-question" && request.method === "POST") {
+    const body = await readAuthJson(request);
+    const password = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    const question = typeof body.question === "string" ? body.question.trim() : "";
+    const answer = normalizeSecurityAnswer(body.answer);
+    if (question.length < 6 || question.length > 200 || /[\u0000-\u001f\u007f]/.test(question) || answer.length < 6 || answer.length > 128) {
+      return json({ error: "INVALID_SECURITY_QUESTION", message: "اكتب سؤالًا وجوابًا من 6 أحرف أو أكثر." }, 400);
+    }
+    if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
+    if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
+    const row = await db.prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ?").bind(user.id).first();
+    if (!row || !(await verifyPassword(password, row, db))) return json({ error: "WRONG_PASSWORD" }, 400);
+    const credential = await createSecurityAnswer(answer);
+    const now = Date.now();
+    const result = await db.prepare(`INSERT INTO user_security_questions (user_id, question, answer_salt, answer_hash, answer_iterations, updated_at)
+      SELECT u.id, ?, ?, ?, ?, ? FROM users u JOIN sessions s ON s.user_id = u.id
+      WHERE u.id = ? AND u.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?
+      ON CONFLICT(user_id) DO UPDATE SET question = excluded.question, answer_salt = excluded.answer_salt,
+        answer_hash = excluded.answer_hash, answer_iterations = excluded.answer_iterations, updated_at = excluded.updated_at`)
+      .bind(question, credential.salt, credential.hash, credential.iterations, now, user.id, row.password_hash, session.tokenHash, now).run();
+    if (Number(result?.meta?.changes) !== 1) return json({ error: "UNAUTHORIZED" }, 401);
+    return json({ ok: true, question });
   }
 
   if (request.method === "POST" && path === "recovery-code") {

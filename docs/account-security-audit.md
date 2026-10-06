@@ -21,6 +21,7 @@ A stored password verifier and the three stored recovery verifiers matched histo
 | Missing Origin accepted on browser mutations | Exact same-origin required for POST/PUT/PATCH/DELETE across account routes and cleanup-demo; cross-site Fetch Metadata also rejected. Tests verify rejection before SQL access. |
 | Unbounded credential request bodies | Streamed JSON is limited to 32 KiB even without Content-Length; wrong media types and invalid JSON are rejected. Dedicated and wildcard credential handlers share the reader. |
 | Recovery codes reusable or unavailable after consumption | High-entropy code digest stored per account, consumed atomically once. Authenticated settings can issue a replacement after checking the current password and valid session; this invalidates previous verifiers. New code is shown once and is never saved to browser storage. |
+| Optional security-question recovery | Settings requires the current password and a valid session to create/replace the question. D1 stores the question and a salted PBKDF2 answer hash only. Recovery shares attempt limits, conditionally replaces the expected password, and revokes all sessions. Tests cover wrong/normalized answers, replacement, account isolation and concurrent resets. |
 | Inconsistent/weak password creation cost | Offline migration, password change and recovery use PBKDF2-SHA256 at 100,000 iterations; verification reads each stored cost. This conservative Workers cap requires deployed compatibility/CPU testing and is below ideal password-hashing guidance. |
 | Credential details in exception logging | Changed credential-path logs to report error names rather than SQL/error parameters. |
 
@@ -30,7 +31,7 @@ The D1 binding batch transaction semantics used by the conditional mutations are
 
 - The generated transition and guarded data rollback both passed against the private export. All original noncredential data rows matched after substituting the ID map, including nonaccount source/avatar tables. Credentials and sessions are intentionally replaced. No discovered FK violation remained.
 - All four accounts logged in using generated credentials on a cloned migrated database. Both password-change handlers accepted six characters, rejected five, persisted the new hash, rejected the previous password, preserved the internal ID and revoked other sessions. Numeric admin login and one-use recovery succeeded.
-- 27 dedicated Node account/security tests passed, including a wrapper that runs 11 Python migration tests. The full repository suite has 230 tests: 220 passed and the same 10 pre-existing failures outside account authentication. Build and whitespace checks passed.
+- 32 dedicated Node account/security tests passed, including a wrapper that runs 11 Python migration tests. The full repository suite has 235 tests: 226 passed and 9 remaining failures outside account authentication. Build and whitespace checks passed.
 - A scan of current functions/src/scripts/migrations/docs/tests found none of the actual exported password or recovery hash literals. Private migration output is outside the repository.
 
 ## Remaining deployment and coverage limits
@@ -40,3 +41,5 @@ The branch remains draft and production is unchanged. Do not deploy the account 
 D1 attempt counters protect credential checks, not volumetric edge/database-cost attacks. WAF/edge protection needs environment validation. Per-account budgets can temporarily deny a legitimate login under targeted abuse. Trusted IP handling assumes Cloudflare's CF-Connecting-IP header.
 
 Admin-assisted recovery and public/invite account creation are not implemented. Source APIs retain their unrelated request-time source schema bootstrap. A comprehensive reader/source/image security audit, deployment secret inventory, historical Git cleanup and proof of production exploit activity are outside this account audit. Restoring an old export or deploying the old recovery handler can revive exposed credentials; use the guarded rollback that retains fresh passwords instead.
+
+Security-question answers are reusable recovery secrets, not MFA. A public question challenge can disclose that an account has configured recovery. Guessable or publicly known answers weaken account security even with hashing and attempt limits; prefer a random recovery code or an unpredictable secret answer. OWASP discourages questions as the sole reset factor: https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html. The requested optional question flow is supported without requiring a second factor.

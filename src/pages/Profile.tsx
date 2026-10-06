@@ -35,6 +35,7 @@ export function Profile({
     setProfileVisibility,
     changePassword,
     generateRecoveryCode,
+    setSecurityQuestion,
   } = useLibrary();
 
   const [displayName, setDisplayNameValue] = useState(user?.name ?? "");
@@ -61,6 +62,9 @@ export function Profile({
   const [recoveryEditing, setRecoveryEditing] = useState(false);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState("");
+  const [questionEditing, setQuestionEditing] = useState(false);
+  const [questionBusy, setQuestionBusy] = useState(false);
+  const [questionFeedback, setQuestionFeedback] = useState("");
 
   useEffect(() => {
     setDisplayNameValue(user?.name ?? "");
@@ -175,6 +179,20 @@ export function Profile({
     } catch (cause) {
       setRecoveryError(cause instanceof Error ? cause.message : "تعذر إصدار رمز الاستعادة.");
     } finally { setRecoveryBusy(false); }
+  }
+
+  async function saveSecurityQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (questionBusy) return;
+    const element = event.currentTarget;
+    const form = new FormData(element);
+    setQuestionBusy(true); setQuestionFeedback("");
+    try {
+      await setSecurityQuestion(String(form.get("questionPassword") ?? ""), String(form.get("securityQuestion") ?? ""), String(form.get("securityAnswer") ?? ""));
+      element.reset(); setQuestionEditing(false); setQuestionFeedback("تم حفظ سؤال الأمان. تقدر تستخدمه من «نسيت كلمة المرور؟».");
+    } catch (cause) {
+      setQuestionFeedback(cause instanceof Error ? cause.message : "تعذر حفظ سؤال الأمان.");
+    } finally { setQuestionBusy(false); }
   }
 
   async function handleSignOut(allDevices = false) {
@@ -422,6 +440,20 @@ export function Profile({
           {!passwordEditing && passwordMessage && (
             <p className="settings-feedback" role="status">{passwordMessage}</p>
           )}
+        </section>
+
+        <section className="settings-section">
+          <h3>سؤال الأمان</h3>
+          {!questionEditing && <button className="secondary" type="button" onClick={() => { setQuestionEditing(true); setQuestionFeedback(""); }}>إعداد أو تغيير سؤال الأمان</button>}
+          {questionEditing && <form className="settings-password-form" onSubmit={saveSecurityQuestion}>
+            <p>اختر جوابًا لا يعرفه غيرك؛ تجنّب الأسماء والتواريخ المعروفة.</p>
+            <label>كلمة المرور الحالية<input name="questionPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={questionBusy} /></label>
+            <label>سؤال الأمان<input name="securityQuestion" minLength={6} maxLength={200} required disabled={questionBusy} placeholder="اكتب سؤالًا تتذكر جوابه" /></label>
+            <label>الإجابة<input name="securityAnswer" type="password" autoComplete="off" minLength={6} maxLength={128} required disabled={questionBusy} /></label>
+            <button className="primary" type="submit" disabled={questionBusy}>{questionBusy ? "جارٍ الحفظ…" : "حفظ سؤال الأمان"}</button>
+            <button className="secondary" type="button" disabled={questionBusy} onClick={() => setQuestionEditing(false)}>إلغاء</button>
+          </form>}
+          {questionFeedback && <p className="settings-feedback" role="status">{questionFeedback}</p>}
         </section>
 
         <section className="settings-section">
