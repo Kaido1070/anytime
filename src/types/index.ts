@@ -57,6 +57,7 @@ export interface SourceManga {
   chapters?: SourceChapter[];
   declaredChapterCount?: number | null;
   chapterListComplete?: boolean | null;
+  chapterPageCount?: number | null;
 }
 
 export interface SourceListResponse {

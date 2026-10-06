@@ -251,6 +251,17 @@ export const sourceService = {
     }
   },
 
+  async getChapterPage(key: string, page = 1) {
+    return apiWithRetry<{
+      chapters: NonNullable<SourceManga["chapters"]>;
+      page: number;
+      pages: number;
+    }>(
+      `/api/source/chapters-page?${params({ key, page })}`,
+      2,
+    );
+  },
+
   async getChapter(key: string, chapter: number, chapterUrl?: string) {
     const requestKey = `${key}:${chapter}:${chapterUrl ?? ""}`;
     const cached = chapterRequests.get(requestKey);

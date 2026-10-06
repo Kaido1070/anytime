@@ -47,7 +47,7 @@ async function onRequest(context) {
   }
 
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
-  if (!["status", "recent", "release-history", "latest", "popular", "search", "resolve", "series", "chapter"].includes(action)) {
+  if (!["status", "recent", "release-history", "latest", "popular", "search", "resolve", "series", "chapters-page", "chapter"].includes(action)) {
     return json({ error: "NOT_FOUND" }, 404);
   }
 
@@ -289,6 +289,27 @@ async function onRequest(context) {
                   : await azoraSeries(db, item);
       const observedDetail = await rememberChapterAvailability(db, detail);
       return json({ item: observedDetail }, 200, shortCache());
+    }
+
+    if (action === "chapters-page") {
+      const key = safeSourceKey(url.searchParams.get("key"));
+      const page = safePage(url.searchParams.get("page"));
+      if (!key) return json({ error: "INVALID_SOURCE_KEY" }, 400);
+
+      const item = await loadItem(db, key);
+      if (!item) return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
+      if (item.source !== "teamx") {
+        return json({ error: "UNSUPPORTED_SOURCE" }, 400);
+      }
+
+      const seriesUrl = item.url || `${TEAMX_BASE}/series/${encodeURIComponent(item.slug)}`;
+      const target = new URL(seriesUrl, TEAMX_BASE);
+      if (page > 1) target.searchParams.set("page", String(page));
+      const html = await teamXFetchText(target.toString());
+      const chapters = parseTeamXChapters(html, seriesUrl);
+      const pages = Math.max(page, teamXLastChapterPage(html));
+
+      return json({ chapters, page, pages }, 200, shortCache());
     }
 
     if (action === "chapter") {
@@ -1773,7 +1794,8 @@ async function teamXSeries(db, item) {
     firstMatch(plain, /الحالة\s*:?\s*(مستمرة|مكتملة|مكتمل|متوقف|متروك|موسم منتهي|قادم قريبًا)/i) || "",
   );
   const genres = extractGenreCandidates(html);
-  const chapters = await teamXAllChapters(html, seriesUrl);
+  const chapters = parseTeamXChapters(html, seriesUrl);
+  const chapterPageCount = teamXLastChapterPage(html);
   const updated = {
     ...item,
     title,
@@ -1783,6 +1805,8 @@ async function teamXSeries(db, item) {
     genres,
     latest: chapters[0]?.number ?? null,
     chapters,
+    chapterPageCount,
+    chapterListComplete: chapterPageCount <= 1,
   };
   await rememberItems(db, [updated]);
   return updated;
@@ -1820,31 +1844,6 @@ function mergeTeamXChapterPages(pages) {
   }
 
   return [...byNumber.values()].sort((a, b) => b.number - a.number);
-}
-
-async function teamXAllChapters(firstHtml, seriesUrl) {
-  const firstPage = parseTeamXChapters(firstHtml, seriesUrl);
-  const lastPage = teamXLastChapterPage(firstHtml);
-  if (lastPage <= 1) return firstPage;
-
-  const pageResults = new Array(lastPage);
-  pageResults[0] = firstPage;
-
-  let cursor = 2;
-  const workers = Array.from({ length: Math.min(6, lastPage - 1) }, async () => {
-    while (true) {
-      const page = cursor++;
-      if (page > lastPage) break;
-
-      const url = new URL(seriesUrl, TEAMX_BASE);
-      url.searchParams.set("page", String(page));
-      const html = await teamXFetchText(url.toString());
-      pageResults[page - 1] = parseTeamXChapters(html, seriesUrl);
-    }
-  });
-
-  await Promise.all(workers);
-  return mergeTeamXChapterPages(pageResults.filter(Boolean));
 }
 
 function parseTeamXPublishedAt(block, now = Date.now()) {

@@ -96,6 +96,9 @@ export function SourceMangaDetails() {
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
   const [chapterBusy, setChapterBusy] = useState<number | null>(null);
   const [chapterPage, setChapterPage] = useState(1);
+  const [teamXChapters, setTeamXChapters] = useState<NonNullable<SourceManga["chapters"]>>([]);
+  const [teamXChapterLoading, setTeamXChapterLoading] = useState(false);
+  const [teamXChapterError, setTeamXChapterError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -131,12 +134,24 @@ export function SourceMangaDetails() {
     void saveWorkSnapshot(item);
   }, [item]);
 
-  const chapterCount = item?.chapters?.length ?? 0;
-  const chapterPageCount = Math.max(1, Math.ceil(chapterCount / CHAPTERS_PER_PAGE));
+  const teamXRemotePages =
+    item?.source === "teamx" && Number(item.chapterPageCount ?? 0) > 1;
+  const localChapterCount = item?.chapters?.length ?? 0;
+  const chapterCount = teamXRemotePages ? teamXChapters.length : localChapterCount;
+  const chapterPageCount = teamXRemotePages
+    ? Math.max(1, Number(item?.chapterPageCount ?? 1))
+    : Math.max(1, Math.ceil(localChapterCount / CHAPTERS_PER_PAGE));
 
   useEffect(() => {
     setChapterPage(1);
+    setTeamXChapters([]);
+    setTeamXChapterError("");
   }, [sourceKey]);
+
+  useEffect(() => {
+    if (item?.source !== "teamx") return;
+    setTeamXChapters(item.chapters ?? []);
+  }, [item]);
 
   useEffect(() => {
     setChapterPage((current) => Math.min(current, chapterPageCount));
@@ -150,12 +165,14 @@ export function SourceMangaDetails() {
   const sourceChoices = requestedSourceKeys
     .map((entryKey) => optionMap.get(entryKey))
     .filter((entry): entry is SourceManga => Boolean(entry));
-  const chapters = item.chapters ?? [];
+  const chapters = teamXRemotePages ? teamXChapters : (item.chapters ?? []);
   const orderedChapters = [...chapters].sort((a, b) => ascending ? a.number - b.number : b.number - a.number);
-  const visibleChapters = orderedChapters.slice(
-    (chapterPage - 1) * CHAPTERS_PER_PAGE,
-    chapterPage * CHAPTERS_PER_PAGE,
-  );
+  const visibleChapters = teamXRemotePages
+    ? orderedChapters
+    : orderedChapters.slice(
+        (chapterPage - 1) * CHAPTERS_PER_PAGE,
+        chapterPage * CHAPTERS_PER_PAGE,
+      );
   const firstChapter = [...chapters].sort((a, b) => a.number - b.number)[0]?.number;
   const highestChapter = libraryEntry?.highestReachedChapter ?? null;
   const highestCompleted =
@@ -237,7 +254,26 @@ export function SourceMangaDetails() {
 
   const goToChapterPage = (nextPage: number) => {
     const bounded = Math.max(1, Math.min(chapterPageCount, nextPage));
-    setChapterPage(bounded);
+
+    if (teamXRemotePages && item.source === "teamx") {
+      const sourcePage = ascending ? chapterPageCount - bounded + 1 : bounded;
+      setTeamXChapterLoading(true);
+      setTeamXChapterError("");
+      void sourceService.getChapterPage(item.key, sourcePage)
+        .then((result) => {
+          setTeamXChapters(result.chapters);
+          setChapterPage(bounded);
+        })
+        .catch((cause) => {
+          setTeamXChapterError(
+            cause instanceof Error ? cause.message : "تعذر تحميل صفحة الفصول.",
+          );
+        })
+        .finally(() => setTeamXChapterLoading(false));
+    } else {
+      setChapterPage(bounded);
+    }
+
     requestAnimationFrame(() => {
       document.querySelector(".chapter-heading")?.scrollIntoView({
         behavior: "smooth",
@@ -289,7 +325,9 @@ export function SourceMangaDetails() {
           item.declaredChapterCount != null &&
           item.declaredChapterCount > chapters.length
             ? `${chapters.length} من ${item.declaredChapterCount} فصل`
-            : `${chapters.length} فصل`}
+            : teamXRemotePages
+              ? `صفحة ${chapterPage} من ${chapterPageCount}`
+              : `${chapters.length} فصل`}
         </span>
       </div>
 
@@ -304,7 +342,28 @@ export function SourceMangaDetails() {
 
       {!!chapters.length && (
         <div className="chapter-tools">
-          <button className="secondary chapter-sort" onClick={() => { setAscending((value) => !value); setChapterPage(1); }} aria-label="عكس ترتيب الفصول">
+          <button className="secondary chapter-sort" onClick={() => {
+            const nextAscending = !ascending;
+            setAscending(nextAscending);
+            if (teamXRemotePages && item.source === "teamx") {
+              setTeamXChapterLoading(true);
+              setTeamXChapterError("");
+              const sourcePage = nextAscending ? chapterPageCount : 1;
+              void sourceService.getChapterPage(item.key, sourcePage)
+                .then((result) => {
+                  setTeamXChapters(result.chapters);
+                  setChapterPage(1);
+                })
+                .catch((cause) => {
+                  setTeamXChapterError(
+                    cause instanceof Error ? cause.message : "تعذر تحميل صفحة الفصول.",
+                  );
+                })
+                .finally(() => setTeamXChapterLoading(false));
+            } else {
+              setChapterPage(1);
+            }
+          }} aria-label="عكس ترتيب الفصول">
             <span className="sort-arrows">⇅</span>
             {ascending ? "من الأقدم للأحدث" : "من الأحدث للأقدم"}
           </button>
@@ -340,6 +399,9 @@ export function SourceMangaDetails() {
         pages={chapterPageCount}
         onPage={goToChapterPage}
       />
+
+      {teamXChapterLoading && <p className="empty">جاري تحميل صفحة الفصول…</p>}
+      {teamXChapterError && <p className="error source-error">{teamXChapterError}</p>}
 
       <div className="chapter-list">
         {visibleChapters.map((chapter) => {
