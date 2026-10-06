@@ -796,7 +796,7 @@ async function mangaTimeLatest(context, db, page) {
 
   const now = Date.now();
   const cutoffIso = new Date(now - 24 * 60 * 60_000).toISOString();
-  const cached = await recentVerifiedReleasesFromDb(db, "mangatime", cutoffIso);
+  let cached = await recentVerifiedReleasesFromDb(db, "mangatime", cutoffIso);
 
   const state = await db
     .prepare("SELECT last_started_at FROM source_sync_state WHERE source = 'mangatime' LIMIT 1")
@@ -811,11 +811,22 @@ async function mangaTimeLatest(context, db, page) {
       .bind(now)
       .run();
 
-    context.waitUntil(
-      syncMangaTimeLatest(db).catch((error) => {
-        console.error("MangaTime background sync failed", error);
-      }),
-    );
+    // An empty D1 cache must not make MangaTime silently disappear from New.
+    // Populate it in-request once, then keep normal refreshes in the background.
+    if (!cached.length) {
+      try {
+        await syncMangaTimeLatest(db);
+        cached = await recentVerifiedReleasesFromDb(db, "mangatime", cutoffIso);
+      } catch (error) {
+        console.error("MangaTime foreground sync failed", error);
+      }
+    } else {
+      context.waitUntil(
+        syncMangaTimeLatest(db).catch((error) => {
+          console.error("MangaTime background sync failed", error);
+        }),
+      );
+    }
   }
 
   return { items: cached, hasMore: false, page };
