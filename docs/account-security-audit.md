@@ -78,3 +78,14 @@ Admin password reset unconditionally retires the saved question/answer, recovery
 A separate `POST /api/admin/users/:id/unlock-recovery` clears only a five-failure lock, preserving the password, question, codes and sessions. The UI explains that the old answer stays valid and directs administrators to password rescue if the answer is compromised. Both actions require the administrator's current password, exact Origin, shared credential-attempt limits and live role/session/credential checks inside their transaction. Actor, target and time are recorded in the existing admin_credential_events table; it does not currently distinguish operation types. No schema migration is needed.
 
 Tests cover rejection of the retired answer/code, reconfiguration of a new question, preservation of unrelated user/library data, in-flight recovery rejection, explicit unlock behavior, unauthorized requests, authorization races and audit/mutation rollback. Live authenticated browser validation remains outstanding.
+
+
+## Browser account isolation correction — 2026-10-06
+
+Client requests carry a local session generation and abort signal. Successful login/logout or a detected session-owner change invalidates prior requests; even an upstream ignoring abort cannot return stale data into the new session. Authentication operations are serialized. Failed logout keeps the existing account and its usable offline snapshots. Library/friend loaders guard both cleanup continuations and network-error fallbacks. React state updates and multi-step untracking also check their starting scope.
+
+Account transitions remove private local data/friend snapshots and session recommendation caches. Fresh snapshots use the v3 namespace so potentially misassigned v2 snapshots are never read. A confirmed same-owner session refresh may retain that owner's v3 offline snapshots. Unrelated preferences are retained. Login/logout uses a storage event nonce to invalidate other tabs and reload their session; this notification requires browser storage support.
+
+Cover jobs are deduplicated by account and session generation plus work/chapter, cancelled with the account signal, and recheck ownership after metadata/image/body reads before starting upload. Existing authorized server operations already sent before logout cannot be undone by browser cancellation; D1 remains the authoritative owner boundary. No schema migration or account-ID change is needed.
+
+Tests delay library/friend/cleanup requests across account changes, inject late network failures, repeat login to the same account, verify successful/failed logout behavior, check authentication ordering, run the actual cover-job orchestration with controlled adapters, and simulate cross-tab invalidation. Live multi-tab/browser validation remains outstanding.

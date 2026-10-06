@@ -33,7 +33,9 @@ export function snapshotToSourceManga(snapshot: WorkSnapshot): SourceManga {
 }
 
 export function saveWorkSnapshot(item: SourceManga, chapter?: number | null) {
-  const jobKey = `${item.key}:${chapter ?? "meta"}`;
+  const scope = userDataService.captureAccountScope();
+  if (!scope) return Promise.resolve();
+  const jobKey = `${scope.key}:${item.key}:${chapter ?? "meta"}`;
   const existing = snapshotJobs.get(jobKey);
   if (existing) return existing;
 
@@ -47,16 +49,20 @@ export function saveWorkSnapshot(item: SourceManga, chapter?: number | null) {
       chapter: chapter ?? null,
     });
 
+    scope.assertCurrent();
     if (!result.needsCover || !item.cover) return;
 
     const imageUrl = sourceService.imageUrl(item.source, item.cover, item.url);
     const response = await fetch(imageUrl, {
+      signal: scope.signal,
       credentials: "include",
       cache: "no-store",
     });
+    scope.assertCurrent();
     if (!response.ok) return;
 
     const blob = await response.blob();
+    scope.assertCurrent();
     if (!blob.type.startsWith("image/") || !blob.size) return;
     await userDataService.saveWorkSnapshotCover(item.key, blob);
   })()
@@ -70,3 +76,4 @@ export function saveWorkSnapshot(item: SourceManga, chapter?: number | null) {
   snapshotJobs.set(jobKey, job);
   return job;
 }
+

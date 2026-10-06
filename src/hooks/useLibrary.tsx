@@ -25,12 +25,16 @@ function useLibraryState() {
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
-    setData(await service.getData());
+    const scope = service.captureAccountScope();
+    const next = await service.getData();
+    setData(current => scope?.isCurrent() ? next : current);
   }, []);
 
   const refreshFriends = useCallback(async () => {
+    const scope = service.captureAccountScope();
     const nextFriends = await service.getFriends();
-    setFriends(nextFriends);
+    scope?.assertCurrent();
+    setFriends(current => scope?.isCurrent() ? nextFriends : current);
     return nextFriends;
   }, []);
 
@@ -91,12 +95,15 @@ function useLibraryState() {
   };
 
   const favorite = async (id: string, forceAdd = false) => {
+    const scope = service.captureAccountScope();
     try {
       setError("");
       if (data?.favorites.includes(id) && !forceAdd)
         await service.removeFavorite(id);
       else await service.addFavorite(id);
-      setData(await service.getData());
+      scope?.assertCurrent();
+      const next = await service.getData();
+      setData(current => scope?.isCurrent() ? next : current);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "تعذر مزامنة المفضلة الآن.",
@@ -105,10 +112,13 @@ function useLibraryState() {
   };
 
   const addToLibrary = async (id: string, status: LibraryStatus = "planned") => {
+    const scope = service.captureAccountScope();
     try {
       setError("");
       await service.addToLibrary(id, status);
-      setData(await service.getData());
+      scope?.assertCurrent();
+      const next = await service.getData();
+      setData(current => scope?.isCurrent() ? next : current);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "تعذر إضافة القصة إلى المكتبة.",
@@ -117,10 +127,13 @@ function useLibraryState() {
   };
 
   const setLibraryStatus = async (id: string, status: LibraryStatus) => {
+    const scope = service.captureAccountScope();
     try {
       setError("");
       await service.setLibraryStatus(id, status);
-      setData(await service.getData());
+      scope?.assertCurrent();
+      const next = await service.getData();
+      setData(current => scope?.isCurrent() ? next : current);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "تعذر تحديث حالة القصة.",
@@ -129,10 +142,13 @@ function useLibraryState() {
   };
 
   const removeFromLibrary = async (id: string) => {
+    const scope = service.captureAccountScope();
     try {
       setError("");
       await service.removeFromLibrary(id);
-      setData(await service.getData());
+      scope?.assertCurrent();
+      const next = await service.getData();
+      setData(current => scope?.isCurrent() ? next : current);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "تعذر حذف القصة من المكتبة.",
@@ -141,8 +157,10 @@ function useLibraryState() {
   };
 
   const recordChapterOpen = useCallback(async (mangaId: string, chapter: number) => {
+    const scope = service.captureAccountScope();
     const readAt = Date.now();
     setData((current) => {
+      if (!scope?.isCurrent()) return current;
       if (!current) return current;
       const existing = current.library.find((item) => item.mangaId === mangaId);
       const next = mergeLibraryRead(existing, mangaId, chapter, readAt);
@@ -162,10 +180,13 @@ function useLibraryState() {
   }, []);
 
   const markChapterUnread = useCallback(async (mangaId: string, chapter: number) => {
+    const scope = service.captureAccountScope();
     try {
       setError("");
       await service.markChapterUnread(mangaId, chapter);
-      setData(await service.getData());
+      scope?.assertCurrent();
+      const next = await service.getData();
+      setData(current => scope?.isCurrent() ? next : current);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "تعذر تعليم الفصل كغير مقروء.",
@@ -175,6 +196,7 @@ function useLibraryState() {
   }, []);
 
   const markWorkUnread = useCallback(async (mangaId: string) => {
+    const scope = service.captureAccountScope();
     try {
       setError("");
 
@@ -183,9 +205,12 @@ function useLibraryState() {
       // Clear reading/history state first, then remove the library row as an
       // explicit second guard so it cannot resurface after the next refresh.
       await service.markWorkUnread(mangaId);
+      scope?.assertCurrent();
       await service.removeFromLibrary(mangaId).catch(() => undefined);
+      scope?.assertCurrent();
 
       setData((current) => {
+      if (!scope?.isCurrent()) return current;
         if (!current) return current;
         const progress = Object.fromEntries(
           Object.entries(current.progress).filter(([key]) => !key.startsWith(`${mangaId}:`)),
@@ -205,6 +230,7 @@ function useLibraryState() {
   }, []);
 
   const markChaptersRead = useCallback(async (mangaId: string, chapters: number[]) => {
+    const scope = service.captureAccountScope();
     if (!chapters.length) return 0;
     try {
       setError("");
@@ -212,6 +238,7 @@ function useLibraryState() {
       const now = Date.now();
       const highest = Math.max(...chapters);
       setData((current) => {
+      if (!scope?.isCurrent()) return current;
         if (!current) return current;
         const completed = new Set(current.completed);
         const progress = { ...current.progress };
@@ -255,8 +282,10 @@ function useLibraryState() {
   }, []);
 
   const saveProgress = async (progress: ReadingProgress) => {
+    const scope = service.captureAccountScope();
     const key = `${progress.mangaId}:${progress.chapter}`;
     setData((current) => {
+      if (!scope?.isCurrent()) return current;
       if (!current) return current;
       const completed =
         progress.percent >= 98 && !current.completed.includes(key)
@@ -306,8 +335,10 @@ function useLibraryState() {
   };
 
   const acceptFriendRequest = async (id: string) => {
+    const scope = service.captureAccountScope();
     setError("");
     const relationship = await service.acceptFriendRequest(id);
+    scope?.assertCurrent();
     await refreshFriends();
     return relationship;
   };
@@ -323,29 +354,37 @@ function useLibraryState() {
   };
 
   const removeFriend = async (id: string) => {
+    const scope = service.captureAccountScope();
     setError("");
     await service.removeFriend(id);
+    scope?.assertCurrent();
     await refreshFriends();
   };
 
   const setAvatar = async (avatarId: string) => {
+    const scope = service.captureAccountScope();
     setError("");
     const updatedUser = await service.setAvatar(avatarId);
-    setUser(updatedUser);
+    scope?.assertCurrent();
+    setUser(current => scope?.isCurrent() ? updatedUser : current);
     return updatedUser;
   };
 
   const setDisplayName = async (name: string) => {
+    const scope = service.captureAccountScope();
     setError("");
     const updatedUser = await service.setDisplayName(name);
-    setUser(updatedUser);
+    scope?.assertCurrent();
+    setUser(current => scope?.isCurrent() ? updatedUser : current);
     return updatedUser;
   };
 
   const setProfileVisibility = async (visibility: ProfileVisibility) => {
+    const scope = service.captureAccountScope();
     setError("");
     const updatedUser = await service.setProfileVisibility(visibility);
-    setUser(updatedUser);
+    scope?.assertCurrent();
+    setUser(current => scope?.isCurrent() ? updatedUser : current);
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
