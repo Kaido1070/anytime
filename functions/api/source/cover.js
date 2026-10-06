@@ -1,3 +1,4 @@
+import { createSourceFetcher } from "../../_source-transport.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const ASQ_BASE = "https://3asq.online";
@@ -8,7 +9,15 @@ const AZORA_BASE = "https://azorafly.com";
 const SOURCE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet(context) {
+  return createCoverHandler(context.request.signal)(context);
+}
+
+// Cover probes and fallback attempts share one bounded request budget.
+function createCoverHandler(requestSignal) {
+const fetch = createSourceFetcher({ requestSignal, maxRequests: 24, maxBodyBytes: 8 * 1024 * 1024, maxTotalBytes: 16 * 1024 * 1024, deadlineMs: 30_000 });
+
+async function onRequestGet({ request, env }) {
   if (!env?.DB) {
     return json({ error: "D1_NOT_CONFIGURED", message: "قاعدة بيانات Anytime غير مربوطة بالموقع." }, 503);
   }
@@ -316,7 +325,7 @@ async function azoraDetailCovers(slug) {
 
   candidates.sort((a, b) => b.score - a.score);
   const resolved = [];
-  for (const candidate of candidates) {
+  for (const candidate of candidates.slice(0, 12)) {
     let imageResponse;
     try {
       imageResponse = await fetch(candidate.url, {
@@ -544,4 +553,8 @@ function json(body, status = 200, extraHeaders = {}) {
       ...extraHeaders,
     },
   });
+}
+
+
+return onRequestGet;
 }

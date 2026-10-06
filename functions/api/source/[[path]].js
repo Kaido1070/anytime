@@ -1,3 +1,4 @@
+import { createSourceFetcher, SourceTransportError } from "../../_source-transport.js";
 import { onRequest as handleImageRequest } from "./image.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
@@ -13,6 +14,14 @@ const SOURCE_UA =
 const sourceSchemaReady = new WeakMap();
 
 export async function onRequest(context) {
+  return createSourceHandler(context.request.signal, context.sourceFetcher).onRequest(context);
+}
+
+// Keep every adapter/retry/background sync in the initiating request budget.
+function createSourceHandler(requestSignal, sharedFetcher) {
+const fetch = sharedFetcher || createSourceFetcher({ requestSignal });
+
+async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   // Match the complete route: suffixes must never reach a legacy handler.
@@ -231,6 +240,9 @@ export async function onRequest(context) {
     return json({ error: "NOT_FOUND" }, 404);
   } catch (error) {
     console.error("Anytime source error", error);
+    if (error instanceof SourceTransportError) {
+      return json({ error: error.code, message: "استجابة المصدر تجاوزت حدود التحميل الآمن. حاول لاحقًا." }, 502);
+    }
     if (error instanceof SourceError) {
       return json({ error: error.code, message: error.message }, error.status);
     }
@@ -953,7 +965,7 @@ async function mangaTimeList(db, { page, sortBy, query = null }) {
     mangaTimeSearchInput({ page, sortBy, query }),
   );
   const items = await Promise.all(
-    (result?.results ?? []).map(async (row) => ({
+    (result?.results ?? []).slice(0, 80).map(async (row) => ({
       key: await makeSourceKey("mt", String(row.id)),
       source: "mangatime",
       sourceId: String(row.id),
@@ -5155,7 +5167,7 @@ function json(body, status = 200, extraHeaders = {}) {
   });
 }
 
-export const __test = {
+const __test = {
   xsanoFetchJson,
   xsanoSeriesItemFromEntry,
   azoraHasNext,
@@ -5247,3 +5259,10 @@ export const __test = {
   isNovelLabel,
   normalizeStatus,
 };
+
+return { onRequest, __test };
+}
+
+export const __test = Object.fromEntries(
+  Object.keys(createSourceHandler().__test).map(key => [key, (...args) => createSourceHandler().__test[key](...args)]),
+);

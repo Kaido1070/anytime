@@ -1,4 +1,5 @@
-import { rasterImageType, protectImageHeaders, isPublicImageUrl, fetchPublicImage } from "../../_image-security.js";
+import { createSourceFetcher } from "../../_source-transport.js";
+import { rasterImageType, protectImageHeaders, isPublicImageUrl } from "../../_image-security.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
@@ -74,9 +75,10 @@ export async function onRequest(context) {
     return headers;
   };
 
+  const fetchSource = createSourceFetcher({ requestSignal: request.signal, maxRequests: 15, maxBodyBytes: 16 * 1024 * 1024, maxTotalBytes: 24 * 1024 * 1024, deadlineMs: 35_000 });
   const fetchImage = async (refererValue = "", bypassCache = false) => {
     try {
-      return await fetchPublicImage(target, {
+      return await fetchSource(target, {
         headers: imageHeaders(refererValue),
         signal: AbortSignal.timeout(12_000),
         cf: source === "teamx"
