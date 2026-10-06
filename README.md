@@ -214,3 +214,5 @@ Account security validation and deployment limits: [account-security-audit.md](d
 ### Unused code checks
 
 Run `pnpm check:unused` after installing dependencies. Knip checks unused files, exports and dependencies; TypeScript rejects unused locals and parameters during checks and builds. `knip.json` treats Cloudflare API routes, tests, build scripts and Vite configuration as entry points, so automatic routes are retained. SQL migrations, private migration tools and historical data are not deleted by this check.
+
+<!-- production-redeploy: 2026-10-06 -->
