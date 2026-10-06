@@ -101,31 +101,20 @@ async function resolveWorks(keys: string[]) {
   };
 }
 
-async function loadCachedSeries(keys: string[]) {
+async function loadSnapshotSeries(keys: string[]) {
   const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
   if (!unique.length) return {} as Record<string, SourceManga>;
 
-  const [snapshots, resolved] = await Promise.all([
-    userDataService.getWorkSnapshots(unique).catch(() => []),
-    // resolve() is D1-backed metadata only and does not contact upstream sites.
-    // Prefer it over an archived snapshot when available so transient source
-    // failures do not downgrade every account card to "archived".
-    sourceService.resolve(unique).catch(() => []),
-  ]);
-
-  const mapped: Record<string, SourceManga> = Object.fromEntries(
+  // Fast path for the account home: snapshot metadata comes from D1 and its
+  // coverUrl points at the archived R2 image. Do not wait for source metadata
+  // before rendering these cards.
+  const snapshots = await userDataService.getWorkSnapshots(unique).catch(() => []);
+  return Object.fromEntries(
     snapshots.map((snapshot) => [
       snapshot.mangaId,
       snapshotToSourceManga(snapshot),
     ]),
-  );
-
-  for (const item of resolved) {
-    mapped[item.key] = item;
-    void saveWorkSnapshot(item);
-  }
-
-  return mapped;
+  ) as Record<string, SourceManga>;
 }
 
 function FullActivityView() {
@@ -221,14 +210,24 @@ function FullReadingView({
 
     void (async () => {
       const keys = reading.map((entry) => entry.mangaId);
-      const cached = await loadCachedSeries(keys);
+      const cached = await loadSnapshotSeries(keys);
       if (!active) return;
 
-      // Render cached metadata immediately. Live source refresh is best-effort
-      // and must not blank a user's reading list.
+      // Render the R2-backed snapshots first. Metadata/live source refreshes
+      // happen after paint and never block the reading list.
       setSeries((current) => ({ ...cached, ...current }));
       setLoading(false);
 
+      const resolved = await sourceService.resolve(keys).catch(() => []);
+      if (active && resolved.length) {
+        setSeries((current) => ({
+          ...current,
+          ...Object.fromEntries(resolved.map((item) => [item.key, item])),
+        }));
+        for (const item of resolved) void saveWorkSnapshot(item);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const results = await Promise.allSettled(
         reading.map((entry) => sourceService.getSeries(entry.mangaId)),
       );
@@ -357,20 +356,26 @@ export function Account() {
       setWorks({});
       return;
     }
-    resolveWorks(sourceKeys)
-      .then((next) => {
-        if (!active) return;
-        for (const work of Object.values(next.works)) void saveWorkSnapshot(work);
-        setWorks(next.works);
-        setWorksError(
-          next.partialFailure ? "تعذر تحميل بعض أغلفة القوائم. يمكنك المحاولة مرة أخرى." : "",
-        );
-      })
-      .catch(() => {
-        if (!active) return;
-        setWorks({});
-        setWorksError("تعذر تحميل أغلفة القوائم. يمكنك المحاولة مرة أخرى.");
-      });
+    void (async () => {
+      const snapshots = await loadSnapshotSeries(sourceKeys);
+      if (!active) return;
+
+      // Paint archived R2 covers immediately. This is the stable fast path for
+      // the account home even when a source or metadata refresh is slow.
+      setWorks(snapshots);
+
+      const next = await resolveWorks(sourceKeys);
+      if (!active) return;
+
+      for (const work of Object.values(next.works)) void saveWorkSnapshot(work);
+      setWorks((current) => ({ ...current, ...next.works }));
+      setWorksError(
+        next.partialFailure ? "تعذر تحديث بعض بيانات القوائم. يمكنك المحاولة مرة أخرى." : "",
+      );
+    })().catch(() => {
+      if (!active) return;
+      setWorksError("تعذر تحديث بيانات القوائم. يمكنك المحاولة مرة أخرى.");
+    });
     return () => {
       active = false;
     };
@@ -410,14 +415,23 @@ export function Account() {
 
     void (async () => {
       const keys = readingEntries.map((entry) => entry.mangaId);
-      const cached = await loadCachedSeries(keys);
+      const cached = await loadSnapshotSeries(keys);
       if (!active) return;
 
-      // Snapshot/D1 metadata is the display source. Upstream sites only refresh
-      // it in the background, so a temporary outage does not become a profile
-      // outage.
+      // R2-backed snapshots are the first-paint source for Continue Reading.
+      // D1/source refreshes enrich them later without delaying the home page.
       setSeries((current) => ({ ...cached, ...current }));
 
+      const resolved = await sourceService.resolve(keys).catch(() => []);
+      if (active && resolved.length) {
+        setSeries((current) => ({
+          ...current,
+          ...Object.fromEntries(resolved.map((item) => [item.key, item])),
+        }));
+        for (const item of resolved) void saveWorkSnapshot(item);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const results = await Promise.allSettled(
         readingEntries.map((entry) => sourceService.getSeries(entry.mangaId)),
       );
