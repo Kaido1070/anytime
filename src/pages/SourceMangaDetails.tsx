@@ -137,7 +137,6 @@ export function SourceMangaDetails() {
   const teamXRemotePages =
     item?.source === "teamx" && Number(item.chapterPageCount ?? 0) > 1;
   const localChapterCount = item?.chapters?.length ?? 0;
-  const chapterCount = teamXRemotePages ? teamXChapters.length : localChapterCount;
   const chapterPageCount = teamXRemotePages
     ? Math.max(1, Number(item?.chapterPageCount ?? 1))
     : Math.max(1, Math.ceil(localChapterCount / CHAPTERS_PER_PAGE));
