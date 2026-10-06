@@ -400,21 +400,21 @@ test("priority windows use Saudi time and stay work-specific", () => {
     eleceed: true,
     magicEmperor: false,
   });
-  assert.equal(__test.sourceRefreshIntervalMs(tuesday20Riyadh), 2 * 60_000);
+  assert.equal(__test.sourceRefreshIntervalMs(tuesday20Riyadh), 5 * 60_000);
 
   const friday05Riyadh = Date.UTC(2026, 8, 25, 2, 0, 0);
   assert.deepEqual(__test.priorityWindow(friday05Riyadh), {
     eleceed: false,
     magicEmperor: true,
   });
-  assert.equal(__test.sourceRefreshIntervalMs(friday05Riyadh), 2 * 60_000);
+  assert.equal(__test.sourceRefreshIntervalMs(friday05Riyadh), 5 * 60_000);
 
   const mondayNoonRiyadh = Date.UTC(2026, 8, 21, 9, 0, 0);
   assert.deepEqual(__test.priorityWindow(mondayNoonRiyadh), {
     eleceed: false,
     magicEmperor: false,
   });
-  assert.equal(__test.sourceRefreshIntervalMs(mondayNoonRiyadh), 5 * 60_000);
+  assert.equal(__test.sourceRefreshIntervalMs(mondayNoonRiyadh), 15 * 60_000);
 });
 
 test("MangaTime follows paginated chapter responses until the real end", async () => {
@@ -1399,4 +1399,3 @@ test("Azora archive recent candidates reject coarse old rows", () => {
     ],
   );
 });
-

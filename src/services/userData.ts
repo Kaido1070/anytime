@@ -741,7 +741,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async markWorkUnread(mangaId: string) {
-    if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
+    if (!isLiveKey(mangaId)) throw new Error("بيانات القصة غير صالحة.");
     await this.request<{ ok: boolean }>("reading/unread-work", {
       method: "POST",
       body: JSON.stringify({ mangaId }),
@@ -750,7 +750,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async markChaptersRead(mangaId: string, chapters: number[]) {
-    if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
+    if (!isLiveKey(mangaId)) throw new Error("بيانات القصة غير صالحة.");
     const normalized = [...new Set(chapters.map(Number).filter((chapter) => Number.isFinite(chapter) && chapter >= 0))].slice(0, 1000);
     if (!normalized.length) return 0;
     const result = await this.request<{ ok: boolean; processed: number }>("reading/read-bulk", {

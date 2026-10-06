@@ -133,7 +133,7 @@ test("profile reading stats stay in one compact three-column row on mobile", asy
     readFile(new URL("../src/profileOverview.css", import.meta.url), "utf8"),
   ]);
   assert.match(overview, /"فصول مقروءة"/);
-  assert.match(overview, /"قصص مكتملة"/);
+  assert.match(overview, /value: readingDays \?\? 0, label: "أيام قراءة"/);
   assert.match(overview, /"أقرأ الآن"/);
   assert.doesNotMatch(overview, /"إجمالي القصص"/);
   const compact = css.slice(css.indexOf("Compact profile shell: one-row identity and stats"));
@@ -150,7 +150,8 @@ test("profile customization moves from the header menu to a pencil by lists", as
     readFile(new URL("../src/components/ProfileOverview.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/components/UI.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(account, /onCustomize=\{\(\) => setCustomizing\(true\)\}/);
+  assert.match(account, /onCustomize=\{\(\) => setCustomizingLists\(true\)\}/);
+  assert.match(account, /<ProfileListsManager/);
   assert.match(overview, /className="profile-section-edit"/);
   assert.match(overview, /Icon name="edit"/);
   assert.match(ui, /edit:/);
@@ -177,4 +178,3 @@ test("profile source failures stay inside their own preview sections", async () 
   assert.match(overview, /onRetry\?: \(\) => void/);
   assert.match(overview, /profile-section-error compact/);
 });
-

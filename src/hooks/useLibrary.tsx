@@ -224,7 +224,7 @@ function useLibraryState() {
         };
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر إلغاء تتبع العمل.");
+      setError(cause instanceof Error ? cause.message : "تعذر إلغاء تتبع القصة.");
       throw cause;
     }
   }, []);

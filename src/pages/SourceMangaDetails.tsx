@@ -319,7 +319,7 @@ export function SourceMangaDetails() {
           </div>
           {bulkConfirm && (
             <div className="chapter-bulk-confirm" role="alert">
-              <span>{bulkConfirm === "read" ? "تعليم جميع الفصول كمقروءة؟" : "إلغاء القراءة والتتبع لهذا العمل؟"}</span>
+              <span>{bulkConfirm === "read" ? "تعليم جميع الفصول كمقروءة؟" : "إلغاء القراءة والتتبع لهذه القصة؟"}</span>
               <div className="chapter-bulk-confirm-actions">
                 <button className="secondary" disabled={bulkBusy} onClick={() => setBulkConfirm(null)}>إلغاء</button>
                 <button className="primary" disabled={bulkBusy} onClick={() => void applyBulkReadState(bulkConfirm === "read")}>

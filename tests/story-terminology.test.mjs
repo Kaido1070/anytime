@@ -23,7 +23,7 @@ test("user-facing copy uses قصة/قصص instead of عمل/أعمال", async (
     const text = await readFile(file, "utf8");
     const lines = text.split("\n");
     lines.forEach((line, index) => {
-      if (!/(?:الأعمال|أعمال|عمل)/.test(line)) return;
+      if (!/(?<!\p{L})(?:الأعمال|أعمال|العمل|عملًا|عمل)(?!\p{L})/u.test(line)) return;
       const isBusinessGenre =
         file.endsWith(path.join("pages", "Discover.tsx")) &&
         line.includes('id: "business"') &&

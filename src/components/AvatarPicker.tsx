@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { userDataService } from "../services/userData";
+import { filterAvatarSeries } from "../services/avatars";
 import type { Avatar, AvatarSeries } from "../types";
 
 function AvatarChoiceImage({ avatar }: { avatar: Avatar }) {
@@ -38,6 +39,7 @@ export function AvatarPicker({
   onClose: () => void;
 }) {
   const [series, setSeries] = useState<AvatarSeries[]>([]);
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(currentAvatarId);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -88,6 +90,8 @@ export function AvatarPicker({
         .find((avatar) => avatar.id === selectedId) ?? null,
     [series, selectedId],
   );
+
+  const filteredSeries = useMemo(() => filterAvatarSeries(series, query), [series, query]);
 
   async function save() {
     if (!selectedId || busy) return;
@@ -152,6 +156,19 @@ export function AvatarPicker({
         </div>
 
 
+        <div className="avatar-picker-search-wrap">
+          <label className="avatar-picker-search">
+            <input
+              type="search"
+              aria-label="ابحث عن قصة أو شخصية"
+              placeholder="ابحث عن قصة أو شخصية"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              disabled={loading || busy}
+            />
+          </label>
+        </div>
+
         <div className="avatar-picker-content">
           {loading ? (
             <div
@@ -162,8 +179,8 @@ export function AvatarPicker({
               <span />
               <span />
             </div>
-          ) : series.length ? (
-            series.map((group) => (
+          ) : filteredSeries.length ? (
+            filteredSeries.map((group) => (
               <section
                 className="avatar-series"
                 key={group.id}
