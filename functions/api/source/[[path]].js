@@ -47,7 +47,7 @@ async function onRequest(context) {
   }
 
   if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
-  if (!["status", "recent", "latest", "popular", "search", "resolve", "series", "chapter"].includes(action)) {
+  if (!["status", "recent", "release-history", "latest", "popular", "search", "resolve", "series", "chapter"].includes(action)) {
     return json({ error: "NOT_FOUND" }, 404);
   }
 
@@ -103,6 +103,84 @@ async function onRequest(context) {
       });
     }
 
+    if (action === "release-history") {
+      const numbers = [...new Set(
+        String(url.searchParams.get("chapters") ?? "")
+          .split(",")
+          .map((value) => Number(value.trim()))
+          .filter((value) => Number.isFinite(value) && value >= 0),
+      )].slice(0, 80);
+
+      if (!numbers.length) {
+        return json({ items: [], hasMore: false, page: 1 }, 200, shortCache());
+      }
+
+      const placeholders = numbers.map(() => "?").join(",");
+      const result = await db
+        .prepare(`SELECT
+            i.source_key,
+            i.source,
+            i.source_id,
+            i.slug,
+            i.type,
+            i.url,
+            i.title,
+            i.cover_url,
+            i.description,
+            i.status,
+            i.genres_json,
+            c.chapter_number,
+            c.published_at
+          FROM source_chapter_seen c
+          JOIN source_items i ON i.source_key = c.source_key
+          WHERE c.chapter_number IN (${placeholders})
+            AND c.published_at IS NOT NULL
+          ORDER BY c.published_at ASC
+          LIMIT 2000`)
+        .bind(...numbers)
+        .all();
+
+      const byKey = new Map();
+      for (const row of result.results ?? []) {
+        const number = Number(row.chapter_number);
+        const publishedAt = String(row.published_at ?? "");
+        if (!Number.isFinite(number) || !Number.isFinite(Date.parse(publishedAt))) continue;
+
+        let item = byKey.get(row.source_key);
+        if (!item) {
+          item = {
+            key: row.source_key,
+            source: row.source,
+            sourceId: row.source_id,
+            slug: row.slug,
+            type: row.type,
+            url: row.url,
+            title: row.title,
+            cover: row.cover_url,
+            description: row.description ?? "",
+            status: row.status ?? "",
+            genres: parseJsonArray(row.genres_json),
+            latest: number,
+            chapters: [],
+          };
+          byKey.set(row.source_key, item);
+        }
+
+        item.latest = Math.max(Number(item.latest || 0), number);
+        item.chapters.push({
+          number,
+          title: `الفصل ${number}`,
+          publishedAt,
+        });
+      }
+
+      return json(
+        { items: [...byKey.values()], hasMore: false, page: 1 },
+        200,
+        shortCache(),
+      );
+    }
+
     if (action === "recent") {
       const source = sourceFromQuery(url);
       const page = safePage(url.searchParams.get("page"));
@@ -119,6 +197,7 @@ async function onRequest(context) {
                 : source === "mangalik"
                   ? await mangalikLatest(db, page)
                   : await azoraRecent(context, db, page);
+      await rememberRecentFeedHistory(db, payload.items);
       return json(payload, 200, shortCache());
     }
 
@@ -630,6 +709,51 @@ function mergeChapterLists(...lists) {
 
 function moreCompleteChapters(current, candidate) {
   return mergeChapterLists(current, candidate);
+}
+
+async function rememberRecentFeedHistory(db, items, now = Date.now()) {
+  const cutoff = now - 48 * 60 * 60_000;
+  const writes = [];
+
+  for (const item of items ?? []) {
+    if (!item?.key || !Array.isArray(item.chapters)) continue;
+    const seen = new Set();
+
+    for (const chapter of item.chapters) {
+      if (chapter?.synthetic || !chapter?.publishedAt) continue;
+      const number = Number(chapter.number);
+      const publishedAt = String(chapter.publishedAt);
+      const timestamp = Date.parse(publishedAt);
+      if (!Number.isFinite(number) || !Number.isFinite(timestamp) || timestamp <= cutoff || timestamp > now) {
+        continue;
+      }
+
+      const identity = sourceChapterIdentity(chapter);
+      if (!identity || seen.has(identity)) continue;
+      seen.add(identity);
+
+      writes.push(
+        db.prepare(`INSERT INTO source_chapter_seen
+          (source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline)
+          VALUES (?, ?, ?, ?, ?, 0)
+          ON CONFLICT(source_key, chapter_identity) DO UPDATE SET
+            chapter_number = excluded.chapter_number,
+            published_at = CASE
+              WHEN source_chapter_seen.published_at IS NULL THEN excluded.published_at
+              WHEN excluded.published_at < source_chapter_seen.published_at THEN excluded.published_at
+              ELSE source_chapter_seen.published_at
+            END
+          WHERE source_chapter_seen.chapter_number IS NOT excluded.chapter_number
+             OR source_chapter_seen.published_at IS NULL
+             OR excluded.published_at < source_chapter_seen.published_at`)
+          .bind(item.key, identity, number, publishedAt, now),
+      );
+    }
+  }
+
+  for (let index = 0; index < writes.length; index += 50) {
+    await db.batch(writes.slice(index, index + 50));
+  }
 }
 
 async function recentVerifiedReleasesFromDb(db, source, cutoffIso) {

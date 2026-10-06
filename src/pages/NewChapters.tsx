@@ -22,7 +22,7 @@ function mergeChapters(pages: NewChapterFeed[]) {
   for (const page of pages) {
     for (const group of page.all) {
       for (const chapter of group.chapters) {
-        const key = `${group.id}:${chapter.identity}`;
+        const key = `${group.id}:${chapter.identity}:${chapter.sourceKey}`;
         const existing = entries.get(key);
         if (!existing || chapter.releaseAt > existing.chapter.releaseAt) {
           entries.set(key, { key, group, chapter });
@@ -172,7 +172,7 @@ export function NewChapters() {
 
               <span className="new-flat-copy">
                 <strong dir="auto">{group.item.title}</strong>
-                <b>{chapter.title || "الفصل " + chapter.number}</b>
+                <b dir="auto">{chapter.title || "الفصل " + chapter.number} · {chapter.sourceLabel}</b>
                 <small>{formatArabicRelativeTime(chapter.releaseAt)}</small>
               </span>
 

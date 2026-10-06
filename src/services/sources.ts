@@ -199,6 +199,18 @@ export const sourceService = {
     );
   },
 
+  async releaseHistory(chapters: number[]) {
+    const values = [...new Set(chapters)]
+      .filter((value) => Number.isFinite(value) && value >= 0)
+      .slice(0, 80);
+    if (!values.length) {
+      return { items: [], hasMore: false, page: 1 } satisfies SourceListResponse;
+    }
+    return api<SourceListResponse>(
+      `/api/source/release-history?${params({ chapters: values.join(",") })}`,
+    );
+  },
+
   async latest(source: SourceName, page = 1) {
     return api<SourceListResponse>(
       `/api/source/latest?${params({ source, page })}`,

@@ -14,6 +14,16 @@ import { userDataService } from "./userData";
 // everywhere else in Wany until their date adapters are verified.
 const VERIFIED_NEW_FEED_SOURCES: SourceName[] = ["3asq", "teamx", "mangalik", "mangatime", "xsano", "starzmanga", "azora"];
 
+const SOURCE_LABELS: Record<SourceName, string> = {
+  mangatime: "MangaTime",
+  teamx: "TeamX",
+  "3asq": "3asq",
+  starzmanga: "StarzManga",
+  xsano: "XSano",
+  mangalik: "MangaLik",
+  azora: "Azora",
+};
+
 export const NEW_CHAPTER_WINDOW_MS = 24 * 60 * 60_000;
 export const MAX_NEW_CHAPTERS_PER_WORK = 5;
 const VERIFIED_SOURCE_SCAN_PAGES: Partial<Record<SourceName, number>> = {
@@ -34,6 +44,7 @@ export interface FeedChapter {
   releaseKind: "published";
   read: boolean;
   sourceKey: string;
+  sourceLabel: string;
 }
 
 export interface ChapterFeedGroup {
@@ -106,6 +117,49 @@ async function withinSourceBudget<T>(promise: Promise<T>, milliseconds = 7500): 
   }
 }
 
+function saudiDayKey(timestamp: number) {
+  return new Date(timestamp + 3 * 60 * 60_000).toISOString().slice(0, 10);
+}
+
+function mergeLatestWithHistory(latest: SourceManga[], history: SourceManga[]) {
+  const byKey = new Map<string, SourceManga>();
+
+  for (const item of [...history, ...latest]) {
+    const existing = byKey.get(item.key);
+    if (!existing) {
+      byKey.set(item.key, {
+        ...item,
+        chapters: [...(item.chapters ?? [])],
+      });
+      continue;
+    }
+
+    const chapterMap = new Map<string, SourceChapter>();
+    for (const chapter of [...(existing.chapters ?? []), ...(item.chapters ?? [])]) {
+      const identity = exactChapterIdentity(chapter);
+      const current = chapterMap.get(identity);
+      if (!current) {
+        chapterMap.set(identity, chapter);
+        continue;
+      }
+
+      const currentAt = parsePublished(current.publishedAt);
+      const candidateAt = parsePublished(chapter.publishedAt);
+      if (candidateAt != null && (currentAt == null || candidateAt < currentAt)) {
+        chapterMap.set(identity, { ...current, ...chapter, publishedAt: chapter.publishedAt });
+      }
+    }
+
+    byKey.set(item.key, {
+      ...existing,
+      ...item,
+      chapters: [...chapterMap.values()],
+    });
+  }
+
+  return [...byKey.values()];
+}
+
 function groupChapters(
   group: SourceGroup,
   state: PersonalizationState,
@@ -143,32 +197,41 @@ function groupChapters(
   }
 
   const chapters: FeedChapter[] = [];
-  for (const [identity, versions] of byIdentity) {
-    // When several sources carry the same chapter, use the earliest verified
-    // publication timestamp. Re-scrapes and late source discovery therefore
-    // cannot make an old chapter look new again.
-    const releaseAt = Math.min(...versions.map((version) => version.timestamp));
-    // Route through the version whose own verified publication time matches
-    // the canonical (earliest) release. This avoids linking a merged feed row
-    // to a late mirror that may list the chapter but cannot actually open it.
-    const routeVersion = [...versions].sort((a, b) => {
-      if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
-      if (a.item.key === group.primary.key) return -1;
-      if (b.item.key === group.primary.key) return 1;
-      return a.item.key.localeCompare(b.item.key);
-    })[0];
-    const number = Number(routeVersion.chapter.number);
-    const isRead = versions.some((version) => read.has(readKey(version.item.key, number)));
+  for (const [identity, rawVersions] of byIdentity) {
+    // Keep one canonical timestamp per source. If a source was observed more
+    // than once, its earliest verified publication timestamp wins.
+    const bySource = new Map<string, (typeof rawVersions)[number]>();
+    for (const version of rawVersions) {
+      const current = bySource.get(version.item.key);
+      if (!current || version.timestamp < current.timestamp) {
+        bySource.set(version.item.key, version);
+      }
+    }
 
-    chapters.push({
-      identity,
-      number,
-      title: routeVersion.chapter.title || `الفصل ${number}`,
-      releaseAt,
-      releaseKind: "published",
-      read: isRead,
-      sourceKey: routeVersion.item.key,
-    });
+    const versions = [...bySource.values()];
+    const firstReleaseAt = Math.min(...versions.map((version) => version.timestamp));
+    const firstReleaseDay = saudiDayKey(firstReleaseAt);
+
+    // A mirror posting the same chapter on a later calendar day is not New.
+    // If several sources release it on the original day, keep each source so
+    // the reader can explicitly choose which source to follow.
+    const sameDayVersions = versions
+      .filter((version) => saudiDayKey(version.timestamp) === firstReleaseDay)
+      .sort((a, b) => a.timestamp - b.timestamp || a.item.key.localeCompare(b.item.key));
+
+    for (const version of sameDayVersions) {
+      const number = Number(version.chapter.number);
+      chapters.push({
+        identity,
+        number,
+        title: version.chapter.title || `الفصل ${number}`,
+        releaseAt: version.timestamp,
+        releaseKind: "published",
+        read: read.has(readKey(version.item.key, number)),
+        sourceKey: version.item.key,
+        sourceLabel: SOURCE_LABELS[version.item.source] ?? version.item.source,
+      });
+    }
   }
 
   chapters.sort((a, b) => b.releaseAt - a.releaseAt || b.number - a.number || a.identity.localeCompare(b.identity));
@@ -219,7 +282,7 @@ export async function loadNewChapterFeed(
 
   // Progress is tied to real completed work: personalization + every source
   // request + final read-state merge. No timer or fake interpolation.
-  const totalSteps = sourceTasks.length + 2;
+  const totalSteps = sourceTasks.length + 3;
   let completedSteps = 0;
   const report = (label: string) => {
     onProgress?.({
@@ -262,10 +325,33 @@ export async function loadNewChapterFeed(
   const hasMore = latestSettled.some(
     (result) => result.status === "fulfilled" && result.value.hasMore,
   );
-  // Latest adapters already return the chapter rows needed by the public
-  // feed. Do not re-open every series here: that turns one lightweight latest
-  // request into N detail requests and is the main source of page latency.
-  const latestGroups = mergeSourceItems(latestItems);
+
+  const chapterNumbers = [...new Set(
+    latestItems.flatMap((item) =>
+      (item.chapters ?? [])
+        .filter((chapter) => Boolean(chapter.publishedAt))
+        .map((chapter) => Number(chapter.number))
+        .filter(Number.isFinite),
+    ),
+  )];
+
+  let historyItems: SourceManga[] = [];
+  try {
+    const history = await withinSourceBudget(
+      sourceService.releaseHistory(chapterNumbers),
+      7500,
+    );
+    historyItems = history.items;
+  } catch {
+    // History improves cross-source deduplication but must never block New.
+  }
+  completedSteps += 1;
+  report("تمت مقارنة الفصول بين المصادر");
+
+  // Historical rows are only used to decide the chapter's original release
+  // day. The current source payload remains authoritative for title/cover/url.
+  const comparableItems = mergeLatestWithHistory(latestItems, historyItems);
+  const latestGroups = mergeSourceItems(comparableItems);
   const readPairs = await userDataService.getReadChapterPairs(collectReadChecks(latestGroups));
   const read = new Set(readPairs.map((entry) => readKey(entry.mangaId, entry.chapter)));
   completedSteps += 1;
