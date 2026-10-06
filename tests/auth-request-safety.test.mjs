@@ -12,7 +12,7 @@ async function credential(password) {
   return { password_salt: encode(salt), password_hash: encode(bits), password_iterations: 25000 };
 }
 
-function database(user, version = '19') {
+function database(user, version = '20') {
   const writes = [];
   const reads = [];
   const db = {

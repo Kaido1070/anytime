@@ -1,5 +1,6 @@
-import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash } from "../_password.js";
-import { isAdminUser, isSocialUser, sessionUser } from "../_admin.js";
+import { snapshotCoverKey, snapshotCoverKeys } from "../_identity.js";
+import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash, replacePassword } from "../_password.js";
+import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_admin.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -39,8 +40,10 @@ export async function onRequest(context) {
     return await route(request, url, db, covers);
   } catch (error) {
     console.error("Anytime API error", error);
-    if (error?.code === "SCHEMA_MIGRATION_REQUIRED") {
-      return json({ error: error.code, message: "تحتاج قاعدة البيانات إلى ترحيل مُراجع قبل تشغيل هذا الإصدار." }, 503);
+    if (["SCHEMA_MIGRATION_REQUIRED", "CREDENTIAL_RUNTIME_UNSUPPORTED"].includes(error?.code)) {
+      return json({ error: error.code, message: error.code === "SCHEMA_MIGRATION_REQUIRED"
+        ? "تحتاج قاعدة البيانات إلى ترحيل مُراجع قبل تشغيل هذا الإصدار."
+        : "تحتاج بيانات الدخول القديمة إلى تحديث مُراجع متوافق مع الخادم." }, 503);
     }
     return json(
       {
@@ -74,7 +77,7 @@ async function route(request, url, db, covers) {
       .bind(username)
       .first();
 
-    if (!user || !(await verifyPassword(password, user))) {
+    if (!user || !(await verifyPassword(password, user, db))) {
       await sleep(120);
       return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
     }
@@ -93,6 +96,7 @@ async function route(request, url, db, covers) {
         .bind(tokenHash, user.id, now, now, expiresAt),
     ]);
 
+    if (isAdminUser(user)) await recordAdminAudit(db, user.id, "admin_login");
     return json(
       { user: sessionUser(user) },
       200,
@@ -319,8 +323,6 @@ async function route(request, url, db, covers) {
     return json({ user: publicUser({ ...user, profile_visibility: visibility }) });
   }
 
-  const snapshotCoverKey = (userId, mangaId) =>
-    `covers/${encodeURIComponent(String(userId))}/${encodeURIComponent(String(mangaId))}`;
   const snapshotCoverVersion = (coverSourceUrl, coverSize) => {
     const value = `${String(coverSourceUrl || "")}|${Number(coverSize || 0)}`;
     let hash = 2166136261;
@@ -339,7 +341,11 @@ async function route(request, url, db, covers) {
       // R2 is authoritative for new covers. Keep the D1 chunks as a temporary
       // fallback so already archived covers survive the migration.
       if (covers) {
-        const object = await covers.get(objectKey);
+        let object = null;
+        for (const key of await snapshotCoverKeys(db, user.id, mangaId)) {
+          object = await covers.get(key);
+          if (object) break;
+        }
         if (object) {
           const headers = new Headers();
           object.writeHttpMetadata(headers);
@@ -566,7 +572,9 @@ async function route(request, url, db, covers) {
       String(existing?.cover_source_url || "") !== String(coverSourceUrl);
     let hasR2Cover = false;
     if (covers) {
-      hasR2Cover = Boolean(await covers.head(snapshotCoverKey(user.id, mangaId)));
+      for (const key of await snapshotCoverKeys(db, user.id, mangaId)) {
+        if (await covers.head(key)) { hasR2Cover = true; break; }
+      }
     }
     return json({
       ok: true,
@@ -1684,24 +1692,16 @@ async function route(request, url, db, covers) {
       )
       .bind(user.id)
       .first();
-    if (!authRow || !(await verifyPassword(currentPassword, authRow))) {
+    if (!authRow || !(await verifyPassword(currentPassword, authRow, db))) {
       return json({ error: "WRONG_PASSWORD", message: "كلمة المرور الحالية غير صحيحة." }, 400);
     }
 
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
     const salt = bytesToBase64Url(saltBytes);
     const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
-    const now = Date.now();
-    await db
-      .prepare(
-        "UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ?",
-      )
-      .bind(salt, hash, PASSWORD_ITERATIONS, now, user.id)
-      .run();
-    await db
-      .prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?")
-      .bind(user.id, session.tokenHash)
-      .run();
+    const changed = await replacePassword(db, user.id, authRow.password_hash, salt, hash, session.tokenHash);
+    if (!changed) return json({ error: "PASSWORD_CHANGED_RETRY", message: "تغيرت بيانات الدخول أثناء الطلب. حاول مرة ثانية." }, 409);
+
     return json({ ok: true });
   }
 
@@ -1715,7 +1715,7 @@ async function ensureApiRuntime(db) {
       const row = await db
         .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
         .first();
-      if (Number(row?.value) < 19 || !Number.isFinite(Number(row?.value))) {
+      if (Number(row?.value) < 20 || !Number.isFinite(Number(row?.value))) {
         const error = new Error("Apply the reviewed deployment migrations before serving requests.");
         error.code = "SCHEMA_MIGRATION_REQUIRED";
         throw error;

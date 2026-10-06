@@ -1,0 +1,33 @@
+{
+  "password_hashes": {
+    "Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE": "dN13h-kpkhGSQJVBkmDOvXb69LKMwGicgTtea0zEAdE",
+    "g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y": "hb284Iod4PzsMFaR1UF0ZeovMGnQi2XHETuB_oPGFLU",
+    "Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI": "a6i7k3yCu28zBKb6rGpJFeJLV8WmWRn3wH18pGbrwWc"
+  },
+  "recovery": {
+    "admin": {
+      "salt": "iXMrYFxlRGeNeXtahvJrxg",
+      "hash": "qB91GPghZPSkaJ4EkLZlQ4O33bYMktRSEWQ8TzHiJ08",
+      "iterations": 210000,
+      "scheme": "pbkdf2-sha256"
+    },
+    "m": {
+      "salt": "DQKmZM9LWDe-yvsralJ3NA",
+      "hash": "gk2_0df_3o7dJprXj1IzLcRnJUUmiGF1YgfjXKhe0T8",
+      "iterations": 210000,
+      "scheme": "pbkdf2-sha256"
+    },
+    "yas": {
+      "salt": "",
+      "hash": "i42rCbZjKdbuv2Il7hNeiymQSxVoTcbR_2v8KhSlT54",
+      "iterations": 1,
+      "scheme": "sha256"
+    },
+    "has": {
+      "salt": "kfncionM84kNNDTiZGagDQ",
+      "hash": "hYOzUUBxo4VWBLVZHUpPbWyufAcPqN11e6GckRtyO_c",
+      "iterations": 210000,
+      "scheme": "pbkdf2-sha256"
+    }
+  }
+}

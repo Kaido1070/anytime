@@ -1,26 +1,36 @@
-// Temporary, read-only compatibility for the three known legacy credentials.
-// Remove only after D1 confirms all affected credentials have been upgraded.
-const LEGACY_VERIFICATION_HASHES = new Map([
-  ["Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE", "dN13h-kpkhGSQJVBkmDOvXb69LKMwGicgTtea0zEAdE"],
-  ["g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y", "hb284Iod4PzsMFaR1UF0ZeovMGnQi2XHETuB_oPGFLU"],
-  ["Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI", "a6i7k3yCu28zBKb6rGpJFeJLV8WmWRn3wH18pGbrwWc"],
-]);
-
 export const PASSWORD_ITERATIONS = 25000;
 
-export async function verifyPassword(password, row) {
-  // Preserve the existing legacy bridge without ever writing credentials.
-  const compatibleHash = Number(row.password_iterations) === 210000
-    ? LEGACY_VERIFICATION_HASHES.get(String(row.password_hash)) : null;
-  const iterations = compatibleHash ? PASSWORD_ITERATIONS : Number(row.password_iterations);
-  const derived = await derivePasswordHash(password, base64UrlToBytes(row.password_salt), iterations);
-  const expected = base64UrlToBytes(compatibleHash ?? row.password_hash);
-  const actual = base64UrlToBytes(derived);
+export async function verifyPassword(password, row, db) {
+  const alternatives = db ? await db.prepare(`SELECT password_salt, password_hash, password_iterations
+    FROM user_password_verifiers WHERE user_id = ?`).bind(row.id).all() : { results: [] };
+  const candidates = [row, ...(alternatives.results ?? [])].filter(candidate =>
+    typeof candidate.password_salt === "string" && typeof candidate.password_hash === "string");
+  let unsupported = false;
+  for (const candidate of candidates) {
+    try {
+      const derived = await derivePasswordHash(password, base64UrlToBytes(candidate.password_salt), Number(candidate.password_iterations));
+      if (constantTimeEqual(base64UrlToBytes(derived), base64UrlToBytes(candidate.password_hash))) return true;
+    } catch (error) {
+      if (error?.name !== "NotSupportedError" && !String(error?.message).includes("iteration counts above")) throw error;
+      unsupported = true;
+    }
+  }
+  if (unsupported) {
+    const error = new Error("An existing credential requires a compatible runtime or reviewed credential upgrade.");
+    error.code = "CREDENTIAL_RUNTIME_UNSUPPORTED";
+    throw error;
+  }
+  return false;
+}
+
+export function constantTimeEqual(actual, expected) {
   if (actual.length !== expected.length) return false;
   let difference = 0;
   for (let i = 0; i < actual.length; i++) difference |= actual[i] ^ expected[i];
   return difference === 0;
 }
+
+export function decodeBase64Url(value) { return base64UrlToBytes(value); }
 
 export async function derivePasswordHash(password, salt, iterations) {
   if (!Number.isInteger(iterations) || iterations < 1) throw new Error("Invalid credential parameters.");
@@ -34,4 +44,16 @@ function bytesToBase64Url(bytes) {
 }
 function base64UrlToBytes(value) {
   return Uint8Array.from(atob(String(value).replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+}
+
+export async function replacePassword(db, userId, expectedHash, salt, hash, currentTokenHash) {
+  const results = await db.batch([
+    db.prepare("UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ? AND password_hash = ?")
+      .bind(salt, hash, PASSWORD_ITERATIONS, Date.now(), userId, expectedHash),
+    db.prepare("DELETE FROM user_password_verifiers WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)")
+      .bind(userId, userId, hash),
+    db.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)")
+      .bind(userId, currentTokenHash, userId, hash),
+  ]);
+  return Number(results[0]?.meta?.changes) === 1;
 }

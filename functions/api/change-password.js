@@ -1,4 +1,4 @@
-import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash } from "../_password.js";
+import { PASSWORD_ITERATIONS, verifyPassword, derivePasswordHash, replacePassword } from "../_password.js";
 const SESSION_COOKIE = "anytime_session";
 
 export async function onRequestPost(context) {
@@ -27,26 +27,20 @@ export async function onRequestPost(context) {
       .first();
     if (!authRow) return json({ error: "UNAUTHORIZED" }, 401);
 
-    if (!(await verifyPassword(currentPassword, authRow))) {
+    if (!(await verifyPassword(currentPassword, authRow, db))) {
       return json({ error: "WRONG_PASSWORD", message: "كلمة المرور الحالية غير صحيحة." }, 400);
     }
 
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
     const salt = bytesToBase64Url(saltBytes);
     const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
-    const now = Date.now();
-    await db
-      .prepare("UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ?")
-      .bind(salt, hash, PASSWORD_ITERATIONS, now, session.user.id)
-      .run();
-    await db
-      .prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?")
-      .bind(session.user.id, session.tokenHash)
-      .run();
+    const changed = await replacePassword(db, session.user.id, authRow.password_hash, salt, hash, session.tokenHash);
+    if (!changed) return json({ error: "PASSWORD_CHANGED_RETRY", message: "تغيرت بيانات الدخول أثناء الطلب. حاول مرة ثانية." }, 409);
 
     return json({ ok: true });
   } catch (error) {
     console.error("Anytime change-password error", error);
+    if (error?.code === "CREDENTIAL_RUNTIME_UNSUPPORTED") return json({ error: error.code }, 503);
     return json({ error: "SERVER_ERROR", message: "تعذر تغيير كلمة المرور الآن." }, 500);
   }
 }

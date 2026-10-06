@@ -280,7 +280,7 @@ class ApiUserDataService implements UserDataService {
 
   async signIn(username: string, password: string) {
     const normalizedUsername = username.trim().toLowerCase();
-    const endpoint = normalizedUsername === "admin" ? "admin-login" : "login";
+    const endpoint = "login";
     const result = await this.request<{ user: User }>(endpoint, {
       method: "POST",
       body: JSON.stringify({ username: normalizedUsername, password }),
@@ -920,3 +920,4 @@ class ApiUserDataService implements UserDataService {
 }
 
 export const userDataService: UserDataService = new ApiUserDataService();
+

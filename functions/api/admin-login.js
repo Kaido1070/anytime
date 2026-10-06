@@ -35,18 +35,11 @@ export async function onRequestPost(context) {
           FROM users WHERE username = ? COLLATE NOCASE AND role = 'admin' LIMIT 1`)
         .bind(username)
         .first();
-      // Preserve the old login alias only for an existing admin-role row.
-      // The alias grants no role and never provisions or rewrites credentials.
-      if (!user && username === "admin") {
-        user = await db.prepare(`SELECT id, username, name, profile_visibility, avatar_id, role,
-          password_salt, password_hash, password_iterations
-          FROM users WHERE id = 'admin' AND role = 'admin' LIMIT 1`).first();
-      }
     } catch (error) {
       return adminStageError("ADMIN_LOOKUP_FAILED", error);
     }
 
-    if (!user || !isAdminUser(user) || !(await verifyPassword(suppliedSecret, user))) {
+    if (!user || !isAdminUser(user) || !(await verifyPassword(suppliedSecret, user, db))) {
       await sleep(120);
       return invalidLogin();
     }

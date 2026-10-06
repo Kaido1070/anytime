@@ -1,34 +1,49 @@
-# Account safety repair: first deployment gate
+# Private numeric account migration
 
-The October 4–5 conversation reported local identity/auth changes, but no corresponding branch or pull request was present when work resumed. Main was still `ceafb7f6053d730509e103d951c6724f8ad3bb40`. This patch is a fresh, reviewable first stage; it does not claim to recover those unsaved files.
+## Result and failure mechanism
 
-## Confirmed failure mechanism
+Accounts use immutable random 32-digit IDs stored as TEXT in D1. Usernames remain login names (for example `m`, `y`, `h`, `admin`); admin permissions come from role. No runtime mapping binds those names to IDs. Never convert IDs to JavaScript Number or SQLite INTEGER.
 
-The former `ensureCanonicalAccountNames` ran before every API route on a new isolate. It threw if H/Y belonged to a row other than has/yas, and otherwise rewrote their password salt/hash. A conflict could prevent health, session, library, and login requests from reaching their handlers. Earlier runtime identity migrations also disagreed with SQL 0014. Production causality still requires its D1 rows and error logs.
+The old request bootstrap could throw on H/has or Y/yas conflicts before any API handler, and rewrote credentials. Admin login also provisioned credentials and removed social data. This implementation removes those side effects and validates schema version >=20 without running DDL. Production causality cannot be established without its logs; no live database was accessed.
 
-## Changes
+## Keep the export private
 
-- Runtime validates schema version 19 or newer, without bootstrap, identity repair, credential writes, or DDL. Older databases receive `SCHEMA_MIGRATION_REQUIRED` (503).
-- Admin schema checks are read-only. Admin login verifies an existing user with role=admin and never provisions, resets credentials, or purges social data. A compatibility login alias for the existing reserved admin row remains until that account is reviewed.
-- Login and both password-change implementations use the same password helper. New password changes retain the existing dedicated endpoint's 25,000-iteration setting; stored credential parameters are still honored. The three existing default-password compatibility hashes are used for verification only, with no rewriting. This is a temporary bridge, not the final password policy.
-- Login username lookup is case insensitive, preserving uppercase H/Y names.
-- No account IDs, relationships, live passwords, R2 objects, or frontend behavior are migrated by this PR.
+The scripts have no Cloudflare connection. All exports, generated SQL, migrated databases and rollback files contain private credential material and must stay outside GitHub. You do not need to send them to anyone.
 
-## Before merging into the production branch
+From the repository, generate a private manifest using a complete D1 SQL export:
 
-1. Obtain a fresh D1 export and confirm R2 backup coverage. Exports contain private credential material: keep them out of GitHub.
-2. Run `python scripts/inspect-account-backup.py /path/to/wany-backup.sql`. It reconstructs only an in-memory SQLite database, reports identities/reference counts, and never prints password hashes, salts, session tokens, or recovery codes. It does not connect to Cloudflare.
-3. Confirm schema version >=19 and required tables/columns. If older, prepare explicit deployment migrations against that export first; do not merely change the version marker. SQL 0014 is not a safe general merge for existing duplicate accounts or runtime snapshot tables.
-4. Confirm the stored admin credential works without ADMIN_INITIAL_PASSWORD provisioning. Check all H/Y/M credentials on a restored staging copy.
-5. Check PBKDF2 parameters on the actual Workers runtime: legacy 210,000-iteration credentials outside the existing compatibility map may exceed its crypto limit. Node tests do not establish deployed-runtime compatibility. Never lower the iterations field without rehashing the actual password.
-6. Only deploy after those gates. No production schema or credential changes are included here.
+```sh
+python scripts/migrate-numeric-user-ids.py --backup /private/wany-backup.sql --template /private/accounts.local.json
+```
 
-## Following stage: merge H/Y data
+Review that manifest locally. Each account has `username`, `source_ids`, and `primary_id`. Put only rows belonging to the same actual person in one group. Set the desired login names to `h`, `y`, `m`, `admin`. Include every source row exactly once. The explicitly chosen primary row supplies password and profile settings when source rows disagree; the tool does not guess ownership from names. Keep separate people in separate groups.
 
-The canonical IDs can be `h` and `y` if that is the chosen design; IDs do not need to match usernames. First establish which rows belong to each real account from the export. Then generate a reviewed merge that reconciles overlapping library/progress/history/state rows, preserves lists and profile settings, updates both sides of social relationships and pair fields, carries recovery/audit/snapshot rows, and preserves access to covers under old R2 keys. Compare row-level data before and after and test rollback on the staging copy. Do not edit or delete a users row directly in D1 to simulate this merge.
+```sh
+python scripts/migrate-numeric-user-ids.py --backup /private/wany-backup.sql --accounts /private/accounts.local.json --out /private/wany-migration
+```
 
-Forced password change, per-account recovery codes, rate limiting, random-ID migration, and admin-assisted recovery remain the next stage after inspecting real account data. They are not implemented in this first safety patch.
+The output directory must be new. The tool verifies apply and rollback against the export locally, then writes `apply.sql`, `rollback.sql`, `mapping.local.json`, `migrated.sqlite`, and `report.json`. It stops on incomplete manifests, role conflicts, foreign-key violations, unsupported conflicting records or incompatible schemas. It requires the complete runtime v19 schema, including snapshots; an older database needs its own reviewed preparation first.
+
+## What the migration preserves
+
+The migration discovers user foreign keys and dependent tables, also updating known pair-ID fields without foreign keys. Overlapping library/progress rows preserve highest progress and latest reading state; history, lists and their items remain attached. Social links are reconciled and self-links removed. Conflicting profile settings use the reviewed primary account.
+
+Passwords and historical compatible verifiers move into per-account D1 rows. Successful explicit password changes retire alternate verifiers and revoke other sessions. Recovery checks D1 rows rather than fixed account names, consumes the code once, and revokes sessions. Historical compatibility material exists only in the offline migration bridge, not runtime account mappings. This is a transition mechanism, not a completed new recovery issuance/admin-review UI or rate-limiting system.
+
+R2 objects are not moved or deleted. Owner-scoped aliases and preferred snapshot locations in D1 keep old cover paths readable. Retain and verify the R2 backup. Sessions attached to changed IDs are invalidated, so those users sign in again.
+
+## Production gate
+
+1. Keep fresh D1 and R2 backups and test their restoration. Plan from the final D1 export taken after pausing writes.
+2. Apply generated SQL to an isolated restored staging database first. Use an isolated Wrangler migrations directory containing only the generated `apply.sql`; do not replay the repository's old migrations indiscriminately on a runtime-created schema. The generated file already includes additive support schema and advances to v20 only with the identity conversion.
+3. Use a D1 migration mechanism that provides one transaction and rollback on failure. Generated files deliberately omit BEGIN/COMMIT. Validate the entire file on actual D1, including statement limits and deferred foreign keys.
+4. Test every actual account's login, admin role, library, progress, lists, social links, covers and password change with the updated code. Node/SQLite tests do not prove Workers PBKDF2 compatibility. Unsupported legacy cost returns 503 rather than silently weakening stored parameters; provision a verified compatible credential before deployment if necessary. New password changes retain the existing 25,000-iteration setting pending a separate runtime-tested policy upgrade.
+5. Compare the private report and row-level results. Only then coordinate the production migration and compatible code deployment during a write pause. Deploying the code on v19 alone returns a migration-required 503; do not deploy prematurely.
+
+Apply and rollback files include exact schema/data guards. New writes or schema changes make the plan fail rather than overwrite newer data. Generate a new plan from a fresh export when guards reject it. Test the D1 execution path before relying on this protection in production.
 
 ## Rollback
 
-Keep the current deployment available. This PR makes no production data migration, so a code rollback does not require restoring D1. Restoring the old deployment also restores its dangerous automatic repair logic; use it only after diagnosing the specific failure, with the backup retained. Never overwrite new reading progress with an old export as an automatic rollback.
+Keep the mapping and original backup private. Verify rollback on staging before production. If no subsequent writes occurred, the guarded rollback restores original account rows and data; additive support tables remain empty. If writes occurred, rollback intentionally stops: reconcile the new data first instead of restoring an old export blindly. Avoid redeploying the former automatic repair logic without diagnosing its conflict.
+
+The branch is a draft implementation. No production D1/R2 conversion or deployment has occurred. Forced password upgrade, issuing replacement recovery codes, admin-assisted recovery and durable rate limiting are subsequent work.

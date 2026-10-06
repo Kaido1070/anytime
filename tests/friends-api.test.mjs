@@ -25,7 +25,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "19" };
+      return { value: "20" };
     }
 
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {

@@ -17,7 +17,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "19" };
+      return { value: "20" };
     }
 
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
@@ -190,12 +190,12 @@ test("password change verifies the current password and invalidates other sessio
     "utf8",
   );
 
-  assert.match(source, /verifyPassword\(currentPassword, authRow\)/);
+  assert.match(source, /verifyPassword\(currentPassword, authRow, db\)/);
   const passwords = await readFile(new URL("../functions/_password.js", import.meta.url), "utf8");
   assert.match(passwords, /PBKDF2/);
   assert.match(passwords, /hash: "SHA-256"/);
   assert.match(
-    source,
+    passwords,
     /DELETE FROM sessions WHERE user_id = \? AND token_hash <> \?/,
   );
   assert.doesNotMatch(
