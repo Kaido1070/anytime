@@ -58,6 +58,7 @@ export function Profile({
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryEditing, setRecoveryEditing] = useState(false);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryError, setRecoveryError] = useState("");
 
@@ -170,7 +171,7 @@ export function Profile({
     setRecoveryBusy(true); setRecoveryError(""); setRecoveryCode("");
     try {
       const code = await generateRecoveryCode(password);
-      form.reset(); setRecoveryCode(code);
+      form.reset(); setRecoveryCode(code); setRecoveryEditing(false);
     } catch (cause) {
       setRecoveryError(cause instanceof Error ? cause.message : "تعذر إصدار رمز الاستعادة.");
     } finally { setRecoveryBusy(false); }
@@ -425,13 +426,15 @@ export function Profile({
 
         <section className="settings-section">
           <h3>رمز استعادة الحساب</h3>
-          <p>إصدار رمز جديد يلغي الرمز السابق. احفظه في مكان خاص؛ يُستخدم مرة واحدة.</p>
-          <form className="settings-password-form" onSubmit={createRecoveryCode}>
+          {!recoveryEditing && <button className="secondary" type="button" onClick={() => { setRecoveryEditing(true); setRecoveryCode(""); setRecoveryError(""); }}>إصدار رمز استعادة</button>}
+          {recoveryEditing && <form className="settings-password-form" onSubmit={createRecoveryCode}>
+            <p>احفظ الرمز الجديد في مكان خاص؛ سيحل محل الرمز السابق.</p>
             <label>كلمة المرور الحالية
               <input name="recoveryPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={recoveryBusy} />
             </label>
             <button className="primary" type="submit" disabled={recoveryBusy}>{recoveryBusy ? "جارٍ الإصدار…" : "إصدار رمز جديد"}</button>
-          </form>
+            <button className="secondary" type="button" disabled={recoveryBusy} onClick={() => setRecoveryEditing(false)}>إلغاء</button>
+          </form>}
           {recoveryError && <p className="settings-feedback error" role="alert">{recoveryError}</p>}
           {recoveryCode && <div role="status"><p>احفظ الرمز الآن؛ لن يظهر بعد إغلاق الصفحة.</p><input aria-label="رمز الاستعادة الجديد" readOnly value={recoveryCode} dir="ltr" onFocus={event => event.currentTarget.select()} /></div>}
         </section>

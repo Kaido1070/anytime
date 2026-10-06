@@ -35,7 +35,7 @@ The D1 binding batch transaction semantics used by the conditional mutations are
 
 ## Remaining deployment and coverage limits
 
-The branch remains draft and production is unchanged. Do not deploy the account code onto the current v19 database alone. Prepare a fresh private export during a write pause, generate the guarded transition, save the private replacement credentials, apply it atomically in restored isolated D1 staging, and test the deployed Worker and actual R2 covers before coordinating production migration/code deployment. Existing R2 keys are retained and read through owner-scoped aliases; no live object verification or complete R2 backup was performed here.
+The branch remains draft and production is unchanged. Do not deploy the account code onto the current v19 database alone. Prepare a fresh private export during a write pause, generate the guarded transition, save the private replacement credentials, apply it atomically in restored isolated D1 staging, and test the deployed Worker before coordinating production migration/code deployment. Existing R2 keys are retained and read through owner-scoped aliases. R2 is a regenerable cover cache: no full R2 backup or object transfer is required for the account migration. Profile refresh refetches and uploads missing covers when the source is reachable. Live R2 behavior was not exercised here; unavailable upstream sources can leave a cover temporarily missing without affecting account or reading data.
 
 D1 attempt counters protect credential checks, not volumetric edge/database-cost attacks. WAF/edge protection needs environment validation. Per-account budgets can temporarily deny a legitimate login under targeted abuse. Trusted IP handling assumes Cloudflare's CF-Connecting-IP header.
 
