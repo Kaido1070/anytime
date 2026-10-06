@@ -322,6 +322,7 @@ export function AdminUserDetail() {
   const [securityBusy, setSecurityBusy] = useState(false);
   const [securityMessage, setSecurityMessage] = useState("");
   const [resetEditing, setResetEditing] = useState(false);
+  const [unlockEditing, setUnlockEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -352,6 +353,7 @@ export function AdminUserDetail() {
     setFailedAnswers(0);
     setSecurityMessage("");
     setResetEditing(false);
+    setUnlockEditing(false);
     userDataService.getAdminSecurityQuestion(id).then(value => { if (active) { setSecurityQuestion(value.question); setRecoveryLocked(value.recoveryLocked); setFailedAnswers(value.failedAnswers); } })
       .catch(() => { if (active) setSecurityMessage("تعذر تحميل سؤال الأمان."); });
     return () => { active = false; };
@@ -371,8 +373,26 @@ export function AdminUserDetail() {
       setRecoveryLocked(false);
       setFailedAnswers(0);
       setResetEditing(false);
-      setSecurityMessage("تم تغيير كلمة المرور وفتح الاستعادة وإبطال الجلسات ورموز الاستعادة القديمة.");
+      setSecurityQuestion(null);
+      setSecurityMessage("تم تغيير كلمة المرور وإبطال الجلسات ورموز الاستعادة وسؤال الأمان القديم. يستطيع المستخدم إعداد سؤال جديد بعد الدخول.");
     } catch (cause) { setSecurityMessage(cause instanceof Error ? cause.message : "تعذر تغيير كلمة المرور."); }
+    finally { setSecurityBusy(false); }
+  }
+
+  async function unlockRecovery(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setSecurityBusy(true);
+    setSecurityMessage("");
+    try {
+      await userDataService.adminUnlockRecovery(id, String(data.get("currentPassword") ?? ""));
+      form.reset();
+      setRecoveryLocked(false);
+      setFailedAnswers(0);
+      setUnlockEditing(false);
+      setSecurityMessage("تم فتح قفل الاستعادة. سؤال الأمان وكلمة المرور لم يتغيرا.");
+    } catch (cause) { setSecurityMessage(cause instanceof Error ? cause.message : "تعذر فتح قفل الاستعادة."); }
     finally { setSecurityBusy(false); }
   }
 
@@ -430,9 +450,17 @@ export function AdminUserDetail() {
       <section className="settings-card">
         <h2>أمان الحساب</h2>
         <p>سؤال الأمان: {securityQuestion ?? "لم يُحفظ سؤال أمان"}</p>
-        <p>الاستعادة: {recoveryLocked ? "مقفلة — أعد تعيين كلمة المرور لفتحها" : `متاحة · ${failedAnswers} من 5 إجابات خاطئة`}</p>
-        <p className="muted">كلمات المرور وإجابات الأمان لا تُعرض. إعادة التعيين تُخرج المستخدم من جميع الأجهزة.</p>
-        <button type="button" className="secondary" disabled={securityBusy} onClick={() => setResetEditing(!resetEditing)}>إعادة تعيين كلمة المرور</button>
+        <p>الاستعادة: {recoveryLocked ? "مقفلة بعد 5 إجابات خاطئة" : `غير مقفلة · ${failedAnswers} من 5 إجابات خاطئة`}</p>
+        <p className="muted">كلمات المرور وإجابات الأمان لا تُعرض. إعادة التعيين تُبطل سؤال الأمان والرموز القديمة وتُخرج المستخدم من جميع الأجهزة.</p>
+        {recoveryLocked && <>
+          <button type="button" className="secondary" disabled={securityBusy} onClick={() => { setUnlockEditing(!unlockEditing); setResetEditing(false); }}>فتح قفل الاستعادة فقط</button>
+          {unlockEditing && <form onSubmit={unlockRecovery}>
+            <p>يبقى جواب الأمان القديم صالحًا. إذا انكشف الجواب، استخدم إعادة تعيين كلمة المرور وإبطال الاستعادة القديمة.</p>
+            <label>كلمة مرور الأدمن الحالية<input name="currentPassword" type="password" required maxLength={128} autoComplete="current-password" /></label>
+            <button disabled={securityBusy}>{securityBusy ? "جارٍ الفتح…" : "فتح القفل"}</button>
+          </form>}
+        </>}
+        <button type="button" className="secondary" disabled={securityBusy} onClick={() => { setResetEditing(!resetEditing); setUnlockEditing(false); }}>إعادة تعيين كلمة المرور وإبطال الاستعادة القديمة</button>
         {resetEditing && <form onSubmit={resetPassword}>
           <label>كلمة مرور الأدمن الحالية<input name="currentPassword" type="password" required maxLength={128} autoComplete="current-password" /></label>
           <label>كلمة مرور المستخدم الجديدة<input name="newPassword" type="password" required minLength={6} maxLength={128} autoComplete="new-password" /></label>
@@ -532,4 +560,3 @@ export function AdminUserDetail() {
     </section>
   );
 }
-

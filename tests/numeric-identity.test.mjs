@@ -453,12 +453,14 @@ test('missing admin audit support rolls back the entire password reset and prese
   const admin = await login(db, 'admin', credentials.admin.password);
   const owner = await login(db, 'h', credentials.h.password);
   const target = credentials.h.user_id;
+  await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'Private question?', answer: 'retained-answer' }, owner.cookie));
   const before = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash;
   sqlite.exec('DROP TABLE admin_credential_events');
   const response = await adminApi(context(`admin/users/${target}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'newsecret' }, admin.cookie));
   assert.equal(response.status, 500);
   assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, before);
   assert.equal((await onRequest(context('security-question', db, null, owner.cookie))).status, 200);
+  assert.equal(sqlite.prepare('SELECT question FROM user_security_questions WHERE user_id = ?').get(target).question, 'Private question?');
 });
 
 test('admin reset current-password guessing is rate limited across different target accounts', async t => {
@@ -506,7 +508,111 @@ test('five wrong security answers persistently lock recovery until the admin res
   assert.equal((await adminApi(context(`admin/users/${credentials.h.user_id}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'adminnew' }, admin.cookie))).status, 200);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM user_security_question_locks WHERE user_id = ?').get(credentials.h.user_id).n, 0);
   assert.equal((await login(db, 'h', 'adminnew')).response.status, 200);
-  assert.equal((await recoverPassword(context('recover-password', db, { ...body, answer: '1' }))).status, 200);
+  assert.equal((await recoverPassword(context('recover-password', db, { ...body, answer: '1' }))).status, 401);
+});
+
+test('admin rescue retires the old answer and code; user can configure a new question without losing data', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const target = credentials.h.user_id;
+  const owner = await login(db, 'h', credentials.h.password);
+  const other = await login(db, 'y', credentials.y.password);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  for (const [account, session] of [['h', owner], ['y', other]]) {
+    assert.equal((await onRequest(context('security-question', db, { currentPassword: credentials[account].password, question: 'Private question?', answer: 'old-answer' }, session.cookie))).status, 200);
+  }
+  const before = sqlite.prepare('SELECT * FROM user_library WHERE user_id = ?').all(target);
+  assert.equal((await adminApi(context(`admin/users/${target}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'rescue6' }, admin.cookie))).status, 200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM user_security_questions WHERE user_id = ?').get(target).n, 0);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM user_security_questions WHERE user_id = ?').get(credentials.y.user_id).n, 1);
+  assert.equal((await recoverPassword(context('recover-password', db, { method: 'security-question', username: 'h', answer: 'old-answer', newPassword: 'attack6' }))).status, 401);
+  assert.equal((await recoverPassword(context('recover-password', db, { username: 'h', recoveryCode: credentials.h.recoveryCode, newPassword: 'attack6' }))).status, 401);
+  const fresh = await login(db, 'h', 'rescue6');
+  assert.equal(fresh.response.status, 200);
+  assert.equal((await onRequest(context('security-question', db, { currentPassword: 'rescue6', question: 'New private question?', answer: 'new-answer' }, fresh.cookie))).status, 200);
+  assert.equal((await recoverPassword(context('recover-password', db, { method: 'security-question', username: 'h', answer: 'new-answer', newPassword: 'chosen6' }))).status, 200);
+  assert.equal((await login(db, 'h', 'chosen6')).response.status, 200);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM user_library WHERE user_id = ?').all(target), before);
+});
+
+test('an old answer verified before admin rescue cannot overwrite the rescued credential afterward', async t => {
+  const { db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'Private question?', answer: 'old-answer' }, owner.cookie));
+  const raced = { ...db, async batch(statements) {
+    if (!statements[0].query.startsWith('UPDATE users SET password_salt')) return db.batch(statements);
+    assert.equal((await adminApi(context(`admin/users/${credentials.h.user_id}/reset-password`, db, { currentPassword: credentials.admin.password, newPassword: 'rescue6' }, admin.cookie))).status, 200);
+    return db.batch(statements);
+  } };
+  assert.equal((await recoverPassword(context('recover-password', raced, { method: 'security-question', username: 'h', answer: 'old-answer', newPassword: 'attack6' }))).status, 401);
+  assert.equal((await login(db, 'h', 'rescue6')).response.status, 200);
+  assert.equal((await login(db, 'h', 'attack6')).response.status, 401);
+});
+
+test('explicit admin unlock only clears the lock and preserves questions, credentials, sessions and codes', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const target = credentials.h.user_id;
+  const owner = await login(db, 'h', credentials.h.password);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'Private question?', answer: 'old-answer' }, owner.cookie));
+  sqlite.prepare('INSERT INTO user_security_question_locks VALUES (?,5)').run(target);
+  const question = sqlite.prepare('SELECT * FROM user_security_questions WHERE user_id = ?').get(target);
+  const codes = sqlite.prepare('SELECT * FROM user_recovery_verifiers WHERE user_id = ?').all(target);
+  const password = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash;
+  const response = await adminApi(context(`admin/users/${target}/unlock-recovery`, db, { currentPassword: credentials.admin.password }, admin.cookie));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM user_security_question_locks WHERE user_id = ?').get(target).n, 0);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM user_security_questions WHERE user_id = ?').get(target), question);
+  assert.deepEqual(sqlite.prepare('SELECT * FROM user_recovery_verifiers WHERE user_id = ?').all(target), codes);
+  assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, password);
+  assert.equal((await onRequest(context('security-question', db, null, owner.cookie))).status, 200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM admin_credential_events WHERE target_user_id = ?').get(target).n, 1);
+  assert.equal((await recoverPassword(context('recover-password', db, { method: 'security-question', username: 'h', answer: 'old-answer', newPassword: 'chosen6' }))).status, 200);
+});
+
+test('unlock requires administrator password and same origin, and cannot target an admin', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const target = credentials.h.user_id;
+  sqlite.prepare('INSERT INTO user_security_question_locks VALUES (?,5)').run(target);
+  const path = `admin/users/${target}/unlock-recovery`;
+  const body = { currentPassword: credentials.admin.password };
+  assert.equal((await adminApi(context(path, db, body))).status, 401);
+  assert.equal((await adminApi(context(path, db, body, owner.cookie))).status, 403);
+  assert.equal((await adminApi(context(path, db, { currentPassword: 'wrong' }, admin.cookie))).status, 400);
+  for (const origin of [null, 'https://evil.test']) {
+    const request = context(path, db, body, admin.cookie);
+    if (origin) request.request.headers.set('Origin', origin); else request.request.headers.delete('Origin');
+    assert.equal((await adminApi(request)).status, 403);
+  }
+  assert.equal((await adminApi(context(`admin/users/${credentials.admin.user_id}/unlock-recovery`, db, body, admin.cookie))).status, 404);
+  assert.equal(sqlite.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').get(target).failures, 5);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM admin_credential_events').get().n, 0);
+});
+
+test('unlock rechecks live authorization and target credential and rolls back if audit is unavailable', async t => {
+  for (const change of ['session', 'role', 'admin-password', 'target-password', 'missing-audit', 'delete-failure']) {
+    const { sqlite, db, credentials } = await fixture(t);
+    const admin = await login(db, 'admin', credentials.admin.password);
+    const target = credentials.h.user_id;
+    sqlite.prepare('INSERT INTO user_security_question_locks VALUES (?,5)').run(target);
+    const raced = { ...db, async batch(statements) {
+      if (!statements[0].query.startsWith('INSERT INTO admin_credential_events')) return db.batch(statements);
+      if (change === 'delete-failure') sqlite.exec("CREATE TRIGGER reject_unlock BEFORE DELETE ON user_security_question_locks BEGIN SELECT RAISE(ABORT, 'audit fixture'); END");
+      if (change === 'session') sqlite.prepare('DELETE FROM sessions WHERE user_id = ?').run(credentials.admin.user_id);
+      if (change === 'role') sqlite.prepare("UPDATE users SET role = 'user' WHERE id = ?").run(credentials.admin.user_id);
+      if (change === 'admin-password') sqlite.prepare("UPDATE users SET password_hash = 'changed' WHERE id = ?").run(credentials.admin.user_id);
+      if (change === 'target-password') sqlite.prepare("UPDATE users SET password_hash = 'changed' WHERE id = ?").run(target);
+      if (change === 'missing-audit') sqlite.exec('DROP TABLE admin_credential_events');
+      return db.batch(statements);
+    } };
+    const response = await adminApi(context(`admin/users/${target}/unlock-recovery`, raced, { currentPassword: credentials.admin.password }, admin.cookie));
+    assert.equal(response.status, ['missing-audit', 'delete-failure'].includes(change) ? 500 : 409, change);
+    assert.equal(sqlite.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').get(target).failures, 5, change);
+    if (change !== 'missing-audit') assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM admin_credential_events').get().n, 0, change);
+  }
 });
 
 test('parallel wrong answers cannot lose increments or exceed the five-answer lock cap', async t => {

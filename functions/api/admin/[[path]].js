@@ -28,7 +28,7 @@ export async function onRequest(context) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\/api\/admin\/?/, "");
 
-    const securityMatch = path.match(/^users\/([^/]+)\/(security-question|reset-password)$/);
+    const securityMatch = path.match(/^users\/([^/]+)\/(security-question|reset-password|unlock-recovery)$/);
     if (securityMatch) {
       const targetId = safeId(decodeURIComponent(securityMatch[1]));
       if (!targetId) return json({ error: "INVALID_USER" }, 400);
@@ -39,14 +39,34 @@ export async function onRequest(context) {
         const lock = await db.prepare("SELECT failures FROM user_security_question_locks WHERE user_id = ?").bind(targetId).first();
         return json({ question: row?.question ?? null, recoveryLocked: Number(lock?.failures) >= 5, failedAnswers: Number(lock?.failures ?? 0) });
       }
-      if (securityMatch[2] === "reset-password" && request.method === "POST") {
+      if (["reset-password", "unlock-recovery"].includes(securityMatch[2]) && request.method === "POST") {
+        const unlockOnly = securityMatch[2] === "unlock-recovery";
         const body = await readAuthJson(request);
         const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
         const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
-        if (newPassword.length < 6 || newPassword.length > 128) return json({ error: "INVALID_PASSWORD", message: "كلمة المرور الجديدة يجب أن تكون بين 6 و128 حرفًا." }, 400);
+        if (!unlockOnly && (newPassword.length < 6 || newPassword.length > 128)) return json({ error: "INVALID_PASSWORD", message: "كلمة المرور الجديدة يجب أن تكون بين 6 و128 حرفًا." }, 400);
         if (!(await reserveAuthAttempt(db, request, "password-change", session.user.id))) return rateLimited();
         const admin = await db.prepare("SELECT password_salt, password_hash, password_iterations FROM users WHERE id = ? AND role = 'admin'").bind(session.user.id).first();
         if (!currentPassword || currentPassword.length > 128 || !admin || !(await verifyPassword(currentPassword, admin))) return json({ error: "WRONG_PASSWORD", message: "كلمة مرور الأدمن غير صحيحة." }, 400);
+        if (unlockOnly) {
+          const now = Date.now();
+          const authorization = `EXISTS (SELECT 1 FROM users a JOIN sessions s ON s.user_id = a.id
+            WHERE a.id = ? AND a.role = 'admin' AND a.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?)`;
+          const args = [targetId, target.password_hash, session.user.id, admin.password_hash, session.tokenHash, now];
+          // The audit and unlock are one transaction, with live authorization
+          // and the target credential rechecked inside both statements.
+          const results = await db.batch([
+            db.prepare(`INSERT INTO admin_credential_events (admin_user_id, target_user_id, created_at)
+              SELECT ?, u.id, ? FROM users u WHERE u.id = ? AND u.role = 'user' AND u.password_hash = ?
+              AND ${authorization} AND EXISTS (SELECT 1 FROM user_security_question_locks WHERE user_id = u.id AND failures >= 5)`)
+              .bind(session.user.id, now, ...args),
+            db.prepare(`DELETE FROM user_security_question_locks WHERE user_id = ? AND failures >= 5
+              AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'user' AND password_hash = ? AND ${authorization})`)
+              .bind(targetId, ...args),
+          ]);
+          if (Number(results[0]?.meta?.changes) !== 1) return json({ error: "UNLOCK_NOT_APPLIED", message: "لم يُفتح القفل. حدّث الصفحة وتحقق من الحساب والجلسة." }, 409);
+          return json({ ok: true });
+        }
         const saltBytes = crypto.getRandomValues(new Uint8Array(16));
         const salt = bytesToBase64Url(saltBytes);
         const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
@@ -56,7 +76,7 @@ export async function onRequest(context) {
             WHERE id = ? AND role = 'user' AND password_hash = ? AND EXISTS
             (SELECT 1 FROM users a JOIN sessions s ON s.user_id = a.id WHERE a.id = ? AND a.role = 'admin' AND a.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?)`)
             .bind(salt, hash, PASSWORD_ITERATIONS, now, targetId, target.password_hash, session.user.id, admin.password_hash, session.tokenHash, now),
-          ...["sessions", "user_password_verifiers", "user_recovery_verifiers", "account_recovery", "user_security_question_locks"].map(table => db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)`).bind(targetId, targetId, hash)),
+          ...["sessions", "user_password_verifiers", "user_recovery_verifiers", "account_recovery", "user_security_questions", "user_security_question_locks"].map(table => db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)`).bind(targetId, targetId, hash)),
           db.prepare(`INSERT INTO admin_credential_events (admin_user_id, target_user_id, created_at)
             SELECT ?, id, ? FROM users WHERE id = ? AND password_hash = ?`).bind(session.user.id, now, targetId, hash),
         ]);
