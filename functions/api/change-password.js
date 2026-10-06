@@ -29,7 +29,7 @@ export async function onRequestPost(context) {
       .first();
     if (!authRow) return json({ error: "UNAUTHORIZED" }, 401);
 
-    if (!(await verifyPassword(currentPassword, authRow, db))) {
+    if (!(await verifyPassword(currentPassword, authRow))) {
       return json({ error: "WRONG_PASSWORD", message: "كلمة المرور الحالية غير صحيحة." }, 400);
     }
 
@@ -70,24 +70,10 @@ async function sha256Base64Url(value) {
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i += 1) result |= a[i] ^ b[i];
-  return result === 0;
-}
-
 function bytesToBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value) {
-  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function getCookie(request, name) {

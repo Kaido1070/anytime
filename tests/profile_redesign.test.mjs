@@ -51,7 +51,7 @@ test("account profile has fixed hierarchy and modular content groups", async () 
   assert.match(account, /id: "lists"/);
   assert.match(account, /id: "reading"/);
   assert.match(account, /id: "activity"/);
-  assert.match(account, /sectionsForSave/);
+  assert.match(account, /ProfileListsManager/);
   assert.doesNotMatch(account, /<Home embedded/);
   assert.doesNotMatch(account, /<Friends embedded/);
   assert.doesNotMatch(account, /<Lists embedded/);
@@ -177,3 +177,4 @@ test("profile source failures stay inside their own preview sections", async () 
   assert.match(overview, /onRetry\?: \(\) => void/);
   assert.match(overview, /profile-section-error compact/);
 });
+

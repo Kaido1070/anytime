@@ -84,24 +84,6 @@ function exactChapterIdentity(chapter: SourceChapter) {
   return Number.isFinite(number) ? String(number) : chapter.title.trim();
 }
 
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  concurrency: number,
-  mapper: (value: T, index: number) => Promise<R>,
-) {
-  const results = new Array<R>(values.length);
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
-    while (true) {
-      const index = cursor++;
-      if (index >= values.length) break;
-      results[index] = await mapper(values[index], index);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
-
 async function withinSourceBudget<T>(promise: Promise<T>, milliseconds = 7500): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -114,33 +96,6 @@ async function withinSourceBudget<T>(promise: Promise<T>, milliseconds = 7500): 
   } finally {
     if (timer) clearTimeout(timer);
   }
-}
-
-async function resolveInChunks(keys: string[]) {
-  const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
-  const chunks: string[][] = [];
-  for (let index = 0; index < unique.length; index += 60) {
-    chunks.push(unique.slice(index, index + 60));
-  }
-  const results = await Promise.allSettled(chunks.map((chunk) => sourceService.resolve(chunk)));
-  return results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-}
-
-async function hydrateGroup(group: SourceGroup) {
-  const details = await mapWithConcurrency(group.items, 3, async (item) => {
-    try {
-      return await sourceService.getSeries(item.key);
-    } catch {
-      return item;
-    }
-  });
-  const readable = details.filter((item) => (item.chapters?.length ?? 0) > 0);
-  const items = readable.length ? readable : details;
-  return {
-    ...group,
-    primary: items.find((item) => item.key === group.primary.key) ?? items[0] ?? group.primary,
-    items,
-  };
 }
 
 function groupChapters(
@@ -363,3 +318,4 @@ export async function loadUnreadFollowedCount() {
   const feed = await loadNewChapterFeed(1);
   return feed.unreadFollowedCount;
 }
+

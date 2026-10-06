@@ -10,7 +10,6 @@ import {
   ProfileReadingSection,
   ProfileStatsSection,
   type ProfileReadingIssue,
-  type ProfileAchievementSummaryItem,
 } from "../components/ProfileOverview";
 import { Icon } from "../components/UI";
 import { ProfileListsManager } from "../components/ProfileListsManager";
@@ -27,7 +26,6 @@ import type {
   ProfileLibraryItem,
   SourceManga,
   UserProfileSection,
-  UserProfileSectionInput,
   UserProfileView,
   ReadingStats,
 } from "../types";
@@ -86,50 +84,6 @@ function buildContentGroups(sections: UserProfileSection[]): ContentGroup[] {
     .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
 }
 
-function sectionsForSave(
-  sections: UserProfileSection[],
-  groups: ContentGroup[],
-): UserProfileSectionInput[] {
-  const buckets = new Map<ContentGroupId, UserProfileSection[]>();
-  for (const group of groups) buckets.set(group.id, []);
-  const passthrough: UserProfileSection[] = [];
-
-  for (const section of sections) {
-    const id = groupIdForSection(section);
-    if (!id) {
-      passthrough.push(section);
-      continue;
-    }
-    buckets.get(id)?.push(section);
-  }
-
-  const ordered: UserProfileSectionInput[] = [];
-  for (const group of groups) {
-    const rows = [...(buckets.get(group.id) ?? [])].sort(
-      (a, b) => a.position - b.position || a.key.localeCompare(b.key),
-    );
-    for (const row of rows) {
-      ordered.push({
-        sectionType: row.sectionType,
-        referenceId: row.referenceId,
-        isVisible: group.visible,
-      });
-    }
-  }
-
-  for (const row of passthrough.sort(
-    (a, b) => a.position - b.position || a.key.localeCompare(b.key),
-  )) {
-    ordered.push({
-      sectionType: row.sectionType,
-      referenceId: row.referenceId,
-      isVisible: row.isVisible,
-    });
-  }
-
-  return ordered;
-}
-
 async function resolveWorks(keys: string[]) {
   const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
   const chunks: string[][] = [];
@@ -172,200 +126,6 @@ async function loadCachedSeries(keys: string[]) {
   }
 
   return mapped;
-}
-
-function ProfileContentEditor({
-  groups,
-  busy,
-  error,
-  onChange,
-  onSave,
-  onCancel,
-}: {
-  groups: ContentGroup[];
-  busy: boolean;
-  error: string;
-  onChange: (groups: ContentGroup[]) => void;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
-  const move = (index: number, delta: number) => {
-    const target = index + delta;
-    if (target < 0 || target >= groups.length) return;
-    const next = [...groups];
-    const [moving] = next.splice(index, 1);
-    next.splice(target, 0, moving);
-    onChange(next);
-  };
-
-  return (
-    <section className="profile-content-editor" aria-labelledby="profile-customize-title">
-      <div className="profile-content-editor-heading">
-        <div>
-          <p className="eyebrow">تخصيص الحساب</p>
-          <h2 id="profile-customize-title">ترتيب أقسام المحتوى</h2>
-        </div>
-        <div>
-          <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
-            إلغاء
-          </button>
-          <button className="primary" type="button" onClick={onSave} disabled={busy}>
-            {busy ? "جاري الحفظ…" : "حفظ"}
-          </button>
-        </div>
-      </div>
-      <p className="muted profile-content-editor-hint">
-        الهوية والإحصائيات ثابتة. يمكنك ترتيب أقسام المحتوى أو إخفاءها فقط.
-      </p>
-      <div className="profile-content-editor-list">
-        {groups.map((group, index) => (
-          <div className="profile-content-editor-row" key={group.id}>
-            <span className="profile-content-drag" aria-hidden="true">☰</span>
-            <b>{group.label}</b>
-            <div className="profile-content-move">
-              <button
-                type="button"
-                disabled={busy || index === 0}
-                aria-label={`تحريك ${group.label} للأعلى`}
-                onClick={() => move(index, -1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                disabled={busy || index === groups.length - 1}
-                aria-label={`تحريك ${group.label} للأسفل`}
-                onClick={() => move(index, 1)}
-              >
-                ↓
-              </button>
-            </div>
-            <button
-              className="profile-content-visibility"
-              type="button"
-              aria-pressed={group.visible}
-              onClick={() =>
-                onChange(
-                  groups.map((entry) =>
-                    entry.id === group.id ? { ...entry, visible: !entry.visible } : entry,
-                  ),
-                )
-              }
-              disabled={busy}
-            >
-              {group.visible ? "ظاهر" : "مخفي"}
-            </button>
-          </div>
-        ))}
-      </div>
-      {error && <p className="error">{error}</p>}
-    </section>
-  );
-}
-
-function ProfileListsEditor({
-  sections,
-  lists,
-  busy,
-  error,
-  onSave,
-  onCancel,
-}: {
-  sections: UserProfileSection[];
-  lists: UserProfileView["lists"];
-  busy: boolean;
-  error: string;
-  onSave: (sections: UserProfileSection[]) => void;
-  onCancel: () => void;
-}) {
-  const initial = sections
-    .filter((section) => groupIdForSection(section) === "lists")
-    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key));
-  const [items, setItems] = useState(initial);
-
-  useEffect(() => {
-    setItems(initial);
-  }, [sections]);
-
-  const labelFor = (section: UserProfileSection) => {
-    if (section.sectionType === "favorites") return "المفضلة";
-    return lists?.find((list) => list.id === section.referenceId)?.name ?? "قائمة";
-  };
-
-  const move = (index: number, delta: number) => {
-    const target = index + delta;
-    if (target < 0 || target >= items.length) return;
-    const next = [...items];
-    const [moving] = next.splice(index, 1);
-    next.splice(target, 0, moving);
-    setItems(next);
-  };
-
-  return (
-    <section className="profile-content-editor" aria-labelledby="profile-lists-customize-title">
-      <div className="profile-content-editor-heading">
-        <div>
-          <p className="eyebrow">القوائم</p>
-          <h2 id="profile-lists-customize-title">ترتيب القوائم</h2>
-        </div>
-        <div>
-          <button className="secondary" type="button" onClick={onCancel} disabled={busy}>
-            إلغاء
-          </button>
-          <button className="primary" type="button" onClick={() => onSave(items)} disabled={busy}>
-            {busy ? "جاري الحفظ…" : "حفظ"}
-          </button>
-        </div>
-      </div>
-      <p className="muted profile-content-editor-hint">
-        هذا التعديل خاص بالقوائم فقط ولا يغيّر ترتيب أقرأ الآن أو النشاط.
-      </p>
-      <div className="profile-content-editor-list">
-        {items.map((section, index) => (
-          <div className="profile-content-editor-row" key={section.key}>
-            <span className="profile-content-drag" aria-hidden="true">☰</span>
-            <b dir="auto">{labelFor(section)}</b>
-            <div className="profile-content-move">
-              <button
-                type="button"
-                disabled={busy || index === 0}
-                aria-label={`تحريك ${labelFor(section)} للأعلى`}
-                onClick={() => move(index, -1)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                disabled={busy || index === items.length - 1}
-                aria-label={`تحريك ${labelFor(section)} للأسفل`}
-                onClick={() => move(index, 1)}
-              >
-                ↓
-              </button>
-            </div>
-            <button
-              className="profile-content-visibility"
-              type="button"
-              aria-pressed={section.isVisible}
-              onClick={() =>
-                setItems((current) =>
-                  current.map((entry) =>
-                    entry.key === section.key
-                      ? { ...entry, isVisible: !entry.isVisible }
-                      : entry,
-                  ),
-                )
-              }
-              disabled={busy}
-            >
-              {section.isVisible ? "ظاهر" : "مخفي"}
-            </button>
-          </div>
-        ))}
-      </div>
-      {error && <p className="error">{error}</p>}
-    </section>
-  );
 }
 
 function FullActivityView() {
@@ -532,7 +292,6 @@ export function Account() {
 
   const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [readingStatsSummary, setReadingStatsSummary] = useState<ReadingStats | null>(null);
-  const [sections, setSections] = useState<UserProfileSection[]>([]);
   const [groups, setGroups] = useState<ContentGroup[]>([]);
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
   const [series, setSeries] = useState<Record<string, SourceManga>>({});
@@ -564,7 +323,6 @@ export function Account() {
         userDataService.getProfileSections(PROFILE_PREVIEW_LIMIT),
       ]);
       setProfile(nextProfile);
-      setSections(nextSections);
       setGroups(buildContentGroups(nextSections));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تحميل ملخص الحساب.");
@@ -798,71 +556,7 @@ export function Account() {
     );
   }
 
-  const achievementSummary: ProfileAchievementSummaryItem[] = (() => {
-    if (!readingStatsSummary) return [];
 
-    const highestAchievement = (
-      value: number,
-      levels: ReadonlyArray<readonly [number, string]>,
-      kind: ProfileAchievementSummaryItem["kind"],
-      category: string,
-    ): ProfileAchievementSummaryItem => {
-      let achievement = "لم يُفتح بعد";
-      let tierIndex = 0;
-
-      levels.forEach(([threshold, name], index) => {
-        if (value >= threshold) {
-          achievement = name;
-          tierIndex = index;
-        }
-      });
-
-      return { category, achievement, tierIndex, kind };
-    };
-
-    return [
-      highestAchievement(
-        readingStatsSummary.organicCompletedChapters,
-        [
-          [10, "برونزي"],
-          [25, "فضي"],
-          [50, "ذهبي"],
-          [100, "بلاتيني"],
-          [250, "ماسي"],
-          [500, "ماستر"],
-          [1000, "نخبة"],
-          [2500, "أسطوري"],
-          [5000, "أسطورة Wany"],
-        ],
-        "chapters",
-        "إنجاز الفصول",
-      ),
-      highestAchievement(
-        readingStatsSummary.storiesRead,
-        [
-          [1, "برونزي"],
-          [5, "فضي"],
-          [10, "ذهبي"],
-          [25, "بلاتيني"],
-          [50, "ماسي"],
-          [100, "ماستر"],
-        ],
-        "stories",
-        "إنجاز الأعمال",
-      ),
-      highestAchievement(
-        readingStatsSummary.bestStreak,
-        [
-          [3, "برونزي"],
-          [7, "فضي"],
-          [14, "ذهبي"],
-          [30, "بلاتيني"],
-        ],
-        "streak",
-        "إنجاز الاستمرارية",
-      ),
-    ];
-  })();
 
   const stats = profile?.stats;
   const orderedGroups = groups.filter((group) => group.visible);
@@ -972,3 +666,4 @@ export function Account() {
     </>
   );
 }
+

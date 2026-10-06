@@ -11,7 +11,7 @@ import { readerPath } from "../services/readerPaths";
 import { formatGregorianDate } from "../services/dateFormat";
 import { sourceService } from "../services/sources";
 import { saveWorkSnapshot } from "../services/workSnapshots";
-import type { LibraryStatus, SourceManga } from "../types";
+import type { SourceManga } from "../types";
 
 const CHAPTERS_PER_PAGE = 100;
 
@@ -83,7 +83,7 @@ export function SourceMangaDetails() {
   const sourceGroupParam = searchParams.get("sources");
   const requestedSourceKeys = parseSourceGroupKeys(sourceGroupParam, sourceKey);
   const requestedSourceSignature = requestedSourceKeys.join("|");
-  const { data, favorite, addToLibrary, setLibraryStatus, saveProgress, markChapterUnread, markWorkUnread, markChaptersRead } = useLibrary();
+  const { data, favorite, saveProgress, markChapterUnread, markWorkUnread, markChaptersRead } = useLibrary();
   const [item, setItem] = useState<SourceManga | null>(null);
   const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
@@ -373,3 +373,4 @@ export function SourceMangaDetails() {
     </>
   );
 }
+

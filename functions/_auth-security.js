@@ -90,7 +90,7 @@ export function authError(error) {
   return null;
 }
 
-export function response(body, status = 200, headers = {}) {
+function response(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers } });
 }
 

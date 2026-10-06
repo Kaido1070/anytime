@@ -1596,7 +1596,7 @@ async function syncTeamXLatest(db) {
       const item = baseItems[index];
 
       try {
-        const detailHtml = await teamXFetchText(item.url, false);
+        const detailHtml = await teamXFetchText(item.url);
         const chapters = parseTeamXChapters(detailHtml, item.url)
           .filter((chapter) => !chapter.synthetic && Boolean(chapter.publishedAt));
         if (!chapters.length) continue;
@@ -1667,7 +1667,7 @@ async function teamXItemsFromHtml(html) {
 }
 
 async function teamXSeries(db, item) {
-  const html = await teamXFetchText(item.url || `/series/${encodeURIComponent(item.slug)}`, false);
+  const html = await teamXFetchText(item.url || `/series/${encodeURIComponent(item.slug)}`);
   const plain = cleanText(stripTags(html));
   const title = cleanText(
     firstMatch(html, /author-info-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -1803,7 +1803,7 @@ async function teamXChapter(db, item, number) {
   const series = await teamXSeries(db, item);
   const selected = series.chapters?.find((chapter) => chapter.number === number);
   const chapterUrl = selected?.url || `${item.url || `${TEAMX_BASE}/series/${item.slug}`}/${number}`;
-  const html = await teamXFetchText(chapterUrl, false);
+  const html = await teamXFetchText(chapterUrl);
   const pages = parseTeamXPages(html);
   if (!pages.length) {
     const plain = cleanText(stripTags(html));
@@ -1836,8 +1836,8 @@ function isLikelyUiImage(url) {
   return /logo|avatar|favicon|icon|profile|ads?|banner/i.test(url);
 }
 
-async function teamXFetchText(pathOrUrl, useBase = true) {
-  const target = useBase ? new URL(pathOrUrl, TEAMX_BASE).toString() : new URL(pathOrUrl, TEAMX_BASE).toString();
+async function teamXFetchText(pathOrUrl) {
+  const target = new URL(pathOrUrl, TEAMX_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(TEAMX_BASE, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"),
     redirect: "follow",
@@ -2221,7 +2221,7 @@ function asqItemsFromHtml(html) {
 }
 
 async function asqSeries(db, item) {
-  const html = await asqFetchText(item.url || "/manga/" + encodeURIComponent(item.slug) + "/", false);
+  const html = await asqFetchText(item.url || "/manga/" + encodeURIComponent(item.slug) + "/");
   const title = cleanText(
     firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
       firstMatch(html, /id=["']manga-title["'][^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -2615,7 +2615,7 @@ async function asqChapter(db, item, number, preferredUrl = "") {
   const sourceChapterUrl = new URL(selected.url, ASQ_BASE).toString();
   const chapterUrl = new URL(sourceChapterUrl);
   chapterUrl.searchParams.set("style", "list");
-  const html = await asqFetchText(chapterUrl.toString(), false);
+  const html = await asqFetchText(chapterUrl.toString());
   const pages = parseAsqPages(html);
   if (!pages.length) {
     throw new SourceError("NO_PAGES", "العاشق لم يرجع صور الفصل.", 502);
@@ -2708,7 +2708,7 @@ function isAsqUiImage(url) {
   return /(?:logo|avatar|favicon|icon|profile)(?:[\/_-]|\.)/i.test(url);
 }
 
-async function asqFetchText(pathOrUrl, useBase = true) {
+async function asqFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, ASQ_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(
@@ -2820,7 +2820,7 @@ function starzItemsFromHtml(html) {
 
 async function starzSeries(db, item) {
   const seriesUrl = item.url || STARZ_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
-  const html = await starzFetchText(seriesUrl, false);
+  const html = await starzFetchText(seriesUrl);
   const title = cleanText(
     firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
       firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -3118,10 +3118,10 @@ async function starzChapter(db, item, number, preferredUrl = "") {
   const chapterUrl = new URL(sourceChapterUrl);
   chapterUrl.searchParams.set("style", "list");
 
-  let html = await starzFetchText(chapterUrl.toString(), false);
+  let html = await starzFetchText(chapterUrl.toString());
   let pages = parseStarzPages(html);
   if (!pages.length && sourceChapterUrl) {
-    html = await starzFetchText(sourceChapterUrl, false);
+    html = await starzFetchText(sourceChapterUrl);
     pages = parseStarzPages(html);
   }
   if (!pages.length) throw new SourceError("NO_PAGES", "StarzManga لم يرجع صور الفصل.", 502);
@@ -3162,7 +3162,7 @@ function isStarzUiImage(url) {
   return /(?:logo|avatar|favicon|icon|profile|banner|ads?)(?:[\/_-]|\.)/i.test(url);
 }
 
-async function starzFetchText(pathOrUrl, useBase = true) {
+async function starzFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, STARZ_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(
@@ -4246,7 +4246,7 @@ function mangalikItemsFromHtml(html) {
 
 async function mangalikSeries(db, item) {
   const seriesUrl = item.url || MANGALIK_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
-  const html = await mangalikFetchText(seriesUrl, false);
+  const html = await mangalikFetchText(seriesUrl);
 
   const title = cleanText(
     firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -4432,16 +4432,16 @@ async function mangalikChapter(db, item, number, preferredUrl = "") {
   const chapterUrl = new URL(sourceChapterUrl);
 
   chapterUrl.searchParams.set("style", "list");
-  let html = await mangalikFetchText(chapterUrl.toString(), false);
+  let html = await mangalikFetchText(chapterUrl.toString());
   let pages = parseMangalikPages(html);
 
   if (!pages.length && sourceChapterUrl) {
-    html = await mangalikFetchText(sourceChapterUrl, false);
+    html = await mangalikFetchText(sourceChapterUrl);
     pages = parseMangalikPages(html);
   }
 
   if (!pages.length && directUrl && sourceChapterUrl !== directUrl) {
-    html = await mangalikFetchText(directUrl, false);
+    html = await mangalikFetchText(directUrl);
     pages = parseMangalikPages(html);
   }
 
@@ -4502,7 +4502,7 @@ function isMangalikUiImage(url) {
   return /(?:logo|avatar|favicon|icon|profile|banner|ads?)(?:[\/_-]|\.)/i.test(url);
 }
 
-async function mangalikFetchText(pathOrUrl, useBase = true) {
+async function mangalikFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, MANGALIK_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(

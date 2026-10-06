@@ -40,7 +40,7 @@ export async function onRequestPost(context) {
       return adminStageError("ADMIN_LOOKUP_FAILED", error);
     }
 
-    if (!(user && isAdminUser(user) ? await verifyPassword(suppliedSecret, user, db) : await verifyMissingUser(suppliedSecret))) {
+    if (!(user && isAdminUser(user) ? await verifyPassword(suppliedSecret, user) : await verifyMissingUser(suppliedSecret))) {
       await sleep(120);
       return invalidLogin();
     }
@@ -96,13 +96,6 @@ async function sha256Base64Url(value) {
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let index = 0; index < a.length; index += 1) result |= a[index] ^ b[index];
-  return result === 0;
-}
-
 function randomToken(size) {
   return bytesToBase64Url(crypto.getRandomValues(new Uint8Array(size)));
 }
@@ -111,13 +104,6 @@ function bytesToBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value) {
-  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function sessionCookie(token, ttlMs) {

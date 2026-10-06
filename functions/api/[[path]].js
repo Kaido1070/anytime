@@ -8,7 +8,7 @@ export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAX_JSON_BYTES = 32 * 1024;
+
 const PROGRESS_ACTIVITY_AGGREGATION_MS = 30 * 60 * 1000;
 const AVATAR_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AVATAR_IMAGE_FAILURE_TTL_MS = 5 * 60 * 1000;
@@ -81,7 +81,7 @@ async function route(request, url, db, covers) {
       .bind(username)
       .first();
 
-    if (!(user ? await verifyPassword(password, user, db) : await verifyMissingUser(password))) {
+    if (!(user ? await verifyPassword(password, user) : await verifyMissingUser(password))) {
       await sleep(120);
       return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
     }
@@ -155,7 +155,7 @@ async function route(request, url, db, covers) {
     if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
     if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
     const row = await db.prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ?").bind(user.id).first();
-    if (!row || !(await verifyPassword(password, row, db))) return json({ error: "WRONG_PASSWORD" }, 400);
+    if (!row || !(await verifyPassword(password, row))) return json({ error: "WRONG_PASSWORD" }, 400);
     const credential = await createSecurityAnswer(answer);
     const now = Date.now();
     const result = await db.prepare(`INSERT INTO user_security_questions (user_id, question, answer_salt, answer_hash, answer_iterations, updated_at)
@@ -174,7 +174,7 @@ async function route(request, url, db, covers) {
     if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
     if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
     const row = await db.prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ?").bind(user.id).first();
-    if (!row || !(await verifyPassword(password, row, db))) return json({ error: "WRONG_PASSWORD" }, 400);
+    if (!row || !(await verifyPassword(password, row))) return json({ error: "WRONG_PASSWORD" }, 400);
     const code = newSessionToken();
     const hash = await sessionTokenHash(code);
     const now = Date.now();
@@ -1767,7 +1767,7 @@ async function route(request, url, db, covers) {
       )
       .bind(user.id)
       .first();
-    if (!authRow || !(await verifyPassword(currentPassword, authRow, db))) {
+    if (!authRow || !(await verifyPassword(currentPassword, authRow))) {
       return json({ error: "WRONG_PASSWORD", message: "كلمة المرور الحالية غير صحيحة." }, 400);
     }
 
@@ -3169,24 +3169,10 @@ async function sha256Base64Url(value) {
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i += 1) result |= a[i] ^ b[i];
-  return result === 0;
-}
-
 function bytesToBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value) {
-  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function randomToken(size) {

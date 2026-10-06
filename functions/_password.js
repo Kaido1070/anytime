@@ -6,7 +6,7 @@ export async function verifyMissingUser(password) {
   return false;
 }
 
-export async function verifyPassword(password, row, db) {
+export async function verifyPassword(password, row) {
   const candidates = [row].filter(candidate =>
     typeof candidate.password_salt === "string" && typeof candidate.password_hash === "string");
   let unsupported = false;

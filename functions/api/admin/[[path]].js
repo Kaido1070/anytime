@@ -46,7 +46,7 @@ export async function onRequest(context) {
         if (newPassword.length < 6 || newPassword.length > 128) return json({ error: "INVALID_PASSWORD", message: "كلمة المرور الجديدة يجب أن تكون بين 6 و128 حرفًا." }, 400);
         if (!(await reserveAuthAttempt(db, request, "password-change", session.user.id))) return rateLimited();
         const admin = await db.prepare("SELECT password_salt, password_hash, password_iterations FROM users WHERE id = ? AND role = 'admin'").bind(session.user.id).first();
-        if (!currentPassword || currentPassword.length > 128 || !admin || !(await verifyPassword(currentPassword, admin, db))) return json({ error: "WRONG_PASSWORD", message: "كلمة مرور الأدمن غير صحيحة." }, 400);
+        if (!currentPassword || currentPassword.length > 128 || !admin || !(await verifyPassword(currentPassword, admin))) return json({ error: "WRONG_PASSWORD", message: "كلمة مرور الأدمن غير صحيحة." }, 400);
         const saltBytes = crypto.getRandomValues(new Uint8Array(16));
         const salt = bytesToBase64Url(saltBytes);
         const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);

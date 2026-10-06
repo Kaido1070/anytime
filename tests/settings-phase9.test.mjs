@@ -191,7 +191,7 @@ test("password change verifies the current password and invalidates other sessio
     "utf8",
   );
 
-  assert.match(source, /verifyPassword\(currentPassword, authRow, db\)/);
+  assert.match(source, /verifyPassword\(currentPassword, authRow\)/);
   const passwords = await readFile(new URL("../functions/_password.js", import.meta.url), "utf8");
   assert.match(passwords, /PBKDF2/);
   assert.match(passwords, /hash: "SHA-256"/);

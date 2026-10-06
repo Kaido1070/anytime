@@ -210,3 +210,7 @@ These files contain historical phase-specific details. This README is the high-l
 
 
 Account security validation and deployment limits: [account-security-audit.md](docs/account-security-audit.md). Settings support one-use recovery-code replacement and logout from all devices. Password changes remain optional (minimum six characters), rotate the current cookie and revoke other sessions.
+
+### Unused code checks
+
+Run `pnpm check:unused` after installing dependencies. Knip checks unused files, exports and dependencies; TypeScript rejects unused locals and parameters during checks and builds. `knip.json` treats Cloudflare API routes, tests, build scripts and Vite configuration as entry points, so automatic routes are retained. SQL migrations, private migration tools and historical data are not deleted by this check.

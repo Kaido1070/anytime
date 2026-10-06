@@ -1,4 +1,4 @@
-export const USER_ID_DIGITS = 32;
+const USER_ID_DIGITS = 32;
 
 // Decimal TEXT, never a JavaScript Number or a SQLite INTEGER.
 // Rejection sampling avoids modulo bias. Leading zero is excluded.

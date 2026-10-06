@@ -36,7 +36,7 @@ const GENERIC_TITLE_SUFFIXES = new Set([
   "comic",
 ]);
 
-export function normalizeSourceIdentity(value: string) {
+function normalizeSourceIdentity(value: string) {
   return String(value ?? "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -102,7 +102,7 @@ function titleWithoutTrailingQualifier(value: string) {
     .trim();
 }
 
-export function sourceIdentityCandidates(item: SourceManga) {
+function sourceIdentityCandidates(item: SourceManga) {
   const identities = new Set<string>();
   const english = sourceEnglishTitle(item);
   if (english) addIdentity(identities, english);
@@ -358,7 +358,7 @@ export function rankSourceGroupsByQuery(groups: SourceGroup[], query: string) {
     .map(({ group }) => group);
 }
 
-export function sourceGroupKeys(values: Array<SourceManga | string>) {
+function sourceGroupKeys(values: Array<SourceManga | string>) {
   return [...new Set(values.map((value) => typeof value === "string" ? value : value.key).filter(isSourceKey))];
 }
 
@@ -382,3 +382,4 @@ export function sourceDetailsPath(key: string, values: Array<SourceManga | strin
 function isSourceKey(value: string) {
   return /^(?:mt|tx|aq|sz|xs|ml|az):[A-Za-z0-9_-]{1,110}$/.test(value);
 }
+
