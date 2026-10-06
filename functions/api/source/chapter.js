@@ -1,3 +1,4 @@
+import { createSourceFetcher } from "../../_source-transport.js";
 import { onRequest as handleSourceRequest } from "./[[path]].js";
 
 const TEAMX_BASE = "https://olympustaff.com";
@@ -14,7 +15,9 @@ const BLOCKED_TEAMX_IMAGE_HASHES = new Set([
 const teamXBannerResultCache = new Map();
 
 export async function onRequest(context) {
-  const response = await handleSourceRequest(context);
+  // Core adapters and the Team-X recovery/filter share the same request budget.
+  const fetchSource = createSourceFetcher({ requestSignal: context.request.signal });
+  const response = await handleSourceRequest({ ...context, sourceFetcher: fetchSource });
   if (!response.ok) return response;
 
   const payload = await response.clone().json().catch(() => null);
@@ -29,7 +32,7 @@ export async function onRequest(context) {
     `${String(chapter.item.url || `${TEAMX_BASE}/series/${chapter.item.slug}`).replace(/\/$/, "")}/${chapter.number}`;
 
   try {
-    const upstream = await fetch(new URL(chapterUrl, TEAMX_BASE).toString(), {
+    const upstream = await fetchSource(new URL(chapterUrl, TEAMX_BASE).toString(), {
       headers: {
         Accept:
           "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -48,7 +51,7 @@ export async function onRequest(context) {
 
     // Remove approved promo images by exact binary fingerprint. Do not rely on
     // canvas dimensions: the same asset can be displayed at different sizes.
-    pageMeta = await filterKnownTeamXBanners(pageMeta, chapterUrl);
+    pageMeta = await filterKnownTeamXBanners(pageMeta, chapterUrl, fetchSource);
 
     payload.chapter.pages = pageMeta.map((page) => page.url);
     payload.chapter.pageMeta = pageMeta;
@@ -66,17 +69,26 @@ export async function onRequest(context) {
   }
 }
 
-async function filterKnownTeamXBanners(pageMeta, chapterUrl) {
-  return Promise.all(pageMeta.map(async (page) => ({ page, blocked: await isKnownTeamXBanner(page, chapterUrl) })))
-    .then((checks) => checks.filter(({ blocked }) => !blocked).map(({ page }) => page));
+async function filterKnownTeamXBanners(pageMeta, chapterUrl, fetchSource) {
+  const blocked = new Set();
+  const limit = Math.min(pageMeta.length, 64);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(4, limit) }, async () => {
+    while (cursor < limit) {
+      const index = cursor++;
+      if (await isKnownTeamXBanner(pageMeta[index], chapterUrl, fetchSource)) blocked.add(index);
+    }
+  });
+  await Promise.all(workers);
+  return pageMeta.filter((_, index) => !blocked.has(index));
 }
 
-async function isKnownTeamXBanner(page, chapterUrl) {
+async function isKnownTeamXBanner(page, chapterUrl, fetchSource) {
   const cached = teamXBannerResultCache.get(page.url);
   if (cached !== undefined) return cached;
 
   try {
-    const response = await fetch(page.url, {
+    const response = await fetchSource(page.url, {
       headers: {
         Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         Referer: chapterUrl,
@@ -231,3 +243,6 @@ function decodeEntities(value) {
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)));
 }
+
+
+export const __test = { filterKnownTeamXBanners };

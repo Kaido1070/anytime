@@ -4,13 +4,14 @@ import test from "node:test";
 
 test("Phase 6 keeps one accepted friendship system and adds canonical pending requests", async () => {
   const api = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
+  const schema = await readFile(new URL("../migrations/0006_friend_requests.sql", import.meta.url), "utf8");
   const migration = await readFile(
     new URL("../migrations/0006_friend_requests.sql", import.meta.url),
     "utf8",
   );
 
-  assert.match(api, /CREATE TABLE IF NOT EXISTS friend_requests/);
-  assert.match(api, /PRIMARY KEY \(pair_low_id, pair_high_id\)/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS friend_requests/);
+  assert.match(schema, /PRIMARY KEY \(pair_low_id, pair_high_id\)/);
   assert.match(api, /canonicalFriendPair/);
   assert.match(migration, /idx_friend_requests_receiver/);
   assert.match(migration, /idx_friend_requests_requester/);
@@ -85,3 +86,4 @@ test("Phase 6 mobile styles stack search and request actions without horizontal 
   assert.match(css, /\.friend-result-card,\s*\.friend-request-card \{\s*align-items: flex-start;\s*flex-direction: column/);
   assert.match(css, /min-width: 0/);
 });
+

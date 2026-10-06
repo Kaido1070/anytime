@@ -1,7 +1,10 @@
+import { mutationOriginError } from "../_auth-security.js";
 const SESSION_COOKIE = "anytime_session";
 const DEMO_IDS = ["returner", "solo", "eleceed", "horizon"];
 
 export async function onRequestPost(context) {
+  const originError = mutationOriginError(context.request);
+  if (originError) return originError;
   const db = context.env?.DB;
   if (!db) {
     return json(

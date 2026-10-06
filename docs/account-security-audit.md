@@ -1,0 +1,170 @@
+# Account security audit — 2026-10-06
+
+## Security-only follow-up: image endpoints
+
+Review found that the authenticated image proxy accepted arbitrary upstream `image/*`, including script-capable SVG, and returned it from the application origin. Snapshot cover uploads and legacy R2/D1 reads also allowed active image documents. This creates a same-origin active-content path; no production exploitation is asserted. These routes now allow only known raster media types and send `nosniff`, a sandboxed restrictive CSP, and same-origin resource policy. Legacy non-raster cache objects fail closed. Authenticated proxy responses use private browser caching rather than public caching.
+
+The proxy validated only the initial hostname while following upstream redirects automatically. It now follows at most four redirects manually, validates every destination before fetching it, and rejects local/private IP literals (including URL-normalized alternate IPv4 and mapped IPv6), local host names, URL credentials and nonstandard ports. This is not a DNS-resolution/egress allowlist: a public hostname resolving to a private address is not detected by these checks. A comprehensive source-fetch/edge egress audit remains outstanding. External image hosts are kept compatible with the existing sources.
+
+Snapshot uploads previously read the entire request before enforcing the 8 MiB limit. They now cancel the stream as soon as it exceeds the limit, including requests without Content-Length. Tests cover active SVG rejection, cached cover rejection, protected raster responses, private redirect destinations, redirect loops, alternate IP spellings, owner-scoped R2 aliases and bounded streams.
+
+Validation for this follow-up: all 53 selected account/image/security tests passed, including the migration test wrapper; the production bundle build and whitespace checks passed. Live deployment tests remain unperformed.
+
+Account review also rechecked dedicated progress routing (delegates to the guarded API), role/session enforcement, bound SQL ownership, credential output whitelists and current-source secret handling. Existing password-change, recovery-lock, administrator-reset and concurrent authorization tests are rerun. Evidence is local WebCrypto/SQLite and mocked fetch/R2; it does not establish live browser or deployed Workers behavior. No production database or settings are changed by this follow-up.
+
+## Test-branch follow-up
+
+The user completed restoring and applying the guarded identity transition on the separate `wany-db` test database; this is evidenced by their terminal screenshots, not direct access to Cloudflare. Production remains unchanged. A subsequent code review fixed successful login being coupled to optional cleanup/library synchronization, preserved client account state when logout fails, and aligned login/recovery username normalization without silently stripping characters. Admin now has a dedicated self-password/settings route with logout-all; changing their own password keeps the role and rotates the session. Admin throttling and runtime errors use the shared safe responses.
+
+The build now rejects database dumps, archives, environment files and known credential/mapping files in public or generated assets, and private-upload names are ignored by Git. The current source/functions/build assets contain none of the privately generated passwords, recovery codes or migrated credential hashes checked locally. This scan covers current local build output, not the live deployment or old Git history. Authentication tests and the build are rerun before updating the test branch. Nine pre-existing full-suite failures concern navigation/profile/source behavior and copy outside this follow-up; they are not evidence that all project issues are fixed.
+
+## Scope and evidence
+
+Reviewed the account API, dedicated login/admin/password/recovery handlers, cookie/session behavior, role authorization, owned-data access, offline identity migration and a privately provided production D1 SQL export. Tests ran offline on SQLite with a D1-shaped transactional adapter. No production database, R2 object, Cloudflare setting or live deployment was modified. Private exports, hashes, mappings and generated credentials are not committed.
+
+The export uses schema v19 and contains four distinct accounts. H has internal ID `has`; Y has internal ID `yas`; those are separate login and internal-identity fields, not duplicate account rows. There are no duplicate normalized login names, FK violations or orphan references in the discovered user-reference fields. The export contains 21 library rows, 3,552 progress rows, 3,738 history rows and 54 snapshots. R2 content cannot be verified from D1 metadata.
+
+A stored password verifier and the three stored recovery verifiers matched historical credential material in the previous code snapshot. Removing literals from current source does not revoke those live credentials or remove Git history. The reviewed transition therefore rotates every password/recovery code once and revokes all old sessions. Ongoing password changes remain optional, with a six-character minimum; no mandatory-change login flow is introduced.
+
+## Fixed behaviors
+
+| Finding | Implementation and verification |
+| --- | --- |
+| Request-time identity/schema/credential repair | Removed account bootstrap and admin provisioning from request paths. Schema checks are read-only and missing support fails closed. |
+| Fixed account IDs/credential material | Random immutable 32-digit TEXT IDs are stored in D1; login names are independent and admin is authorized by role. Runtime verifies only the primary stored credential; retired alternate hashes cannot authenticate. Historical real credential seeds and the fixed recovery bridge are removed. |
+| Session issuance races password reset or role changes | Login and admin-login condition the session INSERT on the credential hash and role just verified. Tests interleave credential changes before issuance and confirm no cookie/session is created. |
+| Password change races session revocation | Credential replacement checks both the expected hash and the still-valid authorizing session inside the atomic batch. Tests revoke that session between reads and writes and confirm the password remains unchanged. |
+| Session persistence after credential changes | Password change revokes other sessions, rotates the current token, and sets the new HttpOnly cookie. Recovery revokes every session. Logout-all is exposed in settings. |
+| Unbounded guessing | D1 stores atomic, expiring attempt counters shared across isolates. General/admin login share one scope. Limits per 15 minutes: 8 IP/account, 24 account, 60 IP. Password verification for settings is similarly bounded. An exhausted IP cannot allocate new account keys. Tests cover parallel requests, distributed IPs, expiry and endpoint switching. |
+| Missing Origin accepted on browser mutations | Exact same-origin required for POST/PUT/PATCH/DELETE across account routes and cleanup-demo; cross-site Fetch Metadata also rejected. Tests verify rejection before SQL access. |
+| Unbounded credential request bodies | Streamed JSON is limited to 32 KiB even without Content-Length; wrong media types and invalid JSON are rejected. Dedicated and wildcard credential handlers share the reader. |
+| Recovery codes reusable or unavailable after consumption | High-entropy code digest stored per account, consumed atomically once. Authenticated settings can issue a replacement after checking the current password and valid session; this invalidates previous verifiers. New code is shown once and is never saved to browser storage. |
+| Optional security-question recovery | Settings requires the current password and a valid session to create/replace the question. D1 stores the question and a salted PBKDF2 answer hash only. Recovery shares attempt limits, conditionally replaces the expected password, and revokes all sessions. Tests cover wrong/normalized answers, replacement, account isolation and concurrent resets. |
+| Inconsistent/weak password creation cost | Offline migration, password change and recovery use PBKDF2-SHA256 at 100,000 iterations; verification reads each stored cost. This conservative Workers cap requires deployed compatibility/CPU testing and is below ideal password-hashing guidance. |
+| Credential details in exception logging | Changed credential-path logs to report error names rather than SQL/error parameters. |
+
+The D1 binding batch transaction semantics used by the conditional mutations are documented at https://developers.cloudflare.com/d1/worker-api/d1-database/#batch. Workers' conservative PBKDF2 cap and proposed increase are tracked at https://github.com/cloudflare/workerd/issues/1346 and https://github.com/cloudflare/workerd/pull/7550. Local WebCrypto/SQLite tests do not establish production CPU limits.
+
+## Validation
+
+- The generated transition and guarded data rollback both passed against the private export. All original noncredential data rows matched after substituting the ID map, including nonaccount source/avatar tables. Credentials and sessions are intentionally replaced. No discovered FK violation remained.
+- All four accounts logged in using generated credentials on a cloned migrated database. Both password-change handlers accepted six characters, rejected five, persisted the new hash, rejected the previous password, preserved the internal ID and revoked other sessions. Numeric admin login and one-use recovery succeeded.
+- 44 dedicated Node account/security tests passed, including a wrapper that runs 11 Python migration tests. Before the admin-reset addition, the full repository suite had 235 tests: 226 passed and 9 remaining failures outside account authentication. Build and whitespace checks passed.
+- A scan of current functions/src/scripts/migrations/docs/tests found none of the actual exported password or recovery hash literals. Private migration output is outside the repository.
+
+## Remaining deployment and coverage limits
+
+The branch remains draft and production is unchanged. Do not deploy the account code onto the current v19 database alone. Prepare a fresh private export during a write pause, generate the guarded transition, save the private replacement credentials, apply it atomically in restored isolated D1 staging, and test the deployed Worker before coordinating production migration/code deployment. Existing R2 keys are retained and read through owner-scoped aliases. R2 is a regenerable cover cache: no full R2 backup or object transfer is required for the account migration. Profile refresh refetches and uploads missing covers when the source is reachable. Live R2 behavior was not exercised here; unavailable upstream sources can leave a cover temporarily missing without affecting account or reading data.
+
+D1 attempt counters protect credential checks, not volumetric edge/database-cost attacks. WAF/edge protection needs environment validation. Per-account budgets can temporarily deny a legitimate login under targeted abuse. Trusted IP handling assumes Cloudflare's CF-Connecting-IP header.
+
+Admin password reset is implemented; public/invite account creation and a separate recovery-approval workflow are not implemented. Source APIs retain their unrelated request-time source schema bootstrap. A comprehensive reader/source/image security audit, deployment secret inventory, historical Git cleanup and proof of production exploit activity are outside this account audit. Restoring an old export or deploying the old recovery handler can revive exposed credentials; use the guarded rollback that retains fresh passwords instead.
+
+Security-question answers are reusable recovery secrets, not MFA. A public question challenge can disclose that an account has configured recovery. Guessable or publicly known answers weaken account security even with hashing and attempt limits; prefer a random recovery code or an unpredictable secret answer. OWASP discourages questions as the sole reset factor: https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html. The requested optional question flow is supported without requiring a second factor.
+
+Admin user details now expose the saved question only and can reset ordinary user passwords after verifying the administrator’s current password. The atomic mutation rechecks admin role, credential and live session plus the target credential, revokes target sessions/legacy verifiers/recovery codes, and records actor, target and time in admin_credential_events. Passwords and answer hashes are never returned or logged. Administrative password rescue now also removes the saved security question; the user may configure a new one after logging in. Tests verify persistent replacement, role/Origin/minimum-length rejection and session-revocation races. Admin authority is enforced by the application, not by exposing a Cloudflare token or arbitrary SQL endpoint.
+
+Additional admin review tests reject races that revoke admin role, change the admin credential or change the target credential; reject anonymous/missing-Origin/admin-target requests; confirm no secret fields in responses; enforce shared guessing limits across target accounts; and prove the complete reset rolls back if its audit insert fails. All 44 dedicated Node tests passed. No new bypass was reproduced in these offline tests; production D1/Workers validation remains outstanding.
+
+Answer policy: any nonempty normalized answer up to 128 characters is accepted without complexity checks, including one character. Passwords retain their six-character minimum. Server hashing, current-password setup verification, guessing budgets and session revocation remain unchanged. A test verifies single-character recovery, empty-answer rejection and five-character password rejection; all 40 dedicated tests and the build passed.
+
+Recovery question lock: five failed verified-answer submissions create a persistent account-level D1 lock, without time-based expiry. Locked recovery rejects question display, answer reset and code reset until an authenticated admin verifies their own password and explicitly unlocks recovery or rescues the account by resetting its password. Existing password login remains available to avoid letting anonymous recovery attempts disable login. Successful recovery before lock clears preceding failures. Counters use atomic UPSERT with a cap of five; password-reset writes recheck the lock, and stale wrong attempts are bound to the credential/question generation. Admin reset clears the lock in its audited transaction. Four new tests cover persistence across adapters/IPs, concurrent failures, correct-answer/lock races and counter reset.
+
+
+## Recovery rescue correction — 2026-10-06
+
+Admin password reset unconditionally retires the saved question/answer, recovery codes, legacy verifiers and sessions in the same audited transaction. An answer verified before rescue cannot commit a reset after rescue because the credential and recovery-factor generation are rechecked. No forced password change is added for other users; passwords retain the six-character minimum.
+
+A separate `POST /api/admin/users/:id/unlock-recovery` clears only a five-failure lock, preserving the password, question, codes and sessions. The UI explains that the old answer stays valid and directs administrators to password rescue if the answer is compromised. Both actions require the administrator's current password, exact Origin, shared credential-attempt limits and live role/session/credential checks inside their transaction. Actor, target and time are recorded in the existing admin_credential_events table; it does not currently distinguish operation types. No schema migration is needed.
+
+Tests cover rejection of the retired answer/code, reconfiguration of a new question, preservation of unrelated user/library data, in-flight recovery rejection, explicit unlock behavior, unauthorized requests, authorization races and audit/mutation rollback. Live authenticated browser validation remains outstanding.
+
+
+## Browser account isolation correction — 2026-10-06
+
+Client requests carry a local session generation and abort signal. Successful login/logout or a detected session-owner change invalidates prior requests; even an upstream ignoring abort cannot return stale data into the new session. Authentication operations are serialized. Failed logout keeps the existing account and its usable offline snapshots. Library/friend loaders guard both cleanup continuations and network-error fallbacks. React state updates and multi-step untracking also check their starting scope.
+
+Account transitions remove private local data/friend snapshots and session recommendation caches. Fresh snapshots use the v3 namespace so potentially misassigned v2 snapshots are never read. A confirmed same-owner session refresh may retain that owner's v3 offline snapshots. Unrelated preferences are retained. Login/logout uses a storage event nonce to invalidate other tabs and reload their session; this notification requires browser storage support.
+
+Cover jobs are deduplicated by account and session generation plus work/chapter, cancelled with the account signal, and recheck ownership after metadata/image/body reads before starting upload. Existing authorized server operations already sent before logout cannot be undone by browser cancellation; D1 remains the authoritative owner boundary. No schema migration or account-ID change is needed.
+
+Tests delay library/friend/cleanup requests across account changes, inject late network failures, repeat login to the same account, verify successful/failed logout behavior, check authentication ordering, run the actual cover-job orchestration with controlled adapters, and simulate cross-tab invalidation. Live multi-tab/browser validation remains outstanding.
+
+## Source schema outside requests — 2026-10-06
+
+The source catchall no longer creates tables/indexes, adds columns or backfills cache rows. Authenticated supported GET routes share three read-only, zero-row SELECT checks covering all required columns. Missing tables/columns return `503 SOURCE_SCHEMA_NOT_READY`; failed checks are evicted so an externally completed migration can take effect without permanent failure caching. Transient database failures remain source errors rather than being mislabeled as migration requirements. Unsupported methods and unknown routes stop before database access. Public health remains a source catalogue/liveness response, not a database-readiness claim. The hardened image route retains its separate handling.
+
+`migrations/0016_source_schema.sql` defines the source cache tables and index outside API requests and backfills only missing `source_items.first_seen_at` from its stored update time. It deliberately leaves the account schema version, identity and credentials alone. Existing older source tables missing `first_seen_at` or `is_baseline` require preparatory ALTER statements. `scripts/prepare-source-schema.py` generates these from a read-only local SQLite backup, refuses unrecognized incomplete schemas and refuses to overwrite its output. It emits schema statements, no backup/user rows, and never accesses D1. Example from a private local SQLite backup:
+
+```sh
+python3 scripts/prepare-source-schema.py /private/backup.sqlite /private/source-schema.sql
+```
+
+Apply that generated SQL outside requests to the intended database before deployment when readiness is missing, using an authorized database operator. Do not replay historic account migrations on an already migrated database. On a new database, run the standalone source SQL alongside the separately managed account setup. A populated current source schema needs no structural change for this release. Do not undo an additive migration by dropping source/user tables when rolling back application code.
+
+Validation: six new source-schema tests exercise early method/path rejection, concurrent read-only readiness, missing-schema 503 with retry after external repair, unauthorized access, transient failures and an offline migration wrapper. The wrapper covers empty/old/current schemas, repeated prepared migration application, account/source row preservation and refusal of unknown schemas. All 16 selected source/image/D1 tests pass. Full suite: 281 tests, 272 pass, the same 9 previously documented unrelated failures. Knip, TypeScript and production build pass.
+
+The saved migrated private SQLite snapshot passes all three readiness queries. An in-memory migration test preserves every account/related row and all source rows except the documented null-timestamp backfill; the original file remains unchanged. This is local snapshot evidence, not a live D1 inspection. No remote D1 migration was performed. Broader source fetching/resource limits remain a separate audit step.
+
+## Bounded source transport — 2026-10-06
+
+All upstream loads in the source adapters and cover resolver now use a request-owned transport. Adapter/retry/background functions close over the initiating request's fetcher rather than using global budget state. The image proxy uses the same transport with an image-sized budget; existing raster-only response headers and source Referer fallbacks remain. Initial targets and every manual redirect are checked against the existing public URL guard; redirects to private/literal local addresses, credential URLs and unusual ports are blocked before dispatch. Redirect loops stop after four hops. Cross-origin redirects strip authorization/cookie headers, POST-to-GET redirect semantics are preserved, and cross-origin 307/308 body replay is refused.
+
+Limits (MiB refer to body bytes actually delivered by the response stream):
+
+| Handler | One body | Total body bytes | Upstream attempts including hops | Shared deadline |
+| --- | --- | --- | --- | --- |
+| Source adapters | 8 MiB | 32 MiB | 96 | 60 seconds |
+| Cover resolver | 8 MiB | 16 MiB | 24 | 30 seconds |
+| Image proxy | 16 MiB | 24 MiB | 15 | 35 seconds |
+
+Each instance permits at most four active loads. A load has a 12-second timeout including queue wait, headers, redirects and body consumption, shortened by the shared deadline or an adapter's stricter supplied signal. The originating request signal cancels its subrequests. Content-Length can reject early but cannot bypass counted streaming limits; a 16,384-chunk ceiling also rejects pathological tiny/empty chunk streams. Rejected/stalled/late responses are cancelled, and slots/listeners/timers are released. Responses are buffered within these limits before being exposed to adapter text/JSON readers or the image client, so overflow cannot become a successful partial image. Decoded responses discard stale content-length/content-encoding headers and retain their resolved URL.
+
+The exact Team-X chapter route shares the core adapter budget with its HTML recovery and promo fingerprint checks. Promo verification uses four workers and checks at most 64 pages, retaining remaining/unverifiable pages rather than dropping reading content. Azora cover probing now considers at most 12 ranked candidates, and MangaTime list hashing limits malformed oversized result arrays to 80 rows. Existing worker pools, pagination repeat detection, chapter completeness logic and normal source parsing remain. Request budgets also bound repeated pagination/adapter retries; unusually large or slow archives may hit a limit and use the existing fallback/error behavior. Limits are defensive defaults and still need real-source/device validation at the final deployed review. Concurrency is per request, not a global rate limiter for all users.
+
+Validation: 14 new transport tests cover initial/private redirects, relative redirects/loops, credential stripping and POST behavior, declared/chunked/false-length oversized bodies, empty-chunk limits, shared request/byte budgets, isolated new budgets, stalled headers/body, concurrency, queue abort, deadline expiry, parent cancellation and the actual image/cover/reader entrypoints. All 37 selected transport/image/source-schema/Team-X tests pass. Full suite: 295 tests, 286 pass, the same nine unrelated documented failures; no new failures. Knip, TypeScript and production build pass.
+
+No D1 schema/data migration or live D1 action is needed or performed. Normal source cache DML still occurs when users access sources. DNS-based private destinations behind public-looking hostnames and platform-wide egress/rate-limit policy remain unverified; URL checks alone do not prove DNS rebinding protection. Live site, D1 and real upstream-source checks are deferred until the correction sequence is complete, as requested.
+
+## Patched source-map-js dependency — 2026-10-06
+
+The installed dependency graph previously resolved `source-map-js@1.2.1` through PostCSS/Vite in the development/build toolchain. GitHub-reviewed advisory GHSA-68fv-2mgg-jv7q identifies indexed source-map offsets as an event-loop denial-of-service risk and lists 1.2.2 as the patched release: https://github.com/advisories/GHSA-68fv-2mgg-jv7q . This finding does not establish an exploitable live Pages account/API path; application Functions do not import this package.
+
+A workspace override pins `source-map-js` to 1.2.2, and the reviewed lockfile now resolves only that version with its registry integrity digest. No other dependency versions were changed. The override protects subsequent installs from selecting the old transitive version again; the frozen lockfile keeps deployment reproducible.
+
+Validation: before the update `pnpm audit --json` reported one high advisory; afterward it completed successfully with zero reported vulnerabilities in every severity category. `pnpm why source-map-js` confirms only 1.2.2. Frozen-lockfile installation with local pnpm 11.25.0 and CI-pinned pnpm 10.15.1 (lockfile-only compatibility check), Knip, TypeScript and production build pass. Full suite: 295 tests, 286 pass, the same nine previously documented unrelated failures. Audit results describe known registry advisories at the time of the scan, not a guarantee of zero application vulnerabilities.
+
+No application account policy, D1 schema/data, credentials, or live database operations changed in this step. The final live review remains deferred until the correction sequence is complete.
+
+## Reviewed source egress destinations — 2026-10-06
+
+The earlier public-address checks rejected literal private addresses but still accepted attacker-selected public DNS names. The production transport now accepts only exact HTTPS hosts in `functions/_source-egress.js`: the seven adapter source domains and their explicit www aliases, plus reviewed image hosts observed in the saved active-source cache (storage.azorafly.com, io.mangalik.net, starz.starzmanga.com, cdn-stellarsaber.com, s4.anilist.co and blogger.googleusercontent.com). No wildcard subdomains or automatic host registration from requests/HTML/redirects are used. Legacy inactive mangadar cache rows are not treated as authorization for another source.
+
+The same policy applies to initial loads and every redirect in adapter, cover, image and Team-X recovery requests. HTTP downgrades, unexpected ports, public IP literals, trailing-dot spellings, credentials and suffix/lookalike hosts fail closed. The image entrypoint rejects unapproved hosts before upstream dispatch. Transport options cannot set Host or cf.resolveOverride to bypass the checked destination. The obsolete unrestricted `fetchPublicImage` helper has been removed; its redirect tests now exercise the production bounded transport. Synthetic fetch fixtures now use an approved source/CDN hostname rather than adding example/attacker domains to the production list.
+
+This closes the application's arbitrary-host input path; it does not pin the resolved IP or prove the network behavior of every approved third party. Cloudflare uses its own resolver for fetch, and resolveOverride has same-zone constraints, so an independent DNS-over-HTTPS lookup would not prove which address the later connection uses. Official references:
+- https://developers.cloudflare.com/workers/platform/known-issues/ (Fetch API resolver/IP behavior)
+- https://developers.cloudflare.com/workers/runtime-apis/request/ (resolveOverride and manual redirect behavior)
+- https://blog.cloudflare.com/workers-environment-live-object-bindings/ (public fetch vs private bindings, including legacy origin caveats)
+
+The allowed sites/CDNs remain trusted external destinations; their DNS/ownership and Cloudflare routing/bindings must be checked during the final deployed review. No private binding fetch or socket/DoH pinning mechanism was added. A DNS compromise of an approved host is outside what exact hostname validation alone can prove. New real CDN hosts are deliberately denied until reviewed and explicitly added; this may affect previously unseen chapter-image hosts. The local cache inventory covers stored work pages/covers, not every current chapter image or redirect destination, so it cannot establish complete live-source compatibility.
+
+Validation: six new egress tests cover approved destinations, attacker-selected DNS names, lookalikes, port/protocol variants, redirect bypass/downgrade, approved CDN redirects, routing overrides and both actual image entrypoints. All 40 selected egress/transport/image/schema tests pass. A read-only saved-cache inventory checks 4,254 stored active-source page/cover URLs with zero rejected destinations; no user credentials or backup rows are committed. Full suite: 301 tests, 292 pass, the same nine unrelated failures. Knip, TypeScript and production build pass. No D1 schema/data migration or live D1 operation was performed.
+
+## Rechecked nine legacy test failures — 2026-10-06
+
+Eight of the nine original failures now pass. Two exposed actual UI/copy gaps: the avatar search helper existed but was disconnected from the picker, and story labels still used work terminology. The picker now filters its already-loaded local series/characters, retains selection independently of the filter, and keeps explicit save; no extra API request is made for search. Story labels were corrected without changing IDs, routes, stored data or API payloads.
+
+Six failures asserted superseded implementation details rather than current defects: embedded settings now hide the duplicate identity editor; list customization uses its own state; the three-column profile shows reading days rather than completed-story count; the public New feed accepts verified publication times only, excluding discovery timestamps and the exact 24-hour boundary; source refresh intervals are intentionally five minutes during priority windows and fifteen otherwise. Tests now preserve these current behaviors instead of reverting the implementation. The terminology check matches complete Arabic words, avoiding false positives for verbs such as يعمل or unrelated words such as العملية and عمليات.
+
+A runtime feed regression executes the actual feed implementation with isolated account/source and merge boundaries. It verifies valid current publications, excludes first-seen-only/invalid/future/synthetic/old/boundary chapters, and checks followed unread count. Existing source merging has separate tests.
+
+One original failure remains deliberately unresolved: AppLayout fixes the New badge count at zero and does not call loadUnreadFollowedCount. That helper performs a complete multi-source feed scan. Restoring an automatic scan on navigation would add upstream/API/D1 traffic and needs an account-scoped, shared feed-state approach; this patch neither restores that scan nor removes/weakens its failing assertion. Four navigation destinations and admin isolation remain present. GitHub validation therefore remains red for this known badge failure.
+
+Validation: original nine now eight pass/one fails; new feed regression passes; full suite 302 tests, 301 pass and only the badge contract fails. Unused-code/TypeScript checks and production build pass. No live D1/R2 operation, schema migration, account credential/policy change, or reader behavior change was performed.
+
+## Explicitly disable automatic navigation badge — 2026-10-06
+
+At the user's request, retired the automatic New navigation badge instead of restoring its multi-source background scan. Removed the fixed-zero counter, unreachable badge markup and unused loadUnreadFollowedCount wrapper. The New route and visible feed are unchanged; the feed's followed/read calculation remains available and covered by the runtime regression. The navigation contract now requires exactly four destinations, the New route, admin isolation and absence of badge/background loaders, fetches and polling in AppLayout. This is a deliberate feature retirement, not a repaired unread badge.
+
+Validation: all 302 tests pass; unused-code/TypeScript and production build pass. The prior eight fixes remain intact. No live D1/R2, migration, account policy, reader or source-adapter changes were made. Live site flows remain unverified.

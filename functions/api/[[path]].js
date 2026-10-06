@@ -1,533 +1,20 @@
-import { ensureAdminSchema, isAdminUser, isSocialUser, sessionUser } from "../_admin.js";
+import { rasterImageType, protectImageHeaders, readImageBody } from "../_image-security.js";
+import { snapshotCoverKey, snapshotCoverKeys } from "../_identity.js";
+import { PASSWORD_ITERATIONS, verifyPassword, verifyMissingUser, derivePasswordHash, replacePassword } from "../_password.js";
+import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_admin.js";
+import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError, newSessionToken, sessionTokenHash, authCookie } from "../_auth-security.js";
+import { normalizeSecurityAnswer, createSecurityAnswer } from "../_security-question.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const PASSWORD_ITERATIONS = 210000;
-const MAX_JSON_BYTES = 32 * 1024;
+
 const PROGRESS_ACTIVITY_AGGREGATION_MS = 30 * 60 * 1000;
 const AVATAR_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const AVATAR_IMAGE_FAILURE_TTL_MS = 5 * 60 * 1000;
 const avatarImageCache = new Map();
 const apiRuntimeReady = new WeakMap();
 const READING_OPEN_DEDUP_MS = 5 * 60 * 1000;
-
-const SEEDED_USERS = [
-  {
-    id: "h",
-    username: "h",
-    name: "Has",
-    salt: "nckWsLoOqPQ2ko0y6KFcdQ",
-    hash: "Ojgf5jLh9y8VI5U-4pGqRufZI_A2SaO-ichqcQHpnZE",
-  },
-  {
-    id: "y",
-    username: "y",
-    name: "Yas",
-    salt: "w-fi6L0FIdkx0NNSYyhvdg",
-    hash: "g4QHWy3pBRzBASWHvjEIMvbwUOXfkQSD5MXPczihp3Y",
-  },
-  {
-    id: "m",
-    username: "m",
-    name: "M",
-    salt: "4ueIIy1PaWKbbDjqIkf39g",
-    hash: "Yf2ROKbhijCsK3zEOivfkaCa3Rdw_VSmG524d3G-nwI",
-  },
-];
-
-const SEEDED_FAVORITES = {
-  h: ["returner", "solo"],
-  y: ["eleceed", "horizon"],
-  m: ["solo", "returner"],
-};
-
-const AVATAR_LIBRARY_SEED = [
-  {
-    "id": "one-piece",
-    "name": "ون بيس",
-    "slug": "one-piece",
-    "position": 1,
-    "avatars": [
-      {
-        "id": "one-piece:luffy",
-        "characterName": "لوفي",
-        "imagePath": "anilist:Monkey D. Luffy",
-        "position": 1
-      },
-      {
-        "id": "one-piece:zoro",
-        "characterName": "زورو",
-        "imagePath": "anilist:Roronoa Zoro",
-        "position": 2
-      },
-      {
-        "id": "one-piece:nami",
-        "characterName": "نامي",
-        "imagePath": "anilist:Nami",
-        "position": 3
-      },
-      {
-        "id": "one-piece:sanji",
-        "characterName": "سانجي",
-        "imagePath": "anilist:Sanji",
-        "position": 4
-      },
-      {
-        "id": "one-piece:robin",
-        "characterName": "روبن",
-        "imagePath": "anilist:Nico Robin",
-        "position": 5
-      },
-      {
-        "id": "one-piece:chopper",
-        "characterName": "تشوبر",
-        "imagePath": "anilist:Tony Tony Chopper",
-        "position": 6
-      },
-      {
-        "id": "one-piece:usopp",
-        "characterName": "أوسوب",
-        "imagePath": "anilist:Usopp",
-        "position": 7
-      },
-      {
-        "id": "one-piece:jinbe",
-        "characterName": "جينبي",
-        "imagePath": "anilist:Jinbe",
-        "position": 8
-      }
-    ]
-  },
-  {
-    "id": "naruto",
-    "name": "ناروتو",
-    "slug": "naruto",
-    "position": 2,
-    "avatars": [
-      {
-        "id": "naruto:naruto",
-        "characterName": "ناروتو",
-        "imagePath": "anilist:Naruto Uzumaki",
-        "position": 1
-      },
-      {
-        "id": "naruto:sasuke",
-        "characterName": "ساسكي",
-        "imagePath": "anilist:Sasuke Uchiha",
-        "position": 2
-      },
-      {
-        "id": "naruto:sakura",
-        "characterName": "ساكورا",
-        "imagePath": "anilist:Sakura Haruno",
-        "position": 3
-      },
-      {
-        "id": "naruto:kakashi",
-        "characterName": "كاكاشي",
-        "imagePath": "anilist:Kakashi Hatake",
-        "position": 4
-      },
-      {
-        "id": "naruto:itachi",
-        "characterName": "إيتاتشي",
-        "imagePath": "anilist:Itachi Uchiha",
-        "position": 5
-      },
-      {
-        "id": "naruto:hinata",
-        "characterName": "هيناتا",
-        "imagePath": "anilist:Hinata Hyuga",
-        "position": 6
-      },
-      {
-        "id": "naruto:gaara",
-        "characterName": "غارا",
-        "imagePath": "anilist:Gaara",
-        "position": 7
-      },
-      {
-        "id": "naruto:shikamaru",
-        "characterName": "شيكامارو",
-        "imagePath": "anilist:Shikamaru Nara",
-        "position": 8
-      }
-    ]
-  },
-  {
-    "id": "bleach",
-    "name": "بليتش",
-    "slug": "bleach",
-    "position": 3,
-    "avatars": [
-      {
-        "id": "bleach:ichigo",
-        "characterName": "إيتشيغو",
-        "imagePath": "anilist:Ichigo Kurosaki",
-        "position": 1
-      },
-      {
-        "id": "bleach:rukia",
-        "characterName": "روكيا",
-        "imagePath": "anilist:Rukia Kuchiki",
-        "position": 2
-      },
-      {
-        "id": "bleach:uryu",
-        "characterName": "أوريو",
-        "imagePath": "anilist:Uryu Ishida",
-        "position": 3
-      },
-      {
-        "id": "bleach:urahara",
-        "characterName": "أوراهارا",
-        "imagePath": "anilist:Kisuke Urahara",
-        "position": 4
-      },
-      {
-        "id": "bleach:byakuya",
-        "characterName": "بياكويا",
-        "imagePath": "anilist:Byakuya Kuchiki",
-        "position": 5
-      },
-      {
-        "id": "bleach:renji",
-        "characterName": "رينجي",
-        "imagePath": "anilist:Renji Abarai",
-        "position": 6
-      },
-      {
-        "id": "bleach:aizen",
-        "characterName": "آيزن",
-        "imagePath": "anilist:Sosuke Aizen",
-        "position": 7
-      }
-    ]
-  },
-  {
-    "id": "attack-on-titan",
-    "name": "هجوم العمالقة",
-    "slug": "attack-on-titan",
-    "position": 4,
-    "avatars": [
-      {
-        "id": "attack-on-titan:eren",
-        "characterName": "إيرين",
-        "imagePath": "anilist:Eren Yeager",
-        "position": 1
-      },
-      {
-        "id": "attack-on-titan:mikasa",
-        "characterName": "ميكاسا",
-        "imagePath": "anilist:Mikasa Ackerman",
-        "position": 2
-      },
-      {
-        "id": "attack-on-titan:armin",
-        "characterName": "أرمين",
-        "imagePath": "anilist:Armin Arlert",
-        "position": 3
-      },
-      {
-        "id": "attack-on-titan:levi",
-        "characterName": "ليفاي",
-        "imagePath": "anilist:Levi Ackerman",
-        "position": 4
-      },
-      {
-        "id": "attack-on-titan:hange",
-        "characterName": "هانجي",
-        "imagePath": "anilist:Hange Zoe",
-        "position": 5
-      },
-      {
-        "id": "attack-on-titan:erwin",
-        "characterName": "إروين",
-        "imagePath": "anilist:Erwin Smith",
-        "position": 6
-      },
-      {
-        "id": "attack-on-titan:reiner",
-        "characterName": "راينر",
-        "imagePath": "anilist:Reiner Braun",
-        "position": 7
-      }
-    ]
-  },
-  {
-    "id": "demon-slayer",
-    "name": "قاتل الشياطين",
-    "slug": "demon-slayer",
-    "position": 5,
-    "avatars": [
-      {
-        "id": "demon-slayer:tanjiro",
-        "characterName": "تانجيرو",
-        "imagePath": "anilist:Tanjiro Kamado",
-        "position": 1
-      },
-      {
-        "id": "demon-slayer:nezuko",
-        "characterName": "نيزوكو",
-        "imagePath": "anilist:Nezuko Kamado",
-        "position": 2
-      },
-      {
-        "id": "demon-slayer:zenitsu",
-        "characterName": "زينيتسو",
-        "imagePath": "anilist:Zenitsu Agatsuma",
-        "position": 3
-      },
-      {
-        "id": "demon-slayer:inosuke",
-        "characterName": "إينوسكي",
-        "imagePath": "anilist:Inosuke Hashibira",
-        "position": 4
-      },
-      {
-        "id": "demon-slayer:giyu",
-        "characterName": "غيو",
-        "imagePath": "anilist:Giyu Tomioka",
-        "position": 5
-      },
-      {
-        "id": "demon-slayer:rengoku",
-        "characterName": "رينغوكو",
-        "imagePath": "anilist:Kyojuro Rengoku",
-        "position": 6
-      },
-      {
-        "id": "demon-slayer:shinobu",
-        "characterName": "شينوبو",
-        "imagePath": "anilist:Shinobu Kocho",
-        "position": 7
-      }
-    ]
-  },
-  {
-    "id": "jujutsu-kaisen",
-    "name": "جوجوتسو كايسن",
-    "slug": "jujutsu-kaisen",
-    "position": 6,
-    "avatars": [
-      {
-        "id": "jujutsu-kaisen:yuji",
-        "characterName": "يوجي",
-        "imagePath": "anilist:Yuji Itadori",
-        "position": 1
-      },
-      {
-        "id": "jujutsu-kaisen:megumi",
-        "characterName": "ميغومي",
-        "imagePath": "anilist:Megumi Fushiguro",
-        "position": 2
-      },
-      {
-        "id": "jujutsu-kaisen:nobara",
-        "characterName": "نوبارا",
-        "imagePath": "anilist:Nobara Kugisaki",
-        "position": 3
-      },
-      {
-        "id": "jujutsu-kaisen:gojo",
-        "characterName": "غوجو",
-        "imagePath": "anilist:Satoru Gojo",
-        "position": 4
-      },
-      {
-        "id": "jujutsu-kaisen:maki",
-        "characterName": "ماكي",
-        "imagePath": "anilist:Maki Zenin",
-        "position": 5
-      },
-      {
-        "id": "jujutsu-kaisen:sukuna",
-        "characterName": "سوكونا",
-        "imagePath": "anilist:Ryomen Sukuna",
-        "position": 6
-      }
-    ]
-  },
-  {
-    "id": "solo-leveling",
-    "name": "سولو ليفلينغ",
-    "slug": "solo-leveling",
-    "position": 7,
-    "avatars": [
-      {
-        "id": "solo-leveling:jinwoo",
-        "characterName": "سونغ جين وو",
-        "imagePath": "anilist:Sung Jinwoo",
-        "position": 1
-      },
-      {
-        "id": "solo-leveling:cha-hae-in",
-        "characterName": "تشا هاي إن",
-        "imagePath": "anilist:Cha Hae-In",
-        "position": 2
-      },
-      {
-        "id": "solo-leveling:jinho",
-        "characterName": "يو جين هو",
-        "imagePath": "anilist:Yoo Jinho",
-        "position": 3
-      },
-      {
-        "id": "solo-leveling:igris",
-        "characterName": "إيغريس",
-        "imagePath": "anilist:Igris",
-        "position": 4
-      },
-      {
-        "id": "solo-leveling:beru",
-        "characterName": "بيرو",
-        "imagePath": "anilist:Beru",
-        "position": 5
-      }
-    ]
-  },
-  {
-    "id": "hunter-x-hunter",
-    "name": "هنتر × هنتر",
-    "slug": "hunter-x-hunter",
-    "position": 8,
-    "avatars": [
-      {
-        "id": "hunter-x-hunter:gon",
-        "characterName": "غون",
-        "imagePath": "anilist:Gon Freecss",
-        "position": 1
-      },
-      {
-        "id": "hunter-x-hunter:killua",
-        "characterName": "كيلوا",
-        "imagePath": "anilist:Killua Zoldyck",
-        "position": 2
-      },
-      {
-        "id": "hunter-x-hunter:kurapika",
-        "characterName": "كورابيكا",
-        "imagePath": "anilist:Kurapika",
-        "position": 3
-      },
-      {
-        "id": "hunter-x-hunter:leorio",
-        "characterName": "ليوريو",
-        "imagePath": "anilist:Leorio Paradinight",
-        "position": 4
-      },
-      {
-        "id": "hunter-x-hunter:hisoka",
-        "characterName": "هيسوكا",
-        "imagePath": "anilist:Hisoka Morow",
-        "position": 5
-      },
-      {
-        "id": "hunter-x-hunter:chrollo",
-        "characterName": "كرولو",
-        "imagePath": "anilist:Chrollo Lucilfer",
-        "position": 6
-      }
-    ]
-  },
-  {
-    "id": "my-hero-academia",
-    "name": "أكاديمية بطلي",
-    "slug": "my-hero-academia",
-    "position": 9,
-    "avatars": [
-      {
-        "id": "my-hero-academia:deku",
-        "characterName": "ديكو",
-        "imagePath": "anilist:Izuku Midoriya",
-        "position": 1
-      },
-      {
-        "id": "my-hero-academia:bakugo",
-        "characterName": "باكوغو",
-        "imagePath": "anilist:Katsuki Bakugo",
-        "position": 2
-      },
-      {
-        "id": "my-hero-academia:todoroki",
-        "characterName": "تودوروكي",
-        "imagePath": "anilist:Shoto Todoroki",
-        "position": 3
-      },
-      {
-        "id": "my-hero-academia:uraraka",
-        "characterName": "أوراراكا",
-        "imagePath": "anilist:Ochaco Uraraka",
-        "position": 4
-      },
-      {
-        "id": "my-hero-academia:all-might",
-        "characterName": "أول مايت",
-        "imagePath": "anilist:All Might",
-        "position": 5
-      },
-      {
-        "id": "my-hero-academia:tsuyu",
-        "characterName": "تسويو",
-        "imagePath": "anilist:Tsuyu Asui",
-        "position": 6
-      }
-    ]
-  },
-  {
-    "id": "fullmetal-alchemist",
-    "name": "الخيميائي الفولاذي",
-    "slug": "fullmetal-alchemist",
-    "position": 10,
-    "avatars": [
-      {
-        "id": "fullmetal-alchemist:edward",
-        "characterName": "إدوارد",
-        "imagePath": "anilist:Edward Elric",
-        "position": 1
-      },
-      {
-        "id": "fullmetal-alchemist:alphonse",
-        "characterName": "ألفونس",
-        "imagePath": "anilist:Alphonse Elric",
-        "position": 2
-      },
-      {
-        "id": "fullmetal-alchemist:roy",
-        "characterName": "روي",
-        "imagePath": "anilist:Roy Mustang",
-        "position": 3
-      },
-      {
-        "id": "fullmetal-alchemist:riza",
-        "characterName": "ريزا",
-        "imagePath": "anilist:Riza Hawkeye",
-        "position": 4
-      },
-      {
-        "id": "fullmetal-alchemist:winry",
-        "characterName": "وينري",
-        "imagePath": "anilist:Winry Rockbell",
-        "position": 5
-      },
-      {
-        "id": "fullmetal-alchemist:scar",
-        "characterName": "سكار",
-        "imagePath": "anilist:Scar",
-        "position": 6
-      }
-    ]
-  }
-];
-
-const SEEDED_PROGRESS = [
-  ["h", "returner", 141, 100, 1],
-  ["h", "returner", 142, 100, 1],
-  ["h", "returner", 143, 62, 0],
-  ["y", "eleceed", 315, 45, 0],
-  ["m", "solo", 197, 55, 0],
-];
 
 export async function onRequest(context) {
   const request = context.request;
@@ -546,16 +33,21 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return json({ error: "NOT_FOUND" }, 404);
 
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
-    const origin = request.headers.get("Origin");
-    if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
-  }
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
 
   try {
     await ensureApiRuntime(db);
     return await route(request, url, db, covers);
   } catch (error) {
-    console.error("Anytime API error", error);
+    console.error("Anytime API error", error instanceof Error ? error.name : "unknown");
+    const safeError = authError(error);
+    if (safeError) return safeError;
+    if (["SCHEMA_MIGRATION_REQUIRED", "CREDENTIAL_RUNTIME_UNSUPPORTED"].includes(error?.code)) {
+      return json({ error: error.code, message: error.code === "SCHEMA_MIGRATION_REQUIRED"
+        ? "تحتاج قاعدة البيانات إلى ترحيل مُراجع قبل تشغيل هذا الإصدار."
+        : "تحتاج بيانات الدخول القديمة إلى تحديث مُراجع متوافق مع الخادم." }, 503);
+    }
     return json(
       {
         error: "SERVER_ERROR",
@@ -577,18 +69,19 @@ async function route(request, url, db, covers) {
     const body = await readJson(request);
     const username = normalizeUsername(body.username);
     const password = typeof body.password === "string" ? body.password : "";
+    if (!(await reserveAuthAttempt(db, request, "login", username))) return rateLimited();
     if (!username || password.length < 1 || password.length > 128) {
       return json({ error: "INVALID_LOGIN", message: "بيانات الدخول غير صحيحة." }, 401);
     }
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, profile_visibility, avatar_id, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, name, profile_visibility, avatar_id, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
       )
       .bind(username)
       .first();
 
-    if (!user || !(await verifyPassword(password, user))) {
+    if (!(user ? await verifyPassword(password, user) : await verifyMissingUser(password))) {
       await sleep(120);
       return json({ error: "INVALID_LOGIN", message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
     }
@@ -598,15 +91,18 @@ async function route(request, url, db, covers) {
     const now = Date.now();
     const expiresAt = now + SESSION_TTL_MS;
 
-    await db.batch([
+    const issued = await db.batch([
       db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
       db
         .prepare(
-          "INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+          `INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at)
+           SELECT ?, id, ?, ?, ? FROM users WHERE id = ? AND password_hash = ? AND role = ?`,
         )
-        .bind(tokenHash, user.id, now, now, expiresAt),
+        .bind(tokenHash, now, now, expiresAt, user.id, user.password_hash, user.role),
     ]);
+    if (Number(issued[1]?.meta?.changes) !== 1) return json({ error: "INVALID_LOGIN" }, 401);
 
+    if (isAdminUser(user)) await recordAdminAudit(db, user.id, "admin_login");
     return json(
       { user: sessionUser(user) },
       200,
@@ -637,6 +133,66 @@ async function route(request, url, db, covers) {
     return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
   }
   const user = session.user;
+
+  if (request.method === "POST" && path === "logout-all") {
+    await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
+    return json({ ok: true }, 200, { "Set-Cookie": authCookie("") });
+  }
+
+  if (path === "security-question" && request.method === "GET") {
+    const row = await db.prepare("SELECT question FROM user_security_questions WHERE user_id = ?").bind(user.id).first();
+    return json({ question: row?.question ?? null });
+  }
+
+  if (path === "security-question" && request.method === "POST") {
+    const body = await readAuthJson(request);
+    const password = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    const question = typeof body.question === "string" ? body.question.trim() : "";
+    const answer = normalizeSecurityAnswer(body.answer);
+    if (question.length < 6 || question.length > 200 || /[\u0000-\u001f\u007f]/.test(question) || answer.length < 1 || answer.length > 128) {
+      return json({ error: "INVALID_SECURITY_QUESTION", message: "اكتب سؤالًا من 6 أحرف أو أكثر وإجابة غير فارغة." }, 400);
+    }
+    if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
+    if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
+    const row = await db.prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ?").bind(user.id).first();
+    if (!row || !(await verifyPassword(password, row))) return json({ error: "WRONG_PASSWORD" }, 400);
+    const credential = await createSecurityAnswer(answer);
+    const now = Date.now();
+    const result = await db.prepare(`INSERT INTO user_security_questions (user_id, question, answer_salt, answer_hash, answer_iterations, updated_at)
+      SELECT u.id, ?, ?, ?, ?, ? FROM users u JOIN sessions s ON s.user_id = u.id
+      WHERE u.id = ? AND u.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?
+      ON CONFLICT(user_id) DO UPDATE SET question = excluded.question, answer_salt = excluded.answer_salt,
+        answer_hash = excluded.answer_hash, answer_iterations = excluded.answer_iterations, updated_at = excluded.updated_at`)
+      .bind(question, credential.salt, credential.hash, credential.iterations, now, user.id, row.password_hash, session.tokenHash, now).run();
+    if (Number(result?.meta?.changes) !== 1) return json({ error: "UNAUTHORIZED" }, 401);
+    return json({ ok: true, question });
+  }
+
+  if (request.method === "POST" && path === "recovery-code") {
+    const body = await readAuthJson(request);
+    const password = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
+    if (!password || password.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
+    const row = await db.prepare("SELECT id, password_salt, password_hash, password_iterations FROM users WHERE id = ?").bind(user.id).first();
+    if (!row || !(await verifyPassword(password, row))) return json({ error: "WRONG_PASSWORD" }, 400);
+    const code = newSessionToken();
+    const hash = await sessionTokenHash(code);
+    const now = Date.now();
+    const result = await db.batch([
+      db.prepare(`DELETE FROM user_recovery_verifiers WHERE user_id = ? AND EXISTS
+        (SELECT 1 FROM users u JOIN sessions s ON s.user_id = u.id WHERE u.id = ? AND u.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?)`)
+        .bind(user.id, user.id, row.password_hash, session.tokenHash, now),
+      db.prepare(`INSERT INTO user_recovery_verifiers (user_id, scheme, recovery_salt, recovery_hash, recovery_iterations)
+        SELECT u.id, 'sha256', '', ?, 1 FROM users u JOIN sessions s ON s.user_id = u.id
+        WHERE u.id = ? AND u.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?`)
+        .bind(hash, user.id, row.password_hash, session.tokenHash, now),
+      db.prepare(`DELETE FROM account_recovery WHERE user_id = ? AND EXISTS
+        (SELECT 1 FROM user_recovery_verifiers WHERE user_id = ? AND recovery_hash = ?)`)
+        .bind(user.id, user.id, hash),
+    ]);
+    if (Number(result[1]?.meta?.changes) !== 1) return json({ error: "UNAUTHORIZED" }, 401);
+    return json({ recoveryCode: code });
+  }
 
   if (path === "personalization-state") {
     if (!isSocialUser(user)) {
@@ -833,8 +389,6 @@ async function route(request, url, db, covers) {
     return json({ user: publicUser({ ...user, profile_visibility: visibility }) });
   }
 
-  const snapshotCoverKey = (userId, mangaId) =>
-    `covers/${encodeURIComponent(String(userId))}/${encodeURIComponent(String(mangaId))}`;
   const snapshotCoverVersion = (coverSourceUrl, coverSize) => {
     const value = `${String(coverSourceUrl || "")}|${Number(coverSize || 0)}`;
     let hash = 2166136261;
@@ -853,10 +407,17 @@ async function route(request, url, db, covers) {
       // R2 is authoritative for new covers. Keep the D1 chunks as a temporary
       // fallback so already archived covers survive the migration.
       if (covers) {
-        const object = await covers.get(objectKey);
+        let object = null;
+        for (const key of await snapshotCoverKeys(db, user.id, mangaId)) {
+          object = await covers.get(key);
+          if (object) break;
+        }
         if (object) {
           const headers = new Headers();
           object.writeHttpMetadata(headers);
+          const type = rasterImageType(headers.get("Content-Type"));
+          if (!type) return json({ error: "INVALID_COVER_TYPE" }, 415);
+          protectImageHeaders(headers, type);
           headers.set("ETag", object.httpEtag);
           headers.set("Cache-Control", "private, max-age=31536000, immutable");
           return new Response(object.body, { status: 200, headers });
@@ -896,14 +457,16 @@ async function route(request, url, db, covers) {
         bytes.set(chunk, offset);
         offset += chunk.byteLength;
       }
+      const storedType = rasterImageType(meta.cover_content_type || "image/jpeg");
+      if (!storedType) return json({ error: "INVALID_COVER_TYPE" }, 415);
       return new Response(bytes, {
         status: 200,
-        headers: {
-          "Content-Type": String(meta.cover_content_type || "image/jpeg"),
+        headers: protectImageHeaders(new Headers({
+          "Content-Type": storedType,
           "Content-Length": String(total),
           "Cache-Control": "private, max-age=31536000, immutable",
           "X-Wany-Cover-Storage": "d1-fallback",
-        },
+        }), storedType),
       });
     }
 
@@ -918,12 +481,14 @@ async function route(request, url, db, covers) {
         );
       }
 
-      const contentType = String(request.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.startsWith("image/")) {
+      const contentType = rasterImageType(request.headers.get("content-type"));
+      if (!contentType) {
         return json({ error: "INVALID_COVER_TYPE" }, 400);
       }
-      const bytes = new Uint8Array(await request.arrayBuffer());
       const MAX_COVER_BYTES = 8 * 1024 * 1024;
+      let bytes;
+      try { bytes = await readImageBody(request, MAX_COVER_BYTES); }
+      catch { return json({ error: "INVALID_COVER_SIZE" }, 413); }
       if (!bytes.byteLength || bytes.byteLength > MAX_COVER_BYTES) {
         return json(
           { error: "INVALID_COVER_SIZE", message: "حجم الغلاف المحفوظ غير مدعوم." },
@@ -1080,7 +645,9 @@ async function route(request, url, db, covers) {
       String(existing?.cover_source_url || "") !== String(coverSourceUrl);
     let hasR2Cover = false;
     if (covers) {
-      hasR2Cover = Boolean(await covers.head(snapshotCoverKey(user.id, mangaId)));
+      for (const key of await snapshotCoverKeys(db, user.id, mangaId)) {
+        if (await covers.head(key)) { hasR2Cover = true; break; }
+      }
     }
     return json({
       ok: true,
@@ -2188,9 +1755,11 @@ async function route(request, url, db, covers) {
     const body = await readJson(request);
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
-    if (newPassword.length < 4 || newPassword.length > 128) {
-      return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر." }, 400);
+    if (newPassword.length < 6 || newPassword.length > 128) {
+      return json({ error: "WEAK_PASSWORD", message: "كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر." }, 400);
     }
+    if (!(await reserveAuthAttempt(db, request, "password-change", user.id))) return rateLimited();
+    if (currentPassword.length > 128) return json({ error: "WRONG_PASSWORD" }, 400);
 
     const authRow = await db
       .prepare(
@@ -2205,18 +1774,11 @@ async function route(request, url, db, covers) {
     const saltBytes = crypto.getRandomValues(new Uint8Array(16));
     const salt = bytesToBase64Url(saltBytes);
     const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
-    const now = Date.now();
-    await db
-      .prepare(
-        "UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ?",
-      )
-      .bind(salt, hash, PASSWORD_ITERATIONS, now, user.id)
-      .run();
-    await db
-      .prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?")
-      .bind(user.id, session.tokenHash)
-      .run();
-    return json({ ok: true });
+    const token = newSessionToken();
+    const changed = await replacePassword(db, user.id, authRow.password_hash, salt, hash, session.tokenHash, await sessionTokenHash(token));
+    if (!changed) return json({ error: "PASSWORD_CHANGED_RETRY", message: "تغيرت بيانات الدخول أثناء الطلب. حاول مرة ثانية." }, 409);
+
+    return json({ ok: true }, 200, { "Set-Cookie": authCookie(token) });
   }
 
   return json({ error: "NOT_FOUND" }, 404);
@@ -2226,36 +1788,14 @@ async function ensureApiRuntime(db) {
   let pending = apiRuntimeReady.get(db);
   if (!pending) {
     pending = (async () => {
-      let version = null;
-      try {
-        const row = await db
-          .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-          .first();
-        version = row?.value ?? null;
-      } catch {
-        // Fresh databases do not have schema_meta yet; bootstrap below.
+      const row = await db
+        .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
+        .first();
+      if (Number(row?.value) < 20 || !Number.isFinite(Number(row?.value))) {
+        const error = new Error("Apply the reviewed deployment migrations before serving requests.");
+        error.code = "SCHEMA_MIGRATION_REQUIRED";
+        throw error;
       }
-
-      if (version !== "19") {
-        await ensureDatabase(db);
-        await ensureAdminSchema(db);
-
-        // Migrations are strictly versioned. Never rerun an older migration against
-        // a newer schema: some legacy steps write their own schema_version.
-        if (version == null || Number(version) < 11) await applyRuntimeOptimizationMigration(db);
-        await applyUsernameMigration(db);
-        await applyUsernameMigrationV13(db);
-        await applyUserIdentityV14(db);
-        await applyYUsernameV15(db);
-        await applyHUsernameV16(db);
-        await applyListIconsV17(db);
-        await applyWorkSnapshotsV18(db);
-        await applyReadingAnalyticsV19(db);
-      }
-
-      // Repair canonical account names independently from schema_version.
-      // This fixes databases that reached v16 before the rename completed.
-      await ensureCanonicalAccountNames(db);
     })().catch((error) => {
       apiRuntimeReady.delete(db);
       throw error;
@@ -2263,927 +1803,6 @@ async function ensureApiRuntime(db) {
     apiRuntimeReady.set(db, pending);
   }
   await pending;
-}
-
-async function applyRuntimeOptimizationMigration(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (Number(version?.value ?? 0) >= 11) return;
-
-  const now = Date.now();
-  const statements = [
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_status ON user_library(user_id, status, manga_id)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_chapter ON reading_history(user_id, manga_id, chapter)"),
-    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
-      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-      SELECT id, 'continue_reading', '', 1024, 1, ?, ?
-      FROM users WHERE role = 'user'`).bind(now, now),
-    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
-      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-      SELECT id, 'favorites', '', 2048, 1, ?, ?
-      FROM users WHERE role = 'user'`).bind(now, now),
-    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
-      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-      SELECT id, 'my_activity', '', 3072, 1, ?, ?
-      FROM users WHERE role = 'user'`).bind(now, now),
-    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
-      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-      SELECT id, 'friends_activity', '', 4096, 1, ?, ?
-      FROM users WHERE role = 'user'`).bind(now, now),
-    db.prepare(`INSERT OR IGNORE INTO user_profile_sections
-      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-      SELECT l.user_id, 'custom_list', l.id, 5120 + l.position, 1, ?, ?
-      FROM user_lists l
-      JOIN users u ON u.id = l.user_id AND u.role = 'user'`).bind(now, now),
-    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '11')"),
-  ];
-  for (const statement of statements) await statement.run();
-}
-
-async function applyUsernameMigration(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "12") return;
-  if (version?.value !== "11") return;
-
-  const now = Date.now();
-  const target = await db
-    .prepare("SELECT id FROM users WHERE username = 'm' COLLATE NOCASE LIMIT 1")
-    .first();
-
-  if (!target) {
-    await db
-      .prepare("UPDATE users SET username = 'm', updated_at = ? WHERE username = 'mah' COLLATE NOCASE")
-      .bind(now)
-      .run();
-  }
-
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '12')")
-    .run();
-}
-
-async function applyUsernameMigrationV13(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "13") return;
-  if (version?.value !== "12") return;
-
-  const target = await db
-    .prepare("SELECT id FROM users WHERE username = 'm' COLLATE NOCASE LIMIT 1")
-    .first();
-
-  if (!target) {
-    await db
-      .prepare("UPDATE users SET username = 'm', updated_at = ? WHERE username = 'mah' COLLATE NOCASE")
-      .bind(Date.now())
-      .run();
-  }
-
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '13')")
-    .run();
-}
-
-async function ensureCanonicalAccountNames(db) {
-  // One-time repair only. Once the marker exists this costs a single indexed
-  // schema_meta read during a fresh Worker isolate and performs no writes.
-  const repairKey = "account_repair_yh_v1";
-  const repaired = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = ? LIMIT 1")
-    .bind(repairKey)
-    .first();
-  if (repaired?.value === "done") return;
-
-  const targets = [
-    {
-      id: "yas",
-      username: "Y",
-      name: "Y",
-      passwordSalt: "diagzwJo5n9Ria4Gme3bxQ",
-      passwordHash: "A0XwxG-Oi9vrhnog3-8dcJ3H0GrkRqjKk6Pv0ulPIu8",
-    },
-    {
-      id: "has",
-      username: "H",
-      name: "H",
-      passwordSalt: "zsbIbvC1euuUyJehR8LR8A",
-      passwordHash: "0FWG3wLZ2u6rRabORuoTLVFUmbsE2cELlRaYrHe29zU",
-    },
-  ];
-
-  const now = Date.now();
-  for (const target of targets) {
-    const conflict = await db
-      .prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id <> ? LIMIT 1")
-      .bind(target.username, target.id)
-      .first();
-    if (conflict) throw new Error(`Username ${target.username} is already in use.`);
-
-    await db
-      .prepare(`UPDATE users
-        SET username = ?,
-            name = ?,
-            password_salt = ?,
-            password_hash = ?,
-            password_iterations = ?,
-            updated_at = ?
-        WHERE id = ?`)
-      .bind(
-        target.username,
-        target.name,
-        target.passwordSalt,
-        target.passwordHash,
-        PASSWORD_ITERATIONS,
-        now,
-        target.id,
-      )
-      .run();
-  }
-
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, 'done')")
-    .bind(repairKey)
-    .run();
-}
-
-async function applyWorkSnapshotsV18(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "18") return;
-  if (version?.value !== "17") return;
-
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS work_snapshots (
-      user_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      source_name TEXT,
-      source_url TEXT,
-      cover_source_url TEXT,
-      cover_content_type TEXT,
-      cover_size INTEGER NOT NULL DEFAULT 0,
-      last_read_chapter REAL,
-      highest_reached_chapter REAL,
-      last_read_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, manga_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS work_snapshot_cover_chunks (
-      user_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      chunk_index INTEGER NOT NULL,
-      data BLOB NOT NULL,
-      PRIMARY KEY (user_id, manga_id, chunk_index),
-      FOREIGN KEY (user_id, manga_id)
-        REFERENCES work_snapshots(user_id, manga_id)
-        ON DELETE CASCADE
-    )`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_work_snapshots_user_updated ON work_snapshots(user_id, updated_at DESC)",
-    ),
-    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '18')"),
-  ]);
-}
-
-async function applyReadingAnalyticsV19(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "19") return;
-  if (version?.value !== "18") return;
-
-  const columns = await db.prepare("PRAGMA table_info(reading_history)").all();
-  const hasEntryType = (columns.results ?? []).some((column) => column.name === "entry_type");
-  if (!hasEntryType) {
-    await db
-      .prepare("ALTER TABLE reading_history ADD COLUMN entry_type TEXT NOT NULL DEFAULT 'organic'")
-      .run();
-  }
-
-  // Historical bulk imports were written at the exact same millisecond for one
-  // work. Classify those bursts once so they do not inflate daily reading pace
-  // or chapter trophies.
-  await db.prepare(`UPDATE reading_history
-    SET entry_type = 'bulk'
-    WHERE entry_type = 'organic'
-      AND EXISTS (
-        SELECT 1
-        FROM reading_history grouped
-        WHERE grouped.user_id = reading_history.user_id
-          AND grouped.manga_id = reading_history.manga_id
-          AND grouped.read_at = reading_history.read_at
-        GROUP BY grouped.user_id, grouped.manga_id, grouped.read_at
-        HAVING COUNT(*) >= 2
-      )`).run();
-
-  await db
-    .prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_type_time ON reading_history(user_id, entry_type, read_at DESC)")
-    .run();
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '19')")
-    .run();
-}
-
-async function applyListIconsV17(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "17") return;
-  if (version?.value !== "16") return;
-
-  const columns = await db.prepare("PRAGMA table_info(user_lists)").all();
-  const hasIconKey = (columns.results ?? []).some((column) => column.name === "icon_key");
-  if (!hasIconKey) {
-    await db.prepare("ALTER TABLE user_lists ADD COLUMN icon_key TEXT NOT NULL DEFAULT 'lists'").run();
-  }
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '17')")
-    .run();
-}
-
-async function applyHUsernameV16(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "16") return;
-  if (version?.value !== "15") return;
-
-  const existingH = await db
-    .prepare("SELECT id FROM users WHERE username = 'H' COLLATE NOCASE AND id <> 'has' LIMIT 1")
-    .first();
-  if (existingH) throw new Error("Username H is already in use.");
-
-  await db.batch([
-    db.prepare("UPDATE users SET username = 'H', name = 'H', updated_at = ? WHERE id = 'has'")
-      .bind(Date.now()),
-    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '16')"),
-  ]);
-}
-
-async function applyYUsernameV15(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "15") return;
-  if (version?.value !== "14") return;
-
-  const existingY = await db
-    .prepare("SELECT id FROM users WHERE username = 'Y' COLLATE NOCASE AND id <> 'yas' LIMIT 1")
-    .first();
-  if (existingY) throw new Error("Username Y is already in use.");
-
-  await db.batch([
-    db.prepare("UPDATE users SET username = 'Y', name = 'Y', updated_at = ? WHERE id = 'yas'")
-      .bind(Date.now()),
-    db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '15')"),
-  ]);
-}
-
-async function applyUserIdentityV14(db) {
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  if (version?.value === "14") return;
-  if (version?.value !== "13") return;
-
-  const identities = [
-    { usernames: ["has"], id: "has", username: "has", name: "Has" },
-    { usernames: ["yas"], id: "yas", username: "yas", name: "Yas" },
-    { usernames: ["m", "mah"], id: "m", username: "m", name: "M" },
-  ];
-
-  for (const identity of identities) {
-    const placeholders = identity.usernames.map(() => "?").join(",");
-    const source = await db
-      .prepare(`SELECT id, username FROM users
-        WHERE lower(username) IN (${placeholders}) AND role = 'user'
-        LIMIT 1`)
-      .bind(...identity.usernames)
-      .first();
-
-    if (!source) continue;
-
-    if (String(source.id) === identity.id) {
-      await db
-        .prepare("UPDATE users SET username = ?, name = ?, updated_at = ? WHERE id = ?")
-        .bind(identity.username, identity.name, Date.now(), identity.id)
-        .run();
-      continue;
-    }
-
-    const target = await db
-      .prepare("SELECT id FROM users WHERE id = ? LIMIT 1")
-      .bind(identity.id)
-      .first();
-    if (target) {
-      throw new Error(`User identity migration target already exists: ${identity.id}`);
-    }
-
-    const temporaryUsername = `__wany_identity_${source.id}_${Date.now()}`;
-    const statements = [
-      db.prepare("UPDATE users SET username = ?, updated_at = ? WHERE id = ?")
-        .bind(temporaryUsername, Date.now(), source.id),
-      db.prepare(`INSERT INTO users
-        (id, username, name, profile_visibility, password_salt, password_hash, password_iterations,
-         created_at, updated_at, avatar_id, role)
-        SELECT ?, ?, ?, profile_visibility, password_salt, password_hash, password_iterations,
-               created_at, ?, avatar_id, role
-        FROM users WHERE id = ?`)
-        .bind(identity.id, identity.username, identity.name, Date.now(), source.id),
-      db.prepare("UPDATE sessions SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE favorites SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE reading_progress SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE user_state SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE friendships SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE friendships SET friend_id = ? WHERE friend_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE user_library SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE reading_history SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE user_lists SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE user_profile_sections SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare("UPDATE activity_events SET user_id = ? WHERE user_id = ?").bind(identity.id, source.id),
-      db.prepare(`UPDATE friend_requests
-        SET pair_low_id = CASE WHEN pair_low_id = ? THEN ? ELSE pair_low_id END,
-            pair_high_id = CASE WHEN pair_high_id = ? THEN ? ELSE pair_high_id END,
-            requester_id = CASE WHEN requester_id = ? THEN ? ELSE requester_id END,
-            receiver_id = CASE WHEN receiver_id = ? THEN ? ELSE receiver_id END
-        WHERE pair_low_id = ? OR pair_high_id = ? OR requester_id = ? OR receiver_id = ?`)
-        .bind(
-          source.id, identity.id,
-          source.id, identity.id,
-          source.id, identity.id,
-          source.id, identity.id,
-          source.id, source.id, source.id, source.id,
-        ),
-      db.prepare("UPDATE admin_audit_log SET target_user_id = ? WHERE target_user_id = ?").bind(identity.id, source.id),
-      db.prepare("DELETE FROM users WHERE id = ?").bind(source.id),
-    ];
-    await db.batch(statements);
-  }
-
-  await db
-    .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '14')")
-    .run();
-}
-
-async function ensureDatabase(db) {
-  await db
-    .prepare(
-      "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-    )
-    .run();
-  const version = await db
-    .prepare("SELECT value FROM schema_meta WHERE key = 'schema_version' LIMIT 1")
-    .first();
-  // Schema v9+ is already bootstrapped. Newer versions are handled by
-  // incremental migrations in ensureApiRuntime; never run the fresh bootstrap
-  // again or ALTER TABLE statements (such as avatar_id) will fail on live DBs.
-  if (Number(version?.value ?? 0) >= 9) return;
-  if (version?.value === "8") {
-    await db.batch([
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-  if (version?.value === "7") {
-    await db.batch([
-      ...profileActivitySectionMigrationStatements(db),
-      ...activitySchemaStatements(db),
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-  if (version?.value === "6") {
-    await db.batch([
-      ...friendRequestSchemaStatements(db),
-      ...profileActivitySectionMigrationStatements(db),
-      ...activitySchemaStatements(db),
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-  if (version?.value === "5") {
-    await db.batch([
-      ...profileVisibilitySchemaStatements(db),
-      ...friendRequestSchemaStatements(db),
-      ...profileActivitySectionMigrationStatements(db),
-      ...activitySchemaStatements(db),
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-  if (version?.value === "4") {
-    await db.batch([
-      ...profileSectionSchemaStatements(db),
-      ...profileVisibilitySchemaStatements(db),
-      ...friendRequestSchemaStatements(db),
-      ...activitySchemaStatements(db),
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-  if (version?.value === "3") {
-    await db.batch([
-      ...listSchemaStatements(db),
-      ...profileSectionSchemaStatements(db),
-      ...profileVisibilitySchemaStatements(db),
-      ...friendRequestSchemaStatements(db),
-      ...activitySchemaStatements(db),
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-  if (version?.value === "2") {
-    await db.batch([
-      ...librarySchemaStatements(db),
-      ...libraryBackfillStatements(db),
-      ...listSchemaStatements(db),
-      ...profileSectionSchemaStatements(db),
-      ...profileVisibilitySchemaStatements(db),
-      ...friendRequestSchemaStatements(db),
-      ...activitySchemaStatements(db),
-      ...avatarSchemaStatements(db),
-      ...avatarSeedStatements(db),
-      db.prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-    ]);
-    return;
-  }
-
-  const now = Date.now();
-  const statements = [
-    db.prepare(`CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      username TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      name TEXT NOT NULL,
-      profile_visibility TEXT NOT NULL DEFAULT 'private'
-        CHECK (profile_visibility IN ('public','private')),
-      role TEXT NOT NULL DEFAULT 'user'
-        CHECK (role IN ('user','admin')),
-      password_salt TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      password_iterations INTEGER NOT NULL DEFAULT 210000,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS sessions (
-      token_hash TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      last_seen_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)"),
-    db.prepare(`CREATE TABLE IF NOT EXISTS favorites (
-      user_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, manga_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS reading_progress (
-      user_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      chapter INTEGER NOT NULL,
-      percent REAL NOT NULL DEFAULT 0,
-      completed INTEGER NOT NULL DEFAULT 0,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, manga_id, chapter),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_progress_user_updated ON reading_progress(user_id, updated_at DESC)"),
-    db.prepare(`CREATE TABLE IF NOT EXISTS user_state (
-      user_id TEXT PRIMARY KEY,
-      last_manga_id TEXT,
-      last_chapter INTEGER,
-      updated_at INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS friendships (
-      user_id TEXT NOT NULL,
-      friend_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, friend_id),
-      CHECK (user_id <> friend_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    ...friendRequestSchemaStatements(db),
-    ...librarySchemaStatements(db),
-    ...listSchemaStatements(db),
-    ...profileSectionSchemaStatements(db),
-    ...activitySchemaStatements(db),
-    ...avatarSchemaStatements(db),
-    ...avatarSeedStatements(db),
-  ];
-
-  for (const seeded of SEEDED_USERS) {
-    statements.push(
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO users
-            (id, username, name, password_salt, password_hash, password_iterations, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          seeded.id,
-          seeded.username,
-          seeded.name,
-          seeded.salt,
-          seeded.hash,
-          PASSWORD_ITERATIONS,
-          now,
-          now,
-        ),
-    );
-  }
-
-  for (const [userId, favorites] of Object.entries(SEEDED_FAVORITES)) {
-    for (const mangaId of favorites) {
-      statements.push(
-        db
-          .prepare("INSERT OR IGNORE INTO favorites (user_id, manga_id, created_at) VALUES (?, ?, ?)")
-          .bind(userId, mangaId, now),
-      );
-    }
-  }
-
-  for (const [userId, mangaId, chapter, percent, completed] of SEEDED_PROGRESS) {
-    statements.push(
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO reading_progress
-            (user_id, manga_id, chapter, percent, completed, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(userId, mangaId, chapter, percent, completed, now),
-    );
-  }
-
-  for (const [userId, mangaId, chapter] of [
-    ["h", "returner", 143],
-    ["y", "eleceed", 315],
-    ["m", "solo", 197],
-  ]) {
-    statements.push(
-      db
-        .prepare(
-          "INSERT OR IGNORE INTO user_state (user_id, last_manga_id, last_chapter, updated_at) VALUES (?, ?, ?, ?)",
-        )
-        .bind(userId, mangaId, chapter, now),
-    );
-  }
-
-  for (const user of SEEDED_USERS) {
-    for (const friend of SEEDED_USERS) {
-      if (user.id === friend.id) continue;
-      statements.push(
-        db
-          .prepare("INSERT OR IGNORE INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)")
-          .bind(user.id, friend.id, now),
-      );
-    }
-  }
-
-  statements.push(...libraryBackfillStatements(db));
-  statements.push(
-    db
-      .prepare("INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('schema_version', '9')"),
-  );
-  await db.batch(statements);
-}
-
-function avatarSchemaStatements(db) {
-  return [
-    db.prepare(`CREATE TABLE IF NOT EXISTS avatar_series (
-      id TEXT PRIMARY KEY,
-      work_id TEXT,
-      name TEXT NOT NULL,
-      slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      position INTEGER NOT NULL UNIQUE CHECK (position BETWEEN 1 AND 10),
-      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS avatars (
-      id TEXT PRIMARY KEY,
-      series_id TEXT NOT NULL,
-      character_name TEXT NOT NULL,
-      image_path TEXT NOT NULL UNIQUE,
-      position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 15),
-      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (series_id) REFERENCES avatar_series(id) ON DELETE CASCADE,
-      UNIQUE (series_id, position),
-      UNIQUE (series_id, character_name COLLATE NOCASE)
-    )`),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_avatars_series_position ON avatars(series_id, position ASC)"),
-    db.prepare("ALTER TABLE users ADD COLUMN avatar_id TEXT REFERENCES avatars(id) ON DELETE SET NULL"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_users_avatar ON users(avatar_id)"),
-  ];
-}
-
-function avatarSeedStatements(db) {
-  const now = Date.now();
-  const statements = [];
-  for (const series of AVATAR_LIBRARY_SEED) {
-    statements.push(
-      db.prepare(`INSERT OR IGNORE INTO avatar_series
-        (id, work_id, name, slug, position, is_active, created_at, updated_at)
-        VALUES (?, NULL, ?, ?, ?, 1, ?, ?)`)
-        .bind(series.id, series.name, series.slug, series.position, now, now),
-    );
-    for (const avatar of series.avatars) {
-      statements.push(
-        db.prepare(`INSERT OR IGNORE INTO avatars
-          (id, series_id, character_name, image_path, position, is_active, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 1, ?, ?)`)
-          .bind(avatar.id, series.id, avatar.characterName, avatar.imagePath, avatar.position, now, now),
-      );
-    }
-  }
-  return statements;
-}
-
-function librarySchemaStatements(db) {
-  return [
-    db.prepare(`CREATE TABLE IF NOT EXISTS user_library (
-      user_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('reading','completed','paused','planned')),
-      added_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      last_read_at INTEGER,
-      last_read_chapter REAL,
-      highest_reached_chapter REAL,
-      PRIMARY KEY (user_id, manga_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_recent ON user_library(user_id, last_read_at DESC, updated_at DESC)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_library_status ON user_library(user_id, status, manga_id)"),
-    db.prepare(`CREATE TABLE IF NOT EXISTS reading_history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      chapter REAL NOT NULL,
-      read_at INTEGER NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_time ON reading_history(user_id, read_at DESC, id DESC)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_work ON reading_history(user_id, manga_id, read_at DESC)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_reading_history_user_chapter ON reading_history(user_id, manga_id, chapter)"),
-  ];
-}
-
-function libraryBackfillStatements(db) {
-  return [
-    db.prepare(`INSERT OR IGNORE INTO user_library
-      (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
-      SELECT user_id, manga_id, 'planned', created_at, created_at, NULL, NULL, NULL
-      FROM favorites`),
-    db.prepare(`INSERT OR IGNORE INTO user_library
-      (user_id, manga_id, status, added_at, updated_at, last_read_at, last_read_chapter, highest_reached_chapter)
-      SELECT
-        p.user_id,
-        p.manga_id,
-        'reading',
-        MIN(p.updated_at),
-        MAX(p.updated_at),
-        MAX(p.updated_at),
-        (
-          SELECT rp.chapter
-          FROM reading_progress rp
-          WHERE rp.user_id = p.user_id AND rp.manga_id = p.manga_id
-          ORDER BY rp.updated_at DESC, rp.chapter DESC
-          LIMIT 1
-        ),
-        MAX(p.chapter)
-      FROM reading_progress p
-      GROUP BY p.user_id, p.manga_id`),
-    db.prepare(`UPDATE user_library
-      SET
-        status = CASE
-          WHEN status = 'planned' AND EXISTS (
-            SELECT 1 FROM reading_progress rp
-            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-          ) THEN 'reading'
-          ELSE status
-        END,
-        updated_at = MAX(
-          updated_at,
-          COALESCE((
-            SELECT MAX(rp.updated_at)
-            FROM reading_progress rp
-            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-          ), updated_at)
-        ),
-        last_read_at = COALESCE((
-          SELECT MAX(rp.updated_at)
-          FROM reading_progress rp
-          WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-        ), last_read_at),
-        last_read_chapter = COALESCE((
-          SELECT rp.chapter
-          FROM reading_progress rp
-          WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-          ORDER BY rp.updated_at DESC, rp.chapter DESC
-          LIMIT 1
-        ), last_read_chapter),
-        highest_reached_chapter = CASE
-          WHEN (
-            SELECT MAX(rp.chapter)
-            FROM reading_progress rp
-            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-          ) IS NULL THEN highest_reached_chapter
-          WHEN highest_reached_chapter IS NULL THEN (
-            SELECT MAX(rp.chapter)
-            FROM reading_progress rp
-            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-          )
-          ELSE MAX(highest_reached_chapter, (
-            SELECT MAX(rp.chapter)
-            FROM reading_progress rp
-            WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-          ))
-        END
-      WHERE EXISTS (
-        SELECT 1 FROM reading_progress rp
-        WHERE rp.user_id = user_library.user_id AND rp.manga_id = user_library.manga_id
-      )`),
-  ];
-}
-
-function listSchemaStatements(db) {
-  return [
-    db.prepare(`CREATE TABLE IF NOT EXISTS user_lists (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      position REAL NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_user_lists_user_position ON user_lists(user_id, position ASC, created_at ASC)",
-    ),
-    db.prepare(`CREATE TABLE IF NOT EXISTS user_list_items (
-      list_id TEXT NOT NULL,
-      manga_id TEXT NOT NULL,
-      position REAL NOT NULL DEFAULT 0,
-      added_at INTEGER NOT NULL,
-      PRIMARY KEY (list_id, manga_id),
-      FOREIGN KEY (list_id) REFERENCES user_lists(id) ON DELETE CASCADE
-    )`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_user_list_items_position ON user_list_items(list_id, position ASC, added_at ASC)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_user_list_items_work ON user_list_items(manga_id, list_id)",
-    ),
-  ];
-}
-
-function profileSectionSchemaStatements(db) {
-  return [
-    db.prepare(`CREATE TABLE IF NOT EXISTS user_profile_sections (
-      user_id TEXT NOT NULL,
-      section_type TEXT NOT NULL CHECK (section_type IN ('continue_reading','favorites','custom_list','my_activity','friends_activity')),
-      reference_id TEXT NOT NULL DEFAULT '',
-      position REAL NOT NULL DEFAULT 0,
-      is_visible INTEGER NOT NULL DEFAULT 1 CHECK (is_visible IN (0,1)),
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, section_type, reference_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
-    ),
-  ];
-}
-
-function profileActivitySectionMigrationStatements(db) {
-  return [
-    db.prepare("DROP INDEX IF EXISTS idx_user_profile_sections_user_position"),
-    db.prepare(`CREATE TABLE user_profile_sections_v8 (
-      user_id TEXT NOT NULL,
-      section_type TEXT NOT NULL CHECK (section_type IN ('continue_reading','favorites','custom_list','my_activity','friends_activity')),
-      reference_id TEXT NOT NULL DEFAULT '',
-      position REAL NOT NULL DEFAULT 0,
-      is_visible INTEGER NOT NULL DEFAULT 1 CHECK (is_visible IN (0,1)),
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, section_type, reference_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(`INSERT INTO user_profile_sections_v8
-      (user_id, section_type, reference_id, position, is_visible, created_at, updated_at)
-      SELECT user_id, section_type, reference_id, position, is_visible, created_at, updated_at
-      FROM user_profile_sections`),
-    db.prepare("DROP TABLE user_profile_sections"),
-    db.prepare("ALTER TABLE user_profile_sections_v8 RENAME TO user_profile_sections"),
-    db.prepare(
-      "CREATE INDEX idx_user_profile_sections_user_position ON user_profile_sections(user_id, position ASC, created_at ASC)",
-    ),
-  ];
-}
-
-function activitySchemaStatements(db) {
-  return [
-    db.prepare(`CREATE TABLE IF NOT EXISTS activity_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('started_work','progress_reached','completed_work','favorited_work','added_to_list','created_list')),
-      manga_id TEXT,
-      list_id TEXT,
-      chapter_number REAL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (list_id) REFERENCES user_lists(id) ON DELETE CASCADE,
-      CHECK (
-        (type IN ('started_work','completed_work','favorited_work') AND manga_id IS NOT NULL)
-        OR (type = 'progress_reached' AND manga_id IS NOT NULL AND chapter_number IS NOT NULL)
-        OR (type = 'added_to_list' AND manga_id IS NOT NULL AND list_id IS NOT NULL)
-        OR (type = 'created_list' AND list_id IS NOT NULL)
-      )
-    )`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_activity_user_created ON activity_events(user_id, created_at DESC, id DESC)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_activity_user_type_work_updated ON activity_events(user_id, type, manga_id, updated_at DESC, id DESC)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_activity_list ON activity_events(list_id, created_at DESC, id DESC)",
-    ),
-  ];
-}
-
-function profileVisibilitySchemaStatements(db) {
-  return [
-    db.prepare(`ALTER TABLE users
-      ADD COLUMN profile_visibility TEXT NOT NULL DEFAULT 'private'
-      CHECK (profile_visibility IN ('public','private'))`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_users_profile_visibility ON users(profile_visibility, id)",
-    ),
-  ];
-}
-
-function friendRequestSchemaStatements(db) {
-  return [
-    db.prepare(`CREATE TABLE IF NOT EXISTS friend_requests (
-      pair_low_id TEXT NOT NULL,
-      pair_high_id TEXT NOT NULL,
-      requester_id TEXT NOT NULL,
-      receiver_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (pair_low_id, pair_high_id),
-      CHECK (pair_low_id <> pair_high_id),
-      CHECK (requester_id <> receiver_id),
-      CHECK (
-        (requester_id = pair_low_id AND receiver_id = pair_high_id)
-        OR (requester_id = pair_high_id AND receiver_id = pair_low_id)
-      ),
-      FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
-    )`),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_friend_requests_receiver ON friend_requests(receiver_id, created_at DESC)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_friend_requests_requester ON friend_requests(requester_id, created_at DESC)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id, user_id)",
-    ),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS idx_users_name_nocase ON users(name COLLATE NOCASE, id)",
-    ),
-  ];
 }
 
 async function syncUserProfileSections(db, userId) {
@@ -4545,51 +3164,15 @@ async function importLegacyData(db, userId, data) {
   if (statements.length) await db.batch(statements);
 }
 
-async function verifyPassword(password, row) {
-  const salt = base64UrlToBytes(row.password_salt);
-  const derived = await derivePasswordHash(password, salt, Number(row.password_iterations));
-  return timingSafeEqual(base64UrlToBytes(derived), base64UrlToBytes(row.password_hash));
-}
-
-async function derivePasswordHash(password, salt, iterations) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations },
-    key,
-    256,
-  );
-  return bytesToBase64Url(new Uint8Array(bits));
-}
-
 async function sha256Base64Url(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return bytesToBase64Url(new Uint8Array(digest));
-}
-
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i += 1) result |= a[i] ^ b[i];
-  return result === 0;
 }
 
 function bytesToBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value) {
-  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function randomToken(size) {
@@ -4623,9 +3206,8 @@ function publicUser(row) {
 }
 
 function normalizeUsername(value) {
-  if (typeof value !== "string") return "";
-  const normalized = value.trim().toLowerCase();
-  return /^[a-z0-9_-]{1,32}$/.test(normalized) ? normalized : "";
+  const normalized = normalizeLoginName(value);
+  return /^[a-z0-9][a-z0-9_.-]{0,31}$/.test(normalized) ? normalized : "";
 }
 
 function normalizeDisplayName(value) {
@@ -4654,11 +3236,7 @@ function safeId(value) {
 }
 
 async function readJson(request) {
-  const length = Number(request.headers.get("Content-Length") ?? 0);
-  if (length > MAX_JSON_BYTES) throw new Error("Request body too large");
-  const type = request.headers.get("Content-Type") ?? "";
-  if (!type.toLowerCase().includes("application/json")) return {};
-  return await request.json();
+  return readAuthJson(request);
 }
 
 function json(body, status = 200, extraHeaders = {}) {

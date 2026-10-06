@@ -13,7 +13,8 @@ test("Phase 5 private profile UI renders favorites without hidden social section
   const source = await readFile(new URL("../src/pages/Friends.tsx", import.meta.url), "utf8");
   assert.match(source, /isPrivate \? \(\s*<FavoritesSection/);
   assert.match(source, /profile\.access === "private"/);
-  assert.match(source, /highestReachedChapter/);
+  const overview = await readFile(new URL("../src/components/ProfileOverview.tsx", import.meta.url), "utf8");
+  assert.match(overview, /highestReachedChapter/);
   assert.doesNotMatch(source, /lastReadChapter/);
   assert.doesNotMatch(source, /Reading History|readingHistory/);
 });
@@ -32,3 +33,4 @@ test("Phase 5 styles remain mobile-first and remove readonly list control column
   assert.match(css, /\.list-sortable-row\.read-only/);
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/);
 });
+

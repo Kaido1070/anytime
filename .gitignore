@@ -5,3 +5,16 @@ test-results/
 playwright-report/
 .env*
 !.env.example
+
+
+/private-migrations/
+*.local.json
+/wany-backup.sql
+/wany-fixed.sql
+/wany-import.sql
+/wany-test.zip
+**/wany-backup.sql
+**/credentials.local.json
+**/login.txt
+__pycache__/
+*.pyc

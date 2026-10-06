@@ -1,4 +1,6 @@
-# Anytime — Phase 2
+# Anytime — Phase 2 (historical overview)
+
+Current account deployment instructions are in [account-safety-rollout.md](docs/account-safety-rollout.md). This document is not a production deployment checklist.
 
 Phase 2 moves account state from browser-only storage to Cloudflare Pages Functions + D1.
 
@@ -6,7 +8,7 @@ Phase 2 moves account state from browser-only storage to Cloudflare Pages Functi
 
 - Real server-side sessions using an HttpOnly, Secure, SameSite=Lax cookie.
 - Session tokens are stored in D1 only as SHA-256 hashes.
-- Passwords are stored only as PBKDF2-SHA256 hashes with per-user salts and 210,000 iterations.
+- Passwords are stored only as PBKDF2-SHA256 hashes with per-user salts and stored iteration parameters. The current creation cost is documented in the rollout guide.
 - Favorites sync across devices.
 - Reading progress, completed chapters, and last-opened chapter sync across devices.
 - User library state is stored per work with status, timestamps, last-read chapter, and a non-regressing highest-reached chapter.
@@ -14,7 +16,7 @@ Phase 2 moves account state from browser-only storage to Cloudflare Pages Functi
 - “أكمل القراءة” is driven by the user library and advances to the next available chapter only when the highest reached chapter is completed.
 - Friends and their favorites/current reading state come from D1.
 - Existing Phase 1 local data is imported once after the first successful Phase 2 login.
-- Profile password changes invalidate the user's other active sessions.
+- Profile password changes invalidate other sessions and rotate the current session cookie.
 - API responses are `Cache-Control: no-store`, and the PWA service worker never caches `/api/*`.
 - The existing automatic PWA cache versioning remains enabled for every build.
 
@@ -27,13 +29,13 @@ The code needs a D1 binding named exactly `DB`.
 3. Go to **Settings → Bindings → Add → D1 database binding**.
 4. Set **Variable name** to `DB` and select `anytime-db`.
 5. Add the binding to **Production** (and Preview too if desired).
-6. Redeploy the latest `main` deployment.
+6. Apply a reviewed compatible schema and complete the private rollout gates before deployment.
 
-No manual SQL migration is required for first use: the API creates the Phase 2 schema and seed rows automatically when it first sees a bound empty D1 database. The same schema is also kept in `migrations/0001_phase2.sql` for audit/recovery.
+Request-time account bootstrap has been removed. Schema changes are explicit, and migrations do not seed real account credentials.
 
 ## Initial accounts
 
-The private accounts remain `has`, `yas`, and `m`. Their original Phase 1 password remains valid initially, but it is not stored as plaintext in the database or migration. Change it from **Profile → تغيير كلمة المرور** after the first login.
+Usernames are reviewed privately; internal IDs are immutable random numeric TEXT values. The private migration rotates every password and recovery code and revokes all sessions. Generated secrets stay only in your private local output folder.
 
 ## API routes
 
@@ -56,3 +58,6 @@ The private accounts remain `has`, `yas`, and `m`. Their original Phase 1 passwo
 - `DELETE /api/friends/:userId`
 - `POST /api/import`
 - `POST /api/change-password`
+- `POST /api/logout-all`
+- `POST /api/recovery-code`
+

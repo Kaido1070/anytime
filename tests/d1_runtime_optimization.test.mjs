@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("general API bootstraps D1 once per binding instead of on every request", async () => {
+test("general API validates the deployed schema once per binding without migration", async () => {
   const api = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
   const requestHandler = api.slice(
     api.indexOf("export async function onRequest"),
@@ -12,8 +12,8 @@ test("general API bootstraps D1 once per binding instead of on every request", a
   assert.doesNotMatch(requestHandler, /ensureDatabase\(db\)/);
   assert.doesNotMatch(requestHandler, /INSERT OR REPLACE INTO schema_meta/);
   assert.match(api, /const apiRuntimeReady = new WeakMap\(\)/);
-  assert.match(api, /if \(version !== "16"\)/);
-  assert.match(api, /schema_version', '16'/);
+  assert.doesNotMatch(api, /ensureDatabase|ensureCanonicalAccountNames|applyUserIdentityV14/);
+  assert.match(api, /SCHEMA_MIGRATION_REQUIRED/);
 });
 
 test("profile section GET is read-only after the one-time backfill", async () => {
@@ -23,7 +23,7 @@ test("profile section GET is read-only after the one-time backfill", async () =>
   const getter = api.slice(start, end);
   assert.doesNotMatch(getter, /syncUserProfileSections/);
   assert.doesNotMatch(getter, /INSERT|UPDATE|DELETE/);
-  assert.match(api, /INSERT OR IGNORE INTO user_profile_sections/);
+  assert.match(await readFile(new URL("../migrations/0011_d1_runtime_optimization.sql", import.meta.url), "utf8"), /INSERT OR IGNORE INTO user_profile_sections/);
 });
 
 test("progress route has one canonical implementation and suppresses no-op writes", async () => {
@@ -100,3 +100,4 @@ test("D1 optimization migration backfills profile sections and advances schema v
   assert.match(migration, /'custom_list'/);
   assert.match(migration, /schema_version', '11'/);
 });
+

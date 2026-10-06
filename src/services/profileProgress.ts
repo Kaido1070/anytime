@@ -7,7 +7,7 @@ export interface AvailableChapterProgress {
   latestChapter: number | null;
 }
 
-export function orderedAvailableChapters(chapters?: SourceChapter[]) {
+function orderedAvailableChapters(chapters?: SourceChapter[]) {
   const unique = new Map<number, SourceChapter>();
   for (const chapter of chapters ?? []) {
     const number = Number(chapter.number);
@@ -42,3 +42,4 @@ export function availableChapterProgress(
     latestChapter: latest ? Number(latest.number) : null,
   };
 }
+

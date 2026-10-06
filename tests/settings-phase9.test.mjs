@@ -17,7 +17,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "9" };
+      return { value: "20" };
     }
 
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
@@ -159,7 +159,8 @@ test("settings UI extends the existing account settings view and reuses AvatarPi
   ]);
 
   assert.match(account, /tab=settings/);
-  assert.doesNotMatch(app, /path="settings"/);
+  assert.doesNotMatch(app.slice(app.indexOf('<Route element={<AppLayout />}')), /path="settings"/);
+  assert.match(app, /path="settings" element={<AdminSettings \/>}/);
   assert.match(profile, /setDisplayName/);
   assert.match(profile, /AvatarPicker/);
   assert.match(profile, /setProfileVisibility/);
@@ -191,10 +192,11 @@ test("password change verifies the current password and invalidates other sessio
   );
 
   assert.match(source, /verifyPassword\(currentPassword, authRow\)/);
-  assert.match(source, /PBKDF2/);
-  assert.match(source, /hash: "SHA-256"/);
+  const passwords = await readFile(new URL("../functions/_password.js", import.meta.url), "utf8");
+  assert.match(passwords, /PBKDF2/);
+  assert.match(passwords, /hash: "SHA-256"/);
   assert.match(
-    source,
+    passwords,
     /DELETE FROM sessions WHERE user_id = \? AND token_hash <> \?/,
   );
   assert.doesNotMatch(

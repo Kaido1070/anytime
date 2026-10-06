@@ -85,21 +85,12 @@ test("admin detail never treats the admin account as a social user target", asyn
   assert.equal((await response.json()).error, "USER_NOT_FOUND");
 });
 
-test("admin account provisioning is secret-driven and migration contains no credential", async () => {
-  const [provision, migration] = await Promise.all([
-    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
-    readFile(new URL("../migrations/0009_admin.sql", import.meta.url), "utf8"),
-  ]);
-
-  assert.match(provision, /ADMIN_INITIAL_PASSWORD/);
-  assert.match(provision, /length < 8/);
-  assert.match(provision, /PBKDF2/);
-  assert.match(provision, /role = 'admin'|role\)\s*VALUES/s);
-  assert.match(provision, /UPDATE users[\s\S]*password_hash = \?[\s\S]*role = 'admin'/);
-  assert.doesNotMatch(migration, /password_hash|password_salt|initial_password/i);
-  assert.match(migration, /role IN \('user','admin'\)/);
-  assert.match(migration, /admin_audit_log/);
+test("identity support schema stores account relationships without seeding real identities", async () => {
+  const migration = await readFile(new URL("../migrations/0015_numeric_identity_support.sql", import.meta.url), "utf8");
+  assert.match(migration, /user_identity_aliases/);
+  assert.doesNotMatch(migration, /INSERT INTO users|ADMIN_INITIAL_PASSWORD|password_hash[^\n]*VALUES/);
 });
+
 
 test("normal APIs exclude admin from profiles, search, friends, requests and activity", async () => {
   const api = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
@@ -129,7 +120,7 @@ test("admin client is isolated to dedicated management routes and mobile layout"
   assert.match(page, /highestReachedChapter/);
   assert.match(page, /lastReadChapter/);
   assert.match(page, /readingHistoryHasMore/);
-  assert.match(service, /normalizedUsername === "admin" \? "admin-login" : "login"/);
+  assert.match(service, /const endpoint = "login"/);
   assert.match(css, /@media\(max-width:759px\)/);
   assert.match(css, /admin-users-table td::before/);
 });
@@ -147,86 +138,50 @@ test("admin responses are no-store and public user serializer does not expose ro
 });
 
 
-test("admin schema repair is non-destructive for existing user accounts", async () => {
+test("admin schema validation never changes existing user accounts", async () => {
   const helpers = await readFile(new URL("../functions/_admin.js", import.meta.url), "utf8");
-  const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
   const api = await readFile(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
-
   assert.match(helpers, /PRAGMA table_info\(users\)/);
-  assert.match(helpers, /ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'/);
-  assert.doesNotMatch(helpers, /DROP TABLE users|DELETE FROM users|UPDATE users/);
-  assert.doesNotMatch(helpers, /schema_version[\s\S]*return/);
-
-  assert.match(api, /role TEXT NOT NULL DEFAULT 'user'[\s\S]*role IN \('user','admin'\)/);
-  assert.doesNotMatch(provision, /DROP TABLE users|DELETE FROM users/);
-  const updateStart = provision.indexOf("UPDATE users");
-  const updateEnd = provision.indexOf(".run();", updateStart);
-  const updateBlock = provision.slice(updateStart, updateEnd);
-  assert.ok(updateStart >= 0, "Admin provisioning should update only the reserved Admin row");
-  assert.match(updateBlock, /WHERE id = \?/);
-  assert.match(provision, /WHERE username = \? COLLATE NOCASE LIMIT 1/);
+  assert.doesNotMatch(helpers, /ALTER TABLE|CREATE TABLE|CREATE INDEX|DELETE FROM users|UPDATE users/);
+  assert.doesNotMatch(api, /ensureCanonicalAccountNames|SEEDED_USERS/);
 });
 
 
-test("admin provisioning never hijacks an ordinary existing account named Admin", async () => {
-  const provision = await readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8");
-  assert.match(provision, /existingByUsername\?\.role === "admin" \? existingByUsername : null/);
-  assert.match(provision, /existingByUsername && existingByUsername\.id !== existing\.id/);
-  assert.match(provision, /ADMIN_INTERNAL_USERNAME/);
-  assert.doesNotMatch(provision, /UPDATE users[\s\S]*WHERE username = \?/);
+test("admin login never provisions or promotes an ordinary account named Admin", async () => {
+  const login = await readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8");
+  assert.doesNotMatch(login, /ensureAdminAccount|UPDATE users|INSERT INTO users|ADMIN_INITIAL_PASSWORD/);
+  assert.match(login, /role = 'admin'/);
 });
 
 
 test("admin login exposes safe stage diagnostics without leaking secrets", async () => {
   const login = await readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8");
   assert.match(login, /ADMIN_SCHEMA_FAILED/);
-  assert.match(login, /ADMIN_PROVISION_FAILED/);
+  assert.doesNotMatch(login, /ensureAdminAccount|ADMIN_PROVISION_FAILED/);
   assert.match(login, /ADMIN_LOOKUP_FAILED/);
   assert.match(login, /ADMIN_SESSION_FAILED/);
-  assert.match(login, /ADMIN_SECRET_MISSING/);
+  assert.doesNotMatch(login, /ADMIN_INITIAL_PASSWORD|ADMIN_SECRET_MISSING/);
   assert.doesNotMatch(login, /initialSecret.*message|suppliedSecret.*message/);
 });
 
 
-test("Admin login uses the reserved id and preserves any ordinary account named Admin", async () => {
-  const [provision, login] = await Promise.all([
-    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
-    readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8"),
-  ]);
-  assert.match(provision, /ADMIN_INTERNAL_USERNAME = "__wany_admin__"/);
-  assert.match(provision, /existingByUsername && existingByUsername\.id !== existing\.id/);
-  assert.match(provision, /const username = existingByUsername \? ADMIN_INTERNAL_USERNAME : ADMIN_USERNAME/);
-  assert.match(provision, /purgeSocialRowsBestEffort/);
-  assert.match(login, /FROM users WHERE id = \? AND role = 'admin' LIMIT 1/);
-  assert.match(login, /\.bind\("admin"\)/);
+test("admin login resolves an existing username and stored role instead of a reserved id", async () => {
+  const login = await readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8");
+  assert.match(login, /FROM users WHERE username = \? COLLATE NOCASE AND role = 'admin'/);
+  assert.doesNotMatch(login, /id = 'admin'|\.bind\("admin"\)/);
 });
 
 
-test("Admin provisioning reports the failing production substage without leaking credentials", async () => {
-  const [provision, login] = await Promise.all([
-    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
-    readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8"),
-  ]);
-  for (const code of [
-    "ADMIN_PROVISION_LOOKUP_FAILED",
-    "ADMIN_PROVISION_HASH_FAILED",
-    "ADMIN_PROVISION_UPDATE_FAILED",
-    "ADMIN_PROVISION_INSERT_FAILED",
-  ]) {
-    assert.match(provision, new RegExp(code));
-  }
-  assert.match(login, /typeof error\.code === "string"/);
-  assert.doesNotMatch(login, /cause.*message:/);
+test("admin login diagnostics do not expose credentials", async () => {
+  const login = await readFile(new URL("../functions/api/admin-login.js", import.meta.url), "utf8");
+  assert.match(login, /ADMIN_LOOKUP_FAILED|ADMIN_SESSION_FAILED/);
+  assert.doesNotMatch(login, /suppliedSecret.*message|password_hash.*message/);
 });
 
 
-test("Admin PBKDF2 cost matches the Cloudflare-safe password flow", async () => {
-  const [provision, changePassword] = await Promise.all([
-    readFile(new URL("../functions/_admin_provision.js", import.meta.url), "utf8"),
-    readFile(new URL("../functions/api/change-password.js", import.meta.url), "utf8"),
-  ]);
-  assert.match(provision, /ADMIN_PASSWORD_ITERATIONS = 25000/);
-  assert.match(changePassword, /PASSWORD_ITERATIONS = 25000/);
+test("password creation uses the shared strengthened password-change parameters", async () => {
+  const passwords = await readFile(new URL("../functions/_password.js", import.meta.url), "utf8");
+  assert.match(passwords, /PASSWORD_ITERATIONS = 100000/);
 });
 
 
@@ -244,3 +199,4 @@ test("admin dashboard removes redundant navigation and surfaces chapters read", 
   assert.match(api, /GROUP BY manga_id, chapter/);
   assert.match(types, /chaptersReadCount: number/);
 });
+

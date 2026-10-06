@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { formatArabicRelativeTime } from "../src/services/dateFormat.ts";
+import ts from "typescript";
 import {
   rankRecommendations,
   recommendationFeatureSignature,
@@ -99,7 +100,7 @@ test("relative release time stays Arabic while long dates stay Gregorian", () =>
   assert.match(formatArabicRelativeTime(now - 20 * 24 * 60 * 60_000, now), /\d{2}\/\d{2}\/\d{4}/);
 });
 
-test("Phase 10.5 navigation exposes exactly the four social destinations and keeps admin isolated", async () => {
+test("navigation keeps four destinations and admin isolation with the automatic New badge disabled", async () => {
   const [layout, app, adminLayout] = await Promise.all([
     readFile(new URL("../src/layouts/AppLayout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
@@ -111,7 +112,9 @@ test("Phase 10.5 navigation exposes exactly the four social destinations and kee
   }
   assert.match(app, /path="fyp" element={<Fyp \/>}/);
   assert.match(app, /path="new" element={<NewChapters \/>}/);
-  assert.match(layout, /loadUnreadFollowedCount/);
+  assert.equal((layout.match(/label: "/g) ?? []).length, 4);
+  assert.match(layout, /label: "جديد", path: "\/new"/);
+  assert.doesNotMatch(layout, /loadUnreadFollowedCount|loadNewChapterFeed|bottom-nav-badge|newCount|fetch\(|setInterval\(/);
   assert.doesNotMatch(adminLayout, /FYP|جديد|استكشف|حسابي/);
 });
 
@@ -135,7 +138,7 @@ test("New tracking is an active union and exact read state reuses reading_histor
   assert.match(migration, /idx_reading_history_user_chapter/);
 });
 
-test("chapter availability uses published time first and stable first_seen fallback, never update time", async () => {
+test("chapter availability retains observation metadata but the New feed requires publication time", async () => {
   const [sourceApi, feed] = await Promise.all([
     readFile(new URL("../functions/api/source/[[path]].js", import.meta.url), "utf8"),
     readFile(new URL("../src/services/newChapters.ts", import.meta.url), "utf8"),
@@ -148,10 +151,9 @@ test("chapter availability uses published time first and stable first_seen fallb
   assert.match(sourceApi, /published_at = COALESCE\(\?, published_at\)/);
   assert.match(sourceApi, /if \(!numberChanged && !publicationChanged\) continue/);
   assert.match(feed, /parsePublished\(chapter\.publishedAt\)/);
-  assert.match(feed, /chapter\.baselineObserved/);
-  assert.match(feed, /chapter\.firstSeenAt/);
   const releaseFunction = feed.slice(feed.indexOf("function releaseFor"), feed.indexOf("function readKey"));
-  assert.doesNotMatch(releaseFunction, /updated/i);
+  assert.match(releaseFunction, /published == null \? null/);
+  assert.doesNotMatch(releaseFunction, /chapter\.(?:updatedAt|firstSeenAt|baselineObserved)/);
 });
 
 test("FYP implementation centralizes weights, excludes known works, caches by algorithm and taste version", async () => {
@@ -181,10 +183,61 @@ test("New page is a flat 24-hour chapter timeline", async () => {
   ]);
 
   assert.match(feed, /NEW_CHAPTER_WINDOW_MS = 24 \* 60 \* 60_000/);
-  assert.match(feed, /chapter\.releaseAt >= cutoff/);
+  assert.match(feed, /chapter\.releaseAt > cutoff/);
   assert.match(page, /page\.all/);
   assert.match(page, /b\.chapter\.releaseAt - a\.chapter\.releaseAt/);
   assert.match(page, /آخر 24 ساعة/);
   assert.doesNotMatch(page, /متابعتي/);
   assert.doesNotMatch(page, /new-work-group/);
+});
+
+test("New feed excludes observation-only, invalid, future, synthetic and 24-hour boundary chapters", async (t) => {
+  const now = Date.UTC(2026, 9, 6, 17);
+  const originalNow = Date.now;
+  t.after(() => {
+    Date.now = originalNow;
+  });
+  Date.now = () => now;
+  const fixtures = [
+    ["fresh", { publishedAt: new Date(now - 60_000).toISOString() }],
+    ["current", { publishedAt: new Date(now).toISOString() }],
+    ["boundary", { publishedAt: new Date(now - 24 * 60 * 60_000).toISOString() }],
+    ["old", { publishedAt: new Date(now - 25 * 60 * 60_000).toISOString(), updatedAt: now }],
+    ["observed", { publishedAt: null, firstSeenAt: now, baselineObserved: false }],
+    ["invalid", { publishedAt: "not-a-date", firstSeenAt: now }],
+    ["future", { publishedAt: new Date(now + 60_000).toISOString() }],
+    ["synthetic", { publishedAt: new Date(now).toISOString(), synthetic: true }],
+  ];
+  const items = fixtures.map(([id, chapter]) => ({
+    ...work(`mt:${id}`, []),
+    chapters: [{ number: 1, title: "الفصل 1", ...chapter }],
+  }));
+  const sourceService = {
+    recent: async (source, page) => ({
+      items: source === "mangatime" ? items : [], hasMore: false, page,
+    }),
+  };
+  const userDataService = {
+    getPersonalizationState: async () => ({
+      followed: [{ mangaId: "mt:fresh", trackingStartedAt: now - 120_000 }],
+    }),
+    getReadChapterPairs: async () => [],
+  };
+  // Run the actual feed implementation with isolated source/account boundaries;
+  // source merging has its own tests and no network/storage is touched here.
+  const source = await readFile(new URL("../src/services/newChapters.ts", import.meta.url), "utf8");
+  const code = ts.transpileModule(source.replace(/^import[\s\S]*?;\n/gm, ""), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
+  }).outputText.replace(/^export /gm, "");
+  const { loadNewChapterFeed } = new Function(
+    "mergeSourceItems", "preferredSourceCover", "sourceService", "userDataService",
+    code + "\nreturn { loadNewChapterFeed };",
+  )(
+    (rows) => rows.map((item) => ({ id: item.key, primary: item, items: [item] })),
+    (rows) => rows[0], sourceService, userDataService,
+  );
+  const feed = await loadNewChapterFeed();
+  assert.deepEqual(feed.all.map((group) => group.item.key), ["mt:current", "mt:fresh"]);
+  assert.equal(feed.unreadFollowedCount, 1);
+  assert.equal(feed.followed[0].item.key, "mt:fresh");
 });

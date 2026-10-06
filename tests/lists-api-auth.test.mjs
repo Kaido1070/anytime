@@ -15,7 +15,7 @@ class FakeStatement {
 
   async first() {
     if (this.query.includes("SELECT value FROM schema_meta")) {
-      return { value: "4" };
+      return { value: "20" };
     }
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
@@ -62,6 +62,7 @@ async function call(path, method, body) {
   const request = new Request(`https://wany.test/api/${path}`, {
     method,
     headers: {
+      Origin: "https://wany.test",
       Cookie: "anytime_session=test-session",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },

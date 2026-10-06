@@ -126,7 +126,7 @@ class RouteStatement {
   }
 
   async first() {
-    if (this.query.includes("SELECT value FROM schema_meta")) return { value: "9" };
+    if (this.query.includes("SELECT value FROM schema_meta")) return { value: "20" };
     if (this.query.includes("FROM sessions s") && this.query.includes("JOIN users u")) {
       return {
         token_hash: "token",
@@ -191,6 +191,7 @@ async function call(db, method, path, body) {
   const request = new Request(`https://wany.test/api/${path}`, {
     method,
     headers: {
+      Origin: "https://wany.test",
       Cookie: "anytime_session=test-session",
       ...(body ? { "Content-Type": "application/json" } : {}),
     },

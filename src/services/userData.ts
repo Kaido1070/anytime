@@ -24,10 +24,22 @@ import type {
   WorkSnapshot,
 } from "../types";
 
+export interface AccountScope {
+  key: string;
+  signal: AbortSignal;
+  isCurrent(): boolean;
+  assertCurrent(): void;
+}
+
 export interface UserDataService {
+  captureAccountScope(): AccountScope | null;
   getUser(): Promise<User | null>;
   signIn(username: string, password: string): Promise<User>;
-  signOut(): Promise<void>;
+  signOut(allDevices?: boolean): Promise<void>;
+  generateRecoveryCode(currentPassword: string): Promise<string>;
+  setSecurityQuestion(currentPassword: string, question: string, answer: string): Promise<void>;
+  getSecurityQuestion(username: string): Promise<string>;
+  recoverWithSecurityAnswer(username: string, answer: string, newPassword: string): Promise<void>;
   recoverPassword(username: string, recoveryCode: string, newPassword: string): Promise<void>;
   getData(): Promise<UserData>;
   getFavorites(): Promise<string[]>;
@@ -56,6 +68,9 @@ export interface UserDataService {
   saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
   getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
   getAdminUsers(options?: { query?: string; visibility?: string; status?: string; sort?: string; limit?: number; offset?: number }): Promise<{ users: AdminUserSummary[]; total: number; hasMore: boolean }>;
+  getAdminSecurityQuestion(id: string): Promise<{ question: string | null; recoveryLocked: boolean; failedAnswers: number }>;
+  adminResetPassword(id: string, currentPassword: string, newPassword: string): Promise<void>;
+  adminUnlockRecovery(id: string, currentPassword: string): Promise<void>;
   getAdminUser(id: string, historyLimit?: number, historyOffset?: number): Promise<AdminUserDetail>;
   getAvatarLibrary(): Promise<AvatarSeries[]>;
   setAvatar(avatarId: string): Promise<User>;
@@ -239,12 +254,82 @@ function normalizeUserProfile(profile: UserProfileView): UserProfileView {
 class ApiUserDataService implements UserDataService {
   private currentUser: User | null = null;
   private cleaned = false;
+  private generation = 0;
+  private accountController = new AbortController();
+  private authQueue: Promise<void> = Promise.resolve();
+  private storageListenerReady = false;
+
+  captureAccountScope(): AccountScope | null {
+    if (!this.currentUser) return null;
+    const generation = this.generation;
+    return {
+      key: `${this.currentUser.id}:${generation}`,
+      signal: this.accountController.signal,
+      isCurrent: () => this.generation === generation,
+      assertCurrent: () => this.assertGeneration(generation),
+    };
+  }
+
+  private assertGeneration(generation: number) {
+    if (this.generation !== generation) throw new ApiError("تغير الحساب؛ تم تجاهل العملية السابقة.", 409, "ACCOUNT_CHANGED");
+  }
+
+  private queueAuth<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.authQueue.then(operation);
+    this.authQueue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  private replaceAccount(user: User | null, preserveOwnCache = false, notifyOtherTabs = false) {
+    this.accountController.abort();
+    this.accountController = new AbortController();
+    this.generation++;
+    this.clearPersonalCache(preserveOwnCache ? user?.id : undefined);
+    this.currentUser = user;
+    this.cleaned = false;
+    if (typeof window !== "undefined" && !this.storageListenerReady) {
+      window.addEventListener("storage", event => {
+        if (event.key !== "wany:account-change") return;
+        this.replaceAccount(null);
+        window.location.reload();
+      });
+      this.storageListenerReady = true;
+    }
+    if (notifyOtherTabs) {
+      try { localStorage.setItem("wany:account-change", crypto.randomUUID()); } catch { /* Storage may be disabled. */ }
+    }
+  }
+
+  private clearPersonalCache(preserveUserId?: string) {
+    // Remove historical snapshots as well: a v2 snapshot may already contain
+    // data written under the wrong account by the retired implementation.
+    try {
+      if (typeof localStorage !== "undefined") {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          const privateKey = key && (key.startsWith("anytime:v1:") || key.startsWith("anytime:v2:migrated:") || key === "anytime:session" || /^anytime:v[23]:(?:data|friends):/.test(key));
+          const keep = preserveUserId && [`anytime:v3:data:${preserveUserId}`, `anytime:v3:friends:${preserveUserId}`].includes(key ?? "");
+          if (privateKey && !keep) localStorage.removeItem(key!);
+        }
+      }
+      if (typeof sessionStorage !== "undefined") {
+        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+          const key = sessionStorage.key(i);
+          if (key?.startsWith("wany:fyp:") && !(preserveUserId && key.startsWith(`wany:fyp:${preserveUserId}:`))) sessionStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // Some browsers disable storage; requests still enforce account scope.
+    }
+  }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const generation = this.generation;
     let response: Response;
     try {
       response = await fetch(`/api/${path}`, {
         ...init,
+        signal: init.signal ?? this.accountController.signal,
         credentials: "include",
         cache: "no-store",
         headers: {
@@ -253,6 +338,7 @@ class ApiUserDataService implements UserDataService {
         },
       });
     } catch {
+      this.assertGeneration(generation);
       throw new ApiError(
         "تعذر الاتصال بخدمة المزامنة. تحقق من الإنترنت وحاول مرة ثانية.",
         0,
@@ -261,6 +347,7 @@ class ApiUserDataService implements UserDataService {
     }
 
     const payload = (await response.json().catch(() => ({}))) as T & ApiErrorPayload;
+    this.assertGeneration(generation);
     if (!response.ok) {
       throw new ApiError(
         payload.message || "تعذر مزامنة بياناتك الآن.",
@@ -271,41 +358,42 @@ class ApiUserDataService implements UserDataService {
     return payload;
   }
 
-  async getUser() {
-    const result = await this.request<{ user: User | null }>("session");
-    this.currentUser = result.user ? normalizeUser(result.user) : null;
-    this.cleaned = false;
-    return this.currentUser;
-  }
-
-  async signIn(username: string, password: string) {
-    const normalizedUsername = username.trim().toLowerCase();
-    const endpoint = normalizedUsername === "admin" ? "admin-login" : "login";
-    const result = await this.request<{ user: User }>(endpoint, {
-      method: "POST",
-      body: JSON.stringify({ username: normalizedUsername, password }),
+  getUser() {
+    return this.queueAuth(async () => {
+      const result = await this.request<{ user: User | null }>("session");
+      const user = result.user ? normalizeUser(result.user) : null;
+      if (!user || user.id !== this.currentUser?.id) this.replaceAccount(user, this.currentUser === null);
+      else this.currentUser = user;
+      return this.currentUser;
     });
-    this.currentUser = normalizeUser(result.user);
-    this.cleaned = false;
-    if (this.currentUser.role !== "admin") await this.cleanupDemoData();
-    return this.currentUser;
   }
 
-  async signOut() {
-    try {
-      await this.request<{ ok: boolean }>("logout", { method: "POST" });
-    } finally {
-      this.currentUser = null;
-      this.cleaned = false;
-    }
+  signIn(username: string, password: string) {
+    return this.queueAuth(async () => {
+      const normalizedUsername = username.normalize("NFKC").trim().toLowerCase();
+      const endpoint = "login";
+      const result = await this.request<{ user: User }>(endpoint, {
+        method: "POST",
+        body: JSON.stringify({ username: normalizedUsername, password }),
+      });
+      const user = normalizeUser(result.user);
+      this.replaceAccount(user, false, true);
+      return user;
+    });
+  }
+
+  signOut(allDevices = false) {
+    return this.queueAuth(async () => {
+      await this.request<{ ok: boolean }>(allDevices ? "logout-all" : "logout", { method: "POST" });
+      this.replaceAccount(null, false, true);
+    });
   }
 
   async recoverPassword(username: string, recoveryCode: string, newPassword: string) {
     const normalizedUsername = username
       .normalize("NFKC")
       .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "");
+      .toLowerCase();
     await this.request<{ ok: boolean }>("recover-password", {
       method: "POST",
       body: JSON.stringify({ username: normalizedUsername, recoveryCode: recoveryCode.trim(), newPassword }),
@@ -313,13 +401,17 @@ class ApiUserDataService implements UserDataService {
   }
 
   async getData(): Promise<UserData> {
+    const generation = this.generation;
     await this.cleanupDemoData();
+    this.assertGeneration(generation);
     try {
       const result = await this.request<{ data: UserData }>("data");
+      this.assertGeneration(generation);
       const data = normalizeData(result.data);
       this.writeSnapshot("data", data);
       return data;
     } catch (error) {
+      this.assertGeneration(generation);
       const snapshot = this.readSnapshot<UserData>("data");
       if (snapshot && error instanceof ApiError && error.code === "NETWORK_ERROR") {
         return normalizeData(snapshot);
@@ -549,6 +641,19 @@ class ApiUserDataService implements UserDataService {
     };
   }
 
+  async getAdminSecurityQuestion(id: string) {
+    const result = await this.request<{ question: string | null; recoveryLocked: boolean; failedAnswers: number }>(`admin/users/${encodeURIComponent(id)}/security-question`);
+    return result;
+  }
+
+  async adminResetPassword(id: string, currentPassword: string, newPassword: string) {
+    await this.request(`admin/users/${encodeURIComponent(id)}/reset-password`, { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+  }
+
+  async adminUnlockRecovery(id: string, currentPassword: string) {
+    await this.request(`admin/users/${encodeURIComponent(id)}/unlock-recovery`, { method: "POST", body: JSON.stringify({ currentPassword }) });
+  }
+
   async getAdminUser(id: string, historyLimit = 50, historyOffset = 0) {
     if (!isListId(id)) throw new Error("معرّف المستخدم غير صالح.");
     const limit = Math.max(1, Math.min(100, Math.trunc(historyLimit)));
@@ -573,16 +678,19 @@ class ApiUserDataService implements UserDataService {
   }
 
   async setAvatar(avatarId: string) {
+    const generation = this.generation;
     if (!isAvatarId(avatarId)) throw new Error("الصورة الشخصية غير صالحة.");
     const result = await this.request<{ user: User }>("profile/avatar", {
       method: "PUT",
       body: JSON.stringify({ avatarId }),
     });
+    this.assertGeneration(generation);
     this.currentUser = normalizeUser(result.user);
     return this.currentUser;
   }
 
   async setDisplayName(name: string) {
+    const generation = this.generation;
     const normalized = name.trim();
     if (!normalized || normalized.length > 50 || /[\u0000-\u001f\u007f]/.test(normalized)) {
       throw new Error("اسم العرض مطلوب ويجب ألا يتجاوز 50 حرفًا.");
@@ -591,16 +699,19 @@ class ApiUserDataService implements UserDataService {
       method: "PUT",
       body: JSON.stringify({ name: normalized }),
     });
+    this.assertGeneration(generation);
     this.currentUser = normalizeUser(result.user);
     return this.currentUser;
   }
 
   async setProfileVisibility(visibility: ProfileVisibility) {
+    const generation = this.generation;
     const normalized: ProfileVisibility = visibility === "public" ? "public" : "private";
     const result = await this.request<{ user: User }>("profile/visibility", {
       method: "PUT",
       body: JSON.stringify({ visibility: normalized }),
     });
+    this.assertGeneration(generation);
     this.currentUser = normalizeUser(result.user);
     return this.currentUser;
   }
@@ -630,7 +741,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async markWorkUnread(mangaId: string) {
-    if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
+    if (!isLiveKey(mangaId)) throw new Error("بيانات القصة غير صالحة.");
     await this.request<{ ok: boolean }>("reading/unread-work", {
       method: "POST",
       body: JSON.stringify({ mangaId }),
@@ -639,7 +750,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   async markChaptersRead(mangaId: string, chapters: number[]) {
-    if (!isLiveKey(mangaId)) throw new Error("بيانات العمل غير صالحة.");
+    if (!isLiveKey(mangaId)) throw new Error("بيانات القصة غير صالحة.");
     const normalized = [...new Set(chapters.map(Number).filter((chapter) => Number.isFinite(chapter) && chapter >= 0))].slice(0, 1000);
     if (!normalized.length) return 0;
     const result = await this.request<{ ok: boolean; processed: number }>("reading/read-bulk", {
@@ -724,12 +835,14 @@ class ApiUserDataService implements UserDataService {
 
   async saveWorkSnapshotCover(mangaId: string, blob: Blob) {
     if (!isLiveKey(mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
+    const generation = this.generation;
     let response: Response;
     try {
       response = await fetch(
         `/api/work-snapshots/cover?key=${encodeURIComponent(mangaId)}`,
         {
           method: "PUT",
+          signal: this.accountController.signal,
           credentials: "include",
           cache: "no-store",
           headers: {
@@ -739,6 +852,7 @@ class ApiUserDataService implements UserDataService {
         },
       );
     } catch {
+      this.assertGeneration(generation);
       throw new ApiError(
         "تعذر حفظ نسخة الغلاف الاحتياطية.",
         0,
@@ -746,6 +860,7 @@ class ApiUserDataService implements UserDataService {
       );
     }
     const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    this.assertGeneration(generation);
     if (!response.ok) {
       throw new ApiError(
         payload.message || "تعذر حفظ نسخة الغلاف الاحتياطية.",
@@ -770,15 +885,19 @@ class ApiUserDataService implements UserDataService {
   }
 
   async getFriends() {
+    const generation = this.generation;
     await this.cleanupDemoData();
+    this.assertGeneration(generation);
     try {
       const result = await this.request<{ friends: Friend[]; total: number; hasMore: boolean }>(
         "friends?limit=100",
       );
+      this.assertGeneration(generation);
       const friends = normalizeFriends(result.friends ?? []);
       this.writeSnapshot("friends", friends);
       return friends;
     } catch (error) {
+      this.assertGeneration(generation);
       const snapshot = this.readSnapshot<Friend[]>("friends");
       if (snapshot && error instanceof ApiError && error.code === "NETWORK_ERROR") {
         return normalizeFriends(snapshot);
@@ -868,10 +987,32 @@ class ApiUserDataService implements UserDataService {
     });
   }
 
+  async generateRecoveryCode(currentPassword: string) {
+    const result = await this.request<{ recoveryCode: string }>("recovery-code", {
+      method: "POST", body: JSON.stringify({ currentPassword }),
+    });
+    return result.recoveryCode;
+  }
+
+  async setSecurityQuestion(currentPassword: string, question: string, answer: string) {
+    await this.request("security-question", { method: "POST", body: JSON.stringify({ currentPassword, question, answer }) });
+  }
+
+  async getSecurityQuestion(username: string) {
+    const result = await this.request<{ question: string }>("recover-password", { method: "POST", body: JSON.stringify({ action: "question", username }) });
+    return result.question;
+  }
+
+  async recoverWithSecurityAnswer(username: string, answer: string, newPassword: string) {
+    await this.request("recover-password", { method: "POST", body: JSON.stringify({ method: "security-question", username, answer, newPassword }) });
+  }
+
   private async cleanupDemoData() {
     if (this.cleaned || !this.currentUser || this.currentUser.role === "admin") return;
+    const generation = this.generation;
     try {
       await this.request<{ ok: boolean }>("cleanup-demo", { method: "POST" });
+      this.assertGeneration(generation);
       this.cleaned = true;
       this.clearLegacyLocalData();
     } catch (error) {
@@ -892,7 +1033,7 @@ class ApiUserDataService implements UserDataService {
   }
 
   private snapshotKey(kind: "data" | "friends") {
-    return this.currentUser ? `anytime:v2:${kind}:${this.currentUser.id}` : null;
+    return this.currentUser ? `anytime:v3:${kind}:${this.currentUser.id}` : null;
   }
 
   private writeSnapshot(kind: "data" | "friends", value: unknown) {

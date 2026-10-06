@@ -1,3 +1,5 @@
+import { createSourceFetcher, SourceTransportError } from "../../_source-transport.js";
+import { onRequest as handleImageRequest } from "./image.js";
 const SESSION_COOKIE = "anytime_session";
 const MANGATIME_BASE = "https://mangatime.org";
 const TEAMX_BASE = "https://olympustaff.com";
@@ -12,9 +14,21 @@ const SOURCE_UA =
 const sourceSchemaReady = new WeakMap();
 
 export async function onRequest(context) {
+  return createSourceHandler(context.request.signal, context.sourceFetcher).onRequest(context);
+}
+
+// Keep every adapter/retry/background sync in the initiating request budget.
+function createSourceHandler(requestSignal, sharedFetcher) {
+const fetch = sharedFetcher || createSourceFetcher({ requestSignal });
+
+async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
-  const action = url.pathname.replace(/^\/api\/source\/?/, "").split("/")[0] || "health";
+  // Match the complete route: suffixes must never reach a legacy handler.
+  const route = url.pathname.match(/^\/api\/source(?:\/([^/]+))?\/?$/);
+  if (!route) return json({ error: "NOT_FOUND" }, 404);
+  const action = route[1] || "health";
+  if (action === "image") return handleImageRequest(context);
 
   if (request.method === "GET" && action === "health") {
     return json({
@@ -32,6 +46,11 @@ export async function onRequest(context) {
     });
   }
 
+  if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405, { Allow: "GET" });
+  if (!["status", "recent", "latest", "popular", "search", "resolve", "series", "chapter"].includes(action)) {
+    return json({ error: "NOT_FOUND" }, 404);
+  }
+
   const db = env?.DB;
   if (!db) {
     return json(
@@ -46,9 +65,7 @@ export async function onRequest(context) {
   }
 
   try {
-    await ensureSourceSchema(db);
-
-    if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+    await assertSourceSchema(db);
 
     if (action === "status") {
       const sources = ["mangatime", "teamx", "3asq", "starzmanga", "xsano", "mangalik", "azora"];
@@ -220,16 +237,12 @@ export async function onRequest(context) {
       return json({ chapter }, 200, { "Cache-Control": "private, max-age=30" });
     }
 
-    if (action === "image") {
-      const source = sourceFromQuery(url);
-      const raw = String(url.searchParams.get("url") ?? "");
-      const referer = String(url.searchParams.get("referer") ?? "");
-      return proxyImage(source, raw, referer);
-    }
-
     return json({ error: "NOT_FOUND" }, 404);
   } catch (error) {
     console.error("Anytime source error", error);
+    if (error instanceof SourceTransportError) {
+      return json({ error: error.code, message: "استجابة المصدر تجاوزت حدود التحميل الآمن. حاول لاحقًا." }, 502);
+    }
     if (error instanceof SourceError) {
       return json({ error: error.code, message: error.message }, error.status);
     }
@@ -328,82 +341,19 @@ function shortCache() {
   return { "Cache-Control": "private, max-age=45" };
 }
 
-async function ensureSourceSchema(db) {
+// Read-only readiness check. Schema changes belong to deployment migration 0016.
+async function assertSourceSchema(db) {
   let pending = sourceSchemaReady.get(db);
   if (!pending) {
-    pending = (async () => {
-      try {
-        await Promise.all([
-          db.prepare("SELECT first_seen_at FROM source_items LIMIT 1").first(),
-          db.prepare("SELECT is_baseline FROM source_chapter_seen LIMIT 1").first(),
-          db.prepare("SELECT last_started_at FROM source_sync_state LIMIT 1").first(),
-        ]);
-        return;
-      } catch {
-        // Missing tables/columns are repaired below once per binding.
-      }
-
-      await db
-        .prepare(`CREATE TABLE IF NOT EXISTS source_items (
-          source_key TEXT PRIMARY KEY,
-          source TEXT NOT NULL,
-          source_id TEXT NOT NULL,
-          slug TEXT NOT NULL,
-          type TEXT NOT NULL DEFAULT '',
-          url TEXT NOT NULL DEFAULT '',
-          title TEXT NOT NULL,
-          cover_url TEXT NOT NULL DEFAULT '',
-          description TEXT,
-          status TEXT,
-          genres_json TEXT NOT NULL DEFAULT '[]',
-          updated_at INTEGER NOT NULL,
-          first_seen_at INTEGER,
-          UNIQUE(source, source_id)
-        )`)
-        .run();
-
-      const columns = await db.prepare("PRAGMA table_info(source_items)").all();
-      if (!(columns.results ?? []).some((column) => column.name === "first_seen_at")) {
-        await db.prepare("ALTER TABLE source_items ADD COLUMN first_seen_at INTEGER").run();
-      }
-
-      const missingFirstSeen = await db
-        .prepare("SELECT 1 AS present FROM source_items WHERE first_seen_at IS NULL LIMIT 1")
-        .first();
-      if (missingFirstSeen) {
-        await db
-          .prepare("UPDATE source_items SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
-          .run();
-      }
-
-      await db
-        .prepare(`CREATE TABLE IF NOT EXISTS source_chapter_seen (
-          source_key TEXT NOT NULL,
-          chapter_identity TEXT NOT NULL,
-          chapter_number REAL,
-          published_at TEXT,
-          first_seen_at INTEGER NOT NULL,
-          is_baseline INTEGER NOT NULL DEFAULT 0,
-          PRIMARY KEY (source_key, chapter_identity),
-          FOREIGN KEY (source_key) REFERENCES source_items(source_key) ON DELETE CASCADE
-        )`)
-        .run();
-      const chapterColumns = await db.prepare("PRAGMA table_info(source_chapter_seen)").all();
-      if (!(chapterColumns.results ?? []).some((column) => column.name === "is_baseline")) {
-        await db.prepare("ALTER TABLE source_chapter_seen ADD COLUMN is_baseline INTEGER NOT NULL DEFAULT 0").run();
-      }
-      await db
-        .prepare("CREATE INDEX IF NOT EXISTS idx_source_chapter_seen_release ON source_chapter_seen(first_seen_at DESC, source_key)")
-        .run();
-
-      await db
-        .prepare(`CREATE TABLE IF NOT EXISTS source_sync_state (
-          source TEXT PRIMARY KEY,
-          last_started_at INTEGER NOT NULL DEFAULT 0
-        )`)
-        .run();
-    })().catch((error) => {
+    pending = Promise.all([
+      db.prepare("SELECT source_key, source, source_id, slug, type, url, title, cover_url, description, status, genres_json, updated_at, first_seen_at FROM source_items LIMIT 0").all(),
+      db.prepare("SELECT source_key, chapter_identity, chapter_number, published_at, first_seen_at, is_baseline FROM source_chapter_seen LIMIT 0").all(),
+      db.prepare("SELECT source, last_started_at FROM source_sync_state LIMIT 0").all(),
+    ]).catch((error) => {
       sourceSchemaReady.delete(db);
+      if (/no such (?:table|column)/i.test(String(error?.message ?? error))) {
+        throw new SourceError("SOURCE_SCHEMA_NOT_READY", "بيانات المصادر تحتاج تهيئة من مسؤول الموقع.", 503);
+      }
       throw error;
     });
     sourceSchemaReady.set(db, pending);
@@ -1015,7 +965,7 @@ async function mangaTimeList(db, { page, sortBy, query = null }) {
     mangaTimeSearchInput({ page, sortBy, query }),
   );
   const items = await Promise.all(
-    (result?.results ?? []).map(async (row) => ({
+    (result?.results ?? []).slice(0, 80).map(async (row) => ({
       key: await makeSourceKey("mt", String(row.id)),
       source: "mangatime",
       sourceId: String(row.id),
@@ -1596,7 +1546,7 @@ async function syncTeamXLatest(db) {
       const item = baseItems[index];
 
       try {
-        const detailHtml = await teamXFetchText(item.url, false);
+        const detailHtml = await teamXFetchText(item.url);
         const chapters = parseTeamXChapters(detailHtml, item.url)
           .filter((chapter) => !chapter.synthetic && Boolean(chapter.publishedAt));
         if (!chapters.length) continue;
@@ -1667,7 +1617,7 @@ async function teamXItemsFromHtml(html) {
 }
 
 async function teamXSeries(db, item) {
-  const html = await teamXFetchText(item.url || `/series/${encodeURIComponent(item.slug)}`, false);
+  const html = await teamXFetchText(item.url || `/series/${encodeURIComponent(item.slug)}`);
   const plain = cleanText(stripTags(html));
   const title = cleanText(
     firstMatch(html, /author-info-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -1803,7 +1753,7 @@ async function teamXChapter(db, item, number) {
   const series = await teamXSeries(db, item);
   const selected = series.chapters?.find((chapter) => chapter.number === number);
   const chapterUrl = selected?.url || `${item.url || `${TEAMX_BASE}/series/${item.slug}`}/${number}`;
-  const html = await teamXFetchText(chapterUrl, false);
+  const html = await teamXFetchText(chapterUrl);
   const pages = parseTeamXPages(html);
   if (!pages.length) {
     const plain = cleanText(stripTags(html));
@@ -1836,8 +1786,8 @@ function isLikelyUiImage(url) {
   return /logo|avatar|favicon|icon|profile|ads?|banner/i.test(url);
 }
 
-async function teamXFetchText(pathOrUrl, useBase = true) {
-  const target = useBase ? new URL(pathOrUrl, TEAMX_BASE).toString() : new URL(pathOrUrl, TEAMX_BASE).toString();
+async function teamXFetchText(pathOrUrl) {
+  const target = new URL(pathOrUrl, TEAMX_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(TEAMX_BASE, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"),
     redirect: "follow",
@@ -2221,7 +2171,7 @@ function asqItemsFromHtml(html) {
 }
 
 async function asqSeries(db, item) {
-  const html = await asqFetchText(item.url || "/manga/" + encodeURIComponent(item.slug) + "/", false);
+  const html = await asqFetchText(item.url || "/manga/" + encodeURIComponent(item.slug) + "/");
   const title = cleanText(
     firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
       firstMatch(html, /id=["']manga-title["'][^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -2615,7 +2565,7 @@ async function asqChapter(db, item, number, preferredUrl = "") {
   const sourceChapterUrl = new URL(selected.url, ASQ_BASE).toString();
   const chapterUrl = new URL(sourceChapterUrl);
   chapterUrl.searchParams.set("style", "list");
-  const html = await asqFetchText(chapterUrl.toString(), false);
+  const html = await asqFetchText(chapterUrl.toString());
   const pages = parseAsqPages(html);
   if (!pages.length) {
     throw new SourceError("NO_PAGES", "العاشق لم يرجع صور الفصل.", 502);
@@ -2708,7 +2658,7 @@ function isAsqUiImage(url) {
   return /(?:logo|avatar|favicon|icon|profile)(?:[\/_-]|\.)/i.test(url);
 }
 
-async function asqFetchText(pathOrUrl, useBase = true) {
+async function asqFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, ASQ_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(
@@ -2820,7 +2770,7 @@ function starzItemsFromHtml(html) {
 
 async function starzSeries(db, item) {
   const seriesUrl = item.url || STARZ_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
-  const html = await starzFetchText(seriesUrl, false);
+  const html = await starzFetchText(seriesUrl);
   const title = cleanText(
     firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
       firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -3118,10 +3068,10 @@ async function starzChapter(db, item, number, preferredUrl = "") {
   const chapterUrl = new URL(sourceChapterUrl);
   chapterUrl.searchParams.set("style", "list");
 
-  let html = await starzFetchText(chapterUrl.toString(), false);
+  let html = await starzFetchText(chapterUrl.toString());
   let pages = parseStarzPages(html);
   if (!pages.length && sourceChapterUrl) {
-    html = await starzFetchText(sourceChapterUrl, false);
+    html = await starzFetchText(sourceChapterUrl);
     pages = parseStarzPages(html);
   }
   if (!pages.length) throw new SourceError("NO_PAGES", "StarzManga لم يرجع صور الفصل.", 502);
@@ -3162,7 +3112,7 @@ function isStarzUiImage(url) {
   return /(?:logo|avatar|favicon|icon|profile|banner|ads?)(?:[\/_-]|\.)/i.test(url);
 }
 
-async function starzFetchText(pathOrUrl, useBase = true) {
+async function starzFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, STARZ_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(
@@ -4246,7 +4196,7 @@ function mangalikItemsFromHtml(html) {
 
 async function mangalikSeries(db, item) {
   const seriesUrl = item.url || MANGALIK_BASE + "/manga/" + encodeURIComponent(item.slug) + "/";
-  const html = await mangalikFetchText(seriesUrl, false);
+  const html = await mangalikFetchText(seriesUrl);
 
   const title = cleanText(
     firstMatch(html, /post-title[^>]*>[\s\S]*?<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
@@ -4432,16 +4382,16 @@ async function mangalikChapter(db, item, number, preferredUrl = "") {
   const chapterUrl = new URL(sourceChapterUrl);
 
   chapterUrl.searchParams.set("style", "list");
-  let html = await mangalikFetchText(chapterUrl.toString(), false);
+  let html = await mangalikFetchText(chapterUrl.toString());
   let pages = parseMangalikPages(html);
 
   if (!pages.length && sourceChapterUrl) {
-    html = await mangalikFetchText(sourceChapterUrl, false);
+    html = await mangalikFetchText(sourceChapterUrl);
     pages = parseMangalikPages(html);
   }
 
   if (!pages.length && directUrl && sourceChapterUrl !== directUrl) {
-    html = await mangalikFetchText(directUrl, false);
+    html = await mangalikFetchText(directUrl);
     pages = parseMangalikPages(html);
   }
 
@@ -4502,7 +4452,7 @@ function isMangalikUiImage(url) {
   return /(?:logo|avatar|favicon|icon|profile|banner|ads?)(?:[\/_-]|\.)/i.test(url);
 }
 
-async function mangalikFetchText(pathOrUrl, useBase = true) {
+async function mangalikFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, MANGALIK_BASE).toString();
   const response = await fetch(target, {
     headers: sourceHeaders(
@@ -5031,95 +4981,6 @@ function chapterNavigation(chapters, number) {
   };
 }
 
-async function proxyImage(source, rawUrl, rawReferer = "") {
-  const base = source === "teamx"
-    ? TEAMX_BASE
-    : source === "3asq"
-      ? ASQ_BASE
-      : source === "starzmanga"
-        ? STARZ_BASE
-        : source === "xsano"
-          ? XSANO_BASE
-          : source === "mangalik"
-            ? MANGALIK_BASE
-            : source === "azora"
-              ? AZORA_BASE
-              : MANGATIME_BASE;
-  const target = absoluteUrl(base, rawUrl);
-  if (!target) return json({ error: "INVALID_IMAGE_URL" }, 400);
-
-  const parsed = new URL(target);
-  if (!["http:", "https:"].includes(parsed.protocol) || isPrivateHost(parsed.hostname)) {
-    return json({ error: "INVALID_IMAGE_HOST" }, 400);
-  }
-
-  const imageAccept = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
-  let requestedReferer = base;
-  if (rawReferer) {
-    try {
-      const parsedReferer = new URL(rawReferer, base);
-      const sourceOrigin = new URL(base).origin;
-      if (
-        ["http:", "https:"].includes(parsedReferer.protocol) &&
-        parsedReferer.origin === sourceOrigin
-      ) {
-        requestedReferer = parsedReferer.toString();
-      }
-    } catch {}
-  }
-
-  const fetchImage = (refererBase) => {
-    const headers = sourceHeaders(refererBase, imageAccept);
-
-    // Azora reader images are stricter about the chapter Referer. When the
-    // caller supplied an exact chapter URL, preserve it byte-for-byte instead
-    // of letting sourceHeaders append another "/" (e.g. /65//).
-    if (source === "azora" && rawReferer) {
-      try {
-        const exactReferer = new URL(rawReferer, AZORA_BASE);
-        if (exactReferer.origin === new URL(AZORA_BASE).origin) {
-          headers.Referer = exactReferer.toString();
-        }
-      } catch {}
-    }
-
-    return fetch(target, {
-      headers,
-      redirect: "follow",
-      cf: { cacheTtl: 86400, cacheEverything: true },
-    });
-  };
-
-  // Reader images can require the exact chapter URL as Referer. The client
-  // already sends it; preserve it here instead of collapsing every request to
-  // the source homepage. If the CDN rejects that, retry against the image
-  // origin below.
-  let response = await fetchImage(requestedReferer);
-  let type = response.headers.get("Content-Type") ?? "";
-  // Chapter pages on Azora commonly serve images from external storage/CDN
-  // hosts. Those hosts may reject a azorafly.com Referer even though the image
-  // URL itself is valid. Retry against the image origin, just as MangaTime
-  // already does for its CDN covers, without transforming the image bytes.
-  if ((source === "mangatime" || source === "azora") &&
-      parsed.origin !== new URL(base).origin &&
-      (!response.ok || !type.toLowerCase().startsWith("image/"))) {
-    response = await fetchImage(parsed.origin);
-    type = response.headers.get("Content-Type") ?? "";
-  }
-
-  if (!response.ok) return json({ error: "IMAGE_UPSTREAM", status: response.status }, 502);
-  if (!type.toLowerCase().startsWith("image/")) {
-    return json({ error: "NOT_AN_IMAGE" }, 502);
-  }
-  const headers = new Headers();
-  headers.set("Content-Type", type);
-  headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
-  headers.set("X-Content-Type-Options", "nosniff");
-  const length = response.headers.get("Content-Length");
-  if (length) headers.set("Content-Length", length);
-  return new Response(response.body, { status: 200, headers });
-}
-
 function sourceHeaders(base, accept) {
   return {
     Accept: accept,
@@ -5263,15 +5124,6 @@ function decodeEntities(value) {
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)));
 }
 
-function isPrivateHost(hostname) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host)) return true;
-  const match = host.match(/^172\.(\d+)\./);
-  if (match && Number(match[1]) >= 16 && Number(match[1]) <= 31) return true;
-  return false;
-}
-
 async function getSession(request, db) {
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) return null;
@@ -5315,7 +5167,7 @@ function json(body, status = 200, extraHeaders = {}) {
   });
 }
 
-export const __test = {
+const __test = {
   xsanoFetchJson,
   xsanoSeriesItemFromEntry,
   azoraHasNext,
@@ -5407,3 +5259,10 @@ export const __test = {
   isNovelLabel,
   normalizeStatus,
 };
+
+return { onRequest, __test };
+}
+
+export const __test = Object.fromEntries(
+  Object.keys(createSourceHandler().__test).map(key => [key, (...args) => createSourceHandler().__test[key](...args)]),
+);

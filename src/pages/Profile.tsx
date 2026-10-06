@@ -34,6 +34,8 @@ export function Profile({
     setDisplayName,
     setProfileVisibility,
     changePassword,
+    generateRecoveryCode,
+    setSecurityQuestion,
   } = useLibrary();
 
   const [displayName, setDisplayNameValue] = useState(user?.name ?? "");
@@ -56,10 +58,19 @@ export function Profile({
 
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryEditing, setRecoveryEditing] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState("");
+  const [questionEditing, setQuestionEditing] = useState(false);
+  const [questionBusy, setQuestionBusy] = useState(false);
+  const [questionFeedback, setQuestionFeedback] = useState("");
 
   useEffect(() => {
     setDisplayNameValue(user?.name ?? "");
   }, [user?.name]);
+
+  useEffect(() => { setRecoveryCode(""); }, [user?.id]);
 
   async function submitDisplayName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,8 +147,8 @@ export function Profile({
       return;
     }
 
-    if (newPassword.length < 4 || newPassword.length > PASSWORD_MAX_LENGTH) {
-      setPasswordError("كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر.");
+    if (newPassword.length < 6 || newPassword.length > PASSWORD_MAX_LENGTH) {
+      setPasswordError("كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر.");
       return;
     }
 
@@ -156,12 +167,41 @@ export function Profile({
     }
   }
 
-  async function handleSignOut() {
+  async function createRecoveryCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (recoveryBusy) return;
+    const form = event.currentTarget;
+    const password = String(new FormData(form).get("recoveryPassword") ?? "");
+    setRecoveryBusy(true); setRecoveryError(""); setRecoveryCode("");
+    try {
+      const code = await generateRecoveryCode(password);
+      form.reset(); setRecoveryCode(code); setRecoveryEditing(false);
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "تعذر إصدار رمز الاستعادة.");
+    } finally { setRecoveryBusy(false); }
+  }
+
+  async function saveSecurityQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (questionBusy) return;
+    const element = event.currentTarget;
+    const form = new FormData(element);
+    setQuestionBusy(true); setQuestionFeedback("");
+    try {
+      await setSecurityQuestion(String(form.get("questionPassword") ?? ""), String(form.get("securityQuestion") ?? ""), String(form.get("securityAnswer") ?? ""));
+      element.reset(); setQuestionEditing(false); setQuestionFeedback("تم حفظ سؤال الأمان. تقدر تستخدمه من «نسيت كلمة المرور؟».");
+    } catch (cause) {
+      setQuestionFeedback(cause instanceof Error ? cause.message : "تعذر حفظ سؤال الأمان.");
+    } finally { setQuestionBusy(false); }
+  }
+
+  async function handleSignOut(allDevices = false) {
     if (logoutBusy) return;
+    setRecoveryCode("");
     setLogoutBusy(true);
     setLogoutError("");
     try {
-      await signOut();
+      await signOut(allDevices);
     } catch (cause) {
       setLogoutError(
         cause instanceof Error ? cause.message : "تعذر تسجيل الخروج الآن.",
@@ -359,7 +399,7 @@ export function Profile({
                   name="newPassword"
                   type="password"
                   autoComplete="new-password"
-                  minLength={4}
+                  minLength={6}
                   maxLength={PASSWORD_MAX_LENGTH}
                   disabled={passwordBusy}
                   required
@@ -371,7 +411,7 @@ export function Profile({
                   name="confirmPassword"
                   type="password"
                   autoComplete="new-password"
-                  minLength={4}
+                  minLength={6}
                   maxLength={PASSWORD_MAX_LENGTH}
                   disabled={passwordBusy}
                   required
@@ -402,6 +442,35 @@ export function Profile({
           )}
         </section>
 
+        <section className="settings-section">
+          <h3>سؤال الأمان</h3>
+          {!questionEditing && <button className="secondary" type="button" onClick={() => { setQuestionEditing(true); setQuestionFeedback(""); }}>إعداد أو تغيير سؤال الأمان</button>}
+          {questionEditing && <form className="settings-password-form" onSubmit={saveSecurityQuestion}>
+            <p>اكتب إجابة تتذكرها. بعد 5 إجابات خاطئة تُقفل الاستعادة حتى يتدخل مسؤول الموقع.</p>
+            <label>كلمة المرور الحالية<input name="questionPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={questionBusy} /></label>
+            <label>سؤال الأمان<input name="securityQuestion" minLength={6} maxLength={200} required disabled={questionBusy} placeholder="اكتب سؤالًا تتذكر جوابه" /></label>
+            <label>الإجابة<input name="securityAnswer" type="password" autoComplete="off" minLength={1} maxLength={128} required disabled={questionBusy} /></label>
+            <button className="primary" type="submit" disabled={questionBusy}>{questionBusy ? "جارٍ الحفظ…" : "حفظ سؤال الأمان"}</button>
+            <button className="secondary" type="button" disabled={questionBusy} onClick={() => setQuestionEditing(false)}>إلغاء</button>
+          </form>}
+          {questionFeedback && <p className="settings-feedback" role="status">{questionFeedback}</p>}
+        </section>
+
+        <section className="settings-section">
+          <h3>رمز استعادة الحساب</h3>
+          {!recoveryEditing && <button className="secondary" type="button" onClick={() => { setRecoveryEditing(true); setRecoveryCode(""); setRecoveryError(""); }}>إصدار رمز استعادة</button>}
+          {recoveryEditing && <form className="settings-password-form" onSubmit={createRecoveryCode}>
+            <p>احفظ الرمز الجديد في مكان خاص؛ سيحل محل الرمز السابق.</p>
+            <label>كلمة المرور الحالية
+              <input name="recoveryPassword" type="password" autoComplete="current-password" required maxLength={128} disabled={recoveryBusy} />
+            </label>
+            <button className="primary" type="submit" disabled={recoveryBusy}>{recoveryBusy ? "جارٍ الإصدار…" : "إصدار رمز جديد"}</button>
+            <button className="secondary" type="button" disabled={recoveryBusy} onClick={() => setRecoveryEditing(false)}>إلغاء</button>
+          </form>}
+          {recoveryError && <p className="settings-feedback error" role="alert">{recoveryError}</p>}
+          {recoveryCode && <div role="status"><p>احفظ الرمز الآن؛ لن يظهر بعد إغلاق الصفحة.</p><input aria-label="رمز الاستعادة الجديد" readOnly value={recoveryCode} dir="ltr" onFocus={event => event.currentTarget.select()} /></div>}
+        </section>
+
         <div className="settings-logout-simple">
           <button
             className="settings-logout-danger"
@@ -411,6 +480,7 @@ export function Profile({
           >
             {logoutBusy ? "جارٍ تسجيل الخروج…" : "تسجيل الخروج"}
           </button>
+          <button className="settings-logout-danger" type="button" disabled={logoutBusy} onClick={() => void handleSignOut(true)}>تسجيل الخروج من كل الأجهزة</button>
           {logoutError && <p className="settings-feedback error" role="alert">{logoutError}</p>}
         </div>
       </div>

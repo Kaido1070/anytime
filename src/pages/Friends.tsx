@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { ActivityFeed } from "../components/ActivityFeed";
 import {
   ProfileActivitySection,
   ProfileIdentityHeader,
@@ -10,7 +9,7 @@ import {
   ProfileStatsSection,
 } from "../components/ProfileOverview";
 import { useLibrary } from "../hooks/useLibrary";
-import { Back, SectionTitle } from "../components/UI";
+import { Back } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { UserAvatar } from "../components/UserAvatar";
 import { sourceDisplayTitle } from "../services/sourceTitles";
@@ -20,22 +19,12 @@ import type {
   FriendRelationship,
   FriendRequests,
   FriendSearchResult,
-  LibraryStatus,
-  ProfileLibraryItem,
-  ProfileListPreview,
   SourceManga,
   User,
   UserProfileView,
 } from "../types";
 
 const PROFILE_PREVIEW_LIMIT = 4;
-
-const libraryStatusLabels: Record<LibraryStatus, string> = {
-  reading: "يقرأ حاليًا",
-  completed: "مكتمل",
-  paused: "متوقف",
-  planned: "مخطط له",
-};
 
 const emptyRequests: FriendRequests = {
   incoming: [],
@@ -129,77 +118,6 @@ function FavoritesSection({
         keys={profile.favorites}
         works={works}
         emptyText="لا توجد قصص في المفضلة."
-      />
-    </section>
-  );
-}
-
-function LibrarySection({
-  entries,
-  works,
-}: {
-  entries: ProfileLibraryItem[];
-  works: Record<string, SourceManga>;
-}) {
-  return (
-    <section className="profile-module">
-      <div className="profile-module-heading">
-        <h2>القصص التي يتابعها</h2>
-      </div>
-      {!entries.length ? (
-        <p className="profile-module-empty">لا توجد قصص في المكتبة حتى الآن.</p>
-      ) : (
-        <div className="profile-library-groups">
-          {(["reading", "completed", "paused", "planned"] as LibraryStatus[]).map((status) => {
-            const statusEntries = entries.filter((entry) => entry.status === status);
-            if (!statusEntries.length) return null;
-            const byKey = new Map(statusEntries.map((entry) => [entry.mangaId, entry]));
-            return (
-              <div className="profile-library-group" key={status}>
-                <div className="profile-library-group-heading">
-                  <h3>{libraryStatusLabels[status]}</h3>
-                  <span>{statusEntries.length}</span>
-                </div>
-                <ProfileWorkStrip
-                  keys={statusEntries.map((entry) => entry.mangaId)}
-                  works={works}
-                  emptyText=""
-                  meta={(key) => {
-                    const chapter = byKey.get(key)?.highestReachedChapter;
-                    return chapter == null ? libraryStatusLabels[status] : `وصل إلى الفصل ${chapter}`;
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ListSection({
-  list,
-  works,
-}: {
-  list: ProfileListPreview;
-  works: Record<string, SourceManga>;
-}) {
-  return (
-    <section className="profile-module">
-      <div className="profile-module-heading">
-        <div className="profile-list-heading-copy">
-          <h2>{list.name}</h2>
-          {list.description && <p className="muted">{list.description}</p>}
-        </div>
-        <Link to={`/lists/${encodeURIComponent(list.id)}`}>
-          عرض القائمة <span aria-hidden="true">↗</span>
-        </Link>
-      </div>
-      <ProfileWorkStrip
-        keys={list.previewItems}
-        works={works}
-        emptyText="لا توجد قصص في هذه القائمة حتى الآن."
       />
     </section>
   );
@@ -864,3 +782,4 @@ export function FriendProfile() {
     </>
   );
 }
+

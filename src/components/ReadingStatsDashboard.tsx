@@ -27,12 +27,12 @@ const CHAPTER_TROPHIES = [
 ] as const;
 
 const STORY_TROPHIES = [
-  [1, "برونزي", "بدأت قراءة أول عمل"],
-  [5, "فضي", "قرأت من 5 أعمال مختلفة"],
-  [10, "ذهبي", "قرأت من 10 أعمال مختلفة"],
-  [25, "بلاتيني", "قرأت من 25 عملًا مختلفًا"],
-  [50, "ماسي", "قرأت من 50 عملًا مختلفًا"],
-  [100, "ماستر", "قرأت من 100 عمل مختلف"],
+  [1, "برونزي", "بدأت قراءة أول قصة"],
+  [5, "فضي", "قرأت من 5 قصص مختلفة"],
+  [10, "ذهبي", "قرأت من 10 قصص مختلفة"],
+  [25, "بلاتيني", "قرأت من 25 قصة مختلفة"],
+  [50, "ماسي", "قرأت من 50 قصة مختلفة"],
+  [100, "ماستر", "قرأت من 100 قصة مختلفة"],
 ] as const;
 
 const STREAK_TROPHIES = [
@@ -44,7 +44,7 @@ const STREAK_TROPHIES = [
 
 const CATEGORY_META: Record<TrophyCategory, { title: string; unit: string }> = {
   chapters: { title: "إنجازات الفصول", unit: "فصل" },
-  stories: { title: "إنجازات الأعمال", unit: "عمل" },
+  stories: { title: "إنجازات القصص", unit: "قصة" },
   streak: { title: "إنجازات الاستمرارية", unit: "يوم" },
 };
 
@@ -201,7 +201,7 @@ export function ReadingStatsDashboard() {
   const unlocked = trophies.filter((trophy) => trophy.value >= trophy.threshold).length;
 
   const quickStats = [
-    { value: stats.storiesRead, label: "أعمال قرأتها", icon: "book" },
+    { value: stats.storiesRead, label: "قصص قرأتها", icon: "book" },
     { value: formatNumber(stats.dailyAverage, 1), label: "متوسط الفصول يوميًا", icon: "spark" },
     { value: stats.activeDays, label: "أيام القراءة", icon: "new" },
     { value: stats.bestStreak, label: "أطول سلسلة قراءة", icon: "flame" },
@@ -393,3 +393,4 @@ export function ReadingStatsDashboard() {
     </section>
   );
 }
+

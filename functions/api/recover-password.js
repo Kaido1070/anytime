@@ -1,152 +1,109 @@
-const PASSWORD_ITERATIONS = 25000;
-const RECOVERY_ITERATIONS = 210000;
-const Y_RECOVERY_DIGEST = new Uint8Array([139,141,171,9,182,99,41,214,238,191,98,37,238,19,94,139,41,144,75,21,104,77,198,209,255,107,252,42,20,165,79,158]);
-
-const RECOVERY_SEEDS = [
-  ["admin", "iXMrYFxlRGeNeXtahvJrxg", "qB91GPghZPSkaJ4EkLZlQ4O33bYMktRSEWQ8TzHiJ08"],
-  ["m", "DQKmZM9LWDe-yvsralJ3NA", "gk2_0df_3o7dJprXj1IzLcRnJUUmiGF1YgfjXKhe0T8"],
-  ["yas", "yzbZYsIxWd_q11a259Vekg", "JkkmyqM-AxXhtFvjyuGw2_tgIOix_C1O0Zww0gEowC0"],
-  ["has", "kfncionM84kNNDTiZGagDQ", "hYOzUUBxo4VWBLVZHUpPbWyufAcPqN11e6GckRtyO_c"],
-];
-
-const RECOVERY_ACCOUNT_IDS = {
-  admin: "admin",
-  m: "m",
-  y: "yas",
-  yas: "yas",
-  h: "has",
-  has: "has",
-};
-
-const RECOVERY_BY_ID = Object.fromEntries(
-  RECOVERY_SEEDS.map(([userId, salt, hash]) => [userId, { salt, hash }]),
-);
+import { PASSWORD_ITERATIONS, derivePasswordHash, constantTimeEqual, decodeBase64Url } from '../_password.js';
+import { normalizeSecurityAnswer, verifySecurityAnswer } from '../_security-question.js';
+import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError } from '../_auth-security.js';
 
 export async function onRequestPost(context) {
   const { request } = context;
   const db = context.env?.DB;
-  if (!db) return json({ error: "D1_NOT_CONFIGURED" }, 503);
-
-  const url = new URL(request.url);
-  const origin = request.headers.get("Origin");
-  if (origin && origin !== url.origin) return json({ error: "BAD_ORIGIN" }, 403);
-
-  let stage = "INIT";
+  if (!db) return json({ error: 'D1_NOT_CONFIGURED' }, 503);
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
   try {
-    stage = "BODY";
-    const body = await request.json().catch(() => ({}));
-    const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
-    const accountId = RECOVERY_ACCOUNT_IDS[username] ?? null;
-    const recoveryCode = typeof body.recoveryCode === "string" ? body.recoveryCode.trim() : "";
-    const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
-
-    if (!accountId || recoveryCode.length < 20 || recoveryCode.length > 128) {
-      await sleep(250);
-      return invalidRecovery("RCV-401-A");
+    const body = await readAuthJson(request);
+    const username = normalizeLoginName(body.username);
+    const code = typeof body.recoveryCode === 'string' ? body.recoveryCode.trim() : '';
+    const password = typeof body.newPassword === 'string' ? body.newPassword : '';
+    if (!(await reserveAuthAttempt(db, request, 'recovery', username))) return rateLimited();
+    if (!username) return invalid();
+    const user = await db.prepare('SELECT id, password_hash FROM users WHERE username = ? COLLATE NOCASE LIMIT 1').bind(username).first();
+    if (user && await isLocked(db, user.id)) return locked();
+    if (body.action === 'question') {
+      const row = await db.prepare(`SELECT q.question FROM user_security_questions q
+        JOIN users u ON u.id = q.user_id WHERE u.username = ? COLLATE NOCASE LIMIT 1`).bind(username).first();
+      return json({ question: row?.question ?? 'ما سؤال الأمان الذي حفظته في إعدادات حسابك؟' });
     }
-    if (newPassword.length < 4 || newPassword.length > 128) {
-      return json({ error: "WEAK_PASSWORD", reference: "RCV-400-PASS", message: "كلمة المرور الجديدة لازم تكون 4 أحرف أو أكثر. [RCV-400-PASS]" }, 400);
-    }
-
-    stage = "USER";
-    const row = await db.prepare("SELECT id FROM users WHERE id = ? LIMIT 1").bind(accountId).first();
-    const recoverySeed = RECOVERY_BY_ID[accountId];
-
-    if (!row || !recoverySeed) {
-      await sleep(250);
-      return invalidRecovery("RCV-401-U");
-    }
-
-    stage = "VERIFY";
-    let recoveryMatches;
-    if (accountId === "yas") {
-      const digest = new Uint8Array(
-        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(recoveryCode)),
-      );
-      recoveryMatches = timingSafeEqual(digest, Y_RECOVERY_DIGEST);
+    const byQuestion = body.method === 'security-question';
+    const answer = normalizeSecurityAnswer(body.answer);
+    if (byQuestion ? answer.length < 1 || answer.length > 128 : code.length < 20 || code.length > 128) return invalid();
+    if (password.length < 6 || password.length > 128) return json({ error: 'WEAK_PASSWORD', message: 'كلمة المرور الجديدة لازم تكون 6 أحرف أو أكثر.' }, 400);
+    let matched = null;
+    let condition;
+    let conditionArgs;
+    if (byQuestion) {
+      const question = user ? await db.prepare('SELECT question, answer_salt, answer_hash, answer_iterations FROM user_security_questions WHERE user_id = ?').bind(user.id).first() : null;
+      if (!(await verifySecurityAnswer(answer, question))) {
+        if (user && question) {
+          const count = await db.prepare(`INSERT INTO user_security_question_locks (user_id, failures)
+            SELECT u.id, 1 FROM users u JOIN user_security_questions q ON q.user_id = u.id
+            WHERE u.id = ? AND u.password_hash = ? AND q.answer_hash = ? AND q.answer_salt = ?
+            ON CONFLICT(user_id) DO UPDATE SET failures = MIN(failures + 1, 5)
+            RETURNING failures`).bind(user.id, user.password_hash, question.answer_hash, question.answer_salt).first();
+          if (Number(count?.failures) >= 5) return locked();
+        }
+        return invalid();
+      }
+      matched = question;
+      condition = `EXISTS (SELECT 1 FROM user_security_questions WHERE user_id = ? AND question = ? AND answer_salt = ? AND answer_hash = ? AND answer_iterations = ?)`;
+      conditionArgs = [user.id, matched.question, matched.answer_salt, matched.answer_hash, matched.answer_iterations];
     } else {
-      const derivedRecoveryHash = await deriveHash(
-        recoveryCode,
-        base64UrlToBytes(recoverySeed.salt),
-        RECOVERY_ITERATIONS,
-      );
-      recoveryMatches = timingSafeEqual(
-        base64UrlToBytes(derivedRecoveryHash),
-        base64UrlToBytes(recoverySeed.hash),
-      );
+      if (!user) return invalid();
+      const result = await db.prepare(`SELECT scheme, recovery_salt, recovery_hash, recovery_iterations
+        FROM user_recovery_verifiers WHERE user_id = ?`).bind(user.id).all();
+      let unsupported = false;
+      for (const verifier of result.results ?? []) {
+        try {
+          const actual = verifier.scheme === 'sha256'
+            ? new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code)))
+            : decodeBase64Url(await derivePasswordHash(code, decodeBase64Url(verifier.recovery_salt), Number(verifier.recovery_iterations)));
+          if (constantTimeEqual(actual, decodeBase64Url(verifier.recovery_hash))) { matched = verifier; break; }
+        } catch (error) {
+          if (error?.name !== 'NotSupportedError' && !String(error?.message).includes('iteration counts above')) throw error;
+          unsupported = true;
+        }
+      }
+      if (!matched) {
+        if (unsupported) return json({ error: 'CREDENTIAL_RUNTIME_UNSUPPORTED' }, 503);
+        return invalid();
+      }
+      condition = `EXISTS (SELECT 1 FROM user_recovery_verifiers WHERE user_id = ? AND scheme = ? AND recovery_salt = ? AND recovery_hash = ? AND recovery_iterations = ?)`;
+      conditionArgs = [user.id, matched.scheme, matched.recovery_salt, matched.recovery_hash, matched.recovery_iterations];
     }
-    if (!recoveryMatches) {
-      await sleep(250);
-      return invalidRecovery("RCV-401-C");
-    }
-
-    stage = "PASSWORD";
-    const passwordSaltBytes = crypto.getRandomValues(new Uint8Array(16));
-    const passwordSalt = bytesToBase64Url(passwordSaltBytes);
-    const passwordHash = await deriveHash(newPassword, passwordSaltBytes, PASSWORD_ITERATIONS);
-    const now = Date.now();
-
-    stage = "WRITE";
-    await db.prepare("UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ? WHERE id = ?")
-      .bind(passwordSalt, passwordHash, PASSWORD_ITERATIONS, now, row.id)
-      .run();
-
-    stage = "SESSIONS";
-    await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(row.id).run();
-
-    return json({ ok: true, reference: "RCV-200" });
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+    const salt = btoa(String.fromCharCode(...saltBytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    const hash = await derivePasswordHash(password, saltBytes, PASSWORD_ITERATIONS);
+    // Guard both the verified recovery factor and the credential generation in the atomic reset.
+    const changed = await db.batch([
+      db.prepare(`UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ?
+        WHERE id = ? AND password_hash = ? AND ${condition} AND NOT EXISTS (SELECT 1 FROM user_security_question_locks WHERE user_id = users.id AND failures >= 5)`)
+        .bind(salt, hash, PASSWORD_ITERATIONS, Date.now(), user.id, user.password_hash, ...conditionArgs),
+      db.prepare('DELETE FROM user_recovery_verifiers WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
+      db.prepare('DELETE FROM account_recovery WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
+      db.prepare('DELETE FROM user_password_verifiers WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
+      db.prepare('DELETE FROM user_security_question_locks WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
+      db.prepare('DELETE FROM sessions WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)').bind(user.id, user.id, hash),
+    ]);
+    if (Number(changed[0]?.meta?.changes) !== 1) return await isLocked(db, user.id) ? locked() : invalid();
+    return json({ ok: true });
   } catch (error) {
-    const reference = `RCV-500-${stage}`;
-    console.error("Wany recovery error", reference, error instanceof Error ? error.message : "unknown");
-    return json({ error: "SERVER_ERROR", reference, message: `تعذر استعادة الحساب الآن. [${reference}]` }, 500);
+    console.error('Wany recovery failed', error instanceof Error ? error.name : 'unknown');
+    const safeError = authError(error);
+    if (safeError) return safeError;
+    return json({ error: 'SERVER_ERROR', message: 'تعذر استعادة الحساب الآن.' }, 500);
   }
 }
-
-async function deriveHash(value, salt, iterations) {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(value), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, key, 256);
-  return bytesToBase64Url(new Uint8Array(bits));
+async function isLocked(db, userId) {
+  const row = await db.prepare('SELECT failures FROM user_security_question_locks WHERE user_id = ?').bind(userId).first();
+  return Number(row?.failures) >= 5;
 }
-
-function invalidRecovery(reference = "RCV-401") {
-  return json({
-    error: "INVALID_RECOVERY",
-    reference,
-    message: `اسم المستخدم أو رمز الاستعادة غير صحيح. [${reference}]`,
-  }, 401);
+function locked() {
+  return json({ error: 'RECOVERY_LOCKED', message: 'تم إيقاف الاستعادة بعد 5 إجابات خاطئة. تواصل مع مسؤول الموقع لفتح الاستعادة وتغيير كلمة المرور.' }, 423);
 }
-
-function timingSafeEqual(a, b) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i += 1) result |= a[i] ^ b[i];
-  return result === 0;
+async function invalid() {
+  await new Promise(resolve => setTimeout(resolve, 120));
+  return json({ error: 'INVALID_RECOVERY', message: 'بيانات الاستعادة غير صحيحة.' }, 401);
 }
-
-function bytesToBase64Url(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function base64UrlToBytes(value) {
-  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
 function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Response(JSON.stringify(body), { status, headers: {
+    'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+  } });
 }
