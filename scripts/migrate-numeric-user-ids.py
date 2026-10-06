@@ -14,7 +14,7 @@ import unicodedata
 
 ROOT = Path(__file__).resolve().parents[1]
 SUPPORT_SQL = (ROOT / 'migrations/0015_numeric_identity_support.sql').read_text()
-SUPPORT_TABLES = {'user_identity_aliases', 'work_snapshot_cover_locations', 'user_password_verifiers', 'user_recovery_verifiers', 'account_recovery', 'auth_attempt_windows', 'user_security_questions'}
+SUPPORT_TABLES = {'user_identity_aliases', 'work_snapshot_cover_locations', 'user_password_verifiers', 'user_recovery_verifiers', 'account_recovery', 'auth_attempt_windows', 'user_security_questions', 'admin_credential_events'}
 USER_COLUMNS = {'user_id', 'friend_id', 'requester_id', 'receiver_id', 'pair_low_id', 'pair_high_id', 'admin_user_id', 'target_user_id'}
 
 class MigrationError(ValueError):

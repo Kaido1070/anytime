@@ -1,3 +1,5 @@
+import { mutationOriginError, readAuthJson, reserveAuthAttempt } from "../../_auth-security.js";
+import { verifyPassword, derivePasswordHash, PASSWORD_ITERATIONS } from "../../_password.js";
 import {
   ensureAdminSchema,
   isAdminUser,
@@ -14,16 +16,55 @@ export async function onRequest(context) {
   if (!db) return json({ error: "D1_NOT_CONFIGURED" }, 503);
 
   try {
+    const originError = mutationOriginError(request);
+    if (originError) return originError;
     await ensureAdminSchema(db);
     const session = await getSession(request, db);
     if (!session) return json({ error: "UNAUTHORIZED", message: "انتهت الجلسة. سجل دخولك مرة ثانية." }, 401);
     if (!isAdminUser(session.user)) {
       return json({ error: "ADMIN_REQUIRED", message: "هذه المنطقة مخصصة للإدارة." }, 403);
     }
-    if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\/api\/admin\/?/, "");
+
+    const securityMatch = path.match(/^users\/([^/]+)\/(security-question|reset-password)$/);
+    if (securityMatch) {
+      const targetId = safeId(decodeURIComponent(securityMatch[1]));
+      if (!targetId) return json({ error: "INVALID_USER" }, 400);
+      const target = await db.prepare("SELECT id, password_hash FROM users WHERE id = ? AND role = 'user'").bind(targetId).first();
+      if (!target) return json({ error: "USER_NOT_FOUND" }, 404);
+      if (securityMatch[2] === "security-question" && request.method === "GET") {
+        const row = await db.prepare("SELECT question FROM user_security_questions WHERE user_id = ?").bind(targetId).first();
+        return json({ question: row?.question ?? null });
+      }
+      if (securityMatch[2] === "reset-password" && request.method === "POST") {
+        const body = await readAuthJson(request);
+        const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+        const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
+        if (newPassword.length < 6 || newPassword.length > 128) return json({ error: "INVALID_PASSWORD", message: "كلمة المرور الجديدة يجب أن تكون بين 6 و128 حرفًا." }, 400);
+        if (!(await reserveAuthAttempt(db, request, "password-change", session.user.id))) return json({ error: "RATE_LIMITED" }, 429);
+        const admin = await db.prepare("SELECT password_salt, password_hash, password_iterations FROM users WHERE id = ? AND role = 'admin'").bind(session.user.id).first();
+        if (!currentPassword || currentPassword.length > 128 || !admin || !(await verifyPassword(currentPassword, admin, db))) return json({ error: "WRONG_PASSWORD", message: "كلمة مرور الأدمن غير صحيحة." }, 400);
+        const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+        const salt = bytesToBase64Url(saltBytes);
+        const hash = await derivePasswordHash(newPassword, saltBytes, PASSWORD_ITERATIONS);
+        const now = Date.now();
+        const results = await db.batch([
+          db.prepare(`UPDATE users SET password_salt = ?, password_hash = ?, password_iterations = ?, updated_at = ?
+            WHERE id = ? AND role = 'user' AND password_hash = ? AND EXISTS
+            (SELECT 1 FROM users a JOIN sessions s ON s.user_id = a.id WHERE a.id = ? AND a.role = 'admin' AND a.password_hash = ? AND s.token_hash = ? AND s.expires_at > ?)`)
+            .bind(salt, hash, PASSWORD_ITERATIONS, now, targetId, target.password_hash, session.user.id, admin.password_hash, session.tokenHash, now),
+          ...["sessions", "user_password_verifiers", "user_recovery_verifiers", "account_recovery"].map(table => db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND EXISTS (SELECT 1 FROM users WHERE id = ? AND password_hash = ?)`).bind(targetId, targetId, hash)),
+          db.prepare(`INSERT INTO admin_credential_events (admin_user_id, target_user_id, created_at)
+            SELECT ?, id, ? FROM users WHERE id = ? AND password_hash = ?`).bind(session.user.id, now, targetId, hash),
+        ]);
+        if (Number(results[0]?.meta?.changes) !== 1) return json({ error: "UNAUTHORIZED" }, 401);
+        return json({ ok: true });
+      }
+      return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+    }
+    if (request.method !== "GET") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
     if (path === "users") {
       return json(await getAdminUsers(db, url));
@@ -40,7 +81,9 @@ export async function onRequest(context) {
 
     return json({ error: "NOT_FOUND" }, 404);
   } catch (error) {
-    console.error("Anytime admin API error", error);
+    console.error("Anytime admin API error", error?.name ?? "Error");
+    if (error?.code === "INVALID_JSON" || error?.code === "BODY_TOO_LARGE") return json({ error: error.code }, error.code === "BODY_TOO_LARGE" ? 413 : 400);
+    if (error?.code === "SCHEMA_MIGRATION_REQUIRED") return json({ error: error.code }, 503);
     return json({ error: "SERVER_ERROR", message: "تعذر تحميل بيانات الإدارة الآن." }, 500);
   }
 }
@@ -354,3 +397,4 @@ function json(body, status = 200) {
     },
   });
 }
+

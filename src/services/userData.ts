@@ -60,6 +60,8 @@ export interface UserDataService {
   saveProfileSections(sections: UserProfileSectionInput[]): Promise<UserProfileSection[]>;
   getUserProfile(id: string, previewLimit?: number): Promise<UserProfileView>;
   getAdminUsers(options?: { query?: string; visibility?: string; status?: string; sort?: string; limit?: number; offset?: number }): Promise<{ users: AdminUserSummary[]; total: number; hasMore: boolean }>;
+  getAdminSecurityQuestion(id: string): Promise<string | null>;
+  adminResetPassword(id: string, currentPassword: string, newPassword: string): Promise<void>;
   getAdminUser(id: string, historyLimit?: number, historyOffset?: number): Promise<AdminUserDetail>;
   getAvatarLibrary(): Promise<AvatarSeries[]>;
   setAvatar(avatarId: string): Promise<User>;
@@ -551,6 +553,15 @@ class ApiUserDataService implements UserDataService {
       total: Number(result.total ?? 0),
       hasMore: Boolean(result.hasMore),
     };
+  }
+
+  async getAdminSecurityQuestion(id: string) {
+    const result = await this.request<{ question: string | null }>(`admin/users/${encodeURIComponent(id)}/security-question`);
+    return result.question;
+  }
+
+  async adminResetPassword(id: string, currentPassword: string, newPassword: string) {
+    await this.request(`admin/users/${encodeURIComponent(id)}/reset-password`, { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
   }
 
   async getAdminUser(id: string, historyLimit = 50, historyOffset = 0) {

@@ -334,3 +334,53 @@ test('security-question setup cannot commit after its session is revoked', async
   const response=await onRequest(context('security-question',db,{currentPassword:credentials.h.password,question:'What is my private phrase?',answer:'secret answer'},h.cookie));
   assert.equal(response.status,401);assert.equal(sqlite.prepare('SELECT count(*) AS n FROM user_security_questions').get().n,0);
 });
+
+
+test('admin reads only the saved question and persistently resets the target password with audit and session revocation', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const targetId = credentials.h.user_id;
+  assert.equal((await onRequest(context('security-question', db, { currentPassword: credentials.h.password, question: 'My private question?', answer: 'Secret answer' }, owner.cookie))).status, 200);
+  const question = await adminApi(context(`admin/users/${targetId}/security-question`, db, null, admin.cookie));
+  assert.equal(question.status, 200);
+  assert.deepEqual(await question.json(), { question: 'My private question?' });
+  const path = `admin/users/${targetId}/reset-password`;
+  assert.equal((await adminApi(context(path, db, { currentPassword: 'wrong', newPassword: 'newpass' }, admin.cookie))).status, 400);
+  assert.equal((await adminApi(context(path, db, { currentPassword: credentials.admin.password, newPassword: 'newpass' }, admin.cookie))).status, 200);
+  assert.equal((await login(db, 'h', credentials.h.password)).response.status, 401);
+  assert.equal((await login(db, 'h', 'newpass')).response.status, 200);
+  assert.equal((await onRequest(context('security-question', db, null, owner.cookie))).status, 401);
+  const audit = sqlite.prepare('SELECT admin_user_id, target_user_id FROM admin_credential_events').all();
+  assert.equal(audit.length, 1);
+  assert.equal(audit[0].target_user_id, targetId);
+  assert.equal((await login(db, 'admin', credentials.admin.password)).response.status, 200);
+});
+
+test('admin reset rejects ordinary users, cross-origin requests and short passwords', async t => {
+  const { db, credentials } = await fixture(t);
+  const owner = await login(db, 'h', credentials.h.password);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const path = `admin/users/${credentials.y.user_id}/reset-password`;
+  const body = { currentPassword: credentials.admin.password, newPassword: 'abcdef' };
+  assert.equal((await adminApi(context(path, db, body, owner.cookie))).status, 403);
+  const cross = context(path, db, body, admin.cookie);
+  cross.request.headers.set('Origin', 'https://evil.test');
+  assert.equal((await adminApi(cross)).status, 403);
+  assert.equal((await adminApi(context(path, db, { ...body, newPassword: '12345' }, admin.cookie))).status, 400);
+});
+
+test('admin reset rechecks the authorizing session inside the mutation', async t => {
+  const { sqlite, db, credentials } = await fixture(t);
+  const admin = await login(db, 'admin', credentials.admin.password);
+  const target = credentials.y.user_id;
+  const original = sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash;
+  const raced = { ...db, async batch(statements) {
+    if (statements[0].query.startsWith('UPDATE users SET password_salt')) sqlite.prepare('DELETE FROM sessions WHERE user_id = ?').run(credentials.admin.user_id);
+    return db.batch(statements);
+  } };
+  const response = await adminApi(context(`admin/users/${target}/reset-password`, raced, { currentPassword: credentials.admin.password, newPassword: 'abcdef' }, admin.cookie));
+  assert.equal(response.status, 401);
+  assert.equal(sqlite.prepare('SELECT password_hash FROM users WHERE id = ?').get(target).password_hash, original);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM admin_credential_events').get().n, 0);
+});

@@ -316,6 +316,10 @@ export function AdminUserDetail() {
   const tab = searchParams.get("tab") ?? "overview";
   const historyOffset = Math.max(0, Number(searchParams.get("historyOffset") ?? 0) || 0);
   const [detail, setDetail] = useState<AdminUserDetailType | null>(null);
+  const [securityQuestion, setSecurityQuestion] = useState<string | null>(null);
+  const [securityBusy, setSecurityBusy] = useState(false);
+  const [securityMessage, setSecurityMessage] = useState("");
+  const [resetEditing, setResetEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -338,6 +342,33 @@ export function AdminUserDetail() {
       active = false;
     };
   }, [id, historyOffset]);
+
+  useEffect(() => {
+    let active = true;
+    setSecurityQuestion(null);
+    setSecurityMessage("");
+    setResetEditing(false);
+    userDataService.getAdminSecurityQuestion(id).then(value => { if (active) setSecurityQuestion(value); })
+      .catch(() => { if (active) setSecurityMessage("تعذر تحميل سؤال الأمان."); });
+    return () => { active = false; };
+  }, [id]);
+
+  async function resetPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const password = String(data.get("newPassword") ?? "");
+    if (password !== data.get("confirmPassword")) { setSecurityMessage("كلمتا المرور غير متطابقتين."); return; }
+    setSecurityBusy(true);
+    setSecurityMessage("");
+    try {
+      await userDataService.adminResetPassword(id, String(data.get("currentPassword") ?? ""), password);
+      form.reset();
+      setResetEditing(false);
+      setSecurityMessage("تم تغيير كلمة المرور وإبطال جلسات المستخدم ورموز الاستعادة القديمة.");
+    } catch (cause) { setSecurityMessage(cause instanceof Error ? cause.message : "تعذر تغيير كلمة المرور."); }
+    finally { setSecurityBusy(false); }
+  }
 
   const workKeys = useMemo(() => {
     if (!detail) return [];
@@ -389,6 +420,20 @@ export function AdminUserDetail() {
           <p className="muted">@{detail.user.username} · {detail.user.profileVisibility === "public" ? "عام" : "خاص"}</p>
         </div>
       </header>
+
+      <section className="settings-card">
+        <h2>أمان الحساب</h2>
+        <p>سؤال الأمان: {securityQuestion ?? "لم يُحفظ سؤال أمان"}</p>
+        <p className="muted">كلمات المرور وإجابات الأمان لا تُعرض. إعادة التعيين تُخرج المستخدم من جميع الأجهزة.</p>
+        <button type="button" className="secondary" disabled={securityBusy} onClick={() => setResetEditing(!resetEditing)}>إعادة تعيين كلمة المرور</button>
+        {resetEditing && <form onSubmit={resetPassword}>
+          <label>كلمة مرور الأدمن الحالية<input name="currentPassword" type="password" required maxLength={128} autoComplete="current-password" /></label>
+          <label>كلمة مرور المستخدم الجديدة<input name="newPassword" type="password" required minLength={6} maxLength={128} autoComplete="new-password" /></label>
+          <label>تأكيد كلمة المرور الجديدة<input name="confirmPassword" type="password" required minLength={6} maxLength={128} autoComplete="new-password" /></label>
+          <button disabled={securityBusy}>{securityBusy ? "جارٍ الحفظ…" : "حفظ كلمة المرور الجديدة"}</button>
+        </form>}
+        {securityMessage && <p role="status">{securityMessage}</p>}
+      </section>
 
       <nav className="admin-tabs" aria-label="أقسام الحساب">
         {tabs.map(([key, label]) => (
@@ -480,3 +525,4 @@ export function AdminUserDetail() {
     </section>
   );
 }
+

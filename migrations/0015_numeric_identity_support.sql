@@ -61,3 +61,10 @@ CREATE TABLE IF NOT EXISTS account_recovery (
   created_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS admin_credential_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at INTEGER NOT NULL
+);
