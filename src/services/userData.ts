@@ -35,6 +35,7 @@ export interface UserDataService {
   captureAccountScope(): AccountScope | null;
   getUser(): Promise<User | null>;
   signIn(username: string, password: string): Promise<User>;
+  register(username: string, password: string, inviteCode: string): Promise<void>;
   signOut(allDevices?: boolean): Promise<void>;
   generateRecoveryCode(currentPassword: string): Promise<string>;
   setSecurityQuestion(currentPassword: string, question: string, answer: string): Promise<void>;
@@ -402,6 +403,13 @@ class ApiUserDataService implements UserDataService {
       const user = normalizeUser(result.user);
       this.replaceAccount(user, false, true);
       return user;
+    });
+  }
+
+  async register(username: string, password: string, inviteCode: string) {
+    await this.request<{ ok: boolean }>("register", {
+      method: "POST",
+      body: JSON.stringify({ username: username.normalize("NFKC").trim().toLowerCase(), password, inviteCode: inviteCode.trim() }),
     });
   }
 

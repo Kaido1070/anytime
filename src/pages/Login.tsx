@@ -7,6 +7,8 @@ export function Login() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [recovering, setRecovering] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [accountCreated, setAccountCreated] = useState(false);
   const [recoveryDone, setRecoveryDone] = useState(false);
   const [recoveryMethod, setRecoveryMethod] = useState("security-question");
   const [recoveryUsername, setRecoveryUsername] = useState("");
@@ -22,11 +24,22 @@ export function Login() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const element = event.currentTarget;
     try {
-      await signIn(String(form.get("username")), String(form.get("password")));
+      if (registering) {
+        const password = String(form.get("password"));
+        if (password !== String(form.get("confirmPassword"))) throw new Error("تأكيد كلمة المرور غير مطابق.");
+        await userDataService.register(String(form.get("username")), password, String(form.get("inviteCode")));
+        element.reset();
+        setRegistering(false);
+        setAccountCreated(true);
+      } else {
+        await signIn(String(form.get("username")), String(form.get("password")));
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تسجيل الدخول.");
     } finally {
@@ -77,12 +90,13 @@ export function Login() {
         </div>
       </div>
       <div className="login-form">
-        <h2>{recovering ? "استعادة الحساب." : "ومن أي مكان."}</h2>
+        <h2>{recovering ? "استعادة الحساب." : registering ? "إنشاء حساب." : "ومن أي مكان."}</h2>
         <p className="muted">
-          {recovering ? "استعد حسابك بسؤال الأمان أو رمز الاستعادة." : "سجّل دخولك وكمل من حيث توقفت."}
+          {recovering ? "استعد حسابك بسؤال الأمان أو رمز الاستعادة." : registering ? "تحتاج كود دعوة من صاحب الموقع لإنشاء حساب." : "سجّل دخولك وكمل من حيث توقفت."}
         </p>
 
         {recoveryDone && <p className="login-success" role="status">تم تغيير كلمة المرور. تقدر تسجل دخولك الآن.</p>}
+        {accountCreated && <p className="login-success" role="status">تم إنشاء حسابك. سجّل دخولك الآن.</p>}
 
         {recovering ? (
           <form onSubmit={recover}>
@@ -107,16 +121,25 @@ export function Login() {
             <button className="login-recovery-link" type="button" onClick={() => { setRecovering(false); setError(""); }}>العودة لتسجيل الدخول</button>
           </form>
         ) : (
-          <form onSubmit={submit}>
+          <form key={registering ? "register" : "login"} onSubmit={submit}>
             <label>اسم المستخدم
-              <input name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required placeholder="اسم المستخدم" />
+              <input name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} required disabled={busy} minLength={registering ? 3 : undefined} maxLength={registering ? 32 : undefined} pattern={registering ? "[A-Za-z0-9][A-Za-z0-9_]{2,31}" : undefined} placeholder="اسم المستخدم" />
             </label>
             <label>كلمة المرور
-              <input name="password" type="password" autoComplete="current-password" required placeholder="كلمة المرور" />
+              <input name="password" type="password" autoComplete={registering ? "new-password" : "current-password"} disabled={busy} minLength={registering ? 8 : undefined} maxLength={128} required placeholder="كلمة المرور" />
             </label>
+            {registering && <>
+              <label>تأكيد كلمة المرور
+                <input name="confirmPassword" type="password" autoComplete="new-password" minLength={8} maxLength={128} disabled={busy} required placeholder="أعد كتابة كلمة المرور" />
+              </label>
+              <label>كود الدعوة
+                <input name="inviteCode" type="password" autoComplete="off" autoCapitalize="none" spellCheck={false} minLength={8} maxLength={128} disabled={busy} required placeholder="الكود الذي أعطاك صاحب الموقع" />
+              </label>
+            </>}
             {error && <p className="error" role="alert">{error}</p>}
-            <button className="primary" disabled={busy}>{busy ? "جاري الدخول…" : "تسجيل الدخول"} <span>←</span></button>
-            <button className="login-recovery-link" type="button" onClick={() => { setRecovering(true); setRecoveryDone(false); setError(""); }}>نسيت كلمة المرور؟</button>
+            <button className="primary" disabled={busy}>{busy ? registering ? "جاري إنشاء الحساب…" : "جاري الدخول…" : registering ? "إنشاء الحساب" : "تسجيل الدخول"} <span>←</span></button>
+            <button className="login-recovery-link" type="button" disabled={busy} onClick={() => { setRegistering(!registering); setAccountCreated(false); setRecoveryDone(false); setError(""); }}>{registering ? "العودة لتسجيل الدخول" : "إنشاء حساب بكود دعوة"}</button>
+            {!registering && <button className="login-recovery-link" type="button" disabled={busy} onClick={() => { setRecovering(true); setAccountCreated(false); setRecoveryDone(false); setError(""); }}>نسيت كلمة المرور؟</button>}
           </form>
         )}
       </div>
