@@ -32,8 +32,15 @@ export function Login() {
     try {
       if (registering) {
         const password = String(form.get("password"));
-        if (password !== String(form.get("confirmPassword"))) throw new Error("تأكيد كلمة المرور غير مطابق.");
-        await userDataService.register(String(form.get("username")), password, String(form.get("inviteCode")));
+        const confirmPassword = String(form.get("confirmPassword"));
+        if (password !== confirmPassword) throw new Error("تأكيد كلمة المرور غير مطابق.");
+        await userDataService.register(
+          String(form.get("username")),
+          password,
+          confirmPassword,
+          String(form.get("securityQuestion")),
+          String(form.get("securityAnswer")),
+        );
         element.reset();
         setRegistering(false);
         setAccountCreated(true);
@@ -92,7 +99,7 @@ export function Login() {
       <div className="login-form">
         <h2>{recovering ? "استعادة الحساب." : registering ? "إنشاء حساب." : "ومن أي مكان."}</h2>
         <p className="muted">
-          {recovering ? "استعد حسابك بسؤال الأمان أو رمز الاستعادة." : registering ? "تحتاج كود دعوة من صاحب الموقع لإنشاء حساب." : "سجّل دخولك وكمل من حيث توقفت."}
+          {recovering ? "استعد حسابك بسؤال الأمان أو رمز الاستعادة." : registering ? "أنشئ حسابك باسم مستخدم وكلمة مرور وسؤال أمان." : "سجّل دخولك وكمل من حيث توقفت."}
         </p>
 
         {recoveryDone && <p className="login-success" role="status">تم تغيير كلمة المرور. تقدر تسجل دخولك الآن.</p>}
@@ -132,13 +139,16 @@ export function Login() {
               <label>تأكيد كلمة المرور
                 <input name="confirmPassword" type="password" autoComplete="new-password" minLength={8} maxLength={128} disabled={busy} required placeholder="أعد كتابة كلمة المرور" />
               </label>
-              <label>كود الدعوة
-                <input name="inviteCode" type="password" inputMode="numeric" pattern="[0-9]{4}" autoComplete="off" autoCapitalize="none" spellCheck={false} minLength={4} maxLength={4} disabled={busy} required placeholder="الكود الذي أعطاك صاحب الموقع" />
+              <label>سؤال الأمان
+                <input name="securityQuestion" autoComplete="off" minLength={6} maxLength={200} disabled={busy} required placeholder="مثال: ما اسم أول مدرسة درست فيها؟" />
+              </label>
+              <label>إجابة سؤال الأمان
+                <input name="securityAnswer" type="password" autoComplete="off" minLength={1} maxLength={128} disabled={busy} required placeholder="الإجابة" />
               </label>
             </>}
             {error && <p className="error" role="alert">{error}</p>}
             <button className="primary" disabled={busy}>{busy ? registering ? "جاري إنشاء الحساب…" : "جاري الدخول…" : registering ? "إنشاء الحساب" : "تسجيل الدخول"} <span>←</span></button>
-            <button className="login-recovery-link" type="button" disabled={busy} onClick={() => { setRegistering(!registering); setAccountCreated(false); setRecoveryDone(false); setError(""); }}>{registering ? "العودة لتسجيل الدخول" : "إنشاء حساب بكود دعوة"}</button>
+            <button className="login-recovery-link" type="button" disabled={busy} onClick={() => { setRegistering(!registering); setAccountCreated(false); setRecoveryDone(false); setError(""); }}>{registering ? "العودة لتسجيل الدخول" : "إنشاء حساب"}</button>
             {!registering && <button className="login-recovery-link" type="button" disabled={busy} onClick={() => { setRecovering(true); setAccountCreated(false); setRecoveryDone(false); setError(""); }}>نسيت كلمة المرور؟</button>}
           </form>
         )}
