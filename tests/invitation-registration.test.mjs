@@ -154,7 +154,9 @@ test('registration rejects cross-site posts, invalid usernames and weak password
   assert.equal((await f.request({}, { origin: 'https://other.test' })).status, 403);
   assert.equal((await f.request({ username: '_cannot_login' })).status, 400);
   assert.equal((await f.request({ password: 'short', confirmPassword: 'short' })).status, 400);
-  for (let i = 0; i < 7; i++) await f.request({ username: 'ab' });
+  for (let i = 0; i < 7; i++) {
+    await f.request({ password: 'short', confirmPassword: 'short' });
+  }
   assert.equal((await f.request()).status, 429);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM users').get().n, 0);
 });
