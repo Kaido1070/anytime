@@ -260,3 +260,22 @@ test("account home caches progress and R2 metadata synchronously, scoped to the 
   assert.deepEqual(service.getCachedWorkSnapshots(['tx:story']), []);
   assert.equal(globalThis.localStorage.getItem('anytime:v3:works:h'), null);
 });
+
+test('identical concurrent reads share a request, but mutations invalidate the shared read', async t => {
+  const state = await clientFixture(t);
+  const pending = deferred();
+  let requests = 0;
+  state.intercept = url => {
+    if (!url.startsWith('/api/work-snapshots?')) return undefined;
+    requests++;
+    return requests === 1 ? pending.promise : Response.json({snapshots: []});
+  };
+  const first = service.getWorkSnapshots(['tx:story']);
+  const second = service.getWorkSnapshots(['tx:story']);
+  assert.equal(requests, 1);
+  await service.addFavorite('tx:new');
+  await service.getWorkSnapshots(['tx:story']);
+  assert.equal(requests, 2, 'the post-mutation read must be fresh');
+  pending.resolve(Response.json({snapshots: []}));
+  await Promise.all([first, second]);
+});

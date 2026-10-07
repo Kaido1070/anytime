@@ -262,6 +262,7 @@ class ApiUserDataService implements UserDataService {
   private accountController = new AbortController();
   private authQueue: Promise<void> = Promise.resolve();
   private storageListenerReady = false;
+  private pendingReads = new Map<string, Promise<unknown>>();
 
   captureAccountScope(): AccountScope | null {
     if (!this.currentUser) return null;
@@ -288,6 +289,7 @@ class ApiUserDataService implements UserDataService {
     this.accountController.abort();
     this.accountController = new AbortController();
     this.generation++;
+    this.pendingReads.clear();
     this.clearPersonalCache(preserveOwnCache ? user?.id : undefined);
     this.currentUser = user;
     this.cleaned = false;
@@ -327,7 +329,23 @@ class ApiUserDataService implements UserDataService {
     }
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  private request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    if ((init.method ?? "GET").toUpperCase() !== "GET") {
+      // A mutation must never join a read that began before that mutation.
+      this.pendingReads.clear();
+      return this.requestOnce<T>(path, init);
+    }
+    const key = `${this.generation}:${path}`;
+    const existing = this.pendingReads.get(key);
+    if (existing) return existing as Promise<T>;
+    const pending = this.requestOnce<T>(path, init).finally(() => {
+      if (this.pendingReads.get(key) === pending) this.pendingReads.delete(key);
+    });
+    this.pendingReads.set(key, pending);
+    return pending;
+  }
+
+  private async requestOnce<T>(path: string, init: RequestInit = {}): Promise<T> {
     const generation = this.generation;
     let response: Response;
     try {

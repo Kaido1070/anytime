@@ -1,21 +1,23 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { useLibrary } from "./hooks/useLibrary";
 import { AppLayout } from "./layouts/AppLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { Login } from "./pages/Login";
-import { Favorites } from "./pages/Favorites";
-import { FriendProfile, Friends } from "./pages/Friends";
+const Favorites = lazy(() => import("./pages/Favorites").then((module) => ({ default: module.Favorites })));
+const FriendProfile = lazy(() => import("./pages/Friends").then((module) => ({ default: module.FriendProfile })));
+const Friends = lazy(() => import("./pages/Friends").then((module) => ({ default: module.Friends })));
 import { Account } from "./pages/Account";
-import { AdminDashboard, AdminUserDetail } from "./pages/Admin";
-import { AdminSettings } from "./pages/AdminSettings";
-import { UserList } from "./pages/UserList";
-import { Lists } from "./pages/Lists";
-import { Discover } from "./pages/Discover";
-import { Fyp } from "./pages/Fyp";
-import { NewChapters } from "./pages/NewChapters";
-import { SourceMangaDetails } from "./pages/SourceMangaDetails";
-import { SourceReader } from "./pages/SourceReader";
+const AdminDashboard = lazy(() => import("./pages/Admin").then((module) => ({ default: module.AdminDashboard })));
+const AdminUserDetail = lazy(() => import("./pages/Admin").then((module) => ({ default: module.AdminUserDetail })));
+const AdminSettings = lazy(() => import("./pages/AdminSettings").then((module) => ({ default: module.AdminSettings })));
+const UserList = lazy(() => import("./pages/UserList").then((module) => ({ default: module.UserList })));
+const Lists = lazy(() => import("./pages/Lists").then((module) => ({ default: module.Lists })));
+const Discover = lazy(() => import("./pages/Discover").then((module) => ({ default: module.Discover })));
+const Fyp = lazy(() => import("./pages/Fyp").then((module) => ({ default: module.Fyp })));
+const NewChapters = lazy(() => import("./pages/NewChapters").then((module) => ({ default: module.NewChapters })));
+const SourceMangaDetails = lazy(() => import("./pages/SourceMangaDetails").then((module) => ({ default: module.SourceMangaDetails })));
+const SourceReader = lazy(() => import("./pages/SourceReader").then((module) => ({ default: module.SourceReader })));
 import "./phase3.css";
 import "./lists.css";
 import "./phase4.css";
@@ -42,6 +44,7 @@ export default function App() {
   return (
     <>
       {error && <div className="global-error" role="alert">{error}</div>}
+      <Suspense fallback={<div className="loading">جاري فتح الصفحة…</div>}>
       {!user ? (
         <Login />
       ) : user.role === "admin" ? (
@@ -79,6 +82,7 @@ export default function App() {
           <Route path="read-source/:key/:chapter" element={<SourceReader />} />
         </Routes>
       )}
+      </Suspense>
     </>
   );
 }

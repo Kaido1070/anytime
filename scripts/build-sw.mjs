@@ -1,5 +1,6 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { posix } from "node:path";
 
 const entries = await readdir("dist", { recursive: true, withFileTypes: true });
 const files = entries
@@ -26,12 +27,24 @@ sw = sw.replace(
   `const CACHE = "anytime-shell-${cacheVersion}";`,
 );
 
-sw = sw.replace(
-  "const PRECACHE = [];",
-  `const PRECACHE = ${JSON.stringify(["/", ...files])};`,
-);
+// Precache only the account shell and its static dependencies. Deferred route
+// chunks are cached when opened, so install does not download every page.
+const html = await readFile("dist/index.html", "utf8");
+const core = new Set(["/", "/index.html", "/manifest.webmanifest"]);
+const queue = [...html.matchAll(/(?:src|href)=["'](\/assets\/[^"']+)["']/g)].map((match) => match[1]);
+while (queue.length) {
+  const asset = queue.pop();
+  if (core.has(asset) || !files.includes(asset)) continue;
+  core.add(asset);
+  if (!asset.endsWith(".js")) continue;
+  const code = await readFile(`dist${asset}`, "utf8");
+  for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*)["'](\.[^"']+\.js)["']/g)) {
+    queue.push(posix.resolve(posix.dirname(asset), match[1]));
+  }
+}
+sw = sw.replace("const PRECACHE = [];", `const PRECACHE = ${JSON.stringify([...core])};`);
 
 await writeFile("dist/sw.js", sw);
 console.log(
-  `PWA: cache anytime-shell-${cacheVersion}; precached ${files.length} local assets.`,
+  `PWA: cache anytime-shell-${cacheVersion}; precached ${core.size} shell assets.`,
 );
