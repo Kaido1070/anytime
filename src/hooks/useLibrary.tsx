@@ -43,7 +43,14 @@ function useLibraryState() {
       .getUser()
       .then(async (currentUser) => {
         setUser(currentUser);
-        if (currentUser && currentUser.role !== "admin") await refresh();
+        if (currentUser && currentUser.role !== "admin") {
+          const cached = service.getCachedData();
+          if (cached) {
+            setData(cached);
+            setLoading(false);
+          }
+          await refresh();
+        }
       })
       .catch((cause) =>
         setError(
@@ -70,6 +77,10 @@ function useLibraryState() {
       window.removeEventListener("focus", focus);
     };
   }, [user, refresh]);
+
+  useEffect(() => {
+    if (user && data) service.cacheData(data);
+  }, [user, data]);
 
   const signIn = async (username: string, password: string) => {
     setError("");

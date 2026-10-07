@@ -42,6 +42,10 @@ export interface UserDataService {
   recoverWithSecurityAnswer(username: string, answer: string, newPassword: string): Promise<void>;
   recoverPassword(username: string, recoveryCode: string, newPassword: string): Promise<void>;
   getData(): Promise<UserData>;
+  getCachedData(): UserData | null;
+  cacheData(data: UserData): void;
+  getCachedOverview(): { profile: UserProfileView; sections: UserProfileSection[] } | null;
+  getCachedWorkSnapshots(keys: string[]): WorkSnapshot[];
   getFavorites(): Promise<string[]>;
   addFavorite(id: string): Promise<void>;
   removeFavorite(id: string): Promise<void>;
@@ -307,8 +311,8 @@ class ApiUserDataService implements UserDataService {
       if (typeof localStorage !== "undefined") {
         for (let i = localStorage.length - 1; i >= 0; i--) {
           const key = localStorage.key(i);
-          const privateKey = key && (key.startsWith("anytime:v1:") || key.startsWith("anytime:v2:migrated:") || key === "anytime:session" || /^anytime:v[23]:(?:data|friends):/.test(key));
-          const keep = preserveUserId && [`anytime:v3:data:${preserveUserId}`, `anytime:v3:friends:${preserveUserId}`].includes(key ?? "");
+          const privateKey = key && (key.startsWith("anytime:v1:") || key.startsWith("anytime:v2:migrated:") || key === "anytime:session" || /^anytime:v[23]:(?:data|friends|profile|sections|works):/.test(key));
+          const keep = preserveUserId && ["data", "friends", "profile", "sections", "works"].some(kind => key === `anytime:v3:${kind}:${preserveUserId}`);
           if (privateKey && !keep) localStorage.removeItem(key!);
         }
       }
@@ -398,6 +402,24 @@ class ApiUserDataService implements UserDataService {
       method: "POST",
       body: JSON.stringify({ username: normalizedUsername, recoveryCode: recoveryCode.trim(), newPassword }),
     });
+  }
+
+  getCachedData(): UserData | null {
+    const cached = this.readSnapshot<UserData>("data");
+    return cached ? normalizeData(cached) : null;
+  }
+
+  cacheData(data: UserData) { this.writeSnapshot("data", normalizeData(data)); }
+
+  getCachedOverview() {
+    const profile = this.readSnapshot<UserProfileView>("profile");
+    const sections = this.readSnapshot<UserProfileSection[]>("sections");
+    return profile && sections ? { profile, sections } : null;
+  }
+
+  getCachedWorkSnapshots(keys: string[]) {
+    const cached = this.readSnapshot<Record<string, WorkSnapshot>>("works") ?? {};
+    return keys.flatMap((key) => cached[key] ? [cached[key]] : []);
   }
 
   async getData(): Promise<UserData> {
@@ -564,7 +586,9 @@ class ApiUserDataService implements UserDataService {
     const result = await this.request<{ sections: UserProfileSection[] }>(
       `profile/sections?limit=${limit}`,
     );
-    return normalizeProfileSections(result.sections);
+    const sections = normalizeProfileSections(result.sections);
+    this.writeSnapshot("sections", sections);
+    return sections;
   }
 
   async getMyActivity(limit = 12, offset = 0) {
@@ -614,7 +638,9 @@ class ApiUserDataService implements UserDataService {
     const result = await this.request<{ profile: UserProfileView }>(
       `profiles/${encodeURIComponent(id)}?limit=${limit}`,
     );
-    return normalizeUserProfile(result.profile);
+    const profile = normalizeUserProfile(result.profile);
+    if (id === this.currentUser?.id) this.writeSnapshot("profile", profile);
+    return profile;
   }
 
   async getAdminUsers(options: { query?: string; visibility?: string; status?: string; sort?: string; limit?: number; offset?: number } = {}) {
@@ -815,7 +841,11 @@ class ApiUserDataService implements UserDataService {
     const result = await this.request<{ snapshots: WorkSnapshot[] }>(
       `work-snapshots?keys=${encodeURIComponent(normalized.join(","))}`,
     );
-    return (result.snapshots ?? []).filter((snapshot) => isLiveKey(snapshot.mangaId));
+    const snapshots = (result.snapshots ?? []).filter((snapshot) => isLiveKey(snapshot.mangaId));
+    const cached = this.readSnapshot<Record<string, WorkSnapshot>>("works") ?? {};
+    for (const snapshot of snapshots) cached[snapshot.mangaId] = snapshot;
+    this.writeSnapshot("works", cached);
+    return snapshots;
   }
 
   async saveWorkSnapshot(input: {
@@ -827,10 +857,27 @@ class ApiUserDataService implements UserDataService {
     chapter?: number | null;
   }) {
     if (!isLiveKey(input.mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
-    return await this.request<{ ok: boolean; needsCover: boolean }>("work-snapshots", {
+    const result = await this.request<{ ok: boolean; needsCover: boolean }>("work-snapshots", {
       method: "POST",
       body: JSON.stringify(input),
     });
+    const cached = this.readSnapshot<Record<string, WorkSnapshot>>("works") ?? {};
+    const previous = cached[input.mangaId];
+    const chapter = input.chapter ?? previous?.lastReadChapter ?? null;
+    cached[input.mangaId] = {
+      mangaId: input.mangaId,
+      title: input.title,
+      source: (input.source ?? previous?.source ?? null) as WorkSnapshot["source"],
+      sourceUrl: input.sourceUrl ?? previous?.sourceUrl ?? null,
+      originalCoverUrl: input.coverUrl ?? previous?.originalCoverUrl ?? null,
+      coverUrl: !result.needsCover ? previous?.coverUrl ?? input.coverUrl ?? null : input.coverUrl ?? null,
+      lastReadChapter: chapter,
+      highestReachedChapter: chapter == null ? previous?.highestReachedChapter ?? null : Math.max(chapter, previous?.highestReachedChapter ?? chapter),
+      lastReadAt: input.chapter != null ? Date.now() : previous?.lastReadAt ?? null,
+      updatedAt: Date.now(),
+    };
+    this.writeSnapshot("works", cached);
+    return result;
   }
 
   async saveWorkSnapshotCover(mangaId: string, blob: Blob) {
@@ -1032,11 +1079,11 @@ class ApiUserDataService implements UserDataService {
     localStorage.removeItem("anytime:session");
   }
 
-  private snapshotKey(kind: "data" | "friends") {
+  private snapshotKey(kind: "data" | "friends" | "profile" | "sections" | "works") {
     return this.currentUser ? `anytime:v3:${kind}:${this.currentUser.id}` : null;
   }
 
-  private writeSnapshot(kind: "data" | "friends", value: unknown) {
+  private writeSnapshot(kind: "data" | "friends" | "profile" | "sections" | "works", value: unknown) {
     if (typeof localStorage === "undefined") return;
     const key = this.snapshotKey(kind);
     if (!key) return;
@@ -1047,7 +1094,7 @@ class ApiUserDataService implements UserDataService {
     }
   }
 
-  private readSnapshot<T>(kind: "data" | "friends"): T | null {
+  private readSnapshot<T>(kind: "data" | "friends" | "profile" | "sections" | "works"): T | null {
     if (typeof localStorage === "undefined") return null;
     const key = this.snapshotKey(kind);
     if (!key) return null;

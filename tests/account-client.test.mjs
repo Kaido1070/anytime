@@ -243,3 +243,20 @@ test('another tab account change invalidates pending work and clears private dat
   assert.equal(localStorage.getItem('anytime:v3:data:h'), null);
   assert.equal(reloads, 1);
 });
+
+test("account home caches progress and R2 metadata synchronously, scoped to the signed-in user", async t => {
+  const state = await clientFixture(t);
+  const next = {version: 3, favorites: ['tx:story'], library: [{mangaId: 'tx:story', status: 'reading', lastReadChapter: 58.1, highestReachedChapter: 58.1, lastReadAt: 100}], progress: {}, completed: [], lastOpened: {mangaId: 'tx:story', chapter: 58.1}};
+  service.cacheData(next);
+  const before = state.calls.length;
+  assert.equal(service.getCachedData().lastOpened.chapter, 58.1);
+  assert.equal(state.calls.length, before, 'cached first paint must not wait for a request');
+  state.intercept = url => url.startsWith('/api/work-snapshots?') ? Response.json({snapshots: [{mangaId: 'tx:story', title: 'Story', coverUrl: '/api/work-snapshots/cover?key=tx%3Astory&v=1'}]}) : undefined;
+  await service.getWorkSnapshots(['tx:story']);
+  assert.match(service.getCachedWorkSnapshots(['tx:story'])[0].coverUrl, /^\/api\/work-snapshots\/cover/);
+  state.intercept = null;
+  await service.signIn('y', 'fixture');
+  assert.equal(service.getCachedData(), null);
+  assert.deepEqual(service.getCachedWorkSnapshots(['tx:story']), []);
+  assert.equal(globalThis.localStorage.getItem('anytime:v3:works:h'), null);
+});

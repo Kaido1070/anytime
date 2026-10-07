@@ -65,6 +65,9 @@ export function saveWorkSnapshot(item: SourceManga, chapter?: number | null) {
     scope.assertCurrent();
     if (!blob.type.startsWith("image/") || !blob.size) return;
     await userDataService.saveWorkSnapshotCover(item.key, blob);
+    scope.assertCurrent();
+    // Persist the versioned R2 URL as soon as the archive upload completes.
+    await userDataService.getWorkSnapshots([item.key]);
   })()
     .catch(() => {
       // Snapshotting is a safety layer and must never block reading.
@@ -77,3 +80,17 @@ export function saveWorkSnapshot(item: SourceManga, chapter?: number | null) {
   return job;
 }
 
+
+export function cachedSnapshotSeries(keys: string[]) {
+  return Object.fromEntries(userDataService.getCachedWorkSnapshots(keys)
+    .map((snapshot) => [snapshot.mangaId, snapshotToSourceManga(snapshot)])) as Record<string, SourceManga>;
+}
+
+export function mergeAccountWorks(current: Record<string, SourceManga>, incoming: Record<string, SourceManga>) {
+  const next = { ...current };
+  for (const [key, item] of Object.entries(incoming)) {
+    const archived = current[key]?.cover;
+    next[key] = { ...item, cover: archived?.startsWith("/api/work-snapshots/cover") ? archived : item.cover };
+  }
+  return next;
+}

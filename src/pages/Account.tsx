@@ -19,7 +19,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import type { SourceName } from "../types";
 import { sourceService } from "../services/sources";
-import { saveWorkSnapshot, snapshotToSourceManga } from "../services/workSnapshots";
+import { cachedSnapshotSeries, mergeAccountWorks, saveWorkSnapshot, snapshotToSourceManga } from "../services/workSnapshots";
 import { PERSONALIZATION_CHANGE_EVENT, userDataService } from "../services/userData";
 import type {
   ActivityEvent,
@@ -210,20 +210,21 @@ function FullReadingView({
 
     void (async () => {
       const keys = reading.map((entry) => entry.mangaId);
+      setSeries(cachedSnapshotSeries(keys));
+      if (Object.keys(cachedSnapshotSeries(keys)).length) setLoading(false);
       const cached = await loadSnapshotSeries(keys);
       if (!active) return;
 
       // Render the R2-backed snapshots first. Metadata/live source refreshes
       // happen after paint and never block the reading list.
-      setSeries((current) => ({ ...cached, ...current }));
+      setSeries((current) => mergeAccountWorks(current, cached));
       setLoading(false);
 
       const resolved = await sourceService.resolve(keys).catch(() => []);
       if (active && resolved.length) {
-        setSeries((current) => ({
-          ...current,
-          ...Object.fromEntries(resolved.map((item) => [item.key, item])),
-        }));
+        setSeries((current) => mergeAccountWorks(current,
+          Object.fromEntries(resolved.map((item) => [item.key, item])),
+        ));
         for (const item of resolved) void saveWorkSnapshot(item);
       }
 
@@ -245,7 +246,7 @@ function FullReadingView({
       });
       setSeries((current) => {
         const next = { ...cached, ...current };
-        for (const [key, item] of refreshed) next[key] = item;
+        for (const [key, item] of refreshed) next[key] = mergeAccountWorks(next, { [key]: item })[key];
         return next;
       });
     })().catch(() => {
@@ -289,9 +290,10 @@ export function Account() {
   const readingOpen = tab === "reading";
   const statsOpen = tab === "stats";
 
-  const [profile, setProfile] = useState<UserProfileView | null>(null);
+  const cachedOverview = userDataService.getCachedOverview();
+  const [profile, setProfile] = useState<UserProfileView | null>(cachedOverview?.profile ?? null);
   const [readingStatsSummary, setReadingStatsSummary] = useState<ReadingStats | null>(null);
-  const [groups, setGroups] = useState<ContentGroup[]>([]);
+  const [groups, setGroups] = useState<ContentGroup[]>(() => buildContentGroups(cachedOverview?.sections ?? []));
   const [works, setWorks] = useState<Record<string, SourceManga>>({});
   const [series, setSeries] = useState<Record<string, SourceManga>>({});
   const [worksError, setWorksError] = useState("");
@@ -299,14 +301,14 @@ export function Account() {
   const [readingIssues, setReadingIssues] = useState<ProfileReadingIssue[]>([]);
   const [worksRetry, setWorksRetry] = useState(0);
   const [readingRetry, setReadingRetry] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedOverview);
   const [customizingLists, setCustomizingLists] = useState(false);
   const [error, setError] = useState("");
   const [settingsAvatarOpen, setSettingsAvatarOpen] = useState(false);
 
   const loadOverview = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    setLoading(!userDataService.getCachedOverview());
     setError("");
 
     // Reading achievements are supplemental. Load them independently so a
@@ -357,6 +359,7 @@ export function Account() {
       return;
     }
     void (async () => {
+      setWorks(cachedSnapshotSeries(sourceKeys));
       const snapshots = await loadSnapshotSeries(sourceKeys);
       if (!active) return;
 
@@ -368,7 +371,7 @@ export function Account() {
       if (!active) return;
 
       for (const work of Object.values(next.works)) void saveWorkSnapshot(work);
-      setWorks((current) => ({ ...current, ...next.works }));
+      setWorks((current) => mergeAccountWorks(current, next.works));
       setWorksError(
         next.partialFailure ? "تعذر تحديث بعض بيانات القوائم. يمكنك المحاولة مرة أخرى." : "",
       );
@@ -415,19 +418,19 @@ export function Account() {
 
     void (async () => {
       const keys = readingEntries.map((entry) => entry.mangaId);
+      setSeries(cachedSnapshotSeries(keys));
       const cached = await loadSnapshotSeries(keys);
       if (!active) return;
 
       // R2-backed snapshots are the first-paint source for Continue Reading.
       // D1/source refreshes enrich them later without delaying the home page.
-      setSeries((current) => ({ ...cached, ...current }));
+      setSeries((current) => mergeAccountWorks(current, cached));
 
       const resolved = await sourceService.resolve(keys).catch(() => []);
       if (active && resolved.length) {
-        setSeries((current) => ({
-          ...current,
-          ...Object.fromEntries(resolved.map((item) => [item.key, item])),
-        }));
+        setSeries((current) => mergeAccountWorks(current,
+          Object.fromEntries(resolved.map((item) => [item.key, item])),
+        ));
         for (const item of resolved) void saveWorkSnapshot(item);
       }
 
@@ -473,7 +476,7 @@ export function Account() {
 
       setSeries((current) => {
         const next = { ...cached, ...current };
-        for (const [key, item] of refreshed) next[key] = item;
+        for (const [key, item] of refreshed) next[key] = mergeAccountWorks(next, { [key]: item })[key];
         return next;
       });
 

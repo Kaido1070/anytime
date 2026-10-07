@@ -6,7 +6,17 @@ type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
   item: SourceManga;
 };
 
-export function SourceCoverImage({ item, onError, className, ...props }: Props) {
+export function SourceCoverImage(props: Props) {
+  // Archived images have already been verified and belong to the signed-in
+  // account. Render them directly; do not resolve upstream covers again.
+  if (props.item.cover?.startsWith("/api/work-snapshots/cover")) {
+    const { item, ...imageProps } = props;
+    return <img {...imageProps} src={item.cover} />;
+  }
+  return <LiveSourceCoverImage {...props} />;
+}
+
+function LiveSourceCoverImage({ item, onError, className, ...props }: Props) {
   const initialCovers =
     item.source === "azora" ? [] : sourceService.coverFallbackCandidates(item);
   const [covers, setCovers] = useState<string[]>(initialCovers);
