@@ -3795,3 +3795,317 @@ button.profile-icon-action {
     height:44px;
   }
 }
+
+
+/* Friends hub: responsive, card-based layout */
+.friend-hub{
+  width:100%;
+  max-width:900px;
+  margin-inline:auto;
+}
+
+.friend-hub:not(.friend-hub-embedded) > .page-intro{
+  margin:10px 0 24px;
+  max-width:620px;
+}
+
+.friend-hub .friend-hub-tabs{
+  width:100%;
+  margin:0 0 16px;
+  padding:4px;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:4px;
+  border:1px solid #343739;
+  border-radius:12px;
+  background:#1d1f20;
+  overflow:hidden;
+}
+
+.friend-hub .friend-hub-tabs > button{
+  min-width:0;
+  min-height:42px;
+  padding:8px 10px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--muted);
+  font-size:11px;
+  white-space:nowrap;
+}
+
+.friend-hub .friend-hub-tabs > button.active{
+  border:0;
+  background:#2a2722;
+  color:#f0e2d0;
+  box-shadow:inset 0 0 0 1px #6f5d48;
+}
+
+.friend-hub .friend-hub-tabs > button > span:not(.friend-request-badge){
+  margin-inline-start:5px;
+  color:inherit;
+  opacity:.72;
+}
+
+.friend-hub .friends-list{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  padding-top:2px;
+}
+
+.friend-hub .friend-row{
+  min-width:0;
+  min-height:86px;
+  display:flex;
+  align-items:center;
+  gap:13px;
+  padding:13px 14px;
+  border:1px solid #343739;
+  border-radius:13px;
+  background:#202224;
+}
+
+.friend-hub .friend-row:hover,
+.friend-hub .friend-row:focus-visible{
+  border-color:#504a43;
+  background:#242627;
+}
+
+.friend-hub .friend-row .large{
+  width:56px;
+  height:56px;
+  flex:0 0 56px;
+  font-size:20px;
+}
+
+.friend-hub .friend-row > div{
+  min-width:0;
+  flex:1;
+  display:grid;
+  gap:4px;
+}
+
+.friend-hub .friend-row h2{
+  margin:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:15px;
+  line-height:1.3;
+}
+
+.friend-hub .friend-row small{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:9px;
+  line-height:1.4;
+  direction:ltr;
+  text-align:right;
+}
+
+.friend-hub .friend-row > span:last-child{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  flex:0 0 34px;
+  border:1px solid #3b3e40;
+  border-radius:9px;
+  background:#1b1d1e;
+  color:#c8cbc8;
+  font-size:16px;
+}
+
+.friend-hub .friend-empty-state{
+  min-height:150px;
+  place-items:center;
+  align-content:center;
+  text-align:center;
+  padding:28px 18px;
+  border:1px dashed #3a3d3f;
+  border-radius:13px;
+  background:#1c1e1f;
+}
+
+.friend-hub .friend-requests-panel,
+.friend-hub .friend-search-hub{
+  padding-top:2px;
+}
+
+.friend-hub .friend-request-section{
+  gap:10px;
+}
+
+.friend-hub .friend-request-section + .friend-request-section{
+  margin-top:6px;
+  padding-top:22px;
+  border-top:1px solid var(--line);
+}
+
+.friend-hub .friend-request-heading{
+  margin-bottom:2px;
+  padding-inline:2px;
+}
+
+.friend-hub .friend-request-heading h3{
+  font-size:14px;
+}
+
+.friend-hub .friend-request-card,
+.friend-hub .friend-result-card{
+  padding:13px 14px;
+  border-radius:12px;
+  background:#202224;
+}
+
+.friend-hub .friend-result-identity{
+  gap:12px;
+}
+
+.friend-hub .friend-result-identity .user-avatar{
+  width:48px;
+  height:48px;
+  flex:0 0 48px;
+}
+
+.friend-hub .friend-result-identity b{
+  font-size:13px;
+}
+
+.friend-hub .friend-result-identity small{
+  font-size:9px;
+}
+
+.friend-hub .friend-search{
+  margin:0 0 12px;
+  padding:14px;
+  border-radius:13px;
+  background:#202224;
+}
+
+.friend-hub .friend-search-results{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 24px;
+}
+
+@media(min-width:760px){
+  .friend-hub:not(.friend-hub-embedded){
+    padding-top:2px;
+  }
+
+  .friend-hub:not(.friend-hub-embedded) > h1{
+    font-size:34px;
+  }
+
+  .friend-hub .friend-requests-panel{
+    gap:22px;
+  }
+}
+
+@media(max-width:759px){
+  .friend-hub{
+    max-width:none;
+  }
+
+  .friend-hub:not(.friend-hub-embedded) > .page-intro{
+    margin:8px 0 20px;
+    font-size:12px;
+  }
+
+  .friend-hub .friend-hub-tabs{
+    margin-bottom:12px;
+    padding:3px;
+    border-radius:11px;
+  }
+
+  .friend-hub .friend-hub-tabs > button{
+    min-height:40px;
+    padding:7px 4px;
+    font-size:10px;
+  }
+
+  .friend-hub .friend-request-badge{
+    min-width:18px;
+    min-height:18px;
+    margin-inline-start:4px;
+    padding:1px 5px;
+    font-size:8px;
+  }
+
+  .friend-hub .friends-list{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+
+  .friend-hub .friend-row{
+    min-height:76px;
+    gap:11px;
+    padding:11px 12px;
+    border-radius:11px;
+  }
+
+  .friend-hub .friend-row .large{
+    width:50px;
+    height:50px;
+    flex-basis:50px;
+    font-size:18px;
+  }
+
+  .friend-hub .friend-row h2{
+    font-size:14px;
+  }
+
+  .friend-hub .friend-row small{
+    font-size:9px;
+  }
+
+  .friend-hub .friend-row > span:last-child{
+    width:32px;
+    height:32px;
+    flex-basis:32px;
+    border-radius:8px;
+    font-size:15px;
+  }
+
+  .friend-hub .friend-result-card,
+  .friend-hub .friend-request-card{
+    gap:10px;
+    padding:11px;
+    border-radius:11px;
+  }
+
+  .friend-hub .friend-result-identity .user-avatar{
+    width:44px;
+    height:44px;
+    flex-basis:44px;
+  }
+
+  .friend-hub .friend-action-group{
+    gap:6px;
+  }
+
+  .friend-hub .friend-action-group > button,
+  .friend-hub .friend-action-primary{
+    min-height:38px;
+  }
+
+  .friend-hub .friend-search{
+    padding:11px;
+    border-radius:11px;
+  }
+
+  .friend-hub .friend-search-results{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+
+  .friend-hub .friend-empty-state{
+    min-height:130px;
+    padding:22px 14px;
+  }
+}
