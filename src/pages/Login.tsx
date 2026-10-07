@@ -133,7 +133,7 @@ export function Login() {
                 <input name="confirmPassword" type="password" autoComplete="new-password" minLength={8} maxLength={128} disabled={busy} required placeholder="أعد كتابة كلمة المرور" />
               </label>
               <label>كود الدعوة
-                <input name="inviteCode" type="password" autoComplete="off" autoCapitalize="none" spellCheck={false} minLength={8} maxLength={128} disabled={busy} required placeholder="الكود الذي أعطاك صاحب الموقع" />
+                <input name="inviteCode" type="password" inputMode="numeric" pattern="[0-9]{4}" autoComplete="off" autoCapitalize="none" spellCheck={false} minLength={4} maxLength={4} disabled={busy} required placeholder="الكود الذي أعطاك صاحب الموقع" />
               </label>
             </>}
             {error && <p className="error" role="alert">{error}</p>}

@@ -21,7 +21,7 @@ export async function registerWithInvite(request, db) {
   if (!/^[a-z0-9][a-z0-9_]{2,31}$/.test(username) || password.length < 8 || password.length > 128) {
     return json({ error: "INVALID_REGISTRATION", message: "اسم المستخدم من 3 إلى 32 حرفًا إنجليزيًا أو رقمًا أو _، وكلمة المرور من 8 إلى 128 حرفًا." }, 400);
   }
-  if (code.length < 8 || code.length > 128) return invalidInvite();
+  if (!/^\d{4}$/.test(code)) return invalidInvite();
   const tables = await db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'
     AND name IN ('registration_invites', 'registration_invite_claims')`).all();
   if ((tables.results ?? []).length !== 2) {

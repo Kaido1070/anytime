@@ -6,6 +6,17 @@ import { onRequest } from '../functions/api/[[path]].js';
 import { verifyPassword } from '../functions/_password.js';
 import { isNumericUserId } from '../functions/_identity.js';
 
+function randomDigitString(length) {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, value => String(value % 10)).join('');
+}
+
+function randomDifferentInviteCode(excluded) {
+  let candidate = randomDigitString(4);
+  while (candidate === excluded) candidate = randomDigitString(4);
+  return candidate;
+}
+
 function adapter(sqlite) {
   return {
     prepare(query) {
@@ -42,16 +53,26 @@ async function fixture(t, migrated = true) {
     CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id),
       created_at INTEGER, last_seen_at INTEGER, expires_at INTEGER);
     CREATE TABLE auth_attempt_windows (bucket_key TEXT PRIMARY KEY, window_start INTEGER, attempts INTEGER);`);
-  const migration = await readFile(new URL('../migrations/0021_invitation_registration.sql', import.meta.url), 'utf8');
-  assert.doesNotMatch(migration, /INSERT\s+INTO\s+registration_invites/i);
-  if (migrated) sqlite.exec(migration);
+  const migrations = await Promise.all([
+    readFile(new URL('../migrations/0021_invitation_registration.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../migrations/0022_four_digit_invitation_codes.sql', import.meta.url), 'utf8'),
+  ]);
+  for (const migration of migrations) {
+    assert.doesNotMatch(migration, /INSERT\\s+INTO\\s+registration_invites\\s*\\([^)]*\\)\\s*VALUES/i);
+  }
+  if (migrated) for (const migration of migrations) sqlite.exec(migration);
   const db = adapter(sqlite);
   // Random, ephemeral test invitations are never deployed or provisioned.
-  const code = crypto.randomUUID();
+  const code = randomDigitString(4);
   const password = crypto.randomUUID();
   function invite(options = {}) {
+    if (options.maxUses == null) {
+      sqlite.prepare('INSERT INTO registration_invites (code, enabled, expires_at) VALUES (?, ?, ?)')
+        .run(code, options.enabled ?? 1, options.expiresAt ?? null);
+      return;
+    }
     sqlite.prepare('INSERT INTO registration_invites (code, enabled, max_uses, expires_at) VALUES (?, ?, ?, ?)')
-      .run(code, options.enabled ?? 1, options.maxUses ?? 1, options.expiresAt ?? null);
+      .run(code, options.enabled ?? 1, options.maxUses, options.expiresAt ?? null);
   }
   function request(body = {}, options = {}) {
     return onRequest({ env: { DB: db }, request: new Request(`https://wany.test/api/${options.path ?? 'register'}`, {
@@ -91,14 +112,24 @@ test('one-use invitation creates only a private regular account with hashed pass
   assert.match(login.headers.get('Set-Cookie'), /HttpOnly; Secure; SameSite=Lax/);
 });
 
-test('disabled, expired, missing and incorrect codes cannot create accounts', async t => {
+test('disabled, expired, malformed, missing and unknown four-digit codes cannot create accounts', async t => {
   for (const options of [{ enabled: 0 }, { expiresAt: Date.now() - 1 }]) {
     const f = await fixture(t); f.invite(options);
     assert.equal((await f.request()).status, 403);
     assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM users').get().n, 0);
   }
+
   const f = await fixture(t); f.invite();
-  for (const code of ['', crypto.randomUUID()]) assert.equal((await f.request({ inviteCode: code })).status, 403);
+  const invalidCodes = [
+    randomDigitString(3),
+    randomDigitString(5),
+    `A${randomDigitString(3)}`,
+    randomDifferentInviteCode(f.code),
+  ];
+  for (const inviteCode of invalidCodes) {
+    assert.equal((await f.request({ inviteCode })).status, 403);
+  }
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) n FROM users').get().n, 0);
 });
 
 test('simultaneous claims cannot exceed the privately configured invitation limit', async t => {
