@@ -5,7 +5,7 @@ import { Icon } from "./UI";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
 import { getContinueChapter } from "../services/reading";
-import { availableChapterProgress } from "../services/profileProgress";
+import { sourceChapterProgress } from "../services/profileProgress";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath } from "../services/readerPaths";
 import type {
@@ -390,7 +390,7 @@ function ReadingCard({
   const location = useLocation();
   const returnState = { returnTo: `${location.pathname}${location.search}${location.hash}` };
   const highest = entry.highestReachedChapter;
-  const progress = availableChapterProgress(item.chapters, highest);
+  const progress = sourceChapterProgress(item, highest);
   const resumeChapter =
     own && highest != null
       ? getContinueChapter(item.chapters, highest, highestCompleted)
@@ -433,7 +433,7 @@ function ReadingCard({
             >
               <span style={{ width: `${progress.percent}%` }} />
             </div>
-            <small>{Math.round(progress.percent)}% من الفصول المتاحة</small>
+            <small>{progress.percent > 0 && progress.percent < 1 ? "أقل من 1" : Math.round(progress.percent)}% {progress.estimated ? "تقدم تقديري حسب رقم أحدث فصل" : "من الفصول المتاحة"}</small>
           </>
         )}
         {archived && own && highest != null ? (

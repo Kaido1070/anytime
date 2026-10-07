@@ -1,7 +1,8 @@
-import type { SourceChapter } from "../types";
+import type { SourceManga, SourceChapter } from "../types";
 
 export interface AvailableChapterProgress {
   percent: number;
+  estimated?: boolean;
   currentPosition: number;
   totalPositions: number;
   latestChapter: number | null;
@@ -43,3 +44,22 @@ export function availableChapterProgress(
   };
 }
 
+
+// A partial archive cannot supply a reliable chapter position. Its latest
+// chapter still provides an explicitly labelled estimate, including parts.
+export function sourceChapterProgress(item: SourceManga, highest: number | null): AvailableChapterProgress | null {
+  if (highest == null || !Number.isFinite(highest)) return null;
+  if (item.chapterListComplete !== false) {
+    const exact = availableChapterProgress(item.chapters, highest);
+    if (exact) return exact;
+  }
+  const latest = Math.max(Number(item.latest) || 0, ...(item.chapters ?? []).map(chapter => Number(chapter.number)).filter(Number.isFinite));
+  if (latest <= 0 || highest < 0 || highest > latest) return null;
+  return {
+    percent: Math.max(0, Math.min(100, highest / latest * 100)),
+    currentPosition: highest,
+    totalPositions: latest,
+    latestChapter: latest,
+    estimated: true,
+  };
+}

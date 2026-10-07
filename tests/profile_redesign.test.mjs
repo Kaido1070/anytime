@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { availableChapterProgress } from "../src/services/profileProgress.ts";
+import { availableChapterProgress, sourceChapterProgress } from "../src/services/profileProgress.ts";
 
 test("profile available-chapter progress uses chapter position, not numeric division", () => {
   const chapters = [
@@ -177,4 +177,18 @@ test("profile source failures stay inside their own preview sections", async () 
   assert.match(account, /setReadingRetry/);
   assert.match(overview, /onRetry\?: \(\) => void/);
   assert.match(overview, /profile-section-error compact/);
+});
+
+test("partial long archives show a labelled estimate even if reached chapter is absent", () => {
+  const result = sourceChapterProgress({ chapterListComplete: false, latest: 407.3, chapters: [{ number: 1 }, { number: 407.3 }] }, 2);
+  assert.equal(result.estimated, true);
+  assert.equal(result.latestChapter, 407.3);
+  assert.ok(result.percent > 0 && result.percent < 1);
+  // The pinned first chapter must not become 50% of a two-entry page.
+  assert.ok(sourceChapterProgress({ chapterListComplete: false, latest: 407.3, chapters: [{ number: 1 }, { number: 407.3 }] }, 1).percent < 1);
+});
+test("complete archives retain exact positions and unknown totals do not fabricate progress", () => {
+  assert.equal(sourceChapterProgress({ chapterListComplete: true, chapters: [{ number: 1 }, { number: 2 }, { number: 4 }] }, 2).estimated, undefined);
+  assert.equal(sourceChapterProgress({ chapters: [] }, 2), null);
+  assert.equal(sourceChapterProgress({ latest: 10 }, 11), null);
 });

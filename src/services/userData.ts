@@ -98,6 +98,7 @@ export interface UserDataService {
     sourceUrl?: string | null;
     coverUrl?: string | null;
     chapter?: number | null;
+    chapterMetadata?: WorkSnapshot["chapterMetadata"];
   }): Promise<{ needsCover: boolean }>;
   saveWorkSnapshotCover(mangaId: string, blob: Blob): Promise<void>;
   getFriends(): Promise<Friend[]>;
@@ -861,7 +862,10 @@ class ApiUserDataService implements UserDataService {
     );
     const snapshots = (result.snapshots ?? []).filter((snapshot) => isLiveKey(snapshot.mangaId));
     const cached = this.readSnapshot<Record<string, WorkSnapshot>>("works") ?? {};
-    for (const snapshot of snapshots) cached[snapshot.mangaId] = snapshot;
+    for (const snapshot of snapshots) {
+      snapshot.chapterMetadata = cached[snapshot.mangaId]?.chapterMetadata;
+      cached[snapshot.mangaId] = snapshot;
+    }
     this.writeSnapshot("works", cached);
     return snapshots;
   }
@@ -873,17 +877,20 @@ class ApiUserDataService implements UserDataService {
     sourceUrl?: string | null;
     coverUrl?: string | null;
     chapter?: number | null;
+    chapterMetadata?: WorkSnapshot["chapterMetadata"];
   }) {
     if (!isLiveKey(input.mangaId)) throw new Error("هذه القصة ليست من مصدر مدعوم.");
+    const { chapterMetadata, ...serverInput } = input;
     const result = await this.request<{ ok: boolean; needsCover: boolean }>("work-snapshots", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(serverInput),
     });
     const cached = this.readSnapshot<Record<string, WorkSnapshot>>("works") ?? {};
     const previous = cached[input.mangaId];
     const chapter = input.chapter ?? previous?.lastReadChapter ?? null;
     cached[input.mangaId] = {
       mangaId: input.mangaId,
+      chapterMetadata: input.chapterMetadata ?? previous?.chapterMetadata,
       title: input.title,
       source: (input.source ?? previous?.source ?? null) as WorkSnapshot["source"],
       sourceUrl: input.sourceUrl ?? previous?.sourceUrl ?? null,

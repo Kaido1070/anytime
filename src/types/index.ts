@@ -194,6 +194,7 @@ export interface UserProfileSectionInput {
 }
 
 export interface WorkSnapshot {
+  chapterMetadata?: Pick<SourceManga, "latest" | "chapters" | "chapterListComplete">;
   mangaId: string;
   title: string;
   source: SourceName | null;

@@ -279,3 +279,18 @@ test('identical concurrent reads share a request, but mutations invalidate the s
   pending.resolve(Response.json({snapshots: []}));
   await Promise.all([first, second]);
 });
+
+test('chapter metadata remains local across snapshot refreshes and is isolated by account', async t => {
+  const state = await clientFixture(t);
+  const chapterMetadata = { latest: 407.3, chapterListComplete: false, chapters: [{number: 407.3, title: 'Latest'}] };
+  await service.saveWorkSnapshot({mangaId: 'tx:story', title: 'Story', chapter: 2, chapterMetadata});
+  const post = state.calls.find(call => call.url === '/api/work-snapshots' && call.init.method === 'POST');
+  assert.equal(JSON.parse(post.init.body).chapterMetadata, undefined, 'no extra server payload or D1 migration');
+  state.intercept = url => url.startsWith('/api/work-snapshots?') ? Response.json({snapshots: [{mangaId: 'tx:story', title: 'Story'}]}) : undefined;
+  const fresh = await service.getWorkSnapshots(['tx:story']);
+  assert.deepEqual(fresh[0].chapterMetadata, chapterMetadata);
+  assert.deepEqual(service.getCachedWorkSnapshots(['tx:story'])[0].chapterMetadata, chapterMetadata);
+  state.intercept = null;
+  await service.signIn('y', 'fixture');
+  assert.deepEqual(service.getCachedWorkSnapshots(['tx:story']), []);
+});

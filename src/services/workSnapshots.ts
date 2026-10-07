@@ -28,6 +28,7 @@ export function snapshotToSourceManga(snapshot: WorkSnapshot): SourceManga {
     cover: snapshot.coverUrl ?? snapshot.originalCoverUrl ?? "",
     genres: [],
     chapters: [],
+    ...snapshot.chapterMetadata,
     status: "archived",
   };
 }
@@ -47,6 +48,7 @@ export function saveWorkSnapshot(item: SourceManga, chapter?: number | null) {
       sourceUrl: item.url,
       coverUrl: item.cover || null,
       chapter: chapter ?? null,
+      chapterMetadata: item.chapters?.length ? { latest: item.latest, chapterListComplete: item.chapterListComplete, chapters: item.chapters.map(({ number, title, url }) => ({ number, title, url })) } : undefined,
     });
 
     scope.assertCurrent();
