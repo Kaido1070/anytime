@@ -3568,6 +3568,83 @@ button.profile-icon-action {
 .settings-logout-simple .settings-logout-danger{
   min-width:160px;
 }
+
+@media(min-width:760px){
+  .settings-page-v2.embedded{
+    width:min(100%,680px);
+    max-width:680px;
+    gap:12px;
+  }
+
+  .settings-page-v2.embedded .settings-heading-v2{
+    padding-inline:2px;
+  }
+
+  .settings-page-v2.embedded .settings-profile-card,
+  .settings-page-v2.embedded .settings-compact-card,
+  .settings-page-v2.embedded .settings-section{
+    width:100%;
+  }
+
+  .settings-page-v2.embedded .settings-section{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:10px 16px;
+    padding:15px 18px;
+    border:1px solid #343739;
+    border-radius:14px;
+    background:#1f2123;
+  }
+
+  .settings-page-v2.embedded .settings-section > h3{
+    margin:0;
+    font-size:14px;
+    line-height:1.4;
+  }
+
+  .settings-page-v2.embedded .settings-section > .secondary{
+    min-width:170px;
+    justify-self:end;
+  }
+
+  .settings-page-v2.embedded .settings-section > .settings-password-form,
+  .settings-page-v2.embedded .settings-section > .settings-feedback,
+  .settings-page-v2.embedded .settings-section > [role="status"]{
+    grid-column:1/-1;
+    width:100%;
+  }
+
+  .settings-page-v2.embedded .settings-section > [role="status"] input{
+    width:100%;
+    min-height:38px;
+    margin-top:7px;
+    padding:8px 10px;
+    border:1px solid #393c3e;
+    border-radius:9px;
+    background:#181a1b;
+    color:#f2f0eb;
+  }
+
+  .settings-page-v2.embedded .settings-logout-simple{
+    width:100%;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    justify-items:stretch;
+    gap:8px;
+    padding:4px 0 0;
+  }
+
+  .settings-page-v2.embedded .settings-logout-simple .settings-logout-danger{
+    width:100%;
+    min-width:0;
+    min-height:40px;
+  }
+
+  .settings-page-v2.embedded .settings-logout-simple .settings-feedback{
+    grid-column:1/-1;
+  }
+}
+
 @media(max-width:759px){
   .settings-logout-simple .settings-logout-danger{
     width:min(100%,240px);
