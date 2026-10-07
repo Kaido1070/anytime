@@ -6,6 +6,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { parseSourceGroupKeys } from "../services/sourceMerge";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath, sourceKeyFromReaderPath } from "../services/readerPaths";
+import { readerChapterWindow } from "../services/readerNavigation";
 import { sourceService } from "../services/sources";
 import { saveWorkSnapshot } from "../services/workSnapshots";
 import type { SourceChapterPayload } from "../types";
@@ -141,7 +142,7 @@ export function SourceReader() {
 
   return (
     <ReaderChapter
-      key={`${sourceKey}:${number}`}
+      key={`${sourceKey}:${number}:${exactChapterUrl ?? ""}`}
       sourceKey={sourceKey}
       sourceKeys={sourceKeys}
       payload={payload}
@@ -396,33 +397,14 @@ function ReaderChapter({
     };
   }, [pumpImageQueue, retryPage]);
 
-  const chapterOptions = [...(payload.item.chapters ?? [])]
-    .filter((entry) => Number.isFinite(Number(entry.number)))
-    .sort((a, b) =>
-      Number(b.number) - Number(a.number) ||
-      String(a.url || "").localeCompare(String(b.url || "")),
-    );
-  const normalizeChapterUrl = (value?: string | null) => {
-    if (!value) return "";
-    try {
-      return new URL(value, payload.item.url || window.location.origin).toString();
-    } catch {
-      return value;
-    }
-  };
-  const currentChapterUrl = normalizeChapterUrl(payload.chapterUrl);
-  const selectedChapter =
-    (currentChapterUrl
-      ? chapterOptions.find(
-          (entry) => normalizeChapterUrl(entry.url) === currentChapterUrl,
-        )
-      : undefined) ??
-    chapterOptions.find(
-      (entry) => Number(entry.number) === Number(chapter),
-    );
-  const selectedChapterIndex = chapterOptions.findIndex(
-    (entry) => entry === selectedChapter,
+  const navigation = readerChapterWindow(
+    payload.item.chapters ?? [], chapter, payload.chapterUrl, payload.item.url,
   );
+  const chapterOptions = navigation.options;
+  const selectedChapterIndex = navigation.selectedIndex;
+  const selectedChapter = chapterOptions[selectedChapterIndex];
+  const previousChapter = navigation.previous?.number ?? payload.previous;
+  const nextChapter = navigation.next?.number ?? payload.next;
   const imageReferer =
     payload.item.source === "teamx"
       ? selectedChapter?.url || `${payload.item.url.replace(/\/$/, "")}/${chapter}`
@@ -434,7 +416,7 @@ function ReaderChapter({
     (location.state as { readerNavigation?: boolean } | null)?.readerNavigation,
   );
   const previousUnreadChapters = data
-    ? chapterOptions
+    ? (payload.item.chapters ?? [])
         .map((entry) => Number(entry.number))
         .filter(
           (entryNumber) =>
@@ -546,7 +528,7 @@ function ReaderChapter({
   }, [sourceKey, chapter, payload.pages.length]);
 
   useEffect(() => {
-    if (payload.next == null || prefetchedNextRef.current === payload.next) return;
+    if (nextChapter == null || prefetchedNextRef.current === nextChapter) return;
 
     // Keep D1/source traffic conservative: prefetch only one adjacent chapter,
     // and only when the reader is likely to need it. Slow/data-saver links wait
@@ -554,10 +536,10 @@ function ReaderChapter({
     const threshold = readerIsSlowConnection() ? 90 : 65;
     if (percent < threshold) return;
 
-    const next = payload.next;
+    const next = nextChapter;
     prefetchedNextRef.current = next;
     const run = () => {
-      void sourceService.getChapter(sourceKey, next).catch(() => {
+      void sourceService.getChapter(sourceKey, next, navigation.next?.url).catch(() => {
         if (prefetchedNextRef.current === next) prefetchedNextRef.current = null;
       });
     };
@@ -567,7 +549,7 @@ function ReaderChapter({
       if (nextPrefetchTimerRef.current) clearTimeout(nextPrefetchTimerRef.current);
       nextPrefetchTimerRef.current = null;
     };
-  }, [percent, payload.next, sourceKey]);
+  }, [percent, nextChapter, navigation.next?.url, sourceKey]);
 
   return (
     <main className="reader source-reader">
@@ -578,12 +560,12 @@ function ReaderChapter({
         <div className="reader-heading">
           <small dir="auto">{displayTitle}</small>
           <div className="reader-chapter-controls">
-            {payload.previous != null ? (
+            {previousChapter != null ? (
               <Link className="reader-chapter-step" to={readerPath(
                 payload.item,
-                payload.previous,
+                previousChapter,
                 sourceKeys,
-                chapterOptions.find((entry) => Number(entry.number) === Number(payload.previous))?.url,
+                navigation.previous?.url,
               )} state={readerNavigationState}>السابق</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">السابق</span>
@@ -617,12 +599,12 @@ function ReaderChapter({
                 </option>
               )) : <option value="current">الفصل {chapter}</option>}
             </select>
-            {payload.next != null ? (
+            {nextChapter != null ? (
               <Link className="reader-chapter-step" to={readerPath(
                 payload.item,
-                payload.next,
+                nextChapter,
                 sourceKeys,
-                chapterOptions.find((entry) => Number(entry.number) === Number(payload.next))?.url,
+                navigation.next?.url,
               )} state={readerNavigationState}>التالي</Link>
             ) : (
               <span className="reader-chapter-step is-disabled">التالي</span>
@@ -683,14 +665,14 @@ function ReaderChapter({
       <footer className="reader-end">
         <p className="eyebrow">نهاية الفصل {chapter}</p>
         <div className="reader-links">
-          {payload.previous != null ? (
+          {previousChapter != null ? (
             <Link
               className="secondary"
               to={readerPath(
                 payload.item,
-                payload.previous,
+                previousChapter,
                 sourceKeys,
-                chapterOptions.find((entry) => Number(entry.number) === Number(payload.previous))?.url,
+                navigation.previous?.url,
               )}
               state={readerNavigationState}
             >
@@ -699,14 +681,14 @@ function ReaderChapter({
           ) : (
             <span>هذا أول فصل</span>
           )}
-          {payload.next != null ? (
+          {nextChapter != null ? (
             <Link
               className="primary"
               to={readerPath(
                 payload.item,
-                payload.next,
+                nextChapter,
                 sourceKeys,
-                chapterOptions.find((entry) => Number(entry.number) === Number(payload.next))?.url,
+                navigation.next?.url,
               )}
               state={readerNavigationState}
             >

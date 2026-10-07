@@ -1928,8 +1928,62 @@ function parseTeamXChapters(html, seriesUrl, now = Date.now()) {
   return [...found.values()].sort((a, b) => b.number - a.number);
 }
 
+async function teamXReaderChapters(series, number, request = teamXFetchText) {
+  const pages = new Map([[1, series.chapters ?? []]]);
+  const load = async (page) => {
+    if (!pages.has(page)) {
+      const target = new URL(series.url);
+      target.searchParams.set("page", String(page));
+      pages.set(page, parseTeamXChapters(await request(target.toString()), series.url));
+    }
+    return pages.get(page);
+  };
+  let low = 1;
+  let high = series.chapterPageCount;
+  let foundPage = null;
+  // The archive is newest-first. Locate older chapters without downloading
+  // thousands of rows or exceeding Workers' upstream request budget.
+  while (low <= high) {
+    const page = Math.floor((low + high) / 2);
+    const rows = await load(page);
+    if (!rows.length) break;
+    if (rows.some((entry) => Number(entry.number) === number)) {
+      foundPage = page;
+      break;
+    }
+    const maximum = Math.max(...rows.map((entry) => Number(entry.number)));
+    const minimum = Math.min(...rows.map((entry) => Number(entry.number)));
+    if (number < minimum) low = page + 1;
+    else if (number > maximum) high = page - 1;
+    else break; // A real archive gap must not create a fabricated chapter.
+  }
+  if (foundPage != null) {
+    const lists = [await load(foundPage)];
+    let before = foundPage + 1;
+    let after = foundPage - 1;
+    let merged = mergeTeamXChapterPages(lists);
+    while (merged.filter((entry) => entry.number < number).length < 5 && before <= series.chapterPageCount) {
+      const rows = await load(before++);
+      if (!rows.length) break;
+      lists.push(rows);
+      merged = mergeTeamXChapterPages(lists);
+    }
+    while (merged.filter((entry) => entry.number > number).length < 30 && after >= 1) {
+      const rows = await load(after--);
+      if (!rows.length) break;
+      lists.push(rows);
+      merged = mergeTeamXChapterPages(lists);
+    }
+    return merged;
+  }
+  return mergeTeamXChapterPages([...pages.values()]);
+}
+
 async function teamXChapter(db, item, number) {
   const series = await teamXSeries(db, item);
+  if (series.chapterPageCount > 1) {
+    series.chapters = await teamXReaderChapters(series, number);
+  }
   const selected = series.chapters?.find((chapter) => chapter.number === number);
   const chapterUrl = selected?.url || `${item.url || `${TEAMX_BASE}/series/${item.slug}`}/${number}`;
   const html = await teamXFetchText(chapterUrl);
@@ -5655,6 +5709,7 @@ const __test = {
   azoraChapterListHasPagination,
   moreCompleteChapters,
   mergeChapterLists,
+  teamXReaderChapters,
   safePreferredChapterUrl,
   preferredChapterUrlForSeries,
   selectChapterRow,
