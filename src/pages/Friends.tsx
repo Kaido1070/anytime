@@ -335,7 +335,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
   }
 
   return (
-    <>
+    <section className={embedded ? "friend-hub friend-hub-embedded" : "friend-hub"}>
       {embedded ? (
         <header className="account-friends-header">
           <div>
@@ -549,7 +549,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           )}
         </section>
       )}
-    </>
+    </section>
   );
 }
 
