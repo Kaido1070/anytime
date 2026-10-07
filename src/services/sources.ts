@@ -1,4 +1,5 @@
 import type {
+  SourceChapter,
   SourceChapterPayload,
   SourceListResponse,
   SourceManga,
@@ -249,6 +250,13 @@ export const sourceService = {
       recordSourceFailure(key, error);
       throw error;
     }
+  },
+
+  async findChapter(key: string, number: number) {
+    const payload = await apiWithRetry<{ chapter: SourceChapter }>(
+      `/api/source/chapter-lookup?${params({ key, number })}`, 2,
+    );
+    return payload.chapter;
   },
 
   async getChapterPage(key: string, page = 1) {

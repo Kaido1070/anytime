@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ListManager } from "../components/ListManager";
 import { SourceCoverImage } from "../components/SourceCoverImage";
@@ -7,6 +7,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { parseSourceGroupKeys, preferredSourceCover, sourceDetailsPath } from "../services/sourceMerge";
 import { getContinueChapter } from "../services/reading";
 import { sourceDisplayTitle } from "../services/sourceTitles";
+import { resolveChapterJump } from "../services/chapterJump";
 import { readerPath } from "../services/readerPaths";
 import { formatGregorianDate } from "../services/dateFormat";
 import { sourceService } from "../services/sources";
@@ -91,6 +92,8 @@ export function SourceMangaDetails() {
   const [ascending, setAscending] = useState(false);
   const [chapterJump, setChapterJump] = useState("");
   const [jumpError, setJumpError] = useState("");
+  const [jumpBusy, setJumpBusy] = useState(false);
+  const jumpRequest = useRef(0);
   const [bulkConfirm, setBulkConfirm] = useState<"read" | "unread" | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
@@ -142,9 +145,13 @@ export function SourceMangaDetails() {
     : Math.max(1, Math.ceil(localChapterCount / CHAPTERS_PER_PAGE));
 
   useEffect(() => {
+    jumpRequest.current += 1;
+    setJumpBusy(false);
+    setJumpError("");
     setChapterPage(1);
     setTeamXChapters([]);
     setTeamXChapterError("");
+    return () => { jumpRequest.current += 1; };
   }, [sourceKey]);
 
   useEffect(() => {
@@ -239,16 +246,25 @@ export function SourceMangaDetails() {
     }
   };
 
-  const jumpToChapter = () => {
-    const raw = chapterJump.trim().replace(",", ".");
-    const number = Number(raw);
-    const chapter = chapters.find((entry) => Math.abs(entry.number - number) < 0.000001);
-    if (!raw || !Number.isFinite(number) || !chapter) {
-      setJumpError("رقم الفصل غير موجود");
-      return;
-    }
+  const jumpToChapter = async () => {
+    if (jumpBusy) return;
+    const request = ++jumpRequest.current;
+    setJumpBusy(true);
     setJumpError("");
-    navigate(readerPath(item, chapter.number, requestedSourceKeys, chapter.url));
+    try {
+      // Search the source's archive rather than only the displayed page.
+      const chapter = await resolveChapterJump(item, chapterJump, sourceService.findChapter);
+      if (request !== jumpRequest.current) return;
+      navigate(readerPath(item, chapter.number, requestedSourceKeys, chapter.url));
+    } catch (cause) {
+      if (request !== jumpRequest.current) return;
+      const code = (cause as { code?: string })?.code;
+      setJumpError(code === "CHAPTER_NOT_FOUND" || code === "SOURCE_ITEM_NOT_FOUND"
+        ? "رقم الفصل غير موجود في المصدر"
+        : cause instanceof Error ? cause.message : "تعذر البحث عن الفصل. حاول مرة أخرى.");
+    } finally {
+      if (request === jumpRequest.current) setJumpBusy(false);
+    }
   };
 
   const goToChapterPage = (nextPage: number) => {
@@ -367,9 +383,10 @@ export function SourceMangaDetails() {
             {ascending ? "من الأقدم للأحدث" : "من الأحدث للأقدم"}
           </button>
           <div className="chapter-jump">
-            <input inputMode="decimal" value={chapterJump} onChange={(event) => { setChapterJump(event.target.value); setJumpError(""); }} onKeyDown={(event) => { if (event.key === "Enter") jumpToChapter(); }} placeholder="اكتب رقم الفصل" aria-label="اكتب رقم الفصل" />
-            <button className="primary chapter-jump-submit" onClick={jumpToChapter} aria-label="بحث عن الفصل" title="بحث عن الفصل"><Icon name="search" /></button>
+            <input inputMode="decimal" value={chapterJump} onChange={(event) => { setChapterJump(event.target.value); setJumpError(""); }} onKeyDown={(event) => { if (event.key === "Enter") void jumpToChapter(); }} placeholder="اكتب رقم الفصل" aria-label="اكتب رقم الفصل" />
+            <button className="primary chapter-jump-submit" disabled={jumpBusy} onClick={() => void jumpToChapter()} aria-label="بحث عن الفصل" title="بحث عن الفصل"><Icon name="search" /></button>
           </div>
+          {jumpBusy && <small role="status">جاري البحث عن الفصل في المصدر…</small>}
           {jumpError && <small className="chapter-jump-error">{jumpError}</small>}
           <div className="chapter-read-tools">
             <button className={`secondary chapter-bulk-read ${bulkConfirm === "read" ? "is-pending" : ""}`} onClick={() => setBulkConfirm("read")}>تمت قراءة الكل</button>

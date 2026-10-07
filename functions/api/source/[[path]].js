@@ -269,11 +269,15 @@ async function onRequest(context) {
       return json({ items: await resolveItems(db, keys) }, 200, shortCache());
     }
 
-    if (action === "series") {
+    if (action === "series" || action === "chapter-lookup") {
       const key = safeSourceKey(url.searchParams.get("key"));
       if (!key) return json({ error: "INVALID_SOURCE_KEY" }, 400);
       const item = await loadItem(db, key);
       if (!item) return json({ error: "SOURCE_ITEM_NOT_FOUND" }, 404);
+      const lookupNumber = action === "chapter-lookup" ? Number(url.searchParams.get("number")) : null;
+      if (action === "chapter-lookup" && (url.searchParams.get("number") == null || !Number.isFinite(lookupNumber) || lookupNumber < 0)) {
+        return json({ error: "INVALID_CHAPTER" }, 400);
+      }
       const detail = item.source === "mangatime"
         ? await mangaTimeSeries(db, item)
         : item.source === "teamx"
@@ -287,6 +291,14 @@ async function onRequest(context) {
                 : item.source === "mangalik"
                   ? await mangalikSeries(db, item)
                   : await azoraSeries(db, item);
+      if (action === "chapter-lookup") {
+        const chapters = detail.source === "teamx" && detail.chapterPageCount > 1
+          ? await teamXReaderChapters(detail, lookupNumber)
+          : detail.chapters ?? [];
+        const chapter = findChapterNumber(chapters, lookupNumber);
+        if (!chapter) return json({ error: "CHAPTER_NOT_FOUND", message: "رقم الفصل غير موجود في المصدر" }, 404);
+        return json({ chapter }, 200, shortCache());
+      }
       const observedDetail = await rememberChapterAvailability(db, detail);
       return json({ item: observedDetail }, 200, shortCache());
     }
@@ -5458,6 +5470,16 @@ async function xsanoFetchText(pathOrUrl) {
 
 // Shared parsing & transport -------------------------------------------------
 
+function findChapterNumber(chapters, number) {
+  const exact = chapters.find((entry) => Math.abs(Number(entry.number) - number) < 0.000001);
+  if (exact) return exact;
+  // An integer chapter may be published only as several numbered parts.
+  return Number.isInteger(number)
+    ? chapters.filter((entry) => Number(entry.number) > number && Number(entry.number) < number + 1)
+        .sort((a, b) => Number(a.number) - Number(b.number))[0]
+    : undefined;
+}
+
 function chapterNavigation(chapters, number) {
   const sorted = [...new Set(chapters.map((chapter) => Number(chapter.number)).filter(Number.isFinite))]
     .sort((a, b) => a - b);
@@ -5713,6 +5735,7 @@ const __test = {
   moreCompleteChapters,
   mergeChapterLists,
   teamXReaderChapters,
+  findChapterNumber,
   safePreferredChapterUrl,
   preferredChapterUrlForSeries,
   selectChapterRow,
