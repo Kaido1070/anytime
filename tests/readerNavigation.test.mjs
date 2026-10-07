@@ -52,3 +52,16 @@ test("Team-X locates an early fractional chapter across paginated 1500-row archi
   assert.equal(window.options.at(-1).number, 12.8);
   assert.ok(calls.length <= 6, `upstream requests: ${calls.length}`);
 });
+
+ test("Team-X archive search tolerates a pinned first chapter on every page", async () => {
+  const url = "https://olympustaff.com/series/pinned";
+  const archive = Array.from({length: 1500}, (_, i) => i + 1).reverse();
+  const html = page => [...archive.slice((page - 1) * 100, page * 100), 1].map(number => `<a href="${url}/${number}">الفصل ${number}</a>`).join("");
+  for (const number of [1, 105, 225]) {
+    const result = await __test.teamXReaderChapters({url, chapterPageCount: 15, chapters: __test.parseTeamXChapters(html(1), url)}, number, async target => html(Number(new URL(target).searchParams.get("page"))));
+    const window = readerChapterWindow(result, number);
+    assert.equal(window.previous?.number, number > 1 ? number - 1 : undefined);
+    assert.equal(window.next.number, number + 1);
+    assert.equal(window.options.length, number > 5 ? 36 : 31);
+  }
+});

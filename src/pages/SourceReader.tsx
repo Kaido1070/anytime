@@ -429,6 +429,7 @@ function ReaderChapter({
   const [catchupBusy, setCatchupBusy] = useState(false);
   const showCatchupPrompt =
     Boolean(data) &&
+    payload.item.chapterListComplete !== false &&
     !enteredFromReader &&
     !catchupDismissed &&
     previousUnreadChapters.length > 0;

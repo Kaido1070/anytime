@@ -1929,21 +1929,24 @@ function parseTeamXChapters(html, seriesUrl, now = Date.now()) {
 }
 
 async function teamXReaderChapters(series, number, request = teamXFetchText) {
-  const pages = new Map([[1, series.chapters ?? []]]);
+  const archiveRows = (rows, page) => page < series.chapterPageCount
+    ? rows.filter((entry) => Number(entry.number) !== 1)
+    : rows;
+  const pages = new Map([[1, archiveRows(series.chapters ?? [], 1)]]);
   const load = async (page) => {
     if (!pages.has(page)) {
       const target = new URL(series.url);
       target.searchParams.set("page", String(page));
-      pages.set(page, parseTeamXChapters(await request(target.toString()), series.url));
+      pages.set(page, archiveRows(parseTeamXChapters(await request(target.toString()), series.url), page));
     }
     return pages.get(page);
   };
   let low = 1;
   let high = series.chapterPageCount;
-  let foundPage = null;
+  let foundPage = pages.get(1).some((entry) => Number(entry.number) === number) ? 1 : null;
   // The archive is newest-first. Locate older chapters without downloading
   // thousands of rows or exceeding Workers' upstream request budget.
-  while (low <= high) {
+  while (foundPage == null && low <= high) {
     const page = Math.floor((low + high) / 2);
     const rows = await load(page);
     if (!rows.length) break;
@@ -1952,10 +1955,10 @@ async function teamXReaderChapters(series, number, request = teamXFetchText) {
       break;
     }
     const maximum = Math.max(...rows.map((entry) => Number(entry.number)));
-    const minimum = Math.min(...rows.map((entry) => Number(entry.number)));
-    if (number < minimum) low = page + 1;
-    else if (number > maximum) high = page - 1;
-    else break; // A real archive gap must not create a fabricated chapter.
+    // Some themes pin chapter 1 to every archive page. Its minimum must
+    // not make the search mistake a latest preview for the current page.
+    if (number <= maximum) low = page + 1;
+    else high = page - 1;
   }
   if (foundPage != null) {
     const lists = [await load(foundPage)];
