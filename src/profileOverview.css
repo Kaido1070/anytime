@@ -3646,8 +3646,91 @@ button.profile-icon-action {
 }
 
 @media(max-width:759px){
-  .settings-logout-simple .settings-logout-danger{
-    width:min(100%,240px);
+  .settings-page-v2.embedded{
+    width:100%;
+    max-width:none;
+    gap:10px;
+  }
+
+  .settings-page-v2.embedded .settings-heading-v2{
+    margin-bottom:4px;
+  }
+
+  .settings-page-v2.embedded .settings-section{
+    display:grid;
+    gap:10px;
+    width:100%;
+    padding:12px;
+    border:1px solid #343739;
+    border-radius:11px;
+    background:#1f2123;
+  }
+
+  .settings-page-v2.embedded .settings-section > h3{
+    margin:0;
+    font-size:14px;
+    line-height:1.4;
+  }
+
+  .settings-page-v2.embedded .settings-section > .secondary{
+    width:100%;
+    min-height:42px;
+    justify-content:center;
+  }
+
+  .settings-page-v2.embedded .settings-section > .settings-password-form{
+    width:100%;
+    padding-top:2px;
+  }
+
+  .settings-page-v2.embedded .settings-section > .settings-password-form > p{
+    margin:0 0 2px;
+    color:var(--muted);
+    font-size:9px;
+    line-height:1.6;
+  }
+
+  .settings-page-v2.embedded .settings-section > [role="status"]{
+    width:100%;
+  }
+
+  .settings-page-v2.embedded .settings-section > [role="status"] p{
+    margin:0 0 7px;
+    color:var(--muted);
+    font-size:9px;
+    line-height:1.6;
+  }
+
+  .settings-page-v2.embedded .settings-section > [role="status"] input{
+    width:100%;
+    min-height:40px;
+    padding:8px 10px;
+    border:1px solid #393c3e;
+    border-radius:9px;
+    background:#181a1b;
+    color:#f2f0eb;
+  }
+
+  .settings-page-v2.embedded .settings-logout-simple{
+    width:100%;
+    justify-items:stretch;
+    gap:8px;
+    margin-top:2px;
+    padding:12px;
+    border:1px solid #533331;
+    border-radius:11px;
+    background:#241d1d;
+  }
+
+  .settings-page-v2.embedded .settings-logout-simple .settings-logout-danger{
+    width:100%;
+    min-width:0;
+    min-height:42px;
+  }
+
+  .settings-page-v2.embedded .settings-logout-simple .settings-feedback{
+    width:100%;
+    margin:2px 0 0;
   }
 }
 
