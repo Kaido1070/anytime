@@ -4,7 +4,7 @@ import { PASSWORD_ITERATIONS, verifyPassword, verifyMissingUser, derivePasswordH
 import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_admin.js";
 import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError, newSessionToken, sessionTokenHash, authCookie } from "../_auth-security.js";
 import { normalizeSecurityAnswer, createSecurityAnswer } from "../_security-question.js";
-import { registerWithInvite } from "../_registration.js";
+import { registerAccount } from "../_registration.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -63,7 +63,7 @@ async function route(request, url, db, covers) {
   const path = url.pathname.replace(/^\/api\/?/, "");
 
   if (request.method === "POST" && path === "register") {
-    return registerWithInvite(request, db);
+    return registerAccount(request, db);
   }
 
   if (request.method === "GET" && path === "health") {
