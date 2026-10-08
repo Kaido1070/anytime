@@ -30,6 +30,20 @@ ALIASES = {
     "my-hero-academia": ("boku no hero academia", "my hero academia"),
     "fullmetal-alchemist": ("fullmetal alchemist", "hagane no renkinjutsushi"),
 }
+SEARCH_VARIANTS = {
+    "naruto:hinata": ["Hinata Hyuuga", "Hinata"],
+    "bleach:uryu": ["Uryuu Ishida", "Uryuu"],
+    "bleach:aizen": ["Sousuke Aizen", "Aizen"],
+    "attack-on-titan:levi": ["Levi", "Rivaille"],
+    "demon-slayer:tanjiro": ["Tanjirou Kamado", "Tanjirou"],
+    "demon-slayer:giyu": ["Giyuu Tomioka", "Giyuu"],
+    "demon-slayer:rengoku": ["Kyoujurou Rengoku", "Kyoujurou"],
+    "jujutsu-kaisen:yuji": ["Yuuji Itadori", "Yuuji"],
+    "jujutsu-kaisen:sukuna": ["Sukuna Ryoumen", "Sukuna"],
+    "solo-leveling:jinwoo": ["Jin-Woo Sung", "Jinwoo"],
+    "solo-leveling:jinho": ["Jin-Ho Yoo", "Jinho"],
+    "hunter-x-hunter:chrollo": ["Kuroro Lucilfer", "Chrollo"],
+}
 QUERY = """query($name:String) {
   Character(search:$name) {
     id
@@ -42,6 +56,24 @@ QUERY = """query($name:String) {
 
 def norm(s):
     return re.sub(r"[^a-z0-9]+", "", (s or "").lower())
+
+
+def canonical_tokens(s):
+    # AniList often uses Japanese name order and doubled romanized vowels.
+    tokens = re.findall(r"[a-z0-9]+", s.lower())
+    return sorted(t.replace("ou", "o").replace("uu", "u") for t in tokens)
+
+
+def verified_character(character, expected, variants, series):
+    names = [character["name"].get("full", "")] + (character["name"].get("alternative") or [])
+    expected_tokens = {tuple(canonical_tokens(n)) for n in [expected] + variants}
+    if not any(tuple(canonical_tokens(n)) in expected_tokens for n in names):
+        raise ValueError(f"name mismatch: {names[:5]}")
+    media = [v for m in (character.get("media") or {}).get("nodes", [])
+             for v in (m.get("title") or {}).values() if v]
+    if not any(norm(alias) in norm(title) for alias in ALIASES[series] for title in media):
+        raise ValueError(f"series mismatch: {media[:5]}")
+    return character
 
 
 def main():
@@ -59,30 +91,40 @@ def main():
             report.append({"id": avatar_id, "status": "existing"})
             continue
         try:
-            response = None
-            for attempt in range(5):
-                response = session.post(
-                    "https://graphql.anilist.co",
-                    json={"query": QUERY, "variables": {"name": name}},
-                    timeout=30,
-                )
-                if response.status_code in (429, 500, 502, 503, 504):
-                    time.sleep(3 * (attempt + 1))
-                    continue
-                response.raise_for_status()
-                break
-            else:
-                raise RuntimeError(f"AniList HTTP {response.status_code}")
-            character = response.json().get("data", {}).get("Character")
+            character = None
+            errors = []
+            variants = SEARCH_VARIANTS.get(avatar_id, [])
+            for query_name in [name] + variants:
+                try:
+                    for attempt in range(5):
+                        response = session.post(
+                            "https://graphql.anilist.co",
+                            json={"query": QUERY, "variables": {"name": query_name}},
+                            timeout=30,
+                        )
+                        if response.status_code == 429:
+                            wait = int(response.headers.get("Retry-After", "15"))
+                            time.sleep(min(max(wait, 15), 75))
+                            continue
+                        if response.status_code in (500, 502, 503, 504):
+                            time.sleep(3 * (attempt + 1))
+                            continue
+                        if response.status_code == 404:
+                            break
+                        response.raise_for_status()
+                        candidate = response.json().get("data", {}).get("Character")
+                        if not candidate:
+                            break
+                        character = verified_character(candidate, name, variants, series)
+                        break
+                    if character:
+                        break
+                    errors.append(f"{query_name}: not found")
+                except (ValueError, requests.RequestException) as exc:
+                    errors.append(f"{query_name}: {exc}")
+                time.sleep(2)
             if not character:
-                raise ValueError("character not found")
-            names = [character["name"].get("full", "")] + (character["name"].get("alternative") or [])
-            if norm(name) not in {norm(x) for x in names}:
-                raise ValueError(f"name mismatch: {names[:5]}")
-            media = [v for m in (character.get("media") or {}).get("nodes", [])
-                     for v in (m.get("title") or {}).values() if v]
-            if not any(norm(alias) in norm(title) for alias in ALIASES[series] for title in media):
-                raise ValueError(f"series mismatch: {media[:5]}")
+                raise ValueError("; ".join(errors)[:600])
             url = character["image"].get("large") or character["image"].get("medium")
             if not url or not url.startswith("https://"):
                 raise ValueError("no trusted portrait URL")
@@ -98,7 +140,7 @@ def main():
         except Exception as exc:
             report.append({"id": avatar_id, "status": "failed", "reason": str(exc)})
             print(f"[{index}/66] FAILED {avatar_id}: {exc}", flush=True)
-        time.sleep(0.85)
+        time.sleep(2.1)
     DEST.mkdir(parents=True, exist_ok=True)
     (DEST / "manifest.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     successful = sum(r["status"] in ("ok", "existing") for r in report)
