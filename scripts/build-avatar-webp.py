@@ -31,6 +31,7 @@ ALIASES = {
     "fullmetal-alchemist": ("fullmetal alchemist", "hagane no renkinjutsushi"),
 }
 SEARCH_VARIANTS = {
+    "one-piece:luffy": ["Luffy Monkey"],
     "naruto:hinata": ["Hinata Hyuuga", "Hinata"],
     "bleach:uryu": ["Uryuu Ishida", "Uryuu"],
     "bleach:aizen": ["Sousuke Aizen", "Aizen"],
