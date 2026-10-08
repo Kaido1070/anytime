@@ -146,7 +146,7 @@ test("chapter availability retains observation metadata but the New feed require
 
   assert.match(sourceApi, /source_chapter_seen/);
   assert.match(sourceApi, /first_seen_at/);
-  assert.match(sourceApi, /synthetic: true/);
+  assert.doesNotMatch(sourceApi, /synthetic: true/, "do not invent chapters missing from the source");
   assert.match(sourceApi, /filter\(\(chapter\) => !chapter\.synthetic\)/);
   assert.match(sourceApi, /published_at = COALESCE\(\?, published_at\)/);
   assert.match(sourceApi, /if \(!numberChanged && !publicationChanged\) continue/);
