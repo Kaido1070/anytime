@@ -47,10 +47,11 @@ export function Login() {
         setRegistering(false);
         setAccountCreated(true);
       } else {
-        await signIn(String(form.get("username")), String(form.get("password")));
-        // Never restore the pre-login URL (including a shared chapter link).
-        // Use the existing account home route after every successful sign-in.
-        navigate("/profile", { replace: true });
+        await signIn(
+          String(form.get("username")),
+          String(form.get("password")),
+          (user) => navigate(user.role === "admin" ? "/admin" : "/profile", { replace: true }),
+        );
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "تعذر تسجيل الدخول.");
