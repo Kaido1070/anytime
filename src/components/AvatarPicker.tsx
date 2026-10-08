@@ -145,7 +145,7 @@ export function AvatarPicker({
             <span className="muted">الصورة المختارة</span>
             <b dir="ltr">{selected?.characterName ?? "اختر شخصية"}</b>
             <small className="avatar-picker-preview-hint">
-              {selected ? "جاهزة للحفظ" : "اضغط على أي صورة لاختيارها"}
+              {selected ? (selected.workTitle ? `مانهوا · ${selected.workTitle}` : "جاهزة للحفظ") : "اضغط على أي صورة لاختيارها"}
             </small>
           </div>
           {selected ? (
@@ -222,6 +222,9 @@ export function AvatarPicker({
                         <span className="avatar-option-name" dir="ltr">
                           {avatar.characterName}
                         </span>
+                        {avatar.workTitle && (
+                          <span className="avatar-option-work" dir="ltr">{avatar.workTitle}</span>
+                        )}
                         {currentState && <small>محدد حاليًا</small>}
                       </button>
                     );
