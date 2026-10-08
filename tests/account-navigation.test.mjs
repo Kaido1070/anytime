@@ -27,3 +27,21 @@ test("profile keeps a compact main page with dedicated lists and friends hubs", 
   assert.match(account, /if \(settingsOpen\)/);
   assert.match(account, /<Profile embedded hideIdentityEditor \/>/);
 });
+
+test("successful sign-in routes to account home before the old chapter can mount", async () => {
+  const login = await readFile(new URL("../src/pages/Login.tsx", import.meta.url), "utf8");
+  const library = await readFile(new URL("../src/hooks/useLibrary.tsx", import.meta.url), "utf8");
+  const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+
+  assert.match(login, /await signIn\([\s\S]*?navigate\(user\.role === "admin" \? "\/admin" : "\/profile", \{ replace: true \}\)/);
+  assert.match(library, /const nextUser = await service\.signIn\(username, password\);\s*\/\/[^\n]*\n(?:[^\n]*\n)*?\s*onAuthenticated\?\.\(nextUser\);\s*setUser\(nextUser\);/);
+  assert.match(app, /path="profile" element=\{<Account \/>\}/);
+});
+
+test("failed sign-in never invokes the post-auth redirect", async () => {
+  const library = await readFile(new URL("../src/hooks/useLibrary.tsx", import.meta.url), "utf8");
+  const auth = library.indexOf("const nextUser = await service.signIn(username, password);");
+  const redirect = library.indexOf("onAuthenticated?.(nextUser);", auth);
+  const mounted = library.indexOf("setUser(nextUser);", redirect);
+  assert.ok(auth >= 0 && redirect > auth && mounted > redirect);
+});
