@@ -2540,9 +2540,30 @@ async function getAvatarLibrary(db) {
       ORDER BY s.position ASC, a.position ASC, a.id ASC`)
     .all();
   const rows = result.results ?? [];
+  // Optional additive migration: the existing library remains usable until D1
+  // receives migrations/0022_manhwa_avatars.sql.
+  let manhwaRows = [];
+  try {
+    const categoryResult = await db
+      .prepare(`SELECT a.id AS avatar_id, a.character_name, a.image_path,
+        c.work_title, c.display_position
+        FROM avatar_display_categories c
+        JOIN avatars a ON a.id = c.avatar_id AND a.is_active = 1
+        JOIN avatar_series s ON s.id = a.series_id AND s.is_active = 1
+        WHERE c.category = 'manhwa'
+        ORDER BY c.display_position ASC`)
+      .all();
+    manhwaRows = categoryResult.results ?? [];
+  } catch (error) {
+    if (!/no such table: avatar_display_categories/i.test(String(error?.message ?? error))) {
+      throw error;
+    }
+  }
   const imageUrls = await resolveAvatarImagePaths(rows);
+  const manhwaIds = new Set(manhwaRows.map((row) => row.avatar_id));
   const groups = new Map();
   for (const row of rows) {
+    if (manhwaIds.has(row.avatar_id) && row.avatar_id.startsWith("manhwa:")) continue;
     if (!groups.has(row.series_id)) {
       groups.set(row.series_id, {
         id: row.series_id,
@@ -2561,10 +2582,28 @@ async function getAvatarLibrary(db) {
       position: Number(row.avatar_position),
     });
   }
-  return [...groups.values()].slice(0, 10).map((group) => ({
+  const resultGroups = [...groups.values()].slice(0, 10).map((group) => ({
     ...group,
     avatars: group.avatars.slice(0, 15),
   }));
+  if (manhwaRows.length) {
+    resultGroups.push({
+      id: "manhwa",
+      workId: null,
+      name: "مانهوا",
+      slug: "manhwa",
+      position: 11,
+      avatars: manhwaRows.slice(0, 10).map((row) => ({
+        id: row.avatar_id,
+        seriesId: "manhwa",
+        characterName: row.character_name,
+        workTitle: row.work_title,
+        imageUrl: imageUrls.get(row.avatar_id) ?? null,
+        position: Number(row.display_position),
+      })),
+    });
+  }
+  return resultGroups;
 }
 
 function avatarSearchName(imagePath) {
