@@ -71,11 +71,24 @@ export async function onRequest(context) {
 
 async function filterKnownTeamXBanners(pageMeta, chapterUrl, fetchSource) {
   const blocked = new Set();
-  const limit = Math.min(pageMeta.length, 64);
+  if (!pageMeta.length) return pageMeta;
+
+  // Check the final canvas first: Team-X sometimes appends a dead image
+  // element after the real chapter. The shared transport has a byte budget,
+  // so checking it after dozens of full-sized pages could silently skip it.
+  const lastIndex = pageMeta.length - 1;
+  if (await isKnownTeamXBanner(pageMeta[lastIndex], chapterUrl, fetchSource)) {
+    blocked.add(lastIndex);
+  }
+
+  const indices = Array.from(
+    { length: Math.min(pageMeta.length, 64) },
+    (_, index) => index,
+  ).filter((index) => index !== lastIndex);
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(4, limit) }, async () => {
-    while (cursor < limit) {
-      const index = cursor++;
+  const workers = Array.from({ length: Math.min(4, indices.length) }, async () => {
+    while (cursor < indices.length) {
+      const index = indices[cursor++];
       if (await isKnownTeamXBanner(pageMeta[index], chapterUrl, fetchSource)) blocked.add(index);
     }
   });
@@ -97,7 +110,19 @@ async function isKnownTeamXBanner(page, chapterUrl, fetchSource) {
       redirect: "follow",
       cf: { cacheTtl: 86400, cacheEverything: true },
     });
+    // An explicitly missing file or an HTML/JSON response is not a chapter
+    // image. Do not exclude 403/429/5xx: these can be temporary hotlink or
+    // upstream failures, and the reader must retain a retry path for them.
+    const contentType = response.headers.get("Content-Type")?.toLowerCase() || "";
+    if (response.status === 404 || response.status === 410) {
+      teamXBannerResultCache.set(page.url, true);
+      return true;
+    }
     if (!response.ok) return false;
+    if (/^(?:text\/html|text\/plain|application\/(?:json|xml|xhtml\+xml))\b/.test(contentType)) {
+      teamXBannerResultCache.set(page.url, true);
+      return true;
+    }
 
     const bytes = await response.arrayBuffer();
     const digest = await crypto.subtle.digest("SHA-256", bytes);
