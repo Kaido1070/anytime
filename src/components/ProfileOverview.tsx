@@ -391,10 +391,18 @@ function ReadingCard({
   const returnState = { returnTo: `${location.pathname}${location.search}${location.hash}` };
   const highest = entry.highestReachedChapter;
   const progress = sourceChapterProgress(item, highest);
+  // Resume the last opened chapter first. The highest reached chapter is
+  // historical progress, not necessarily the chapter the reader last opened.
+  const lastRead = entry.lastReadChapter;
   const resumeChapter =
-    own && highest != null
-      ? getContinueChapter(item.chapters, highest, highestCompleted)
-      : null;
+    own && lastRead != null && Number.isFinite(Number(lastRead))
+      ? Number(lastRead)
+      : own && highest != null
+        ? getContinueChapter(item.chapters, highest, highestCompleted)
+        : null;
+  const resumeChapterEntry = item.chapters?.find(
+    (chapter) => Math.abs(Number(chapter.number) - Number(resumeChapter)) < 0.000001,
+  );
 
   const archived = item.type === "archived";
 
@@ -455,7 +463,7 @@ function ReadingCard({
         ) : own && resumeChapter != null ? (
           <Link
             className="primary profile-reading-continue"
-            to={readerPath(item, resumeChapter)} state={returnState}
+            to={readerPath(item, resumeChapter, [], resumeChapterEntry?.url)} state={returnState}
           >
             متابعة القراءة
           </Link>
