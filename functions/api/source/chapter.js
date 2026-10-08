@@ -149,37 +149,68 @@ export function parseTeamXCanvasPages(html) {
 }
 
 export function parseTeamXCanvasPageMeta(html) {
-  const marker = String(html ?? "").search(
+  const source = String(html ?? "");
+  const marker = source.search(
     /<div\b[^>]*class=["'][^"']*\bimage_list\b[^"']*["'][^>]*>/i,
   );
   if (marker < 0) return [];
 
-  const source = String(html);
-  const hardEnd = Math.min(source.length, marker + 2_500_000);
-  const footer = source.slice(marker, hardEnd).search(/<footer\b/i);
-  const end = footer >= 0 ? marker + footer : hardEnd;
-  const scoped = source.slice(marker, end);
+  // Only read descendants of image_list. Previously the parser scanned all
+  // the way to <footer>, including unrelated linked recommendations/promos.
+  const scoped = teamXImageListHtml(source.slice(marker, marker + 2_500_000));
+  if (!scoped) return [];
 
-  const canvasPages = extractCanvasPages(scoped);
+  const canvasPages = extractTeamXPageTags(scoped, "canvas");
   if (canvasPages.length) return uniquePageMeta(canvasPages);
 
-  const imagePages = extractTagUrls(scoped, "img", ["data-src", "data-lazy-src", "src"]);
-  return uniquePageMeta(imagePages.map((url) => ({ url }))).filter(
+  return uniquePageMeta(extractTeamXPageTags(scoped, "img")).filter(
     (page) => !/logo|avatar|favicon|icon|profile|(?:^|[\/_-])ads?(?:[\/_-]|\.)|banner/i.test(page.url),
   );
 }
 
-function extractCanvasPages(html) {
-  const pages = [];
-  const regex = /<canvas\b([^>]*)>/gi;
+// Return exactly the balanced image_list container, not its sibling content.
+// Track nested divs; unrelated links outside the reader cannot become pages.
+function teamXImageListHtml(html) {
+  const tags = /<\/?div\b[^>]*>/gi;
+  let depth = 0;
   let match;
-  while ((match = regex.exec(html))) {
-    const attrs = match[1];
-    const url = readAttr(attrs, "data-src") || readAttr(attrs, "data-lazy-src");
-    if (!url) continue;
+  while ((match = tags.exec(html))) {
+    if (/^<\/div\b/i.test(match[0])) {
+      depth--;
+      if (depth === 0) return html.slice(0, tags.lastIndex);
+    } else {
+      depth++;
+    }
+  }
+  return html; // Fail open for malformed source HTML.
+}
 
-    const width = readCanvasDimension(attrs, "width");
-    const height = readCanvasDimension(attrs, "height");
+// Keep linked promotions out of the chapter, even when they sit inside the
+// image_list. A chapter image does not link to a different series/novel.
+function extractTeamXPageTags(html, tag) {
+  const pages = [];
+  const token = /<\/?a\b[^>]*>|<(?:canvas|img)\b[^>]*>/gi;
+  const links = [];
+  let match;
+  while ((match = token.exec(html))) {
+    const element = match[0];
+    if (/^<\/a\b/i.test(element)) {
+      links.pop();
+      continue;
+    }
+    if (/^<a\b/i.test(element)) {
+      const href = readAttr(element, "href");
+      links.push(isTeamXPromotionalLink(href));
+      continue;
+    }
+    if (!new RegExp(`^<${tag}\\b`, "i").test(element)) continue;
+    if (links.some(Boolean)) continue;
+    const url = readAttr(element, "data-src") ||
+      readAttr(element, "data-lazy-src") ||
+      (tag === "img" ? readAttr(element, "src") : "");
+    if (!url || isTeamXPromoAsset(url)) continue;
+    const width = tag === "canvas" ? readCanvasDimension(element, "width") : undefined;
+    const height = tag === "canvas" ? readCanvasDimension(element, "height") : undefined;
     pages.push({
       url,
       ...(width ? { width } : {}),
@@ -187,6 +218,23 @@ function extractCanvasPages(html) {
     });
   }
   return pages;
+}
+
+function isTeamXPromotionalLink(href) {
+  if (!href) return false;
+  try {
+    const url = new URL(href, TEAMX_BASE);
+    // Ignore only unrelated content links, not normal image CDN links.
+    return /^\/series\/[^/]+/i.test(url.pathname) &&
+      !/\/\d+(?:\.\d+)?\/?$/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function isTeamXPromoAsset(url) {
+  // The known recurring Lord of Truth novel banner is not a manga page.
+  return /lord[-_\s]*(?:of[-_\s]*)?(?:the[-_\s]*)?truth/i.test(url);
 }
 
 function readCanvasDimension(attrs, name) {
