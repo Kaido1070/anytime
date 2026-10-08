@@ -348,7 +348,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           <Back to="/profile" />
           <p className="eyebrow">مجتمعك في Wany</p>
           <h1>الأصدقاء<span className="accent">.</span></h1>
-          <p className="muted page-intro">أصدقاؤك وطلبات الصداقة والبحث في مكان واحد.</p>
+          <p className="muted page-intro">تواصل مع أصدقائك وابحث عن مستخدمين جدد.</p>
         </>
       )}
 
@@ -420,9 +420,9 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
           </div>
           {!friends.length && !friendsError && (
             <div className="friend-empty-state">
-              <p>ما عندك أصدقاء حتى الآن.</p>
+              <p>قائمة أصدقائك فارغة حاليًا.</p>
               <button className="secondary" type="button" onClick={() => setTab("search")}>
-                البحث عن مستخدم
+                ابحث عن أصدقاء
               </button>
             </div>
           )}
