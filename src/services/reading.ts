@@ -31,3 +31,24 @@ export function getContinueChapter(
     .sort((a, b) => a - b)[0];
   return next ?? highestReachedChapter;
 }
+
+/**
+ * Resume the chapter most recently opened, not the highest ever reached.
+ * The chapter archive may be paginated or incomplete, so never substitute
+ * its first available chapter for an already recorded reading position.
+ */
+export function getResumeChapter(
+  entry: Pick<LibraryEntry, "lastReadChapter" | "highestReachedChapter"> | undefined,
+  chapters: Array<{ number: number }> | undefined,
+  highestChapterCompleted: boolean,
+): number | null {
+  const lastRead = entry?.lastReadChapter;
+  if (lastRead != null && Number.isFinite(Number(lastRead)) && Number(lastRead) > 0) {
+    return Number(lastRead);
+  }
+  const highest = entry?.highestReachedChapter;
+  if (highest == null || !Number.isFinite(Number(highest)) || Number(highest) <= 0) {
+    return null;
+  }
+  return getContinueChapter(chapters, Number(highest), highestChapterCompleted);
+}
