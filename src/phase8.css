@@ -687,3 +687,17 @@
     height:min(20vw,60px);
   }
 }
+
+/* Manhwa shelf: keep Wany colors and typography, show work beneath character. */
+.avatar-option-work {
+  width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 8px;
+  line-height: 1.3;
+  color: var(--muted, #a7a7a7);
+  overflow-wrap: anywhere;
+  text-align: center;
+}
