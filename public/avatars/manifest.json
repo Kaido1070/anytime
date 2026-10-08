@@ -1,0 +1,332 @@
+[
+  {
+    "id": "one-piece:luffy",
+    "status": "failed",
+    "reason": "name mismatch: ['Luffy Monkey', 'Mugiwara (麦わら)', 'Straw Hat', 'Mugi (麦)', 'Straw']"
+  },
+  {
+    "id": "one-piece:zoro",
+    "status": "failed",
+    "reason": "name mismatch: ['Zoro Roronoa', 'Zolo', 'Kaizoku Gari (海賊狩り)', 'Pirate Hunter', 'Marimo Head']"
+  },
+  {
+    "id": "one-piece:nami",
+    "status": "ok",
+    "bytes": 14976
+  },
+  {
+    "id": "one-piece:sanji",
+    "status": "ok",
+    "bytes": 8930
+  },
+  {
+    "id": "one-piece:robin",
+    "status": "failed",
+    "reason": "name mismatch: ['Robin Nico', 'Akuma no Ko (悪魔の子)', 'Demon Child', 'Devil Child', 'Miss All Sunday']"
+  },
+  {
+    "id": "one-piece:chopper",
+    "status": "failed",
+    "reason": "name mismatch: ['Chopper Tony Tony', 'Tanuki', 'Chopperman', 'Cotton Candy Lover', 'Racoon Dog']"
+  },
+  {
+    "id": "one-piece:usopp",
+    "status": "ok",
+    "bytes": 16226
+  },
+  {
+    "id": "one-piece:jinbe",
+    "status": "ok",
+    "bytes": 9260
+  },
+  {
+    "id": "naruto:naruto",
+    "status": "ok",
+    "bytes": 9822
+  },
+  {
+    "id": "naruto:sasuke",
+    "status": "ok",
+    "bytes": 6984
+  },
+  {
+    "id": "naruto:sakura",
+    "status": "ok",
+    "bytes": 8838
+  },
+  {
+    "id": "naruto:kakashi",
+    "status": "ok",
+    "bytes": 8642
+  },
+  {
+    "id": "naruto:itachi",
+    "status": "ok",
+    "bytes": 8066
+  },
+  {
+    "id": "naruto:hinata",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "naruto:gaara",
+    "status": "ok",
+    "bytes": 9558
+  },
+  {
+    "id": "naruto:shikamaru",
+    "status": "ok",
+    "bytes": 7698
+  },
+  {
+    "id": "bleach:ichigo",
+    "status": "ok",
+    "bytes": 11590
+  },
+  {
+    "id": "bleach:rukia",
+    "status": "ok",
+    "bytes": 6622
+  },
+  {
+    "id": "bleach:uryu",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "bleach:urahara",
+    "status": "ok",
+    "bytes": 9744
+  },
+  {
+    "id": "bleach:byakuya",
+    "status": "ok",
+    "bytes": 8024
+  },
+  {
+    "id": "bleach:renji",
+    "status": "ok",
+    "bytes": 11038
+  },
+  {
+    "id": "bleach:aizen",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "attack-on-titan:eren",
+    "status": "ok",
+    "bytes": 9174
+  },
+  {
+    "id": "attack-on-titan:mikasa",
+    "status": "ok",
+    "bytes": 8534
+  },
+  {
+    "id": "attack-on-titan:armin",
+    "status": "ok",
+    "bytes": 9530
+  },
+  {
+    "id": "attack-on-titan:levi",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "attack-on-titan:hange",
+    "status": "ok",
+    "bytes": 9280
+  },
+  {
+    "id": "attack-on-titan:erwin",
+    "status": "ok",
+    "bytes": 7304
+  },
+  {
+    "id": "attack-on-titan:reiner",
+    "status": "ok",
+    "bytes": 5428
+  },
+  {
+    "id": "demon-slayer:tanjiro",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "demon-slayer:nezuko",
+    "status": "ok",
+    "bytes": 9570
+  },
+  {
+    "id": "demon-slayer:zenitsu",
+    "status": "ok",
+    "bytes": 14640
+  },
+  {
+    "id": "demon-slayer:inosuke",
+    "status": "ok",
+    "bytes": 14052
+  },
+  {
+    "id": "demon-slayer:giyu",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "demon-slayer:rengoku",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "demon-slayer:shinobu",
+    "status": "failed",
+    "reason": "name mismatch: ['Shinobu Kochou', 'Insect Hashira', 'Insect Pillar']"
+  },
+  {
+    "id": "jujutsu-kaisen:yuji",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "jujutsu-kaisen:megumi",
+    "status": "ok",
+    "bytes": 8246
+  },
+  {
+    "id": "jujutsu-kaisen:nobara",
+    "status": "ok",
+    "bytes": 14858
+  },
+  {
+    "id": "jujutsu-kaisen:gojo",
+    "status": "ok",
+    "bytes": 17060
+  },
+  {
+    "id": "jujutsu-kaisen:maki",
+    "status": "ok",
+    "bytes": 13198
+  },
+  {
+    "id": "jujutsu-kaisen:sukuna",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "solo-leveling:jinwoo",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "solo-leveling:cha-hae-in",
+    "status": "failed",
+    "reason": "name mismatch: ['Hae-In Cha', 'Shizuku Kousaka (向坂雫)', 'Blade Dancer']"
+  },
+  {
+    "id": "solo-leveling:jinho",
+    "status": "failed",
+    "reason": "404 Client Error: Not Found for url: https://graphql.anilist.co/"
+  },
+  {
+    "id": "solo-leveling:igris",
+    "status": "ok",
+    "bytes": 5344
+  },
+  {
+    "id": "solo-leveling:beru",
+    "status": "ok",
+    "bytes": 5192
+  },
+  {
+    "id": "hunter-x-hunter:gon",
+    "status": "ok",
+    "bytes": 7574
+  },
+  {
+    "id": "hunter-x-hunter:killua",
+    "status": "ok",
+    "bytes": 10850
+  },
+  {
+    "id": "hunter-x-hunter:kurapika",
+    "status": "ok",
+    "bytes": 10432
+  },
+  {
+    "id": "hunter-x-hunter:leorio",
+    "status": "ok",
+    "bytes": 9506
+  },
+  {
+    "id": "hunter-x-hunter:hisoka",
+    "status": "ok",
+    "bytes": 9504
+  },
+  {
+    "id": "hunter-x-hunter:chrollo",
+    "status": "failed",
+    "reason": "AniList HTTP 429"
+  },
+  {
+    "id": "my-hero-academia:deku",
+    "status": "ok",
+    "bytes": 9070
+  },
+  {
+    "id": "my-hero-academia:bakugo",
+    "status": "ok",
+    "bytes": 10602
+  },
+  {
+    "id": "my-hero-academia:todoroki",
+    "status": "ok",
+    "bytes": 9606
+  },
+  {
+    "id": "my-hero-academia:uraraka",
+    "status": "ok",
+    "bytes": 9798
+  },
+  {
+    "id": "my-hero-academia:all-might",
+    "status": "ok",
+    "bytes": 9924
+  },
+  {
+    "id": "my-hero-academia:tsuyu",
+    "status": "ok",
+    "bytes": 9954
+  },
+  {
+    "id": "fullmetal-alchemist:edward",
+    "status": "ok",
+    "bytes": 12502
+  },
+  {
+    "id": "fullmetal-alchemist:alphonse",
+    "status": "ok",
+    "bytes": 6082
+  },
+  {
+    "id": "fullmetal-alchemist:roy",
+    "status": "ok",
+    "bytes": 7404
+  },
+  {
+    "id": "fullmetal-alchemist:riza",
+    "status": "ok",
+    "bytes": 9986
+  },
+  {
+    "id": "fullmetal-alchemist:winry",
+    "status": "ok",
+    "bytes": 15296
+  },
+  {
+    "id": "fullmetal-alchemist:scar",
+    "status": "ok",
+    "bytes": 4830
+  }
+]
