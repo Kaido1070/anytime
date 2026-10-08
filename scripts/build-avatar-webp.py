@@ -16,6 +16,7 @@ from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 SQL = ROOT / "migrations/0008_avatar_library.sql"
+MANHWA_SQL = ROOT / "migrations/0022_manhwa_avatars.sql"
 DEST = ROOT / "public/avatars"
 PATTERN = re.compile(r"\('([^']+:[^']+)','([^']+)','[^']+','anilist:([^']+)'")
 ALIASES = {
@@ -30,7 +31,27 @@ ALIASES = {
     "my-hero-academia": ("boku no hero academia", "my hero academia"),
     "fullmetal-alchemist": ("fullmetal alchemist", "hagane no renkinjutsushi"),
 }
+MANHWA_WORKS = {
+    "manhwa:kim-dokja": ("omniscient reader", "jeonjijeok dokja"),
+    "manhwa:twenty-fifth-bam": ("tower of god", "sinui tap"),
+    "manhwa:cheon-yeowoon": ("nano machine", "nano masin"),
+    "manhwa:jin-muwon": ("legend of the northern blade", "bukgeomjeongi"),
+    "manhwa:chung-myung": ("return of the mount hua", "return of the blossoming blade", "hwasangwihwan"),
+    "manhwa:seo-jiwoo": ("eleceed",),
+    "manhwa:grid": ("overgeared", "temppal"),
+    "manhwa:lloyd-frontera": ("greatest estate developer", "world's best engineer"),
+    "manhwa:daniel-park": ("lookism", "oemojisangjuui"),
+}
 SEARCH_VARIANTS = {
+    "manhwa:kim-dokja": ["Dokja Kim", "Kim Dokja"],
+    "manhwa:twenty-fifth-bam": ["Bam", "Baam", "Twenty Fifth Baam"],
+    "manhwa:cheon-yeowoon": ["Yeo Woon Cheon", "Cheon Yeowoon"],
+    "manhwa:jin-muwon": ["Mu-Won Jin", "Jin Muwon"],
+    "manhwa:chung-myung": ["Cheongmyeong", "Chung Myung"],
+    "manhwa:seo-jiwoo": ["Jiwoo Seo", "Seo Jiwoo"],
+    "manhwa:grid": ["Youngwoo Shin", "Shin Youngwoo", "Grid"],
+    "manhwa:lloyd-frontera": ["Lloyd Frontera"],
+    "manhwa:daniel-park": ["Hyungseok Park", "Daniel Park"],
     "one-piece:luffy": ["Luffy Monkey"],
     "naruto:hinata": ["Hinata Hyuuga", "Hinata"],
     "bleach:uryu": ["Uryuu Ishida", "Uryuu"],
@@ -65,14 +86,14 @@ def canonical_tokens(s):
     return sorted(t.replace("ou", "o").replace("uu", "u") for t in tokens)
 
 
-def verified_character(character, expected, variants, series):
+def verified_character(character, expected, variants, series, avatar_id):
     names = [character["name"].get("full", "")] + (character["name"].get("alternative") or [])
     expected_tokens = {tuple(canonical_tokens(n)) for n in [expected] + variants}
     if not any(tuple(canonical_tokens(n)) in expected_tokens for n in names):
         raise ValueError(f"name mismatch: {names[:5]}")
     media = [v for m in (character.get("media") or {}).get("nodes", [])
              for v in (m.get("title") or {}).values() if v]
-    if not any(norm(alias) in norm(title) for alias in ALIASES[series] for title in media):
+    if not any(norm(alias) in norm(title) for alias in (MANHWA_WORKS[avatar_id] if avatar_id in MANHWA_WORKS else ALIASES[series]) for title in media):
         raise ValueError(f"series mismatch: {media[:5]}")
     return character
 
@@ -81,6 +102,10 @@ def main():
     rows = PATTERN.findall(SQL.read_text(encoding="utf-8"))
     if len(rows) != 66 or len({row[0] for row in rows}) != 66:
         raise RuntimeError(f"Expected exactly 66 unique characters, got {len(rows)}")
+    extra_rows = PATTERN.findall(MANHWA_SQL.read_text(encoding="utf-8"))
+    if len(extra_rows) != 9 or len({row[0] for row in extra_rows}) != 9:
+        raise RuntimeError(f"Expected exactly 9 new manhwa characters, got {len(extra_rows)}")
+    rows.extend((avatar_id, "manhwa", name) for avatar_id, _, name in extra_rows)
     session = requests.Session()
     session.headers.update({"User-Agent": "Wany-Avatar-Builder/1.0"})
     report = []
@@ -116,7 +141,7 @@ def main():
                         candidate = response.json().get("data", {}).get("Character")
                         if not candidate:
                             break
-                        character = verified_character(candidate, name, variants, series)
+                        character = verified_character(candidate, name, variants, series, avatar_id)
                         break
                     if character:
                         break
@@ -158,8 +183,8 @@ def main():
     )
     (ROOT / "functions/avatar-local-images.js").write_text(generated, encoding="utf-8")
     successful = sum(r["status"] in ("ok", "existing") for r in report)
-    print(f"Portraits available: {successful}/66", flush=True)
-    return 0 if successful == 66 else 1
+    print(f"Portraits available: {successful}/{len(rows)}", flush=True)
+    return 0 if successful == len(rows) else 1
 
 
 if __name__ == "__main__":
