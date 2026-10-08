@@ -119,7 +119,7 @@ async function onRequestGet({ request, env }) {
     return json(
       {
         covers:
-          source === "azora"
+          source === "azora" && isAzoraSocialPreviewUrl(storedCover)
             ? []
             : buildCoverCandidates(storedCover),
       },
