@@ -5,6 +5,7 @@ import { isAdminUser, isSocialUser, sessionUser, recordAdminAudit } from "../_ad
 import { mutationOriginError, readAuthJson, normalizeLoginName, reserveAuthAttempt, rateLimited, authError, newSessionToken, sessionTokenHash, authCookie } from "../_auth-security.js";
 import { normalizeSecurityAnswer, createSecurityAnswer } from "../_security-question.js";
 import { registerAccount } from "../_registration.js";
+import { localAvatarUrl } from "../avatar-local-images.js";
 export { isAdminUser, isSocialUser };
 
 const SESSION_COOKIE = "anytime_session";
@@ -317,7 +318,7 @@ async function route(request, url, db, covers) {
       .bind(avatarId)
       .first();
     if (!avatar) return json({ error: "AVATAR_NOT_FOUND" }, 404);
-    const imageUrl = await resolveAvatarImagePath(avatar.image_path);
+    const imageUrl = localAvatarUrl(avatarId) ?? await resolveAvatarImagePath(avatar.image_path);
     if (!imageUrl) return json({ error: "AVATAR_IMAGE_UNAVAILABLE" }, 404);
     return new Response(null, {
       status: 302,
@@ -2651,11 +2652,12 @@ async function resolveAvatarImagePath(imagePath) {
 }
 
 async function resolveAvatarImagePaths(rows) {
-  await warmAvatarImageCache(rows.map((row) => row.image_path));
+  await warmAvatarImageCache(rows.filter((row) => !localAvatarUrl(row.avatar_id)).map((row) => row.image_path));
   return new Map(
     rows.map((row) => [
       row.avatar_id,
-      avatarImageCache.get(row.image_path)?.url ??
+      localAvatarUrl(row.avatar_id) ??
+        avatarImageCache.get(row.image_path)?.url ??
         `/api/avatars/${encodeURIComponent(row.avatar_id)}/image`,
     ]),
   );
