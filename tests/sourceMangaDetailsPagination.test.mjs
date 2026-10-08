@@ -11,7 +11,7 @@ test("source details paginates large chapter lists instead of rendering every ro
   assert.match(details, /const CHAPTERS_PER_PAGE = 100;/);
   assert.match(
     details,
-    /const visibleChapters = orderedChapters\.slice\(\s*\(chapterPage - 1\) \* CHAPTERS_PER_PAGE,\s*chapterPage \* CHAPTERS_PER_PAGE,/,
+    /const visibleChapters = teamXRemotePages[\s\S]*?orderedChapters\.slice\(\s*\(chapterPage - 1\) \* CHAPTERS_PER_PAGE,\s*chapterPage \* CHAPTERS_PER_PAGE,/,
   );
   assert.match(details, /<ChapterPagination[\s\S]*page=\{chapterPage\}[\s\S]*pages=\{chapterPageCount\}/);
   assert.match(details, /\{visibleChapters\.map\(\(chapter\) =>/);
