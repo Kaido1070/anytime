@@ -82,7 +82,7 @@ async function filterKnownTeamXBanners(pageMeta, chapterUrl, fetchSource) {
   }
 
   const indices = Array.from(
-    { length: Math.min(pageMeta.length, 64) },
+    { length: Math.min(pageMeta.length - 1, 63) },
     (_, index) => index,
   ).filter((index) => index !== lastIndex);
   let cursor = 0;
@@ -225,8 +225,10 @@ function isTeamXPromotionalLink(href) {
   try {
     const url = new URL(href, TEAMX_BASE);
     // Ignore only unrelated content links, not normal image CDN links.
-    return /^\/series\/[^/]+/i.test(url.pathname) &&
-      !/\/\d+(?:\.\d+)?\/?$/i.test(url.pathname);
+    // Real reader pages may link to their full-resolution image. A link
+    // to any HTML page, other chapter, novel, or external landing page is
+    // promotional/navigation content rather than a chapter image.
+    return !/\.(?:jpe?g|png|webp|gif|avif|bmp|svg)(?:$|[?#])/i.test(url.pathname);
   } catch {
     return false;
   }
