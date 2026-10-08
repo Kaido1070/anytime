@@ -230,6 +230,10 @@ function ReaderChapter({
   const [retryVersions, setRetryVersions] = useState<Map<number, number>>(
     () => new Map(),
   );
+  // Some Team-X chapters append a broken trailing canvas after the real pages.
+  // Collapse it only after all normal image retries fail, not on a transient error.
+  const [failedTrailingTeamXPage, setFailedTrailingTeamXPage] = useState(false);
+  const trailingTeamXIndex = payload.item.source === "teamx" ? payload.pages.length - 1 : -1;
   const prefetchedNextRef = useRef<number | null>(null);
   const nextPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markedUnreadRef = useRef(false);
@@ -344,11 +348,15 @@ function ReaderChapter({
         // receive its src again on the bounded retry attempt.
         requestedRef.current.delete(index);
         setRequestedPages(new Set(requestedRef.current));
+      } else if (index === trailingTeamXIndex && index > 0) {
+        // Never leave a full-height broken image after the actual chapter.
+        // Keep an explicit retry action in case the upstream image was temporary.
+        setFailedTrailingTeamXPage(true);
       }
 
       pumpImageQueue();
     },
-    [pumpImageQueue, schedulePageRetry],
+    [pumpImageQueue, schedulePageRetry, trailingTeamXIndex],
   );
 
   useEffect(() => {
@@ -650,7 +658,7 @@ function ReaderChapter({
 
       <div className="reader-panels source-pages">
         {payload.pages.map((page, index) => (
-          <ProgressiveReaderPage
+          failedTrailingTeamXPage && index === trailingTeamXIndex ? null : <ProgressiveReaderPage
             key={`${index}:${page}`}
             index={index}
             src={sourceService.imageUrl(payload.item.source, page, imageReferer)}
@@ -662,6 +670,27 @@ function ReaderChapter({
           />
         ))}
       </div>
+      {failedTrailingTeamXPage && (
+        <button
+          className="secondary"
+          type="button"
+          onClick={() => {
+            retryCountRef.current.delete(trailingTeamXIndex);
+            requestedRef.current.delete(trailingTeamXIndex);
+            loadedRef.current.delete(trailingTeamXIndex);
+            setRequestedPages(new Set(requestedRef.current));
+            setRetryVersions((current) => {
+              const next = new Map(current);
+              next.set(trailingTeamXIndex, (next.get(trailingTeamXIndex) ?? 0) + 1);
+              return next;
+            });
+            setFailedTrailingTeamXPage(false);
+            requestPage(trailingTeamXIndex);
+          }}
+        >
+          إعادة محاولة تحميل الصورة الأخيرة
+        </button>
+      )}
 
       <footer className="reader-end">
         <p className="eyebrow">نهاية الفصل {chapter}</p>
