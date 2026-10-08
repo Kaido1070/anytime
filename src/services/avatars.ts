@@ -15,7 +15,8 @@ export function filterAvatarSeries(series: AvatarSeries[], query: string) {
     const avatars = seriesMatches
       ? group.avatars
       : group.avatars.filter((avatar) =>
-          normalizedSearch(avatar.characterName).includes(needle),
+          normalizedSearch(avatar.characterName).includes(needle) ||
+          normalizedSearch(avatar.workTitle ?? "").includes(needle),
         );
     return avatars.length ? [{ ...group, avatars }] : [];
   });
