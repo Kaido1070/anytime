@@ -4,7 +4,7 @@ import { ActivityFeed } from "./ActivityFeed";
 import { Icon } from "./UI";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
-import { getContinueChapter } from "../services/reading";
+import { getResumeChapter } from "../services/reading";
 import { sourceChapterProgress } from "../services/profileProgress";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { readerPath } from "../services/readerPaths";
@@ -391,15 +391,10 @@ function ReadingCard({
   const returnState = { returnTo: `${location.pathname}${location.search}${location.hash}` };
   const highest = entry.highestReachedChapter;
   const progress = sourceChapterProgress(item, highest);
-  // Resume the last opened chapter first. The highest reached chapter is
-  // historical progress, not necessarily the chapter the reader last opened.
-  const lastRead = entry.lastReadChapter;
-  const resumeChapter =
-    own && lastRead != null && Number.isFinite(Number(lastRead))
-      ? Number(lastRead)
-      : own && highest != null
-        ? getContinueChapter(item.chapters, highest, highestCompleted)
-        : null;
+  // All Continue Reading entry points must resolve the same saved chapter.
+  const resumeChapter = own
+    ? getResumeChapter(entry, item.chapters, highestCompleted)
+    : null;
   const resumeChapterEntry = item.chapters?.find(
     (chapter) => Math.abs(Number(chapter.number) - Number(resumeChapter)) < 0.000001,
   );
