@@ -187,3 +187,34 @@ test("Team-X excludes linked promos in img-based chapters without losing real im
     "https://olympustaff.com/chapter/002.jpg",
   ]);
 });
+
+
+test("Team-X filters different linked novel banners for every series", () => {
+  for (const novel of ["lord-of-the-truth", "the-master", "another-novel"]) {
+    const html = `
+      <div class="image_list">
+        <canvas data-src="/chapter/001.webp"></canvas>
+        <a href="/series/${novel}/"><canvas data-src="/promotions/${novel}.webp"></canvas></a>
+        <canvas data-src="/chapter/002.webp"></canvas>
+      </div>
+    `;
+    assert.deepEqual(parseTeamXCanvasPages(html), [
+      "https://olympustaff.com/chapter/001.webp",
+      "https://olympustaff.com/chapter/002.webp",
+    ]);
+  }
+});
+
+test("Team-X keeps chapter pages linked to full-resolution images", () => {
+  const html = `
+    <div class="image_list">
+      <a href="/full/001.jpg"><canvas data-src="/chapter/001.webp"></canvas></a>
+      <a href="https://example.com/novel/read"><canvas data-src="/ads/clickable.webp"></canvas></a>
+      <canvas data-src="/chapter/002.webp"></canvas>
+    </div>
+  `;
+  assert.deepEqual(parseTeamXCanvasPages(html), [
+    "https://olympustaff.com/chapter/001.webp",
+    "https://olympustaff.com/chapter/002.webp",
+  ]);
+});
