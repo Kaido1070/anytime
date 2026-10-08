@@ -5,7 +5,7 @@ import { SourceCoverImage } from "../components/SourceCoverImage";
 import { Back, Icon } from "../components/UI";
 import { useLibrary } from "../hooks/useLibrary";
 import { parseSourceGroupKeys, preferredSourceCover, sourceDetailsPath } from "../services/sourceMerge";
-import { getContinueChapter } from "../services/reading";
+import { getResumeChapter } from "../services/reading";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { resolveChapterJump } from "../services/chapterJump";
 import { readerPath } from "../services/readerPaths";
@@ -183,10 +183,10 @@ export function SourceMangaDetails() {
   const highestChapter = libraryEntry?.highestReachedChapter ?? null;
   const highestCompleted =
     highestChapter != null && Boolean(data?.completed.includes(`${sourceKey}:${highestChapter}`));
-  const startChapter =
-    highestChapter != null
-      ? getContinueChapter(chapters, highestChapter, highestCompleted)
-      : firstChapter;
+  // Use the same last-read identity as the account page. The Team-X
+  // archive is paginated and its first page may contain only recent chapters.
+  const resumeChapter = getResumeChapter(libraryEntry, chapters, highestCompleted);
+  const startChapter = resumeChapter ?? firstChapter;
   const startChapterEntry =
     startChapter != null
       ? chapters.find((entry) => Math.abs(Number(entry.number) - Number(startChapter)) < 0.000001)
@@ -326,7 +326,7 @@ export function SourceMangaDetails() {
           <div className="genres">{(item.genres ?? []).slice(0, 10).map((genre) => <span key={genre}>{genre}</span>)}</div>
           {item.description && <p className="description" dir="auto">{item.description}</p>}
           <div className="detail-actions">
-            {startChapter != null && <Link className="primary" to={readerPath(item, startChapter, requestedSourceKeys, startChapterEntry?.url)}>{highestChapter != null ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
+            {startChapter != null && <Link className="primary" to={readerPath(item, startChapter, requestedSourceKeys, startChapterEntry?.url)}>{resumeChapter != null ? "متابعة القراءة" : "ابدأ القراءة"} <Icon name="arrow" /></Link>}
             <ListManager mangaId={sourceKey} />
             <button className="secondary" aria-pressed={isFavorite} onClick={() => void favorite(sourceKey)}><Icon name={isFavorite ? "check" : "favorites"} />{isFavorite ? "في المفضلة" : "إضافة للمفضلة"}</button>
           </div>
