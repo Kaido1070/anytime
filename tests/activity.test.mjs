@@ -225,3 +225,36 @@ test("client cannot create arbitrary activity through an activity endpoint", asy
   assert.equal(response.status, 404);
   assert.equal(payload.error, "NOT_FOUND");
 });
+
+
+test("cancelling a work retracts only its reading activity in the same user-scoped transaction", async () => {
+  class UnreadDb extends RouteDb {
+    constructor() {
+      super();
+      this.batches = [];
+    }
+    async batch(statements) {
+      this.batches.push(statements);
+      return statements.map(() => ({ meta: { changes: 1 } }));
+    }
+  }
+  const db = new UnreadDb();
+  const { response, payload } = await call(db, "POST", "reading/unread-work", {
+    mangaId: "mt:work",
+  });
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(db.batches.length, 1);
+  const activityDelete = db.queries.find(
+    (query) => query.includes("DELETE FROM activity_events") &&
+      query.includes("'started_work'") &&
+      query.includes("'completed_work'"),
+  );
+  assert.ok(activityDelete, "reading activity must be deleted with the reading state");
+  assert.match(activityDelete, /user_id = \? AND manga_id = \?/);
+  assert.match(activityDelete, /'progress_reached'/);
+  assert.doesNotMatch(activityDelete, /'favorited_work'|'added_to_list'|'created_list'/);
+  assert.ok(db.queries.some((query) => query.includes("DELETE FROM reading_history")));
+  assert.ok(db.queries.some((query) => query.includes("DELETE FROM reading_progress")));
+  assert.ok(db.queries.some((query) => query.includes("DELETE FROM user_library")));
+});
