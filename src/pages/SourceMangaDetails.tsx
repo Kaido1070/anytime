@@ -388,13 +388,13 @@ export function SourceMangaDetails() {
           </div>
           {jumpBusy && <small role="status">جاري البحث عن الفصل في المصدر…</small>}
           {jumpError && <small className="chapter-jump-error">{jumpError}</small>}
-          <div className="chapter-read-tools">
-            <button className={`secondary chapter-bulk-read ${bulkConfirm === "read" ? "is-pending" : ""}`} onClick={() => setBulkConfirm("read")}>تمت قراءة الكل</button>
-            <button className={`secondary chapter-bulk-unread ${bulkConfirm === "unread" ? "is-pending" : ""}`} onClick={() => setBulkConfirm("unread")}>لم تتم قراءة الكل</button>
+          <div className="chapter-read-tools" aria-label="إدارة تقدم القراءة">
+            <button type="button" className={`secondary chapter-bulk-read ${bulkConfirm === "read" ? "is-pending" : ""}`} disabled={bulkBusy} onClick={() => setBulkConfirm("read")}><Icon name="check" /> تحديد الكل كمقروء</button>
+            <button type="button" className={`secondary chapter-bulk-unread ${bulkConfirm === "unread" ? "is-pending" : ""}`} disabled={bulkBusy} onClick={() => setBulkConfirm("unread")}>مسح تقدم القراءة</button>
           </div>
           {bulkConfirm && (
             <div className="chapter-bulk-confirm" role="alert">
-              <span>{bulkConfirm === "read" ? "تعليم جميع الفصول كمقروءة؟" : "إلغاء القراءة والتتبع لهذه القصة؟"}</span>
+              <span>{bulkConfirm === "read" ? "تحديد جميع الفصول كمقروءة؟" : "مسح تقدم القراءة المحفوظ لهذه القصة من جميع مصادرها؟ لن تُحذف من المفضلة أو القوائم."}</span>
               <div className="chapter-bulk-confirm-actions">
                 <button className="secondary" disabled={bulkBusy} onClick={() => setBulkConfirm(null)}>إلغاء</button>
                 <button className="primary" disabled={bulkBusy} onClick={() => void applyBulkReadState(bulkConfirm === "read")}>
