@@ -63,7 +63,7 @@ test("Madara chapter sources always probe beyond page one even without a visible
 
 test("Wany paginates large chapter lists locally after fetching the complete source list", () => {
   assert.match(details, /const CHAPTERS_PER_PAGE = 100;/);
-  assert.match(details, /const visibleChapters = orderedChapters\.slice/);
+  assert.match(details, /const visibleChapters = teamXRemotePages[\s\S]*?orderedChapters\.slice/);
   assert.match(details, /<ChapterPagination/);
 });
 
