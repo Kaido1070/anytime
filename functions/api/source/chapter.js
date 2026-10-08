@@ -115,12 +115,12 @@ async function isKnownTeamXBanner(page, chapterUrl, fetchSource) {
     // upstream failures, and the reader must retain a retry path for them.
     const contentType = response.headers.get("Content-Type")?.toLowerCase() || "";
     if (response.status === 404 || response.status === 410) {
-      teamXBannerResultCache.set(page.url, true);
+      // Do not cache missing-file decisions: a source may restore the image.
       return true;
     }
     if (!response.ok) return false;
     if (/^(?:text\/html|text\/plain|application\/(?:json|xml|xhtml\+xml))\b/.test(contentType)) {
-      teamXBannerResultCache.set(page.url, true);
+      // A temporary HTML challenge must not permanently remove a page.
       return true;
     }
 
