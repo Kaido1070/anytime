@@ -1117,6 +1117,12 @@ async function route(request, url, db, covers) {
       db.prepare("DELETE FROM reading_history WHERE user_id = ? AND manga_id = ?").bind(user.id, mangaId),
       db.prepare("DELETE FROM reading_progress WHERE user_id = ? AND manga_id = ?").bind(user.id, mangaId),
       db.prepare("DELETE FROM user_library WHERE user_id = ? AND manga_id = ?").bind(user.id, mangaId),
+      // Cancelling a work also retracts its reading-only activity. Keep
+      // unrelated favorite/list activity intact and scope by signed-in user.
+      db.prepare(`DELETE FROM activity_events
+        WHERE user_id = ? AND manga_id = ?
+          AND type IN ('started_work', 'progress_reached', 'completed_work')`)
+        .bind(user.id, mangaId),
       db.prepare(`UPDATE user_state
         SET last_manga_id = NULL, last_chapter = NULL, updated_at = ?
         WHERE user_id = ? AND last_manga_id = ?`).bind(now, user.id, mangaId),
