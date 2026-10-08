@@ -82,9 +82,17 @@ function useLibraryState() {
     if (user && data) service.cacheData(data);
   }, [user, data]);
 
-  const signIn = async (username: string, password: string) => {
+  const signIn = async (
+    username: string,
+    password: string,
+    onAuthenticated?: (user: User) => void,
+  ) => {
     setError("");
     const nextUser = await service.signIn(username, password);
+    // Redirect before mounting the authenticated route. Otherwise opening a
+    // shared chapter while logged out briefly mounts that chapter for the new
+    // account and can record an unwanted chapter-open event.
+    onAuthenticated?.(nextUser);
     setUser(nextUser);
     setData(null);
     setFriends([]);
