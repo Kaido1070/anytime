@@ -4109,3 +4109,148 @@ button.profile-icon-action {
     padding:22px 14px;
   }
 }
+
+
+/* Account and friends density pass.
+   Intentionally reuse the existing font, accent and surface design tokens. */
+.profile-reading-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 70px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.profile-reading-empty .profile-overview-empty {
+  margin: 0;
+  padding: 0;
+  line-height: 1.7;
+}
+
+.profile-reading-discover {
+  flex: 0 0 auto;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  text-decoration: none;
+}
+
+.profile-list-preview-strip {
+  grid-auto-columns: 150px;
+  gap: 10px;
+}
+
+.profile-list-preview-card {
+  align-content: start;
+  gap: 7px;
+}
+
+.profile-list-collage {
+  aspect-ratio: 1.5 / 1;
+  max-height: 110px;
+}
+
+.profile-list-preview-copy {
+  gap: 3px;
+}
+
+.profile-content-sections {
+  gap: 23px;
+}
+
+.profile-overview-section-heading {
+  margin-bottom: 9px;
+}
+
+.friend-hub:not(.friend-hub-embedded) > .eyebrow {
+  margin-bottom: 5px;
+}
+
+.friend-hub:not(.friend-hub-embedded) > h1 {
+  margin-top: 0;
+  margin-bottom: 5px;
+  line-height: 1.25;
+}
+
+.friend-hub:not(.friend-hub-embedded) > .page-intro {
+  margin-top: 4px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.friend-hub .friend-hub-tabs {
+  margin-bottom: 12px;
+}
+
+.friend-hub .friend-empty-state {
+  min-height: 110px;
+  gap: 10px;
+  padding: 20px 14px;
+}
+
+.friend-hub .friend-empty-state p {
+  margin: 0;
+}
+
+.friend-hub .friend-empty-state .secondary {
+  min-height: 40px;
+}
+
+@media (max-width: 759px) {
+  .profile-content-sections {
+    gap: 19px;
+  }
+
+  .profile-stats-section {
+    margin-bottom: 19px;
+  }
+
+  .profile-list-preview-strip {
+    grid-auto-columns: 132px;
+    gap: 9px;
+  }
+
+  .profile-list-collage {
+    max-height: 92px;
+  }
+
+  .profile-reading-empty {
+    min-height: 88px;
+    padding: 12px;
+  }
+
+  .friend-hub:not(.friend-hub-embedded) > h1 {
+    font-size: 28px;
+  }
+
+  .friend-hub:not(.friend-hub-embedded) > .page-intro {
+    margin: 3px 0 12px;
+  }
+
+  .friend-hub .friend-empty-state {
+    min-height: 108px;
+    padding: 18px 12px;
+  }
+}
+
+@media (max-width: 359px) {
+  .profile-reading-empty {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-reading-discover {
+    width: 100%;
+  }
+
+  .profile-list-preview-strip {
+    grid-auto-columns: 122px;
+  }
+}
