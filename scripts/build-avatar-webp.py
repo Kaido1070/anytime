@@ -34,10 +34,10 @@ ALIASES = {
 MANHWA_WORKS = {
     "manhwa:kim-dokja": ("omniscient reader", "jeonjijeok dokja"),
     "manhwa:twenty-fifth-bam": ("tower of god", "sinui tap"),
-    "manhwa:cheon-yeowoon": ("nano machine", "nano masin"),
+    "manhwa:jin-mori": ("god of high school", "god of highschool", "gat of high school"),
     "manhwa:jin-muwon": ("legend of the northern blade", "bukgeomjeongi"),
     "manhwa:chung-myung": ("return of the mount hua", "return of the blossoming blade", "hwasangwihwan"),
-    "manhwa:seo-jiwoo": ("eleceed",),
+    "manhwa:raizel": ("noblesse",),
     "manhwa:grid": ("overgeared", "temppal"),
     "manhwa:lloyd-frontera": ("greatest estate developer", "world's best engineer"),
     "manhwa:daniel-park": ("lookism", "oemojisangjuui"),
@@ -45,10 +45,10 @@ MANHWA_WORKS = {
 SEARCH_VARIANTS = {
     "manhwa:kim-dokja": ["Dokja Kim", "Kim Dokja"],
     "manhwa:twenty-fifth-bam": ["Bam", "Baam", "Twenty Fifth Baam"],
-    "manhwa:cheon-yeowoon": ["Yeo Woon Cheon", "Cheon Yeowoon"],
+    "manhwa:jin-mori": ["Mori Jin", "Jin Mori"],
     "manhwa:jin-muwon": ["Mu-Won Jin", "Jin Muwon"],
     "manhwa:chung-myung": ["Cheongmyeong", "Chung Myung"],
-    "manhwa:seo-jiwoo": ["Jiwoo Seo", "Seo Jiwoo"],
+    "manhwa:raizel": ["Cadis Etrama Di Raizel", "Raizel"],
     "manhwa:grid": ["Youngwoo Shin", "Shin Youngwoo", "Grid"],
     "manhwa:lloyd-frontera": ["Lloyd Frontera"],
     "manhwa:daniel-park": ["Hyungseok Park", "Daniel Park"],
@@ -82,7 +82,7 @@ def norm(s):
 
 def canonical_tokens(s):
     # AniList often uses Japanese name order and doubled romanized vowels.
-    tokens = re.findall(r"[a-z0-9]+", s.lower())
+    tokens = re.findall(r"[a-z0-9]+", s.lower().replace("-", ""))
     return sorted(t.replace("ou", "o").replace("uu", "u") for t in tokens)
 
 
