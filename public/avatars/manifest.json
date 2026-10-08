@@ -1,13 +1,11 @@
 [
   {
     "id": "one-piece:luffy",
-    "status": "ok",
-    "bytes": 12570
+    "status": "existing"
   },
   {
     "id": "one-piece:zoro",
-    "status": "ok",
-    "bytes": 14620
+    "status": "existing"
   },
   {
     "id": "one-piece:nami",
@@ -19,13 +17,11 @@
   },
   {
     "id": "one-piece:robin",
-    "status": "ok",
-    "bytes": 8274
+    "status": "existing"
   },
   {
     "id": "one-piece:chopper",
-    "status": "ok",
-    "bytes": 8096
+    "status": "existing"
   },
   {
     "id": "one-piece:usopp",
@@ -57,8 +53,7 @@
   },
   {
     "id": "naruto:hinata",
-    "status": "ok",
-    "bytes": 7076
+    "status": "existing"
   },
   {
     "id": "naruto:gaara",
@@ -78,8 +73,7 @@
   },
   {
     "id": "bleach:uryu",
-    "status": "ok",
-    "bytes": 5700
+    "status": "existing"
   },
   {
     "id": "bleach:urahara",
@@ -95,8 +89,7 @@
   },
   {
     "id": "bleach:aizen",
-    "status": "ok",
-    "bytes": 14404
+    "status": "existing"
   },
   {
     "id": "attack-on-titan:eren",
@@ -112,8 +105,7 @@
   },
   {
     "id": "attack-on-titan:levi",
-    "status": "ok",
-    "bytes": 8764
+    "status": "existing"
   },
   {
     "id": "attack-on-titan:hange",
@@ -129,8 +121,7 @@
   },
   {
     "id": "demon-slayer:tanjiro",
-    "status": "ok",
-    "bytes": 15408
+    "status": "existing"
   },
   {
     "id": "demon-slayer:nezuko",
@@ -146,23 +137,19 @@
   },
   {
     "id": "demon-slayer:giyu",
-    "status": "ok",
-    "bytes": 7842
+    "status": "existing"
   },
   {
     "id": "demon-slayer:rengoku",
-    "status": "ok",
-    "bytes": 17462
+    "status": "existing"
   },
   {
     "id": "demon-slayer:shinobu",
-    "status": "ok",
-    "bytes": 12180
+    "status": "existing"
   },
   {
     "id": "jujutsu-kaisen:yuji",
-    "status": "ok",
-    "bytes": 16088
+    "status": "existing"
   },
   {
     "id": "jujutsu-kaisen:megumi",
@@ -182,23 +169,19 @@
   },
   {
     "id": "jujutsu-kaisen:sukuna",
-    "status": "ok",
-    "bytes": 11082
+    "status": "existing"
   },
   {
     "id": "solo-leveling:jinwoo",
-    "status": "ok",
-    "bytes": 6784
+    "status": "existing"
   },
   {
     "id": "solo-leveling:cha-hae-in",
-    "status": "ok",
-    "bytes": 10628
+    "status": "existing"
   },
   {
     "id": "solo-leveling:jinho",
-    "status": "ok",
-    "bytes": 7020
+    "status": "existing"
   },
   {
     "id": "solo-leveling:igris",
@@ -230,8 +213,7 @@
   },
   {
     "id": "hunter-x-hunter:chrollo",
-    "status": "ok",
-    "bytes": 11884
+    "status": "existing"
   },
   {
     "id": "my-hero-academia:deku",
@@ -280,5 +262,50 @@
   {
     "id": "fullmetal-alchemist:scar",
     "status": "existing"
+  },
+  {
+    "id": "manhwa:kim-dokja",
+    "status": "failed",
+    "reason": "Dokja Kim: name mismatch: ['Dok-Ja Kim', 'Dokja']; Dokja Kim: name mismatch: ['Dok-Ja Kim', 'Dokja']; Kim Dokja: name mismatch: ['Dok-Ja Kim', 'Dokja']"
+  },
+  {
+    "id": "manhwa:twenty-fifth-bam",
+    "status": "ok",
+    "bytes": 8388
+  },
+  {
+    "id": "manhwa:cheon-yeowoon",
+    "status": "failed",
+    "reason": "Cheon Yeo-Woon: not found; Yeo Woon Cheon: not found; Cheon Yeowoon: not found"
+  },
+  {
+    "id": "manhwa:jin-muwon",
+    "status": "ok",
+    "bytes": 5894
+  },
+  {
+    "id": "manhwa:chung-myung",
+    "status": "ok",
+    "bytes": 7722
+  },
+  {
+    "id": "manhwa:seo-jiwoo",
+    "status": "failed",
+    "reason": "Jiwoo Seo: series mismatch: ['Na Honjaman Level Up', 'Solo Leveling', '나 혼자만 레벨업', 'Ore dake Level Up na Ken: Season 2 - Arise from the Shadow', 'Solo Leveling Season 2 -Arise from the Shadow-']; Jiwoo Seo: series mismatch: ['Na Honjaman Level Up', 'Solo Leveling', '나 혼자만 레벨업', 'Ore dake Level Up na Ken: Season 2 - Arise from the Shadow', 'Solo Leveling Season 2 -Arise from the Shadow-']; Seo Jiwoo: series mismatch: ['Na Honjaman Level Up', 'Solo Leveling', '나 혼자만 레벨업', 'Ore dake Level Up na Ken: Season 2 - Arise from the Shadow', 'Solo Leveling Season 2 -Arise from the Shadow-']"
+  },
+  {
+    "id": "manhwa:grid",
+    "status": "ok",
+    "bytes": 7184
+  },
+  {
+    "id": "manhwa:lloyd-frontera",
+    "status": "ok",
+    "bytes": 8186
+  },
+  {
+    "id": "manhwa:daniel-park",
+    "status": "ok",
+    "bytes": 6654
   }
 ]

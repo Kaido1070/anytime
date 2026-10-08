@@ -65,7 +65,13 @@ const LOCAL_AVATAR_IDS = new Set([
   "fullmetal-alchemist:roy",
   "fullmetal-alchemist:riza",
   "fullmetal-alchemist:winry",
-  "fullmetal-alchemist:scar"
+  "fullmetal-alchemist:scar",
+  "manhwa:twenty-fifth-bam",
+  "manhwa:jin-muwon",
+  "manhwa:chung-myung",
+  "manhwa:grid",
+  "manhwa:lloyd-frontera",
+  "manhwa:daniel-park"
 ]);
 
 export function localAvatarUrl(avatarId) {
