@@ -522,9 +522,16 @@ export function ProfileReadingSection({
           })}
         </div>
       ) : entries.length && error ? null : (
-        <p className="profile-overview-empty">
-          {entries.length ? "تعذر تحميل بيانات الفصول لهذه القصص." : "لا توجد قصص تقرؤها حاليًا."}
-        </p>
+        <div className="profile-reading-empty">
+          <p className="profile-overview-empty">
+            {entries.length ? "تعذر تحميل بيانات الفصول لهذه القصص." : "ما بدأت قراءة أي قصة حتى الآن."}
+          </p>
+          {!entries.length && own && (
+            <Link className="secondary profile-reading-discover" to="/discover">
+              استكشف القصص
+            </Link>
+          )}
+        </div>
       )}
       {issues.length > 0 && (
         <div className="profile-reading-issues" role="status" aria-live="polite">
