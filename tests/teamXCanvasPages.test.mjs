@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   parseTeamXCanvasPageMeta,
   parseTeamXCanvasPages,
+  __test,
 } from "../functions/api/source/chapter.js";
 
 test("Team-X reader prefers lazy canvas pages over a promo image", () => {
@@ -66,4 +67,65 @@ test("Team-X reader still supports chapters that use normal img tags", () => {
     "https://olympustaff.com/storage/chapter/01.jpg",
     "https://olympustaff.com/storage/chapter/02.jpg",
   ]);
+});
+
+
+test("Team-X excludes a confirmed missing trailing canvas before returning chapter pages", async () => {
+  const pages = [
+    { url: "https://olympustaff.com/uploads/chapter/001.webp" },
+    { url: "https://olympustaff.com/uploads/chapter/002.webp" },
+    { url: "https://olympustaff.com/uploads/chapter/dead.webp" },
+  ];
+  const checked = [];
+  const fetchSource = async (url) => {
+    checked.push(url);
+    return new Response(null, { status: url.endsWith("dead.webp") ? 404 : 403 });
+  };
+  const filtered = await __test.filterKnownTeamXBanners(
+    pages, "https://olympustaff.com/series/example/4", fetchSource,
+  );
+  assert.deepEqual(filtered, pages.slice(0, 2));
+  assert.equal(checked[0], pages[2].url, "trailing canvas must be checked first");
+});
+
+test("Team-X excludes HTML masquerading as the final chapter image", async () => {
+  const pages = [
+    { url: "https://olympustaff.com/uploads/chapter/003.webp" },
+    { url: "https://olympustaff.com/uploads/chapter/missing.webp" },
+  ];
+  const filtered = await __test.filterKnownTeamXBanners(
+    pages, "https://olympustaff.com/series/example/4",
+    async (url) => url.endsWith("missing.webp")
+      ? new Response("<html>not an image</html>", { headers: { "Content-Type": "text/html" } })
+      : new Response(null, { status: 403 }),
+  );
+  assert.deepEqual(filtered, pages.slice(0, 1));
+});
+
+test("Team-X retains temporarily blocked pages rather than deleting real chapter content", async () => {
+  const pages = [
+    { url: "https://olympustaff.com/uploads/chapter/004.webp" },
+    { url: "https://olympustaff.com/uploads/chapter/005.webp" },
+  ];
+  const filtered = await __test.filterKnownTeamXBanners(
+    pages, "https://olympustaff.com/series/example/4",
+    async () => new Response(null, { status: 503 }),
+  );
+  assert.deepEqual(filtered, pages);
+});
+
+test("Team-X verifies the trailing image even in chapters longer than 64 pages", async () => {
+  const pages = Array.from({ length: 75 }, (_, index) => ({
+    url: `https://olympustaff.com/uploads/long-chapter/${index}.webp`,
+  }));
+  const checked = [];
+  const filtered = await __test.filterKnownTeamXBanners(
+    pages, "https://olympustaff.com/series/example/4",
+    async (url) => {
+      checked.push(url);
+      return new Response(null, { status: url === pages[74].url ? 410 : 403 });
+    },
+  );
+  assert.equal(filtered.length, 74);
+  assert.equal(checked[0], pages[74].url);
 });
