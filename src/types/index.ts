@@ -16,6 +16,7 @@ export interface Avatar {
   id: string;
   seriesId: string;
   characterName: string;
+  workTitle?: string;
   imageUrl: string | null;
   position: number;
 }
