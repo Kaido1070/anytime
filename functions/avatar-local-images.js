@@ -66,9 +66,12 @@ const LOCAL_AVATAR_IDS = new Set([
   "fullmetal-alchemist:riza",
   "fullmetal-alchemist:winry",
   "fullmetal-alchemist:scar",
+  "manhwa:kim-dokja",
   "manhwa:twenty-fifth-bam",
+  "manhwa:jin-mori",
   "manhwa:jin-muwon",
   "manhwa:chung-myung",
+  "manhwa:raizel",
   "manhwa:grid",
   "manhwa:lloyd-frontera",
   "manhwa:daniel-park"

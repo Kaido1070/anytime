@@ -265,47 +265,41 @@
   },
   {
     "id": "manhwa:kim-dokja",
-    "status": "failed",
-    "reason": "Dokja Kim: name mismatch: ['Dok-Ja Kim', 'Dokja']; Dokja Kim: name mismatch: ['Dok-Ja Kim', 'Dokja']; Kim Dokja: name mismatch: ['Dok-Ja Kim', 'Dokja']"
+    "status": "ok",
+    "bytes": 6752
   },
   {
     "id": "manhwa:twenty-fifth-bam",
-    "status": "ok",
-    "bytes": 8388
+    "status": "existing"
   },
   {
-    "id": "manhwa:cheon-yeowoon",
-    "status": "failed",
-    "reason": "Cheon Yeo-Woon: not found; Yeo Woon Cheon: not found; Cheon Yeowoon: not found"
+    "id": "manhwa:jin-mori",
+    "status": "ok",
+    "bytes": 7912
   },
   {
     "id": "manhwa:jin-muwon",
-    "status": "ok",
-    "bytes": 5894
+    "status": "existing"
   },
   {
     "id": "manhwa:chung-myung",
-    "status": "ok",
-    "bytes": 7722
+    "status": "existing"
   },
   {
-    "id": "manhwa:seo-jiwoo",
-    "status": "failed",
-    "reason": "Jiwoo Seo: series mismatch: ['Na Honjaman Level Up', 'Solo Leveling', '나 혼자만 레벨업', 'Ore dake Level Up na Ken: Season 2 - Arise from the Shadow', 'Solo Leveling Season 2 -Arise from the Shadow-']; Jiwoo Seo: series mismatch: ['Na Honjaman Level Up', 'Solo Leveling', '나 혼자만 레벨업', 'Ore dake Level Up na Ken: Season 2 - Arise from the Shadow', 'Solo Leveling Season 2 -Arise from the Shadow-']; Seo Jiwoo: series mismatch: ['Na Honjaman Level Up', 'Solo Leveling', '나 혼자만 레벨업', 'Ore dake Level Up na Ken: Season 2 - Arise from the Shadow', 'Solo Leveling Season 2 -Arise from the Shadow-']"
+    "id": "manhwa:raizel",
+    "status": "ok",
+    "bytes": 6864
   },
   {
     "id": "manhwa:grid",
-    "status": "ok",
-    "bytes": 7184
+    "status": "existing"
   },
   {
     "id": "manhwa:lloyd-frontera",
-    "status": "ok",
-    "bytes": 8186
+    "status": "existing"
   },
   {
     "id": "manhwa:daniel-park",
-    "status": "ok",
-    "bytes": 6654
+    "status": "existing"
   }
 ]
