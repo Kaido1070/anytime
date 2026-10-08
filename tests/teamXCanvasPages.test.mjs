@@ -129,3 +129,61 @@ test("Team-X verifies the trailing image even in chapters longer than 64 pages",
   assert.equal(filtered.length, 74);
   assert.equal(checked[0], pages[74].url);
 });
+
+
+test("Team-X does not collect images outside the reader image_list", () => {
+  const html = `
+    <div class="image_list">
+      <canvas data-src="/chapter/001.webp"></canvas>
+      <div class="page"><canvas data-src="/chapter/002.webp"></canvas></div>
+    </div>
+    <div class="recommended"><canvas data-src="/novel-promo.webp"></canvas></div>
+    <footer></footer>
+  `;
+  assert.deepEqual(parseTeamXCanvasPages(html), [
+    "https://olympustaff.com/chapter/001.webp",
+    "https://olympustaff.com/chapter/002.webp",
+  ]);
+});
+
+test("Team-X excludes clickable novel promotions within the reader", () => {
+  const html = `
+    <div class="image_list">
+      <canvas data-src="/chapter/001.webp"></canvas>
+      <a href="/series/lord-of-the-truth">
+        <canvas data-src="/ads/promo-unique-filename.webp"></canvas>
+      </a>
+      <canvas data-src="/chapter/002.webp"></canvas>
+    </div>
+  `;
+  assert.deepEqual(parseTeamXCanvasPages(html), [
+    "https://olympustaff.com/chapter/001.webp",
+    "https://olympustaff.com/chapter/002.webp",
+  ]);
+});
+
+test("Team-X removes the recurring Lord of Truth image even without a wrapping link", () => {
+  const html = `
+    <div class="image_list">
+      <canvas data-src="/chapter/001.webp"></canvas>
+      <canvas data-src="/uploads/Lord-of-Truth-banner.webp"></canvas>
+    </div>
+  `;
+  assert.deepEqual(parseTeamXCanvasPages(html), [
+    "https://olympustaff.com/chapter/001.webp",
+  ]);
+});
+
+test("Team-X excludes linked promos in img-based chapters without losing real images", () => {
+  const html = `
+    <div class="image_list">
+      <img src="/chapter/001.jpg">
+      <a href="/series/lord-of-the-truth"><img src="/promo/teaser.jpg"></a>
+      <img data-src="/chapter/002.jpg">
+    </div>
+  `;
+  assert.deepEqual(parseTeamXCanvasPages(html), [
+    "https://olympustaff.com/chapter/001.jpg",
+    "https://olympustaff.com/chapter/002.jpg",
+  ]);
+});
