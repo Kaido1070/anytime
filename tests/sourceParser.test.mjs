@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { __test } from "../functions/api/source/[[path]].js";
 
-test("Team-X parser finds real chapter links and synthesizes gaps", () => {
+test("Team-X parser preserves only actual source chapter links", () => {
   const html = `
     <a href="/series/villain-is-here/357"><div>الفصل 357 معركة</div></a>
     <a href="/series/villain-is-here/355"><div>الفصل 355</div></a>
@@ -14,7 +14,7 @@ test("Team-X parser finds real chapter links and synthesizes gaps", () => {
   );
   assert.equal(chapters[0].number, 357);
   assert.equal(chapters.at(-1).number, 1);
-  assert.ok(chapters.some((chapter) => chapter.number === 356));
+  assert.ok(!chapters.some((chapter) => chapter.number === 356), "missing chapters must not be fabricated");
 });
 
 test("Team-X parser attaches each relative timestamp to the correct chapter", () => {
