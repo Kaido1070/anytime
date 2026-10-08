@@ -38,7 +38,7 @@ export function getContinueChapter(
  * its first available chapter for an already recorded reading position.
  */
 export function getResumeChapter(
-  entry: Pick<LibraryEntry, "lastReadChapter" | "highestReachedChapter"> | undefined,
+  entry: { lastReadChapter?: number | null; highestReachedChapter: number | null } | undefined,
   chapters: Array<{ number: number }> | undefined,
   highestChapterCompleted: boolean,
 ): number | null {
