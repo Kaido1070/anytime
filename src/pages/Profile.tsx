@@ -298,7 +298,7 @@ export function Profile({
                             </div>
                           ) : (
                             <strong className="settings-inline-value" dir="auto">
-                              {user?.name ?? "—"} <AccountBadge username={user?.username} />
+                              {user?.name ?? "—"} <AccountBadge badgeType={user?.badgeType} />
                             </strong>
                           )}
             
