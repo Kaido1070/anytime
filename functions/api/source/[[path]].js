@@ -643,12 +643,33 @@ async function rememberChapterAvailability(db, item) {
   };
 }
 
+// Recovery of the verified Team-X permalink. Reading history can outlive a
+// source_items catalog row; a missing catalog row must not strand this series.
+// Never trust a URL provided by the client or manufacture chapter records.
+function recoverGodOfMartialArts(key) {
+  if (key !== "tx:god-of-martial-arts") return null;
+  const slug = "god-of-martial-arts";
+  return {
+    key,
+    source: "teamx",
+    sourceId: slug,
+    slug,
+    type: "series",
+    url: TEAMX_BASE + "/series/" + slug,
+    title: "God Of Martial Arts",
+    cover: "",
+    description: "",
+    status: "",
+    genres: [],
+  };
+}
+
 async function loadItem(db, key) {
   const row = await db
     .prepare("SELECT * FROM source_items WHERE source_key = ? LIMIT 1")
     .bind(key)
     .first();
-  return row ? rowToItem(row) : null;
+  return row ? rowToItem(row) : recoverGodOfMartialArts(key);
 }
 
 async function resolveItems(db, keys) {
