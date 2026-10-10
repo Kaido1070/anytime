@@ -5822,6 +5822,7 @@ const __test = {
   mergeChapterLists,
   teamXReaderChapters,
   teamXChapterLinksFromReader,
+  teamXChapter,
   findChapterNumber,
   safePreferredChapterUrl,
   preferredChapterUrlForSeries,
