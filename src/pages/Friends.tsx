@@ -12,6 +12,7 @@ import { useLibrary } from "../hooks/useLibrary";
 import { Back } from "../components/UI";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { UserAvatar } from "../components/UserAvatar";
+import { AccountBadge } from "../components/AccountBadge";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import { userDataService } from "../services/userData";
@@ -136,7 +137,7 @@ function PublicFriendsSection({ friends }: { friends: User[] }) {
             <Link to={`/friends/${friend.id}`} className="profile-friend-card" key={friend.id}>
               <UserAvatar user={friend} className={`tone-${index % 3}`} />
               <span>
-                <b>{friend.name}</b>
+                <b>{friend.name} <AccountBadge username={friend.username} /></b>
                 <small>@{friend.username}</small>
               </span>
             </Link>
@@ -445,7 +446,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
                     <Link className="friend-result-identity" to={`/friends/${request.user.id}`}>
                       <UserAvatar user={request.user} className={`tone-${index % 3}`} />
                       <span>
-                        <b>{request.user.name}</b>
+                        <b>{request.user.name} <AccountBadge username={request.user.username} /></b>
                         <small>@{request.user.username}</small>
                       </span>
                     </Link>
@@ -528,7 +529,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
                   <Link className="friend-result-identity" to={`/friends/${result.user.id}`}>
                     <UserAvatar user={result.user} className={`tone-${index % 3}`} />
                     <span>
-                      <b>{result.user.name}</b>
+                      <b>{result.user.name} <AccountBadge username={result.user.username} /></b>
                       <small>@{result.user.username}</small>
                     </span>
                   </Link>
