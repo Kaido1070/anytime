@@ -72,3 +72,23 @@ test("both badge image files are sharp scalable static assets", async () => {
     assert.doesNotMatch(svg, /<script|<foreignObject|onload=|<image|<use/i);
   }
 });
+
+test("badge tooltip appears only after interaction and is temporary", async () => {
+  const source = await read("../src/components/AccountBadge.tsx");
+  const css = await read("../src/styles.css");
+  const profileCss = await read("../src/profileOverview.css");
+
+  assert.match(source, /kind === "crown" \? "Owner" : "Beta Tester"/);
+  assert.match(source, /\{visible && \(/);
+  assert.match(source, /setTimeout\(\(\) => \{/);
+  assert.match(source, /setVisible\(false\)/);
+  assert.match(source, /}, 2500\)/);
+  assert.match(source, /event\.preventDefault\(\)/);
+  assert.match(source, /event\.stopPropagation\(\)/);
+  assert.match(source, /event\.key !== "Enter" && event\.key !== " "/);
+  assert.match(source, /clearTimeout\(timeoutRef\.current\)/);
+  assert.doesNotMatch(source, /onMouseEnter=|onMouseOver=|title=\{/);
+  assert.match(css, /\.wany-account-badge-tooltip\s*\{[^}]*bottom:\s*calc\(100% \+ 8px\)/);
+  assert.match(css, /\.wany-account-badge-tooltip\s*\{[^}]*pointer-events:\s*none/);
+  assert.match(profileCss, /\.friend-hub \.friend-row h2:has\(\.wany-account-badge\)/);
+});
