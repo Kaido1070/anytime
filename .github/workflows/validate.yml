@@ -28,6 +28,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Block tracked D1 exports and embedded secrets
+        run: node scripts/check-tracked-secrets.mjs
       - name: Parallel checks
         shell: bash
         run: |
