@@ -41,3 +41,13 @@ test("account and friend names render badge to the left, never between name and 
   assert.match(css, /\.wany-badged-name\s*\{[^}]*display:\s*inline-flex/);
   assert.doesNotMatch(friends, /friend\.user\.username === ["'](?:h|y)["']/);
 });
+
+test("profile identity has badge to the physical right of name and a distinct stats strip", async () => {
+  const profile = await read("../src/components/ProfileOverview.tsx");
+  const css = await read("../src/profileOverview.css");
+  assert.match(profile, /<bdi>\{user\?\.name \?\? "—"\}<\/bdi><AccountBadge badgeType=\{user\?\.badgeType\} \/>/);
+  assert.match(css, /\.profile-overview-header \.wany-badged-name\s*\{[^}]*direction:\s*ltr/);
+  assert.match(css, /\.profile-overview-header \.profile-overview-identity\s*\{[^}]*direction:\s*ltr/);
+  assert.match(css, /\.profile-stats-section \.profile-stats-grid\s*\{[^}]*border-radius:\s*0/);
+  assert.match(css, /\.profile-stats-section \.profile-stats-grid\s*\{[^}]*background:\s*transparent/);
+});
