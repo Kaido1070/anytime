@@ -127,7 +127,7 @@ export function SourceReader() {
   if (loading)
     return (
       <main className="reader source-reader-loading">
-        <div className="loading">جاري جلب صفحات الفصل من المصدر…</div>
+        <div className="loading">جاري تحميل صفحات الفصل…</div>
       </main>
     );
 
