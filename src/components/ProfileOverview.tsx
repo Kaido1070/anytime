@@ -127,7 +127,7 @@ export function ProfileIdentityHeader({
                 </form>
               ) : (
                 <div className="profile-overview-name-editable">
-                  <h1 dir="auto">{user?.name ?? "—"} <AccountBadge badgeType={user?.badgeType} /></h1>
+                  <h1 dir="auto"><span className="wany-badged-name"><bdi>{user?.name ?? "—"}</bdi><AccountBadge badgeType={user?.badgeType} /></span></h1>
                   <button
                     className="profile-overview-inline-edit"
                     type="button"
@@ -142,7 +142,7 @@ export function ProfileIdentityHeader({
                 </div>
               )
             ) : (
-              <h1 dir="auto">{user?.name ?? "—"} <AccountBadge badgeType={user?.badgeType} /></h1>
+              <h1 dir="auto"><span className="wany-badged-name"><bdi>{user?.name ?? "—"}</bdi><AccountBadge badgeType={user?.badgeType} /></span></h1>
             )}
             <p dir="ltr">@{user?.username ?? "—"}</p>
             {nameError && <small className="profile-header-name-error">{nameError}</small>}
