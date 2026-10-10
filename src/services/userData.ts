@@ -1,4 +1,4 @@
-import { reconcileAccountIdentity } from "./accountIdentity";
+import { reconcileAccountIdentity } from "./accountIdentity.ts";
 import type {
   ActivityFeed,
   AdminUserDetail,
