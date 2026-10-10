@@ -25,7 +25,59 @@
 @media(max-width:759px){.new-progress-card{min-height:220px;padding:24px 18px}.new-progress-ring{width:118px;height:118px}.new-progress-ring-core strong{font-size:25px}}
 @media(prefers-reduced-motion:no-preference){.new-progress-ring{transition:background .24s ease}.new-progress-card{animation:new-progress-in .18s ease-out}@keyframes new-progress-in{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}}
 
-/* FYP uses the same ring/card as New with only the two approved lines. */
-.fyp-progress-card .new-progress-copy {gap: 8px;max-width: min(100%, 460px)}
-.fyp-progress-card .new-progress-copy b {font-size: clamp(16px, 2.4vw, 20px);font-weight: 650;line-height: 1.55}
-.fyp-progress-card .new-progress-copy small {font-size: clamp(11px, 1.6vw, 13px);line-height: 1.6;color: var(--muted)}
+/* FYP: a compact, considered loading surface in Wany graphite and muted gold. */
+.fyp-page:has(.fyp-progress-card) {gap: 16px}
+.fyp-progress-card {
+  width: 100%;
+  min-height: 0;
+  padding: 28px 20px 30px;
+  gap: 18px;
+  border: 1px solid #413d37;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(219,185,145,.055), transparent 62%),
+    linear-gradient(155deg,#252628,#202224);
+  box-shadow: inset 0 1px 0 rgba(219,185,145,.08);
+}
+.fyp-progress-card .fyp-progress-ring {
+  width: 110px;
+  height: 110px;
+  background: conic-gradient(var(--accent) var(--new-progress),#363839 0);
+  box-shadow: 0 0 0 1px rgba(219,185,145,.10);
+}
+.fyp-progress-card .fyp-progress-ring::before {
+  inset: 8px;
+  background: #202224;
+}
+.fyp-progress-card .new-progress-ring-core strong {
+  font-size: 29px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+}
+.fyp-progress-card .new-progress-copy {
+  gap: 7px;
+  max-width: min(100%, 480px);
+}
+.fyp-progress-card .new-progress-copy b {
+  font-size: clamp(15px,2vw,18px);
+  font-weight: 650;
+  line-height: 1.55;
+  color: #f0eee8;
+}
+.fyp-progress-card .new-progress-copy small {
+  font-size: clamp(11px,1.5vw,13px);
+  line-height: 1.55;
+  color: #999b99;
+}
+@media (max-width:759px) {
+  .fyp-page:has(.fyp-progress-card) {gap: 14px}
+  .fyp-progress-card {
+    padding: 24px 18px 26px;
+    gap: 17px;
+    border-radius: 14px;
+  }
+  .fyp-progress-card .fyp-progress-ring {width: 106px;height: 106px}
+  .fyp-progress-card .new-progress-ring-core strong {font-size: 27px}
+  .fyp-progress-card .new-progress-copy b {font-size: 15px}
+  .fyp-progress-card .new-progress-copy small {font-size: 11px}
+}
