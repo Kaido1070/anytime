@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { SourceCoverImage } from "../components/SourceCoverImage";
 import { useLibrary } from "../hooks/useLibrary";
@@ -68,13 +68,22 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function resolveInChunks(keys: string[]) {
+async function resolveInChunks(
+  keys: string[],
+  onProgress?: (completed: number, total: number) => void,
+) {
   const unique = [...new Set(keys)].filter(sourceService.isSourceKey);
   const chunks: string[][] = [];
   for (let index = 0; index < unique.length; index += 60) {
     chunks.push(unique.slice(index, index + 60));
   }
-  const settled = await Promise.allSettled(chunks.map((chunk) => sourceService.resolve(chunk)));
+  let completed = 0;
+  const settled = await Promise.allSettled(
+    chunks.map((chunk) => sourceService.resolve(chunk).finally(() => {
+      completed += 1;
+      onProgress?.(completed, chunks.length);
+    })),
+  );
   return settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
 }
 
@@ -165,11 +174,16 @@ function writeSnapshot(userId: string, snapshot: FypSnapshot) {
   }
 }
 
-async function loadLists() {
+async function loadLists(onProgress?: (completed: number, total: number) => void) {
   const summaries = await userDataService.getLists();
+  let completed = 0;
   const settled = await Promise.allSettled(
-    summaries.map((summary) => userDataService.getList(summary.id)),
+    summaries.map((summary) => userDataService.getList(summary.id).finally(() => {
+      completed += 1;
+      onProgress?.(completed, summaries.length);
+    })),
   );
+  onProgress?.(summaries.length, summaries.length);
   return settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
 }
 
@@ -194,12 +208,19 @@ function buildTasteSignature(
   return [favorite, library, listItems, reading].join("|");
 }
 
-async function hydrateSignalItems(items: SourceManga[]) {
+async function hydrateSignalItems(
+  items: SourceManga[],
+  onProgress?: (completed: number, total: number) => void,
+) {
+  let completed = 0;
   return mapWithConcurrency(items, 6, async (item) => {
     try {
       return await sourceService.getSeries(item.key);
     } catch {
       return item;
+    } finally {
+      completed += 1;
+      onProgress?.(completed, items.length);
     }
   });
 }
@@ -233,13 +254,24 @@ async function buildFyp(
   userId: string,
   onProgress?: (percent: number) => void,
 ) {
-  const report = (percent: number) => onProgress?.(Math.max(0, Math.min(100, Math.round(percent))));
-  report(0);
+  // A progress milestone means the work behind it is completed. Never move backwards.
+  let lastReported = 0;
+  const report = (percent: number) => {
+    const next = Math.max(1, Math.min(100, Math.round(percent)));
+    if (next > lastReported) {
+      lastReported = next;
+      onProgress?.(next);
+    }
+  };
+  report(1);
   const [state, lists] = await Promise.all([
-    userDataService.getPersonalizationState(),
-    loadLists(),
+    userDataService.getPersonalizationState().then((value) => {
+      report(8);
+      return value;
+    }),
+    loadLists((completed, total) => report(8 + (completed / Math.max(1, total)) * 12)),
   ]);
-  report(12);
+  report(20);
   const signature = buildTasteSignature(data, state, lists);
   const cached = readSnapshot(userId, signature);
   if (cached) {
@@ -258,8 +290,10 @@ async function buildFyp(
     ...readingByKey.keys(),
   ]);
 
-  const knownBase = await resolveInChunks([...knownKeys]);
-  report(25);
+  const knownBase = await resolveInChunks([...knownKeys], (completed, total) =>
+    report(20 + (completed / Math.max(1, total)) * 12),
+  );
+  report(32);
   const priority = [...knownBase].sort((a, b) => {
     const wa =
       (favorite.has(a.key) ? W.favorite : 0) +
@@ -271,8 +305,10 @@ async function buildFyp(
       (readingByKey.get(b.key)?.lastReadAt ?? 0) / 1e14;
     return wb - wa || a.key.localeCompare(b.key);
   });
-  const signalItems = await hydrateSignalItems(priority.slice(0, 48));
-  report(40);
+  const signalItems = await hydrateSignalItems(priority.slice(0, 48), (completed, total) =>
+    report(32 + (completed / Math.max(1, total)) * 16),
+  );
+  report(48);
   const now = Date.now();
   const signals: TasteSignal[] = signalItems.flatMap((item) => {
     const entry = libraryByKey.get(item.key);
@@ -301,7 +337,7 @@ async function buildFyp(
   const trackSourceRequest = <T,>(request: Promise<T>): Promise<T> =>
     request.finally(() => {
       completedSourceRequests += 1;
-      report(40 + (completedSourceRequests / sourceRequestTotal) * 25);
+      report(48 + (completedSourceRequests / sourceRequestTotal) * 25);
     });
   const sourcePairs = await Promise.allSettled(
     SOURCES.flatMap((source) => [
@@ -351,10 +387,10 @@ async function buildFyp(
       } satisfies RecommendationCandidate;
     } finally {
       hydratedCandidates += 1;
-      report(65 + (hydratedCandidates / Math.max(1, candidateGroups.length)) * 30);
+      report(73 + (hydratedCandidates / Math.max(1, candidateGroups.length)) * 25);
     }
   });
-  report(95);
+  report(98);
 
   const candidates: RecommendationCandidate[] = hydrated.filter(
     (candidate): candidate is NonNullable<typeof candidate> => candidate !== null,
@@ -373,15 +409,35 @@ async function buildFyp(
 }
 
 function FypProgress({ percent }: { percent: number }) {
+  // Smooth only towards completed work. Never invent progress while a request waits.
+  const [displayed, setDisplayed] = useState(1);
+  const targetRef = useRef(1);
+  targetRef.current = Math.max(1, Math.min(100, percent));
+
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setDisplayed(targetRef.current);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setDisplayed((current) => Math.min(targetRef.current, current + 1));
+    }, 45);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
-    <div className="new-progress-card fyp-progress-card" role="status" aria-live="polite">
+    <div className="new-progress-card fyp-progress-card" aria-busy="true">
       <div
-        className="new-progress-ring"
-        style={{ "--new-progress": percent + "%" } as CSSProperties}
-        aria-label={percent + "% مكتمل"}
+        className="new-progress-ring fyp-progress-ring"
+        style={{ "--new-progress": displayed + "%" } as CSSProperties}
+        role="progressbar"
+        aria-label="تقدم تجهيز الاقتراحات"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={displayed}
       >
         <div className="new-progress-ring-core">
-          <strong>{percent}%</strong>
+          <strong>{displayed}%</strong>
         </div>
       </div>
       <div className="new-progress-copy">
@@ -399,7 +455,7 @@ export function Fyp() {
   const [snapshot, setSnapshot] = useState<FypSnapshot | null>(null);
   const [visibleCount, setVisibleCount] = useState(FYP_INITIAL_COUNT);
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(1);
   const [error, setError] = useState("");
 
   const visible = useMemo(
@@ -412,7 +468,7 @@ export function Fyp() {
     const saved = Number(sessionStorage.getItem("wany:fyp:scroll") ?? 0);
     let active = true;
     setLoading(true);
-    setProgress(0);
+    setProgress(1);
     setError("");
     buildFyp(data, user.id, (percent) => {
       if (active) setProgress((current) => Math.max(current, percent));
@@ -440,7 +496,7 @@ export function Fyp() {
     if (!user || !data) return;
     sessionStorage.removeItem(snapshotKey(user.id));
     setLoading(true);
-    setProgress(0);
+    setProgress(1);
     setError("");
     try {
       setSnapshot(await buildFyp(data, user.id, (percent) =>
