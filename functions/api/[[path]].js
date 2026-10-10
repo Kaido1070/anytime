@@ -82,7 +82,7 @@ async function route(request, url, db, covers) {
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, profile_visibility, avatar_id, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
+        "SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
       )
       .bind(username)
       .first();
@@ -898,6 +898,7 @@ async function route(request, url, db, covers) {
           `SELECT
              l.id, l.name, l.description, l.icon_key, l.position, l.created_at, l.updated_at,
              u.id AS owner_id, u.username AS owner_username, u.name AS owner_name,
+             (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS owner_badge_type,
              u.profile_visibility AS owner_profile_visibility
            FROM user_lists l
            JOIN users u ON u.id = l.user_id
@@ -912,6 +913,7 @@ async function route(request, url, db, covers) {
         id: listRow.owner_id,
         username: listRow.owner_username,
         name: listRow.owner_name,
+        badge_type: listRow.owner_badge_type,
         profile_visibility: listRow.owner_profile_visibility,
       });
       const access = getProfileAccess(user, {
@@ -1682,8 +1684,8 @@ async function route(request, url, db, covers) {
     const target = await db
       .prepare(
         targetId
-          ? "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? AND role = 'user' LIMIT 1"
-          : "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE username = ? AND role = 'user' LIMIT 1",
+          ? "SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type FROM users WHERE id = ? AND role = 'user' LIMIT 1"
+          : "SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type FROM users WHERE username = ? AND role = 'user' LIMIT 1",
       )
       .bind(targetId || username)
       .first();
@@ -2206,7 +2208,8 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.role
+         u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.role,
+         (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -2297,7 +2300,7 @@ export function getProfileAccess(viewer, target) {
 
 async function getUserProfileView(db, viewer, targetId, previewLimit) {
   const target = await db
-    .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? AND role = 'user' LIMIT 1")
+    .prepare("SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type FROM users WHERE id = ? AND role = 'user' LIMIT 1")
     .bind(targetId)
     .first();
   if (!target) return null;
@@ -2372,7 +2375,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       .bind(targetId)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type
         FROM friendships f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
@@ -2713,7 +2716,7 @@ async function getFriends(db, userId, limit = 50, offset = 0) {
       .first(),
     db
       .prepare(
-        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
+        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type
          FROM friendships f
          JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = ?
@@ -2849,7 +2852,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId)
       .first(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.requester_id
         WHERE r.receiver_id = ?
@@ -2859,7 +2862,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId, limit)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.receiver_id
         WHERE r.requester_id = ?
@@ -2889,7 +2892,7 @@ async function searchUsersForFriends(db, userId, query, limit = 20) {
   const contains = `%${escaped}%`;
   const prefix = `${escaped}%`;
   const result = await db
-    .prepare(`SELECT id, username, name, profile_visibility
+    .prepare(`SELECT id, username, name, profile_visibility, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type
       FROM users
       WHERE id <> ?
         AND role = 'user'
@@ -3057,6 +3060,7 @@ function mapActivityRow(row) {
       name: row.name,
       profile_visibility: row.profile_visibility,
       avatar_id: row.avatar_id,
+      badge_type: row.badge_type,
     }),
     mangaId: row.manga_id ?? null,
     list:
@@ -3080,6 +3084,7 @@ async function getUserActivity(db, userId, limit = 12, offset = 0) {
           e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
           e.created_at, e.updated_at,
           u.username, u.name, u.profile_visibility, u.avatar_id,
+          (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type,
           l.name AS list_name
         FROM activity_events e
         JOIN users u ON u.id = e.user_id
@@ -3114,6 +3119,7 @@ async function getFriendsActivity(db, userId, limit = 12, offset = 0) {
           e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
           e.created_at, e.updated_at,
           u.username, u.name, u.profile_visibility, u.avatar_id,
+          (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type,
           l.name AS list_name
         FROM activity_events e
         JOIN friendships f ON f.user_id = ? AND f.friend_id = e.user_id
@@ -3254,6 +3260,7 @@ function publicUser(row) {
         ? "public"
         : "private",
     avatarId: row.avatar_id ?? row.avatarId ?? null,
+    badgeType: row.badge_type === "crown" || row.badge_type === "verified" ? row.badge_type : null,
   };
 }
 
