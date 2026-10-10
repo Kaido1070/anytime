@@ -81,3 +81,29 @@
   .fyp-progress-card .new-progress-copy b {font-size: 15px}
   .fyp-progress-card .new-progress-copy small {font-size: 11px}
 }
+
+/* FYP heading follows Wany's physical left edge, including on RTL pages. */
+.fyp-page > .fyp-intro {
+  width: 100%;
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  direction: ltr;
+  text-align: left;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.fyp-page > .fyp-intro .eyebrow {
+  direction: rtl;
+  text-align: left;
+  margin: 0;
+}
+.fyp-page > .fyp-intro h1 {
+  direction: ltr;
+  text-align: left;
+  margin: 0;
+}
+.fyp-page > .fyp-intro .fyp-cold-start {
+  direction: rtl;
+  text-align: left;
+}
