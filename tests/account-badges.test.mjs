@@ -15,11 +15,13 @@ test("badge display accepts only server-issued badgeType", async () => {
 test("badge authority is sourced from D1 on login, session, profile and social APIs", async () => {
   const api = await read("../functions/api/[[path]].js");
   const admin = await read("../functions/_admin.js");
-  assert.match(api, /FROM user_badges WHERE user_id =/);
-  assert.match(api, /badgeType: row\.badge_type/);
+  assert.match(api, /SELECT user_id, badge_type FROM user_badges WHERE user_id IN/);
+  assert.match(api, /attachServerBadges\(response, db\)/);
+  assert.match(api, /node\.badgeType = granted\.get\(node\.id\) \?\? null/);
+  assert.doesNotMatch(api, /username === "m"/);
   assert.match(admin, /badgeType: row\.badge_type/);
-  assert.match(api, /AS badge_type[\s\S]*FROM sessions/);
-  assert.match(api, /AS badge_type[\s\S]*FROM friend_requests/);
+  assert.match(api, /return await attachServerBadges/);
+  assert.match(api, /function attachServerBadges/);
 });
 
 test("account UI renders badges only from server-provided field", async () => {
