@@ -4443,3 +4443,155 @@ button.profile-icon-action {
 .profile-overview-header .profile-overview-name-editable {
   direction: ltr;
 }
+
+/*
+ * Profile visual hierarchy: global Wany brand header -> portrait / identity
+ * -> quiet metrics. Preserve the site's graphite / warm-gold palette.
+ * Physical LTR layout here is intentional even on Arabic pages.
+ */
+.profile-overview-header {
+  margin-top: 14px;
+  padding: 24px 28px;
+  border: 1px solid #403a33;
+  border-radius: 24px 24px 10px 24px;
+  background:
+    radial-gradient(ellipse at 9% 48%, rgba(219,185,145,.115), transparent 38%),
+    linear-gradient(112deg, #272624 0%, #222426 52%, #202224 100%);
+  box-shadow: 0 12px 30px rgba(0,0,0,.11);
+}
+.profile-overview-header .profile-overview-identity {
+  gap: 22px;
+}
+.profile-overview-header .user-avatar.profile-overview-avatar {
+  width: 92px;
+  height: 92px;
+  min-width: 92px;
+  min-height: 92px;
+  max-width: 92px;
+  max-height: 92px;
+  flex-basis: 92px;
+  border: 2px solid #c9a77d;
+  box-shadow: 0 0 0 5px rgba(219,185,145,.08);
+}
+.profile-overview-header .profile-overview-name {
+  min-width: 0;
+}
+.profile-overview-header .profile-overview-name h1 {
+  font-size: clamp(26px,3.1vw,38px);
+  letter-spacing: -.035em;
+}
+.profile-overview-header .wany-badged-name {
+  direction: ltr;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: .2em;
+}
+.profile-overview-header .wany-badged-name > .wany-account-badge {
+  margin: 0;
+}
+.profile-overview-header .profile-overview-name p {
+  margin-top: 7px;
+  color: #a9a4a0;
+  font-size: 12px;
+}
+.profile-overview-header .profile-header-friends {
+  background: rgba(19,20,21,.36);
+  border-color: #4b433b;
+}
+.profile-overview-header .profile-overview-actions {
+  margin-left: auto;
+}
+.profile-overview-header .profile-header-friends + .profile-overview-actions {
+  margin-left: 0;
+}
+
+/* The statistics are a secondary open data strip, not another hero card. */
+.profile-stats-section {
+  margin-top: 22px;
+}
+.profile-stats-section .profile-stats-grid {
+  gap: 0;
+  border: 0;
+  border-top: 1px solid #383838;
+  border-bottom: 1px solid #383838;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.profile-stats-section .profile-stat {
+  min-height: 92px;
+  padding: 19px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.profile-stats-section .profile-stat + .profile-stat {
+  border-inline-start: 1px solid #383838;
+}
+.profile-stats-section .profile-stat strong {
+  font-size: clamp(24px, 3.2vw, 34px);
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+.profile-stats-section .profile-stat span {
+  color: #a7a2a0;
+  font-size: 11px;
+}
+
+@media (max-width: 759px) {
+  .profile-overview-header {
+    margin-top: 10px;
+    padding: 17px 13px;
+    border-radius: 19px 19px 8px 19px;
+  }
+  .profile-overview-header .profile-overview-identity {
+    gap: 12px;
+  }
+  .profile-overview-header .user-avatar.profile-overview-avatar {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    min-height: 60px;
+    max-width: 60px;
+    max-height: 60px;
+    flex-basis: 60px;
+    box-shadow: 0 0 0 3px rgba(219,185,145,.07);
+  }
+  .profile-overview-header .profile-overview-details {
+    gap: 6px;
+  }
+  .profile-overview-header .profile-overview-name h1 {
+    font-size: clamp(17px, 5vw, 24px);
+  }
+  .profile-overview-header .profile-overview-name p {
+    font-size: 10px;
+    margin-top: 4px;
+  }
+  .profile-stats-section {
+    margin-top: 18px;
+  }
+  .profile-stats-section .profile-stat {
+    min-height: 76px;
+    padding: 14px 4px;
+  }
+  .profile-stats-section .profile-stat strong {
+    font-size: clamp(18px, 5vw, 25px);
+  }
+  .profile-stats-section .profile-stat span {
+    font-size: 9px;
+  }
+}
+@media (max-width: 359px) {
+  .profile-overview-header .user-avatar.profile-overview-avatar {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+    flex-basis: 48px;
+  }
+  .profile-overview-header .profile-overview-identity {
+    gap: 8px;
+  }
+}
