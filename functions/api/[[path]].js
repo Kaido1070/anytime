@@ -40,7 +40,8 @@ export async function onRequest(context) {
 
   try {
     await ensureApiRuntime(db);
-    return await route(request, url, db, covers);
+    const response = await route(request, url, db, covers);
+    return await attachServerBadges(response, db);
   } catch (error) {
     console.error("Anytime API error", error instanceof Error ? error.name : "unknown");
     const safeError = authError(error);
@@ -58,6 +59,58 @@ export async function onRequest(context) {
       500,
     );
   }
+}
+
+// A badge is granted exclusively by the D1 user_badges table, never by a
+// client-supplied username, display name, or request payload. Enrich existing
+// API identity responses without changing their tested authentication queries.
+async function attachServerBadges(response, db) {
+  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) return response;
+  const raw = await response.clone().text();
+  if (!raw.includes('"username"')) return response;
+  let payload;
+  try { payload = JSON.parse(raw); } catch { return response; }
+  const identities = [];
+  const seen = new Set();
+  function collect(node, depth = 0) {
+    if (!node || typeof node !== "object" || depth > 8 || identities.length >= 100) return;
+    if (Array.isArray(node)) {
+      for (const child of node) collect(child, depth + 1);
+      return;
+    }
+    if (typeof node.id === "string" && typeof node.username === "string" && !seen.has(node.id)) {
+      seen.add(node.id);
+      identities.push(node);
+    }
+    for (const value of Object.values(node)) collect(value, depth + 1);
+  }
+  collect(payload);
+  if (!identities.length) return response;
+  let rows;
+  try {
+    const placeholders = identities.map(() => "?").join(",");
+    const result = await db.prepare(`SELECT user_id, badge_type FROM user_badges WHERE user_id IN (${placeholders})`)
+      .bind(...identities.map((item) => item.id)).all();
+    rows = result.results ?? [];
+  } catch (error) {
+    // Older test fixtures and databases without this optional table remain usable.
+    console.warn("Badge lookup unavailable", error instanceof Error ? error.name : "unknown");
+    return response;
+  }
+  const granted = new Map(rows.filter((row) => row.badge_type === "crown" || row.badge_type === "verified")
+    .map((row) => [String(row.user_id), row.badge_type]));
+  function assign(node, depth = 0) {
+    if (!node || typeof node !== "object" || depth > 8) return;
+    if (Array.isArray(node)) { for (const child of node) assign(child, depth + 1); return; }
+    if (typeof node.id === "string" && typeof node.username === "string") {
+      node.badgeType = granted.get(node.id) ?? null;
+    }
+    for (const value of Object.values(node)) assign(value, depth + 1);
+  }
+  assign(payload);
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return new Response(JSON.stringify(payload), { status: response.status, statusText: response.statusText, headers });
 }
 
 async function route(request, url, db, covers) {
@@ -82,7 +135,7 @@ async function route(request, url, db, covers) {
 
     const user = await db
       .prepare(
-        "SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
+        "SELECT id, username, name, profile_visibility, avatar_id, role, password_salt, password_hash, password_iterations FROM users WHERE username = ? COLLATE NOCASE LIMIT 1",
       )
       .bind(username)
       .first();
@@ -898,7 +951,6 @@ async function route(request, url, db, covers) {
           `SELECT
              l.id, l.name, l.description, l.icon_key, l.position, l.created_at, l.updated_at,
              u.id AS owner_id, u.username AS owner_username, u.name AS owner_name,
-             (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS owner_badge_type,
              u.profile_visibility AS owner_profile_visibility
            FROM user_lists l
            JOIN users u ON u.id = l.user_id
@@ -913,7 +965,6 @@ async function route(request, url, db, covers) {
         id: listRow.owner_id,
         username: listRow.owner_username,
         name: listRow.owner_name,
-        badge_type: listRow.owner_badge_type,
         profile_visibility: listRow.owner_profile_visibility,
       });
       const access = getProfileAccess(user, {
@@ -1684,8 +1735,8 @@ async function route(request, url, db, covers) {
     const target = await db
       .prepare(
         targetId
-          ? "SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type FROM users WHERE id = ? AND role = 'user' LIMIT 1"
-          : "SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type FROM users WHERE username = ? AND role = 'user' LIMIT 1",
+          ? "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? AND role = 'user' LIMIT 1"
+          : "SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE username = ? AND role = 'user' LIMIT 1",
       )
       .bind(targetId || username)
       .first();
@@ -2208,8 +2259,7 @@ async function getSession(request, db) {
     .prepare(
       `SELECT
          s.token_hash, s.user_id, s.expires_at, s.last_seen_at,
-         u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.role,
-         (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type
+         u.id, u.username, u.name, u.profile_visibility, u.avatar_id, u.role
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > ?
@@ -2300,7 +2350,7 @@ export function getProfileAccess(viewer, target) {
 
 async function getUserProfileView(db, viewer, targetId, previewLimit) {
   const target = await db
-    .prepare("SELECT id, username, name, profile_visibility, avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type FROM users WHERE id = ? AND role = 'user' LIMIT 1")
+    .prepare("SELECT id, username, name, profile_visibility, avatar_id FROM users WHERE id = ? AND role = 'user' LIMIT 1")
     .bind(targetId)
     .first();
   if (!target) return null;
@@ -2375,7 +2425,7 @@ async function getUserProfileView(db, viewer, targetId, previewLimit) {
       .bind(targetId)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
         FROM friendships f
         JOIN users u ON u.id = f.friend_id
         WHERE f.user_id = ?
@@ -2716,7 +2766,7 @@ async function getFriends(db, userId, limit = 50, offset = 0) {
       .first(),
     db
       .prepare(
-        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type
+        `SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id
          FROM friendships f
          JOIN users u ON u.id = f.friend_id
          WHERE f.user_id = ?
@@ -2852,7 +2902,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId)
       .first(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.requester_id
         WHERE r.receiver_id = ?
@@ -2862,7 +2912,7 @@ async function getFriendRequests(db, userId, limit = 50) {
       .bind(userId, limit)
       .all(),
     db
-      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type, r.created_at
+      .prepare(`SELECT u.id, u.username, u.name, u.profile_visibility, u.avatar_id, r.created_at
         FROM friend_requests r
         JOIN users u ON u.id = r.receiver_id
         WHERE r.requester_id = ?
@@ -2892,7 +2942,7 @@ async function searchUsersForFriends(db, userId, query, limit = 20) {
   const contains = `%${escaped}%`;
   const prefix = `${escaped}%`;
   const result = await db
-    .prepare(`SELECT id, username, name, profile_visibility, (SELECT badge_type FROM user_badges WHERE user_id = users.id) AS badge_type
+    .prepare(`SELECT id, username, name, profile_visibility
       FROM users
       WHERE id <> ?
         AND role = 'user'
@@ -3060,7 +3110,6 @@ function mapActivityRow(row) {
       name: row.name,
       profile_visibility: row.profile_visibility,
       avatar_id: row.avatar_id,
-      badge_type: row.badge_type,
     }),
     mangaId: row.manga_id ?? null,
     list:
@@ -3084,7 +3133,6 @@ async function getUserActivity(db, userId, limit = 12, offset = 0) {
           e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
           e.created_at, e.updated_at,
           u.username, u.name, u.profile_visibility, u.avatar_id,
-          (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type,
           l.name AS list_name
         FROM activity_events e
         JOIN users u ON u.id = e.user_id
@@ -3119,7 +3167,6 @@ async function getFriendsActivity(db, userId, limit = 12, offset = 0) {
           e.id, e.type, e.user_id, e.manga_id, e.list_id, e.chapter_number,
           e.created_at, e.updated_at,
           u.username, u.name, u.profile_visibility, u.avatar_id,
-          (SELECT badge_type FROM user_badges WHERE user_id = u.id) AS badge_type,
           l.name AS list_name
         FROM activity_events e
         JOIN friendships f ON f.user_id = ? AND f.friend_id = e.user_id
@@ -3260,7 +3307,6 @@ function publicUser(row) {
         ? "public"
         : "private",
     avatarId: row.avatar_id ?? row.avatarId ?? null,
-    badgeType: row.badge_type === "crown" || row.badge_type === "verified" ? row.badge_type : null,
   };
 }
 
