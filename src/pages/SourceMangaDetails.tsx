@@ -11,10 +11,15 @@ import { resolveChapterJump } from "../services/chapterJump";
 import { readerPath } from "../services/readerPaths";
 import { formatGregorianDate } from "../services/dateFormat";
 import { sourceService } from "../services/sources";
-import { saveWorkSnapshot } from "../services/workSnapshots";
+import { cachedSnapshotSeries, saveWorkSnapshot } from "../services/workSnapshots";
 import type { SourceManga } from "../types";
 
 const CHAPTERS_PER_PAGE = 100;
+const VERIFIED_MARTIAL_KEYS = new Set([
+  "tx:god-of-martial-arts",
+  "sz:god-of-martial-arts",
+  "ml:god-of-martial-arts",
+]);
 
 function ChapterPagination({
   page,
@@ -89,6 +94,8 @@ export function SourceMangaDetails() {
   const [sourceOptions, setSourceOptions] = useState<SourceManga[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showSavedSeries, setShowSavedSeries] = useState(false);
+  const [seriesRetry, setSeriesRetry] = useState(0);
   const [ascending, setAscending] = useState(false);
   const [chapterJump, setChapterJump] = useState("");
   const [jumpError, setJumpError] = useState("");
@@ -105,14 +112,33 @@ export function SourceMangaDetails() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    // This series is already in the user's reading history. Show a cached
+    // snapshot immediately while the upstream chapter list is revalidated.
+    const saved = VERIFIED_MARTIAL_KEYS.has(sourceKey)
+      ? cachedSnapshotSeries([sourceKey])[sourceKey] ?? null
+      : null;
+    setItem(saved);
+    setShowSavedSeries(Boolean(saved));
+    setLoading(!saved);
     setError("");
     sourceService.getSeries(sourceKey)
-      .then((next) => active && setItem(next))
-      .catch((cause) => active && setError(cause instanceof Error ? cause.message : "تعذر تحميل القصة."))
-      .finally(() => active && setLoading(false));
+      .then((next) => {
+        if (!active) return;
+        setItem(next);
+        setShowSavedSeries(Boolean(next.sourceTemporarilyUnavailable));
+      })
+      .catch((cause) => {
+        if (!active) return;
+        if (saved) {
+          // Still let the user see real, previously archived chapters.
+          setShowSavedSeries(true);
+        } else {
+          setError(cause instanceof Error ? cause.message : "تعذر تحميل القصة.");
+        }
+      })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [sourceKey]);
+  }, [sourceKey, seriesRetry]);
 
   useEffect(() => {
     let active = true;
@@ -164,7 +190,16 @@ export function SourceMangaDetails() {
   }, [chapterPageCount]);
 
   if (loading) return <><Back to={returnTo} /><p className="empty">جاري تحميل القصة والفصول…</p></>;
-  if (!item || error) return <><Back to={returnTo} /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
+  if (!item) return (
+    <>
+      <Back to={returnTo} />
+      <h1>تعذر فتح القصة</h1>
+      <p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p>
+      <button className="secondary" type="button" onClick={() => setSeriesRetry((value) => value + 1)}>
+        إعادة المحاولة
+      </button>
+    </>
+  );
 
   const optionMap = new Map(sourceOptions.map((entry) => [entry.key, entry]));
   optionMap.set(item.key, item);
@@ -300,6 +335,14 @@ export function SourceMangaDetails() {
   return (
     <>
       <Back to={returnTo} />
+      {showSavedSeries && (
+        <div className="chapter-list-warning" role="status">
+          <span>تعذر تحديث الفصول الآن. نعرض آخر البيانات المحفوظة.</span>
+          <button type="button" className="secondary" onClick={() => setSeriesRetry((value) => value + 1)}>
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
       <div className="details-hero">
         {coverItem.cover ? <SourceCoverImage item={coverItem} className="detail-cover" alt={`غلاف ${displayTitle}`} /> :
           <div className="detail-cover source-cover-placeholder source-detail-placeholder">{item.title.slice(0, 1)}</div>}
@@ -447,7 +490,7 @@ export function SourceMangaDetails() {
         onPage={goToChapterPage}
       />
 
-      {!chapters.length && <p className="empty">المصدر ما رجع فصول لهذه القصة.</p>}
+      {!chapters.length && <p className="empty">{showSavedSeries ? "لا توجد فصول محفوظة بعد. جرّب مجددًا." : "المصدر ما رجع فصول لهذه القصة."}</p>}
     </>
   );
 }
