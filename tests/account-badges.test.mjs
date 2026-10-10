@@ -31,14 +31,13 @@ test("account UI renders badges only from server-provided field", async () => {
 });
 
 
-test("ordinary account header and other users' profiles show D1 badge without entering edit mode", async () => {
-  const src = await read("../src/components/ProfileOverview.tsx");
-  const headers = [...src.matchAll(/<h1 dir="auto">\{user\?\.name \?\? "—"\} <AccountBadge badgeType=\{user\?\.badgeType\} \/><\/h1>/g)];
-  assert.equal(headers.length, 2, "both editable and read-only headers must show the badge");
-});
-
-test("friends list renders D1-authorized badges for h and y beside display names", async () => {
-  const src = await read("../src/pages/Friends.tsx");
-  assert.match(src, /<h2>\{friend\.user\.name\} <AccountBadge badgeType=\{friend\.user\.badgeType\} \/><\/h2>/);
-  assert.doesNotMatch(src, /friend\.user\.username === ["'](?:h|y)["']/);
+test("account and friend names render badge to the left, never between name and avatar", async () => {
+  const profile = await read("../src/components/ProfileOverview.tsx");
+  const friends = await read("../src/pages/Friends.tsx");
+  const css = await read("../src/styles.css");
+  assert.equal(profile.split('className="wany-badged-name"').length - 1, 2);
+  assert.match(friends, /<h2><span className="wany-badged-name"><bdi>\{friend\.user\.name\}<\/bdi><AccountBadge badgeType=\{friend\.user\.badgeType\} \/><\/span><\/h2>/);
+  assert.match(css, /\.wany-badged-name\s*\{[^}]*direction:\s*rtl/);
+  assert.match(css, /\.wany-badged-name\s*\{[^}]*display:\s*inline-flex/);
+  assert.doesNotMatch(friends, /friend\.user\.username === ["'](?:h|y)["']/);
 });
