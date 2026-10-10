@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
+import { AccountBadge } from "./AccountBadge";
 import { sourceDisplayTitle } from "../services/sourceTitles";
 import { sourceService } from "../services/sources";
 import type { ActivityEvent, SourceManga } from "../types";
@@ -57,7 +58,7 @@ function ActivitySentence({
 }) {
   const actor = showActor ? (
     <Link className="activity-user-link" to={`/friends/${encodeURIComponent(event.user.id)}`}>
-      {event.user.name}
+      {event.user.name} <AccountBadge username={event.user.username} />
     </Link>
   ) : null;
   const prefix = showActor ? actor : null;
