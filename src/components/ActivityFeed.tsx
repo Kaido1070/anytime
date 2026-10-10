@@ -58,7 +58,7 @@ function ActivitySentence({
 }) {
   const actor = showActor ? (
     <Link className="activity-user-link" to={`/friends/${encodeURIComponent(event.user.id)}`}>
-      {event.user.name} <AccountBadge username={event.user.username} />
+      {event.user.name} <AccountBadge badgeType={event.user.badgeType} />
     </Link>
   ) : null;
   const prefix = showActor ? actor : null;
