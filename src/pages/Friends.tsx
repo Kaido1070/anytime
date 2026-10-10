@@ -137,7 +137,7 @@ function PublicFriendsSection({ friends }: { friends: User[] }) {
             <Link to={`/friends/${friend.id}`} className="profile-friend-card" key={friend.id}>
               <UserAvatar user={friend} className={`tone-${index % 3}`} />
               <span>
-                <b>{friend.name} <AccountBadge badgeType={friend.badgeType} /></b>
+                <b><span className="wany-badged-name"><bdi>{friend.name}</bdi><AccountBadge badgeType={friend.badgeType} /></span></b>
                 <small>@{friend.username}</small>
               </span>
             </Link>
@@ -446,7 +446,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
                     <Link className="friend-result-identity" to={`/friends/${request.user.id}`}>
                       <UserAvatar user={request.user} className={`tone-${index % 3}`} />
                       <span>
-                        <b>{request.user.name} <AccountBadge badgeType={request.user.badgeType} /></b>
+                        <b><span className="wany-badged-name"><bdi>{request.user.name}</bdi><AccountBadge badgeType={request.user.badgeType} /></span></b>
                         <small>@{request.user.username}</small>
                       </span>
                     </Link>
@@ -529,7 +529,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
                   <Link className="friend-result-identity" to={`/friends/${result.user.id}`}>
                     <UserAvatar user={result.user} className={`tone-${index % 3}`} />
                     <span>
-                      <b>{result.user.name} <AccountBadge badgeType={result.user.badgeType} /></b>
+                      <b><span className="wany-badged-name"><bdi>{result.user.name}</bdi><AccountBadge badgeType={result.user.badgeType} /></span></b>
                       <small>@{result.user.username}</small>
                     </span>
                   </Link>
