@@ -1976,3 +1976,25 @@ body.reader-edge-to-edge {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
+
+/* Wany gold identity seals: same rosette silhouette for crown and check. */
+.wany-account-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.16em;
+  flex: 0 0 auto;
+  margin-inline-start: 0.16em;
+  line-height: 1;
+  white-space: nowrap;
+  direction: ltr;
+}
+.wany-account-badge svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+  min-width: 15px;
+  min-height: 15px;
+  max-width: 24px;
+  max-height: 24px;
+}
