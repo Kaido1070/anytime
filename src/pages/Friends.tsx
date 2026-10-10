@@ -412,7 +412,7 @@ export function Friends({ embedded = false }: { embedded?: boolean }) {
               <Link key={friend.user.id} to={`/friends/${friend.user.id}`} className="friend-row">
                 <UserAvatar user={friend.user} className={`large tone-${index % 3}`} />
                 <div>
-                  <h2>{friend.user.name}</h2>
+                  <h2>{friend.user.name} <AccountBadge badgeType={friend.user.badgeType} /></h2>
                   <small>@{friend.user.username}</small>
                 </div>
                 <span aria-hidden="true">↗</span>
