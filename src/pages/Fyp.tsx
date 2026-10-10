@@ -444,7 +444,7 @@ function FypProgress({ percent }: { percent: number }) {
         </div>
       </div>
       <div className="new-progress-copy">
-        <b>جاري تجهيز قصصًا تناسب ما تتابعه</b>
+        <b>جاري تجهيز اقتراحاتك</b>
         <small>ستظهر القصص فور اكتمال التحميل</small>
       </div>
     </div>
