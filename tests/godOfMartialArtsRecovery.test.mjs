@@ -49,6 +49,29 @@ test("existing catalog entries always take precedence over recovery", async () =
   assert.equal(item.title, "Existing Saved Title");
   assert.equal(item.cover, original.cover_url);
   assert.equal(calls, 1);
+  assert.equal(item.url, original.url, "a correct existing permalink stays intact");
+});
+
+test("stale saved permalink for the same series is normalized without losing catalog metadata", async () => {
+  const key = "tx:god-of-martial-arts";
+  const db = { prepare() { return { bind() { return { async first() {
+    return {
+      source_key: key,
+      source: "teamx",
+      source_id: "god-of-martial-arts",
+      slug: "old-or-broken-slug",
+      type: "series",
+      url: "https://olympustaff.com/series/old-or-broken-slug",
+      title: "User's existing catalog title",
+      cover_url: "https://olympustaff.com/images/real-cover.webp",
+      genres_json: "[]",
+    };
+  } }; } }; } };
+  const result = await __test.loadItem(db, key);
+  assert.equal(result.slug, "god-of-martial-arts");
+  assert.equal(result.url, "https://olympustaff.com/series/god-of-martial-arts");
+  assert.equal(result.title, "User's existing catalog title");
+  assert.equal(result.cover, "https://olympustaff.com/images/real-cover.webp");
 });
 
 test("missing Team-X catalog entry falls back to an upstream-verifiable permalink", async () => {
