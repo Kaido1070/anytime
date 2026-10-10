@@ -1977,7 +1977,7 @@ body.reader-edge-to-edge {
   }
 }
 
-/* Wany gold identity seals: same rosette silhouette for crown and check. */
+/* Wany gold identity seals: optimized image assets with identical visual bounds. */
 .wany-account-badge {
   display: inline-flex;
   align-items: center;
@@ -1989,7 +1989,7 @@ body.reader-edge-to-edge {
   white-space: nowrap;
   direction: ltr;
 }
-.wany-account-badge svg {
+.wany-account-badge img {
   display: block;
   width: 1em;
   height: 1em;

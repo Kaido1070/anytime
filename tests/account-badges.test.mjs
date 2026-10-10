@@ -9,7 +9,11 @@ test("badge display accepts only server-issued badgeType", async () => {
   assert.match(src, /badgeType === "crown" \|\| badgeType === "verified"/);
   assert.doesNotMatch(src, /username\s*===/);
   assert.match(src, /if \(!kind\) return null/);
-  assert.match(src, /var\(--accent/);
+  assert.match(src, /\/badges\/crown\.webp/);
+  assert.match(src, /\/badges\/verified\.webp/);
+  assert.doesNotMatch(src, /<svg\b|<path\b/);
+  const css = await read("../src/styles.css");
+  assert.match(css, /\.wany-account-badge img\s*\{/);
 });
 
 test("badge authority is sourced from D1 on login, session, profile and social APIs", async () => {
