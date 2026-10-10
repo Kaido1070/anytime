@@ -4595,3 +4595,33 @@ button.profile-icon-action {
     gap: 8px;
   }
 }
+
+/* Friends page: keep avatar and name on physical LEFT, navigation arrow on RIGHT.
+   Scoped to cards only; do not flip the Arabic tabs or page heading. */
+.friend-hub .friends-list > .friend-row {
+  direction: ltr;
+  flex-direction: row;
+  text-align: left;
+}
+.friend-hub .friends-list > .friend-row > .user-avatar {
+  order: 0;
+  flex-shrink: 0;
+}
+.friend-hub .friends-list > .friend-row > div {
+  order: 1;
+  min-width: 0;
+  text-align: left;
+}
+.friend-hub .friends-list > .friend-row h2,
+.friend-hub .friends-list > .friend-row small {
+  text-align: left;
+}
+.friend-hub .friends-list > .friend-row .wany-badged-name {
+  direction: ltr;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.friend-hub .friends-list > .friend-row > span:last-child {
+  order: 2;
+  margin-left: auto;
+}
