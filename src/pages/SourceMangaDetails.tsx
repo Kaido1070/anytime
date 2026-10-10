@@ -163,7 +163,7 @@ export function SourceMangaDetails() {
     setChapterPage((current) => Math.min(current, chapterPageCount));
   }, [chapterPageCount]);
 
-  if (loading) return <><Back to={returnTo} /><p className="empty">جاري تحميل القصة والفصول من المصدر…</p></>;
+  if (loading) return <><Back to={returnTo} /><p className="empty">جاري تحميل القصة والفصول…</p></>;
   if (!item || error) return <><Back to={returnTo} /><h1>تعذر فتح القصة</h1><p className="error source-error">{error || "القصة غير موجودة في المصدر."}</p></>;
 
   const optionMap = new Map(sourceOptions.map((entry) => [entry.key, entry]));
@@ -386,7 +386,7 @@ export function SourceMangaDetails() {
             <input inputMode="decimal" value={chapterJump} onChange={(event) => { setChapterJump(event.target.value); setJumpError(""); }} onKeyDown={(event) => { if (event.key === "Enter") void jumpToChapter(); }} placeholder="اكتب رقم الفصل" aria-label="اكتب رقم الفصل" />
             <button className="primary chapter-jump-submit" disabled={jumpBusy} onClick={() => void jumpToChapter()} aria-label="بحث عن الفصل" title="بحث عن الفصل"><Icon name="search" /></button>
           </div>
-          {jumpBusy && <small role="status">جاري البحث عن الفصل في المصدر…</small>}
+          {jumpBusy && <small role="status">جاري البحث عن الفصل…</small>}
           {jumpError && <small className="chapter-jump-error">{jumpError}</small>}
           <div className="chapter-read-tools" aria-label="إدارة تقدم القراءة">
             <button type="button" className={`secondary chapter-bulk-read ${bulkConfirm === "read" ? "is-pending" : ""}`} disabled={bulkBusy} onClick={() => setBulkConfirm("read")}><Icon name="check" /> تحديد الكل كمقروء</button>
