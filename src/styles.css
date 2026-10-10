@@ -1979,6 +1979,7 @@ body.reader-edge-to-edge {
 
 /* Wany gold identity seals: optimized image assets with identical visual bounds. */
 .wany-account-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1988,6 +1989,47 @@ body.reader-edge-to-edge {
   line-height: 1;
   white-space: nowrap;
   direction: ltr;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.wany-account-badge:focus-visible {
+  outline: 2px solid var(--accent, #dbb991);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.wany-account-badge-tooltip {
+  position: absolute;
+  z-index: 50;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: block;
+  padding: 5px 9px;
+  border: 1px solid #66523d;
+  border-radius: 7px;
+  background: #272421;
+  color: #f1e6d6;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, .28);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
+}
+.wany-account-badge-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 1px);
+  width: 7px;
+  height: 7px;
+  transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid #66523d;
+  border-bottom: 1px solid #66523d;
+  background: #272421;
 }
 .wany-account-badge img {
   display: block;
