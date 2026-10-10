@@ -278,19 +278,27 @@ async function onRequest(context) {
       if (action === "chapter-lookup" && (url.searchParams.get("number") == null || !Number.isFinite(lookupNumber) || lookupNumber < 0)) {
         return json({ error: "INVALID_CHAPTER" }, 400);
       }
-      const detail = item.source === "mangatime"
-        ? await mangaTimeSeries(db, item)
-        : item.source === "teamx"
-          ? await teamXSeries(db, item)
-          : item.source === "3asq"
-            ? await asqSeries(db, item)
-            : item.source === "starzmanga"
-              ? await starzSeries(db, item)
-              : item.source === "xsano"
-                ? await xsanoSeries(db, item)
-                : item.source === "mangalik"
-                  ? await mangalikSeries(db, item)
-                  : await azoraSeries(db, item);
+      let detail;
+      try {
+        detail = item.source === "mangatime"
+          ? await mangaTimeSeries(db, item)
+          : item.source === "teamx"
+            ? await teamXSeries(db, item)
+            : item.source === "3asq"
+              ? await asqSeries(db, item)
+              : item.source === "starzmanga"
+                ? await starzSeries(db, item)
+                : item.source === "xsano"
+                  ? await xsanoSeries(db, item)
+                  : item.source === "mangalik"
+                    ? await mangalikSeries(db, item)
+                    : await azoraSeries(db, item);
+      } catch (error) {
+        // Only this verified series can fall back to previously observed D1
+        // chapters. Never invent chapter URLs or alter reading progress.
+        if (action !== "series" || !recoverGodOfMartialArts(key)) throw error;
+        detail = await recoverRecordedGodOfMartialArts(db, item);
+      }
       if (action === "chapter-lookup") {
         const chapters = detail.source === "teamx" && detail.chapterPageCount > 1
           ? await teamXReaderChapters(detail, lookupNumber)
@@ -670,6 +678,28 @@ function recoverGodOfMartialArts(key) {
     description: "",
     status: "",
     genres: [],
+  };
+}
+
+// The detail page can remain usable when an upstream temporary outage occurs.
+// D1 observations are genuine chapter numbers, not a fabricated archive.
+async function recoverRecordedGodOfMartialArts(db, item) {
+  const result = await db.prepare(
+    "SELECT chapter_number, published_at FROM source_chapter_seen WHERE source_key = ? ORDER BY chapter_number DESC LIMIT 1200",
+  ).bind(item.key).all();
+  const chapters = (result.results ?? [])
+    .map((row) => ({
+      number: Number(row.chapter_number),
+      title: "الفصل " + Number(row.chapter_number),
+      publishedAt: row.published_at ?? null,
+    }))
+    .filter((chapter) => Number.isFinite(chapter.number) && chapter.number >= 0);
+  return {
+    ...item,
+    chapters,
+    latest: chapters[0]?.number ?? null,
+    chapterListComplete: false,
+    sourceTemporarilyUnavailable: true,
   };
 }
 
@@ -2158,20 +2188,42 @@ function isLikelyUiImage(url) {
   return /logo|avatar|favicon|icon|profile|ads?|banner/i.test(url);
 }
 
+function isGodOfMartialArtsTeamXUrl(value) {
+  const url = new URL(value, TEAMX_BASE);
+  return (url.hostname === "olympustaff.com" || url.hostname === "www.olympustaff.com")
+    && /^\\/series\\/god-of-martial-arts(?:\\/\\d+(?:\\.\\d+)?)?\\/?$/.test(url.pathname);
+}
+
 async function teamXFetchText(pathOrUrl) {
   const target = new URL(pathOrUrl, TEAMX_BASE).toString();
-  const response = await fetch(target, {
-    headers: sourceHeaders(TEAMX_BASE, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"),
-    redirect: "follow",
-    cf: { cacheTtl: 30, cacheEverything: true },
-  });
-  if (!response.ok) {
-    if (response.status === 403 || response.status === 503) {
-      throw new SourceError("TEAMX_BLOCKED", "Team-X رفض الطلب مؤقتًا.", 502);
+  const fetchOne = async (candidate) => {
+    const origin = new URL(candidate).origin;
+    const response = await fetch(candidate, {
+      headers: sourceHeaders(origin, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"),
+      redirect: "follow",
+      cf: { cacheTtl: 30, cacheEverything: true },
+    });
+    if (!response.ok) {
+      if (response.status === 403 || response.status === 503) {
+        throw new SourceError("TEAMX_BLOCKED", "Team-X رفض الطلب مؤقتًا.", 502);
+      }
+      throw new SourceError("TEAMX_UPSTREAM", `Team-X رجع HTTP ${response.status}.`, 502);
     }
-    throw new SourceError("TEAMX_UPSTREAM", `Team-X رجع HTTP ${response.status}.`, 502);
+    return response.text();
+  };
+  try {
+    return await fetchOne(target);
+  } catch (error) {
+    if (!isGodOfMartialArtsTeamXUrl(target)) throw error;
+    // Team-X serves this permalink on both exact, allowlisted origins.
+    // Try the other public host only for network/5xx/blocked failures.
+    if (error instanceof SourceError && error.code !== "TEAMX_BLOCKED" &&
+        !/HTTP 5\\d\\d/.test(error.message)) throw error;
+    const alternate = new URL(target);
+    alternate.hostname = alternate.hostname === "olympustaff.com"
+      ? "www.olympustaff.com" : "olympustaff.com";
+    return fetchOne(alternate.toString());
   }
-  return response.text();
 }
 
 function teamXHasNext(html) {
