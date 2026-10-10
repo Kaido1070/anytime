@@ -51,3 +51,13 @@ test("FYP animates only toward real milestones and respects reduced motion", asy
   assert.match(css, /\.fyp-progress-card \.new-progress-copy small/);
   assert.match(css, /\.fyp-progress-card\s*\{[^}]*background:/);
 });
+
+test("FYP heading is left-aligned under Wany without reversing Arabic text", async () => {
+  const fyp = await read("../src/pages/Fyp.tsx");
+  const css = await read("../src/phase10_5.css");
+  assert.match(fyp, /className="page-intro fyp-intro"/);
+  assert.match(css, /\.fyp-page > \.fyp-intro\s*\{[^}]*direction:\s*ltr/);
+  assert.match(css, /\.fyp-page > \.fyp-intro\s*\{[^}]*justify-items:\s*start/);
+  assert.match(css, /\.fyp-page > \.fyp-intro \.eyebrow\s*\{[^}]*direction:\s*rtl/);
+  assert.match(css, /\.fyp-page > \.fyp-intro h1\s*\{[^}]*text-align:\s*left/);
+});
