@@ -62,3 +62,36 @@ test("series results are memoized with short lifetime and bounded memory", async
   assert.match(code, /seriesCache\.get\(key\)/);
   assert.match(code, /seriesRequests\.delete\(key\)/);
 });
+
+test("opening God Of Martial Arts 114.3 returns chapter pages with one upstream request", async (t) => {
+  const oldFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = oldFetch; });
+  const seen = [];
+  globalThis.fetch = async (url, options) => {
+    seen.push(String(url));
+    assert.equal(options.redirect, "manual");
+    return new Response(`
+      <div class="image_list"><img src="https://cdn-stellarsaber.com/chapter/page1.webp"></div>
+      <a href="${series}/114.2">الفصل السابق</a>
+      <a href="${series}/115.1">الفصل التالي</a>
+    `, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+  };
+  const item = {
+    key: "tx:god-of-martial-arts",
+    source: "teamx",
+    sourceId: "god-of-martial-arts",
+    slug: "god-of-martial-arts",
+    title: "God Of Martial Arts",
+    url: series,
+  };
+  const db = { prepare() { assert.fail("fast path must not query the archive database"); } };
+  const payload = await __test.teamXChapter(db, item, 114.3);
+  assert.equal(seen.length, 1, "chapter HTML loads before any series or pagination fetch");
+  assert.equal(seen[0], series + "/114.3");
+  assert.equal(payload.number, 114.3);
+  assert.equal(payload.pages.length, 1);
+  assert.equal(payload.previous, 114.2);
+  assert.equal(payload.next, 115.1);
+  assert.equal(payload.item.chapterListComplete, false);
+  assert.deepEqual(payload.item.chapters.map(c => c.number), [114.2, 114.3, 115.1]);
+});
