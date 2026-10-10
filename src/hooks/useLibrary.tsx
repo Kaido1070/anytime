@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { reconcileAccountIdentity } from "../services/accountIdentity";
 import { mergeLibraryRead } from "../services/reading";
 import { userDataService as service } from "../services/userData";
 import type {
@@ -28,6 +29,19 @@ function useLibraryState() {
     const scope = service.captureAccountScope();
     const next = await service.getData();
     setData(current => scope?.isCurrent() ? next : current);
+  }, []);
+
+  // Revalidate identity after returning from settings; the backend owns badge grants.
+  const refreshUser = useCallback(async () => {
+    const scope = service.captureAccountScope();
+    if (!scope) return null;
+    const freshUser = await service.getUser();
+    if (!scope.isCurrent()) return null;
+    setUser(current => {
+      if (!freshUser) return null;
+      return reconcileAccountIdentity(current, freshUser);
+    });
+    return freshUser;
   }, []);
 
   const refreshFriends = useCallback(async () => {
@@ -421,6 +435,7 @@ function useLibraryState() {
     loading,
     error,
     refresh,
+    refreshUser,
     refreshFriends,
     signIn,
     signOut,
