@@ -1998,3 +1998,22 @@ body.reader-edge-to-edge {
   max-width: 24px;
   max-height: 24px;
 }
+
+/* In RTL layouts the badge must appear LEFT of the displayed name, away from the avatar. */
+.wany-badged-name {
+  display: inline-flex;
+  flex-direction: row;
+  direction: rtl;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.24em;
+  vertical-align: middle;
+  max-width: 100%;
+}
+.wany-badged-name > bdi {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wany-badged-name > .wany-account-badge { margin-inline-start: 0; }
