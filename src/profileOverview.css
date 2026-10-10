@@ -4409,3 +4409,37 @@ button.profile-icon-action {
     min-width: 46px;
   }
 }
+
+/* Account header: avatar at physical left, controls at physical right. */
+.profile-overview-header .profile-overview-identity {
+  direction: ltr;
+}
+.profile-overview-header .profile-overview-details {
+  direction: ltr;
+  width: 100%;
+  min-width: 0;
+}
+.profile-overview-header .profile-overview-name {
+  text-align: left;
+  order: 0;
+}
+.profile-overview-header .profile-overview-name h1,
+.profile-overview-header .profile-overview-name p {
+  text-align: left;
+}
+.profile-overview-header .profile-header-friends {
+  order: 1;
+  direction: rtl;
+  margin-left: auto;
+}
+.profile-overview-header .profile-overview-actions {
+  order: 2;
+  direction: ltr;
+  margin-left: auto;
+}
+.profile-overview-header .profile-header-friends + .profile-overview-actions {
+  margin-left: 0;
+}
+.profile-overview-header .profile-overview-name-editable {
+  direction: ltr;
+}
