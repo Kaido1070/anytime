@@ -7,6 +7,7 @@ export interface User {
   id: string;
   name: string;
   username: string;
+  badgeType?: "crown" | "verified" | null;
   profileVisibility: ProfileVisibility;
   avatarId: string | null;
   role?: UserRole;
