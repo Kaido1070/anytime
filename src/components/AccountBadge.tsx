@@ -1,11 +1,52 @@
-// Badge authorization is issued by the server from D1, never inferred from usernames.
-// The icons are crisp standalone vector-image assets, not inline SVG drawings.
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+
+// The server (D1) grants badgeType. The UI only explains the existing badge.
+// Using a focusable span avoids nesting a native button inside friend/profile links.
 export function AccountBadge({ badgeType }: { badgeType: "crown" | "verified" | null | undefined }) {
   const kind = badgeType === "crown" || badgeType === "verified" ? badgeType : null;
+  const [visible, setVisible] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+  }, []);
+
   if (!kind) return null;
-  const title = kind === "crown" ? "حساب المالك" : "حساب موثق";
+
+  const label = kind === "crown" ? "Owner" : "Beta Tester";
+  const showHint = () => {
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    setVisible(true);
+    timeoutRef.current = setTimeout(() => {
+      setVisible(false);
+      timeoutRef.current = null;
+    }, 2500);
+  };
+
+  const handleClick = (event: MouseEvent<HTMLSpanElement>) => {
+    // A badge can live inside a clickable friend card: don't open the profile.
+    event.preventDefault();
+    event.stopPropagation();
+    showHint();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    showHint();
+  };
+
   return (
-    <span className="wany-account-badge" role="img" aria-label={title} title={title}>
+    <span
+      className="wany-account-badge"
+      role="button"
+      tabIndex={0}
+      aria-label={`عرض الشارة: ${label}`}
+      aria-expanded={visible}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
       <img
         src={kind === "crown" ? "/badges/crown.svg" : "/badges/verified.svg"}
         width={20}
@@ -14,6 +55,11 @@ export function AccountBadge({ badgeType }: { badgeType: "crown" | "verified" | 
         aria-hidden="true"
         decoding="async"
       />
+      {visible && (
+        <span className="wany-account-badge-tooltip" role="tooltip" dir="ltr">
+          {label}
+        </span>
+      )}
     </span>
   );
 }
