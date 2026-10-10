@@ -647,15 +647,24 @@ async function rememberChapterAvailability(db, item) {
 // source_items catalog row; a missing catalog row must not strand this series.
 // Never trust a URL provided by the client or manufacture chapter records.
 function recoverGodOfMartialArts(key) {
-  if (key !== "tx:god-of-martial-arts") return null;
+  // Only these verified, fixed upstream permalinks are eligible. No dynamic
+  // client-provided host, alternate title matching or fabricated chapters.
   const slug = "god-of-martial-arts";
+  const known = {
+    "tx:god-of-martial-arts": ["teamx", TEAMX_BASE + "/series/" + slug, "series"],
+    "sz:god-of-martial-arts": ["starzmanga", STARZ_BASE + "/manga/" + slug + "/", "manga"],
+    "ml:god-of-martial-arts": ["mangalik", MANGALIK_BASE + "/manga/" + slug + "/", "manga"],
+  };
+  const record = known[key];
+  if (!record) return null;
+  const [source, url, type] = record;
   return {
     key,
-    source: "teamx",
+    source,
     sourceId: slug,
     slug,
-    type: "series",
-    url: TEAMX_BASE + "/series/" + slug,
+    type,
+    url,
     title: "God Of Martial Arts",
     cover: "",
     description: "",
@@ -5844,6 +5853,8 @@ const __test = {
   teamXReaderChapters,
   teamXChapterLinksFromReader,
   teamXChapter,
+  recoverGodOfMartialArts,
+  loadItem,
   findChapterNumber,
   safePreferredChapterUrl,
   preferredChapterUrlForSeries,
