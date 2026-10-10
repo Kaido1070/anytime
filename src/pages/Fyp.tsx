@@ -257,7 +257,7 @@ async function buildFyp(
   // A progress milestone means the work behind it is completed. Never move backwards.
   let lastReported = 0;
   const report = (percent: number) => {
-    const next = Math.max(1, Math.min(100, Math.round(percent)));
+    const next = Math.max(1, Math.min(100, Math.round(percent * 10) / 10));
     if (next > lastReported) {
       lastReported = next;
       onProgress?.(next);
@@ -417,8 +417,11 @@ function FypProgress({ percent }: { percent: number }) {
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
       setDisplayed(targetRef.current);
-      return;
     }
+  }, [percent]);
+
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const timer = window.setInterval(() => {
       setDisplayed((current) => Math.min(targetRef.current, current + 1));
     }, 45);
@@ -429,15 +432,15 @@ function FypProgress({ percent }: { percent: number }) {
     <div className="new-progress-card fyp-progress-card" aria-busy="true">
       <div
         className="new-progress-ring fyp-progress-ring"
-        style={{ "--new-progress": displayed + "%" } as CSSProperties}
+        style={{ "--new-progress": displayed.toFixed(1) + "%" } as CSSProperties}
         role="progressbar"
         aria-label="تقدم تجهيز الاقتراحات"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={displayed}
+        aria-valuenow={Math.floor(displayed)}
       >
         <div className="new-progress-ring-core">
-          <strong>{displayed}%</strong>
+          <strong>{Math.floor(displayed)}%</strong>
         </div>
       </div>
       <div className="new-progress-copy">
