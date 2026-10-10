@@ -29,3 +29,10 @@ test("account UI renders badges only from server-provided field", async () => {
     assert.doesNotMatch(src, /<AccountBadge username=/);
   }
 });
+
+
+test("ordinary account header and other users' profiles show D1 badge without entering edit mode", async () => {
+  const src = await read("../src/components/ProfileOverview.tsx");
+  const headers = [...src.matchAll(/<h1 dir="auto">\{user\?\.name \?\? "—"\} <AccountBadge badgeType=\{user\?\.badgeType\} \/><\/h1>/g)];
+  assert.equal(headers.length, 2, "both editable and read-only headers must show the badge");
+});
