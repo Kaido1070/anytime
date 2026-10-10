@@ -51,3 +51,11 @@ test("profile identity has badge to the physical right of name and a distinct st
   assert.match(css, /\.profile-stats-section \.profile-stats-grid\s*\{[^}]*border-radius:\s*0/);
   assert.match(css, /\.profile-stats-section \.profile-stats-grid\s*\{[^}]*background:\s*transparent/);
 });
+
+test("friends cards use left-aligned avatar and name with arrow on right", async () => {
+  const css = await read("../src/profileOverview.css");
+  assert.match(css, /\.friend-hub \.friends-list > \.friend-row\s*\{[^}]*direction:\s*ltr/);
+  assert.match(css, /\.friend-hub \.friends-list > \.friend-row > \.user-avatar\s*\{[^}]*order:\s*0/);
+  assert.match(css, /\.friend-hub \.friends-list > \.friend-row > div\s*\{[^}]*order:\s*1/);
+  assert.match(css, /\.friend-hub \.friends-list > \.friend-row > span:last-child\s*\{[^}]*order:\s*2/);
+});
