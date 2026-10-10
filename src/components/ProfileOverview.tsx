@@ -142,7 +142,7 @@ export function ProfileIdentityHeader({
                 </div>
               )
             ) : (
-              <h1 dir="auto">{user?.name ?? "—"}</h1>
+              <h1 dir="auto">{user?.name ?? "—"} <AccountBadge badgeType={user?.badgeType} /></h1>
             )}
             <p dir="ltr">@{user?.username ?? "—"}</p>
             {nameError && <small className="profile-header-name-error">{nameError}</small>}
