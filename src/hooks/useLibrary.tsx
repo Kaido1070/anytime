@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { reconcileAccountIdentity } from "../services/accountIdentity";
+import { reconcileAccountIdentity } from "../services/accountIdentity.ts";
 import { mergeLibraryRead } from "../services/reading";
 import { userDataService as service } from "../services/userData";
 import type {
