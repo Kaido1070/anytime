@@ -18,6 +18,7 @@ export function publicUser(row) {
         ? "public"
         : "private",
     avatarId: row.avatar_id ?? row.avatarId ?? null,
+    badgeType: row.badge_type === "crown" || row.badge_type === "verified" ? row.badge_type : null,
   };
 }
 
