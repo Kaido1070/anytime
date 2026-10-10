@@ -4625,3 +4625,11 @@ button.profile-icon-action {
   order: 2;
   margin-left: auto;
 }
+
+/* Badge hints rise above the name without being clipped by heading ellipsis.
+   The bdi inside .wany-badged-name still truncates long display names. */
+.profile-overview-name h1:has(.wany-account-badge),
+.friend-hub .friend-row h2:has(.wany-account-badge) {
+  overflow: visible;
+  text-overflow: clip;
+}
