@@ -4,6 +4,7 @@ import { ActivityFeed } from "./ActivityFeed";
 import { Icon } from "./UI";
 import { SourceCoverImage } from "./SourceCoverImage";
 import { UserAvatar } from "./UserAvatar";
+import { AccountBadge } from "./AccountBadge";
 import { getResumeChapter } from "../services/reading";
 import { sourceChapterProgress } from "../services/profileProgress";
 import { sourceDisplayTitle } from "../services/sourceTitles";
@@ -126,7 +127,7 @@ export function ProfileIdentityHeader({
                 </form>
               ) : (
                 <div className="profile-overview-name-editable">
-                  <h1 dir="auto">{user?.name ?? "—"}</h1>
+                  <h1 dir="auto">{user?.name ?? "—"} <AccountBadge username={user?.username} /></h1>
                   <button
                     className="profile-overview-inline-edit"
                     type="button"
