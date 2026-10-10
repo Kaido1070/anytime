@@ -1184,7 +1184,7 @@ async function route(request, url, db, covers) {
     try {
       await reconcileProgressActivity(db, user.id, mangaId, null);
     } catch (error) {
-      console.error("Unread work activity reconciliation failed", { userId: user.id, mangaId, error });
+      console.error("Unread work activity reconciliation failed", error instanceof Error ? error.name : "unknown");
     }
     return json({ ok: true });
   }
@@ -1244,7 +1244,7 @@ async function route(request, url, db, covers) {
     try {
       await reconcileProgressActivity(db, user.id, mangaId, correctedHighest);
     } catch (error) {
-      console.error("Progress activity reconciliation failed", { userId: user.id, mangaId, error });
+      console.error("Progress activity reconciliation failed", error instanceof Error ? error.name : "unknown");
     }
     return json({
       ok: true,
@@ -2728,7 +2728,7 @@ async function warmAvatarImageCache(imagePaths) {
       });
     });
   } catch (error) {
-    console.error("Avatar image resolution failed", error);
+    console.error("Avatar image resolution failed", error instanceof Error ? error.name : "unknown");
     for (const imagePath of misses) {
       avatarImageCache.set(imagePath, {
         url: null,
@@ -3027,7 +3027,7 @@ async function recordReadingActivity(db, userId, mangaId, chapter, previous, now
     try {
       await recordProgressActivity(db, userId, mangaId, chapter, now);
     } catch (error) {
-      console.error("Progress activity write failed", { userId, mangaId, chapter, error });
+      console.error("Progress activity write failed", error instanceof Error ? error.name : "unknown");
     }
   }
 }
@@ -3096,7 +3096,7 @@ async function recordActivitySafely(db, { userId, type, mangaId = null, listId =
       .bind(userId, type, mangaId, listId, now, now)
       .run();
   } catch (error) {
-    console.error("Activity write failed", { type, userId, error });
+    console.error("Activity write failed", error instanceof Error ? error.name : "unknown");
   }
 }
 
