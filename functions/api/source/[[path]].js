@@ -2191,7 +2191,7 @@ function isLikelyUiImage(url) {
 function isGodOfMartialArtsTeamXUrl(value) {
   const url = new URL(value, TEAMX_BASE);
   return (url.hostname === "olympustaff.com" || url.hostname === "www.olympustaff.com")
-    && /^\\/series\\/god-of-martial-arts(?:\\/\\d+(?:\\.\\d+)?)?\\/?$/.test(url.pathname);
+    && /^\/series\/god-of-martial-arts(?:\/\d+(?:\.\d+)?)?\/?$/.test(url.pathname);
 }
 
 async function teamXFetchText(pathOrUrl) {
@@ -2218,7 +2218,7 @@ async function teamXFetchText(pathOrUrl) {
     // Team-X serves this permalink on both exact, allowlisted origins.
     // Try the other public host only for network/5xx/blocked failures.
     if (error instanceof SourceError && error.code !== "TEAMX_BLOCKED" &&
-        !/HTTP 5\\d\\d/.test(error.message)) throw error;
+        !/HTTP 5\d\d/.test(error.message)) throw error;
     const alternate = new URL(target);
     alternate.hostname = alternate.hostname === "olympustaff.com"
       ? "www.olympustaff.com" : "olympustaff.com";
