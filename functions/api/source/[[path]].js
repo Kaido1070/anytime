@@ -678,7 +678,15 @@ async function loadItem(db, key) {
     .prepare("SELECT * FROM source_items WHERE source_key = ? LIMIT 1")
     .bind(key)
     .first();
-  return row ? rowToItem(row) : recoverGodOfMartialArts(key);
+  const verified = recoverGodOfMartialArts(key);
+  if (!row) return verified;
+  const item = rowToItem(row);
+  // Repair an outdated series link without changing saved user progress or
+  // replacing the existing cover/title. Only the fixed verified permalinks
+  // above are eligible; every other story uses its untouched catalog record.
+  return verified
+    ? { ...item, source: verified.source, slug: verified.slug, url: verified.url }
+    : item;
 }
 
 async function resolveItems(db, keys) {
