@@ -1,14 +1,6 @@
-import type { User } from "../types";
-
-// Badges are tied to immutable login usernames, never editable display names.
-export function accountBadgeKind(username: string | null | undefined): "crown" | "verified" | null {
-  if (username === "m") return "crown";
-  if (username === "h" || username === "y") return "verified";
-  return null;
-}
-
-export function AccountBadge({ username }: { username: string | null | undefined }) {
-  const kind = accountBadgeKind(username);
+// Badge authorization is issued by the server from D1, never inferred from usernames.
+export function AccountBadge({ badgeType }: { badgeType: "crown" | "verified" | null | undefined }) {
+  const kind = badgeType === "crown" || badgeType === "verified" ? badgeType : null;
   if (!kind) return null;
   const title = kind === "crown" ? "حساب المالك" : "حساب موثق";
   return (
