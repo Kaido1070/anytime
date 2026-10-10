@@ -60,6 +60,7 @@ export interface SourceManga {
   declaredChapterCount?: number | null;
   chapterListComplete?: boolean | null;
   chapterPageCount?: number | null;
+  sourceTemporarilyUnavailable?: boolean;
 }
 
 export interface SourceListResponse {
