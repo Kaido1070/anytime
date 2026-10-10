@@ -1,3 +1,4 @@
+import { reconcileAccountIdentity } from "./accountIdentity";
 import type {
   ActivityFeed,
   AdminUserDetail,
@@ -387,7 +388,7 @@ class ApiUserDataService implements UserDataService {
       const result = await this.request<{ user: User | null }>("session");
       const user = result.user ? normalizeUser(result.user) : null;
       if (!user || user.id !== this.currentUser?.id) this.replaceAccount(user, this.currentUser === null);
-      else this.currentUser = user;
+      else this.currentUser = reconcileAccountIdentity(this.currentUser, user);
       return this.currentUser;
     });
   }
@@ -744,7 +745,7 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify({ avatarId }),
     });
     this.assertGeneration(generation);
-    this.currentUser = normalizeUser(result.user);
+    this.currentUser = reconcileAccountIdentity(this.currentUser, normalizeUser(result.user));
     return this.currentUser;
   }
 
@@ -759,7 +760,7 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify({ name: normalized }),
     });
     this.assertGeneration(generation);
-    this.currentUser = normalizeUser(result.user);
+    this.currentUser = reconcileAccountIdentity(this.currentUser, normalizeUser(result.user));
     return this.currentUser;
   }
 
@@ -771,7 +772,7 @@ class ApiUserDataService implements UserDataService {
       body: JSON.stringify({ visibility: normalized }),
     });
     this.assertGeneration(generation);
-    this.currentUser = normalizeUser(result.user);
+    this.currentUser = reconcileAccountIdentity(this.currentUser, normalizeUser(result.user));
     return this.currentUser;
   }
 
