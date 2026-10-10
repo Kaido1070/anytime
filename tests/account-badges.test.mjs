@@ -63,3 +63,12 @@ test("friends cards use left-aligned avatar and name with arrow on right", async
   assert.match(css, /\.friend-hub \.friends-list > \.friend-row > div\s*\{[^}]*order:\s*1/);
   assert.match(css, /\.friend-hub \.friends-list > \.friend-row > span:last-child\s*\{[^}]*order:\s*2/);
 });
+
+test("both badge image files are sharp scalable static assets", async () => {
+  for (const name of ["crown", "verified"]) {
+    const svg = await read(`../public/badges/${name}.svg`);
+    assert.match(svg, /viewBox="0 0 256 256"/);
+    assert.match(svg, /fill="#D9B88F"/);
+    assert.doesNotMatch(svg, /<script|<foreignObject|onload=|<image|<use/i);
+  }
+});
