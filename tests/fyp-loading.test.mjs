@@ -9,7 +9,7 @@ test("FYP uses the same loading card and ring as New without extra copy", async 
   const styles = await read("../src/phase10_5.css");
   assert.match(fyp, /className="new-progress-card fyp-progress-card"/);
   assert.match(fyp, /className="new-progress-ring fyp-progress-ring"/);
-  assert.match(fyp, /<b>جاري تجهيز قصصًا تناسب ما تتابعه<\/b>/);
+  assert.match(fyp, /<b>جاري تجهيز اقتراحاتك<\/b>/);
   assert.match(fyp, /<small>ستظهر القصص فور اكتمال التحميل<\/small>/);
   assert.doesNotMatch(fyp, /FypSkeleton|fyp-skeleton" key=/);
   assert.doesNotMatch(fyp, /<span>مكتمل<\/span>|\{progress\.completed\} من/);
