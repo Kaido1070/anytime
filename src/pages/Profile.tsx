@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AvatarPicker } from "../components/AvatarPicker";
 import { Icon } from "../components/UI";
 import { UserAvatar } from "../components/UserAvatar";
+import { AccountBadge } from "../components/AccountBadge";
 import { useLibrary } from "../hooks/useLibrary";
 
 const DISPLAY_NAME_MAX_LENGTH = 50;
@@ -297,7 +298,7 @@ export function Profile({
                             </div>
                           ) : (
                             <strong className="settings-inline-value" dir="auto">
-                              {user?.name ?? "—"}
+                              {user?.name ?? "—"} <AccountBadge username={user?.username} />
                             </strong>
                           )}
             
