@@ -222,22 +222,44 @@
 }
 
 
-/* Mobile bottom navigation: leave desktop persistent, hide only while scrolling down. */
+/* Mobile navigation: compositor-only slide/fade, no reflow or sideways shift. */
 @media (max-width: 759px) {
   .bottom-nav {
-    transition: transform 180ms ease, opacity 150ms ease;
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+    transition:
+      transform 300ms cubic-bezier(.22, 1, .36, 1),
+      opacity 220ms ease-out;
     will-change: transform;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .bottom-nav.mobile-hidden {
-    transform: translate(-50%, calc(100% + 40px));
+    /* The old -50% X translation incorrectly shifted the full-width bar. */
+    transform: translate3d(0, calc(100% + 12px), 0);
     opacity: 0;
     pointer-events: none;
+    transition-duration: 240ms, 180ms;
+    transition-timing-function: cubic-bezier(.4, 0, .2, 1), ease-in;
+  }
+
+  .bottom-nav a {
+    transition: color 180ms ease-out;
+  }
+
+  .bottom-nav a .bottom-nav-icon {
+    transition: transform 210ms cubic-bezier(.22, 1, .36, 1);
+  }
+
+  .bottom-nav a.active .bottom-nav-icon {
+    transform: translateY(-2px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bottom-nav {
+  .bottom-nav,
+  .bottom-nav a,
+  .bottom-nav a .bottom-nav-icon {
     transition: none;
   }
 }
