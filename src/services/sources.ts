@@ -8,6 +8,12 @@ import type {
 
 const coverRequests = new Map<string, Promise<string[]>>();
 const chapterRequests = new Map<string, Promise<SourceChapterPayload>>();
+// Reopening a public series (for example after reading a chapter) should not
+// re-fetch its entire upstream chapter archive each time.
+const seriesRequests = new Map<string, Promise<SourceManga>>();
+const seriesCache = new Map<string, { item: SourceManga; expires: number }>();
+const SERIES_CACHE_TTL_MS = 90_000;
+const SERIES_CACHE_LIMIT = 24;
 export interface SourceDiagnostic {
   source: SourceName;
   lastSyncAt: number | null;
@@ -231,6 +237,13 @@ export const sourceService = {
   },
 
   async getSeries(key: string) {
+    const warm = seriesCache.get(key);
+    if (warm && warm.expires > Date.now()) return warm.item;
+    if (warm) seriesCache.delete(key);
+
+    const pending = seriesRequests.get(key);
+    if (pending) return pending;
+
     if (!circuitAllows(key)) {
       throw new SourceRequestError(
         "المصدر متعثر مؤقتًا ويجري الانتظار قبل المحاولة التالية.",
@@ -239,17 +252,27 @@ export const sourceService = {
       );
     }
 
-    try {
-      const payload = await apiWithRetry<{ item: SourceManga }>(
-        `/api/source/series?${params({ key })}`,
-        2,
-      );
+    const request = apiWithRetry<{ item: SourceManga }>(
+      `/api/source/series?${params({ key })}`,
+      2,
+    ).then(({ item }) => {
       recordSourceSuccess(key);
-      return payload.item;
-    } catch (error) {
+      seriesCache.delete(key);
+      seriesCache.set(key, { item, expires: Date.now() + SERIES_CACHE_TTL_MS });
+      while (seriesCache.size > SERIES_CACHE_LIMIT) {
+        const oldest = seriesCache.keys().next().value;
+        if (oldest === undefined) break;
+        seriesCache.delete(oldest);
+      }
+      return item;
+    }).catch((error) => {
       recordSourceFailure(key, error);
       throw error;
-    }
+    }).finally(() => {
+      if (seriesRequests.get(key) === request) seriesRequests.delete(key);
+    });
+    seriesRequests.set(key, request);
+    return request;
   },
 
   async findChapter(key: string, number: number) {
