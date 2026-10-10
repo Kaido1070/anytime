@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { AvatarPicker } from "../components/AvatarPicker";
@@ -282,10 +282,18 @@ function FullReadingView({
 }
 
 export function Account() {
-  const { user, data, markWorkUnread, setAvatar, setDisplayName } = useLibrary();
+  const { user, data, markWorkUnread, setAvatar, setDisplayName, refreshUser } = useLibrary();
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab");
   const settingsOpen = tab === "settings";
+  const wasSettingsOpen = useRef(settingsOpen);
+  useEffect(() => {
+    const returnedFromSettings = wasSettingsOpen.current && !settingsOpen;
+    wasSettingsOpen.current = settingsOpen;
+    if (returnedFromSettings && user) {
+      void refreshUser().catch(() => undefined);
+    }
+  }, [settingsOpen, user?.id, refreshUser]);
   const activityOpen = tab === "activity";
   const readingOpen = tab === "reading";
   const statsOpen = tab === "stats";
