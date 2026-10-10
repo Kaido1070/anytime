@@ -1994,14 +1994,81 @@ async function teamXReaderChapters(series, number, request = teamXFetchText) {
   return mergeTeamXChapterPages([...pages.values()]);
 }
 
-async function teamXChapter(db, item, number) {
-  const series = await teamXSeries(db, item);
-  if (series.chapterPageCount > 1) {
-    series.chapters = await teamXReaderChapters(series, number);
+// Read actual chapter links from the chapter page (including the source's
+// chapter selector and previous/next links). This avoids a serial binary
+// search across a long paginated archive before the reader can render images.
+function teamXChapterLinksFromReader(html, seriesUrl, number) {
+  const series = new URL(seriesUrl, TEAMX_BASE);
+  const prefix = series.pathname.replace(/\/$/, "") + "/";
+  const found = new Map();
+  const canonical = (raw) => {
+    if (!raw) return null;
+    try {
+      const url = new URL(raw, series);
+      if (url.protocol !== "https:" ||
+          url.hostname.replace(/^www\./i, "") !== series.hostname.replace(/^www\./i, "") ||
+          !url.pathname.startsWith(prefix)) return null;
+      const tail = decodeURIComponent(url.pathname.slice(prefix.length)).replace(/\/$/, "");
+      if (!/^\d+(?:\.\d+)?$/.test(tail)) return null;
+      const parsed = Number(tail);
+      return Number.isFinite(parsed) && parsed >= 0
+        ? { number: parsed, title: "الفصل " + parsed, url: url.toString() }
+        : null;
+    } catch {
+      return null;
+    }
+  };
+  const current = canonical(seriesUrl.replace(/\/$/, "") + "/" + number);
+  if (current) found.set(current.number, current);
+  let previous = null;
+  let next = null;
+  for (const anchor of extractAnchors(html)) {
+    const entry = canonical(anchor.href);
+    if (!entry) continue;
+    const label = [
+      cleanText(stripTags(anchor.inner)),
+      anchor.attrs["aria-label"] || "",
+      anchor.attrs.title || "",
+      anchor.attrs.rel || "",
+    ].join(" ");
+    if (/(?:الفصل\s*)?(?:السابق|previous|prev)/i.test(label) && entry.number < number) {
+      previous = entry;
+      found.set(entry.number, entry);
+    } else if (/(?:الفصل\s*)?(?:التالي|next)/i.test(label) && entry.number > number) {
+      next = entry;
+      found.set(entry.number, entry);
+    }
   }
-  const selected = series.chapters?.find((chapter) => chapter.number === number);
-  const chapterUrl = selected?.url || `${item.url || `${TEAMX_BASE}/series/${item.slug}`}/${number}`;
-  const html = await teamXFetchText(chapterUrl);
+  // Some Team-X reader layouts include an entire chapter selector on the
+  // chapter page. Reuse its real links, never invent gaps or fractional chapters.
+  const optionRegex = /<option\b([^>]*)>([\s\S]*?)<\/option>/gi;
+  let match;
+  while ((match = optionRegex.exec(html)) && found.size < 1600) {
+    const attrs = parseAttrs(match[1]);
+    const entry = canonical(attrs.value || attrs["data-url"] || attrs.href);
+    if (entry) found.set(entry.number, entry);
+  }
+  const ordered = [...found.values()].sort((a, b) => a.number - b.number);
+  const center = ordered.findIndex((row) => row.number === number);
+  const rows = ordered.length > 36 && center >= 0
+    ? ordered.slice(Math.max(0, center - 5), Math.min(ordered.length, center + 31))
+    : ordered;
+  const neighbors = chapterNavigation(ordered, number);
+  return {
+    chapters: rows,
+    previous: previous?.number ?? neighbors.previous,
+    next: next?.number ?? neighbors.next,
+    hasNavigation: Boolean(previous || next || ordered.length > 1),
+  };
+}
+
+async function teamXChapter(db, item, number) {
+  const seriesUrl = `${TEAMX_BASE}/series/${encodeURIComponent(item.slug)}`;
+  const directChapterUrl = `${seriesUrl}/${encodeURIComponent(String(number))}`;
+  // The permalink is stable even for old fractional chapters such as 114.3.
+  // Fetch the requested pages immediately; pagination is needed only if this
+  // page does not expose usable chapter navigation.
+  const html = await teamXFetchText(directChapterUrl);
   const pages = parseTeamXPages(html);
   if (!pages.length) {
     const plain = cleanText(stripTags(html));
@@ -2010,6 +2077,25 @@ async function teamXChapter(db, item, number) {
     }
     throw new SourceError("NO_PAGES", "Team-X لم يرجع صور الفصل.", 502);
   }
+  const links = teamXChapterLinksFromReader(html, seriesUrl, number);
+  if (links.hasNavigation) {
+    return {
+      item: { ...item, chapters: links.chapters, chapterListComplete: false },
+      number,
+      title: `الفصل ${number}`,
+      pages,
+      previous: links.previous,
+      next: links.next,
+    };
+  }
+
+  // Compatibility fallback for other Team-X themes whose reader hides the
+  // navigation links. Preserve the original archive-based chapter lookup.
+  const series = await teamXSeries(db, item);
+  if (series.chapterPageCount > 1) {
+    series.chapters = await teamXReaderChapters(series, number);
+  }
+  const selected = series.chapters?.find((chapter) => chapter.number === number);
   return {
     item: series,
     number,
@@ -5735,6 +5821,7 @@ const __test = {
   moreCompleteChapters,
   mergeChapterLists,
   teamXReaderChapters,
+  teamXChapterLinksFromReader,
   findChapterNumber,
   safePreferredChapterUrl,
   preferredChapterUrlForSeries,
